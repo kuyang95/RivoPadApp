@@ -4,14 +4,79 @@
 //
 //  Created by meee on 1/30/26.
 //
-
 import SwiftUI
 
 @main
 struct shortcuts_exampleApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var shortcutRouter = ShortcutRouter()
+    @StateObject private var appRouter = AppRouter()
+
+    @State private var path = NavigationPath()   // ✅ App이 path 관리
+
+    init() {
+           AppBootstrap.prepareAppGroup()
+        _ = TTSManager.shared
+        _ = SoundEffectManager.shared
+        SoundEffectManager.shared.preloadAll()
+        AppAudioManager.shared.configure()
+       }
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
-        }
+            NavigationStack(path: $path) {
+                HomeView()
+                    .environmentObject(shortcutRouter)
+                    .navigationDestination(for: AppRoute.self) { event in
+                        switch event {
+                        case .documentScanning:
+                            DocumentScanRootView()
+                                .toolbar(.hidden, for: .navigationBar)
+                                .ignoresSafeArea()
+                        case .OCRResult (let image):
+                            OCRResultView(image: image)
+                        }
+                    }
+                    .navigationDestination(for: ShortcutRouter.IntentEvent.self) { event in
+                        switch event {
+                        case .documentQA(let document, let question, _):
+                            LLMContentView(intent: .documentQA(document: document, question: question))
+                            
+                        case .imageQA(url: let url, question: let question, token: _):
+                            LLMContentView(intent: .imageAnalysis(imageURL: url, question: question))
+                       
+                        case .importImage(let url, _):
+                            DocumentScanRootView()
+                            
+                        case .documentScanning:
+                           DocumentScanRootView()
+                        }
+                    }
+               
+            }
+            .environmentObject(appRouter)
+          //  .onAppear { router.consumeLastIfNeeded() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { shortcutRouter.consumeLastIfNeeded() }
+            }
+            .onChange(of: shortcutRouter.intentEvent) { _, dest in
+                guard let dest else { return }
+
+                // (선택) 항상 Home부터 시작하고 싶으면:
+                // path = NavigationPath()
+
+                path.append(dest)          // ✅ App이 push 처리
+                shortcutRouter.intentEvent = nil   // ✅ 이벤트 소비
+            }
+            .onChange(of: appRouter.route) { _, route in
+                guard let route else { return }
+                path.append(route)
+                appRouter.route = nil
+            }
+            
+        }.environment(\.font, .custom("NanumSquareRoundOTFEB", size: 16))
     }
+        
 }
+
+

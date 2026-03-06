@@ -3,6 +3,8 @@ import VisionKit
 
 final class DocumentScannerViewController: UIViewController, VNDocumentCameraViewControllerDelegate {
 
+    var onScanCompleted: ((UIImage) -> Void)?
+    
     // MARK: - State
     
     private var hasLaunchedScanner = false
@@ -137,8 +139,10 @@ final class DocumentScannerViewController: UIViewController, VNDocumentCameraVie
             guard scan.pageCount > 0 else { return }
 
             let scannedImage = scan.imageOfPage(at: 0)
-            let vc = OCRResultViewController(image: scannedImage)
-            self.navigationController?.pushViewController(vc, animated: true)
+         
+            // ✅ SwiftUI로 결과 전달
+                      self.onScanCompleted?(scannedImage)
+        
         }
     }
 

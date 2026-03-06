@@ -1,72 +1,39 @@
 import SwiftUI
 
 struct HomeView: View {
-    
-    var body: some View {
-        GeometryReader { geometry in
-            VStack(spacing: 0) {
-                
-                HStack(spacing: 0) {
-                    
-                    QuadrantView(
-                        title: "OCR",
-                        color: .white
-                    ) {
-                        print("Top Left tapped")
-                    }
-                    
-                    QuadrantView(
-                        title: "OCR 확대",
-                        color: .white
-                    ) {
-                        print("Top Right tapped")
-                    }
-                }
-                
-                HStack(spacing: 0) {
-                    
-                    QuadrantView(
-                        title: "이미지 질의",
-                        color: .white
-                    ) {
-                        print("Bottom Left tapped")
-                    }
-                    
-                    QuadrantView(
-                        title: "문서 질의",
-                        color: .white
-                    ) {
-                        print("Bottom Right tapped")
-                    }
-                }
-            }
-            .ignoresSafeArea()
-        }
-    }
-}
-
-struct QuadrantView: View {
-    
-    var title: String
-    var color: Color
-    var action: () -> Void
+    @EnvironmentObject var appRouter: AppRouter
     
     var body: some View {
         ZStack {
-            color
+            Color.white
+                .ignoresSafeArea()
             
-            Text(title)
-                .font(.system(size: 24, weight: .bold))
-                .foregroundColor(.black)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            action()
+            VStack(spacing: 48) {
+                
+                Button {
+                    appRouter.route = .documentScanning
+                } label: {
+                    Text("카메라")
+                        .font(.system(size: 56, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: 520)
+                        .frame(height: 120)
+                        .background(Color.black)
+                        .cornerRadius(28)
+                }
+                
+                Button {
+                    print("파일에서 tapped")
+                } label: {
+                    Text("파일")
+                        .font(.system(size: 56, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: 520)
+                        .frame(height: 120)
+                        .background(Color.black)
+                        .cornerRadius(28)
+                }
+            }
         }
     }
-}
-
-#Preview {
-    ContentView()
 }

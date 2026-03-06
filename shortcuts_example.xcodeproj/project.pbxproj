@@ -6,9 +6,100 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		9E0351482F4BF88000D864AF /* MLXEmbedders in Frameworks */ = {isa = PBXBuildFile; productRef = 9E0351472F4BF88000D864AF /* MLXEmbedders */; };
+		9E03514A2F4BF88000D864AF /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = 9E0351492F4BF88000D864AF /* MLXLLM */; };
+		9E03514C2F4BF88000D864AF /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 9E03514B2F4BF88000D864AF /* MLXLMCommon */; };
+		9E03514E2F4BF88000D864AF /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = 9E03514D2F4BF88000D864AF /* MLXVLM */; };
+		9ED29E682F47FA34007204D2 /* Intents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9ED29E672F47FA34007204D2 /* Intents.framework */; };
+		9ED29E732F47FA34007204D2 /* IntentsUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9ED29E722F47FA34007204D2 /* IntentsUI.framework */; };
+		9ED29E7D2F47FA34007204D2 /* intentExtensionUI.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9ED29E712F47FA34007204D2 /* intentExtensionUI.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		9ED29E802F47FA34007204D2 /* intentExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9ED29E662F47FA34007204D2 /* intentExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		9ED29E992F47FA9A007204D2 /* appIntentExtension.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = 9ED29E902F47FA9A007204D2 /* appIntentExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		9ED29E7B2F47FA34007204D2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9E901E8F2F2C4D010028581D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9ED29E702F47FA34007204D2;
+			remoteInfo = intentExtensionUI;
+		};
+		9ED29E7E2F47FA34007204D2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9E901E8F2F2C4D010028581D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9ED29E652F47FA34007204D2;
+			remoteInfo = intentExtension;
+		};
+		9ED29E972F47FA9A007204D2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9E901E8F2F2C4D010028581D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9ED29E8F2F47FA9A007204D2;
+			remoteInfo = appIntentExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		9ED29E892F47FA34007204D2 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				9ED29E802F47FA34007204D2 /* intentExtension.appex in Embed Foundation Extensions */,
+				9ED29E7D2F47FA34007204D2 /* intentExtensionUI.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9ED29E9E2F47FA9A007204D2 /* Embed ExtensionKit Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(EXTENSIONS_FOLDER_PATH)";
+			dstSubfolderSpec = 16;
+			files = (
+				9ED29E992F47FA9A007204D2 /* appIntentExtension.appex in Embed ExtensionKit Extensions */,
+			);
+			name = "Embed ExtensionKit Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		9E901E972F2C4D010028581D /* shortcuts_example.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = shortcuts_example.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9ED29E662F47FA34007204D2 /* intentExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = intentExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		9ED29E672F47FA34007204D2 /* Intents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Intents.framework; path = System/Library/Frameworks/Intents.framework; sourceTree = SDKROOT; };
+		9ED29E712F47FA34007204D2 /* intentExtensionUI.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = intentExtensionUI.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		9ED29E722F47FA34007204D2 /* IntentsUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IntentsUI.framework; path = System/Library/Frameworks/IntentsUI.framework; sourceTree = SDKROOT; };
+		9ED29E902F47FA9A007204D2 /* appIntentExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = appIntentExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		9ED29E812F47FA34007204D2 /* Exceptions for "intentExtension" folder in "intentExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 9ED29E652F47FA34007204D2 /* intentExtension */;
+		};
+		9ED29E852F47FA34007204D2 /* Exceptions for "intentExtensionUI" folder in "intentExtensionUI" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 9ED29E702F47FA34007204D2 /* intentExtensionUI */;
+		};
+		9ED29E9A2F47FA9A007204D2 /* Exceptions for "appIntentExtension" folder in "appIntentExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 9ED29E8F2F47FA9A007204D2 /* appIntentExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		9E901E992F2C4D020028581D /* shortcuts_example */ = {
@@ -16,10 +107,61 @@
 			path = shortcuts_example;
 			sourceTree = "<group>";
 		};
+		9ED29E692F47FA34007204D2 /* intentExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				9ED29E812F47FA34007204D2 /* Exceptions for "intentExtension" folder in "intentExtension" target */,
+			);
+			path = intentExtension;
+			sourceTree = "<group>";
+		};
+		9ED29E742F47FA34007204D2 /* intentExtensionUI */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				9ED29E852F47FA34007204D2 /* Exceptions for "intentExtensionUI" folder in "intentExtensionUI" target */,
+			);
+			path = intentExtensionUI;
+			sourceTree = "<group>";
+		};
+		9ED29E912F47FA9A007204D2 /* appIntentExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				9ED29E9A2F47FA9A007204D2 /* Exceptions for "appIntentExtension" folder in "appIntentExtension" target */,
+			);
+			path = appIntentExtension;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		9E901E942F2C4D010028581D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9E03514A2F4BF88000D864AF /* MLXLLM in Frameworks */,
+				9E03514C2F4BF88000D864AF /* MLXLMCommon in Frameworks */,
+				9E03514E2F4BF88000D864AF /* MLXVLM in Frameworks */,
+				9E0351482F4BF88000D864AF /* MLXEmbedders in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9ED29E632F47FA34007204D2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9ED29E682F47FA34007204D2 /* Intents.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9ED29E6E2F47FA34007204D2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9ED29E732F47FA34007204D2 /* IntentsUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9ED29E8D2F47FA9A007204D2 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,6 +175,10 @@
 			isa = PBXGroup;
 			children = (
 				9E901E992F2C4D020028581D /* shortcuts_example */,
+				9ED29E692F47FA34007204D2 /* intentExtension */,
+				9ED29E742F47FA34007204D2 /* intentExtensionUI */,
+				9ED29E912F47FA9A007204D2 /* appIntentExtension */,
+				9ED29D382F3435A8007204D2 /* Frameworks */,
 				9E901E982F2C4D010028581D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,8 +187,20 @@
 			isa = PBXGroup;
 			children = (
 				9E901E972F2C4D010028581D /* shortcuts_example.app */,
+				9ED29E662F47FA34007204D2 /* intentExtension.appex */,
+				9ED29E712F47FA34007204D2 /* intentExtensionUI.appex */,
+				9ED29E902F47FA9A007204D2 /* appIntentExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		9ED29D382F3435A8007204D2 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				9ED29E672F47FA34007204D2 /* Intents.framework */,
+				9ED29E722F47FA34007204D2 /* IntentsUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -55,20 +213,95 @@
 				9E901E932F2C4D010028581D /* Sources */,
 				9E901E942F2C4D010028581D /* Frameworks */,
 				9E901E952F2C4D010028581D /* Resources */,
+				9ED29E892F47FA34007204D2 /* Embed Foundation Extensions */,
+				9ED29E9E2F47FA9A007204D2 /* Embed ExtensionKit Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				9ED29E7C2F47FA34007204D2 /* PBXTargetDependency */,
+				9ED29E7F2F47FA34007204D2 /* PBXTargetDependency */,
+				9ED29E982F47FA9A007204D2 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				9E901E992F2C4D020028581D /* shortcuts_example */,
 			);
 			name = shortcuts_example;
 			packageProductDependencies = (
+				9E0351472F4BF88000D864AF /* MLXEmbedders */,
+				9E0351492F4BF88000D864AF /* MLXLLM */,
+				9E03514B2F4BF88000D864AF /* MLXLMCommon */,
+				9E03514D2F4BF88000D864AF /* MLXVLM */,
 			);
 			productName = shortcuts_example;
 			productReference = 9E901E972F2C4D010028581D /* shortcuts_example.app */;
 			productType = "com.apple.product-type.application";
+		};
+		9ED29E652F47FA34007204D2 /* intentExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9ED29E822F47FA34007204D2 /* Build configuration list for PBXNativeTarget "intentExtension" */;
+			buildPhases = (
+				9ED29E622F47FA34007204D2 /* Sources */,
+				9ED29E632F47FA34007204D2 /* Frameworks */,
+				9ED29E642F47FA34007204D2 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				9ED29E692F47FA34007204D2 /* intentExtension */,
+			);
+			name = intentExtension;
+			packageProductDependencies = (
+			);
+			productName = intentExtension;
+			productReference = 9ED29E662F47FA34007204D2 /* intentExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		9ED29E702F47FA34007204D2 /* intentExtensionUI */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9ED29E862F47FA34007204D2 /* Build configuration list for PBXNativeTarget "intentExtensionUI" */;
+			buildPhases = (
+				9ED29E6D2F47FA34007204D2 /* Sources */,
+				9ED29E6E2F47FA34007204D2 /* Frameworks */,
+				9ED29E6F2F47FA34007204D2 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				9ED29E742F47FA34007204D2 /* intentExtensionUI */,
+			);
+			name = intentExtensionUI;
+			packageProductDependencies = (
+			);
+			productName = intentExtensionUI;
+			productReference = 9ED29E712F47FA34007204D2 /* intentExtensionUI.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		9ED29E8F2F47FA9A007204D2 /* appIntentExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9ED29E9B2F47FA9A007204D2 /* Build configuration list for PBXNativeTarget "appIntentExtension" */;
+			buildPhases = (
+				9ED29E8C2F47FA9A007204D2 /* Sources */,
+				9ED29E8D2F47FA9A007204D2 /* Frameworks */,
+				9ED29E8E2F47FA9A007204D2 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				9ED29E912F47FA9A007204D2 /* appIntentExtension */,
+			);
+			name = appIntentExtension;
+			packageProductDependencies = (
+			);
+			productName = appIntentExtension;
+			productReference = 9ED29E902F47FA9A007204D2 /* appIntentExtension.appex */;
+			productType = "com.apple.product-type.extensionkit-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -83,6 +316,15 @@
 					9E901E962F2C4D010028581D = {
 						CreatedOnToolsVersion = 26.2;
 					};
+					9ED29E652F47FA34007204D2 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					9ED29E702F47FA34007204D2 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					9ED29E8F2F47FA9A007204D2 = {
+						CreatedOnToolsVersion = 26.2;
+					};
 				};
 			};
 			buildConfigurationList = 9E901E922F2C4D010028581D /* Build configuration list for PBXProject "shortcuts_example" */;
@@ -94,18 +336,45 @@
 			);
 			mainGroup = 9E901E8E2F2C4D010028581D;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				9E0351462F4BF88000D864AF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9E901E982F2C4D010028581D /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				9E901E962F2C4D010028581D /* shortcuts_example */,
+				9ED29E652F47FA34007204D2 /* intentExtension */,
+				9ED29E702F47FA34007204D2 /* intentExtensionUI */,
+				9ED29E8F2F47FA9A007204D2 /* appIntentExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		9E901E952F2C4D010028581D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9ED29E642F47FA34007204D2 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9ED29E6F2F47FA34007204D2 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9ED29E8E2F47FA9A007204D2 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +391,46 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9ED29E622F47FA34007204D2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9ED29E6D2F47FA34007204D2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9ED29E8C2F47FA9A007204D2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		9ED29E7C2F47FA34007204D2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9ED29E702F47FA34007204D2 /* intentExtensionUI */;
+			targetProxy = 9ED29E7B2F47FA34007204D2 /* PBXContainerItemProxy */;
+		};
+		9ED29E7F2F47FA34007204D2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9ED29E652F47FA34007204D2 /* intentExtension */;
+			targetProxy = 9ED29E7E2F47FA34007204D2 /* PBXContainerItemProxy */;
+		};
+		9ED29E982F47FA9A007204D2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9ED29E8F2F47FA9A007204D2 /* appIntentExtension */;
+			targetProxy = 9ED29E972F47FA9A007204D2 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		9E901EA02F2C4D030028581D /* Debug */ = {
@@ -246,14 +554,26 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				AUTOMATION_APPLE_EVENTS = NO;
+				CODE_SIGN_ENTITLEMENTS = shortcuts_example/shortcuts_example.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Z3TXJ872H6;
 				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "shortcuts-example-Info.plist";
+				INFOPLIST_KEY_NSCameraUsageDescription = "for document scan";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "음성 입력을 위해 필요합니다.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "음성 인식을 위해 필요합니다.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -272,6 +592,12 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "com.rivo.shortcuts-example.shortcuts-example";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
@@ -290,14 +616,26 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				AUTOMATION_APPLE_EVENTS = NO;
+				CODE_SIGN_ENTITLEMENTS = shortcuts_example/shortcuts_example.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Z3TXJ872H6;
 				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "shortcuts-example-Info.plist";
+				INFOPLIST_KEY_NSCameraUsageDescription = "for document scan";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "음성 입력을 위해 필요합니다.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "음성 인식을 위해 필요합니다.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -316,6 +654,12 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "com.rivo.shortcuts-example.shortcuts-example";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
@@ -326,6 +670,195 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Release;
+		};
+		9ED29E832F47FA34007204D2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = intentExtension/intentExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z3TXJ872H6;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = intentExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = intentExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.rivo.shortcuts-example.shortcuts-example.intentExtension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		9ED29E842F47FA34007204D2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = intentExtension/intentExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z3TXJ872H6;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = intentExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = intentExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.rivo.shortcuts-example.shortcuts-example.intentExtension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		9ED29E872F47FA34007204D2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = intentExtensionUI/intentExtensionUI.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z3TXJ872H6;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = intentExtensionUI/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = intentExtensionUI;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.rivo.shortcuts-example.shortcuts-example.intentExtensionUI";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		9ED29E882F47FA34007204D2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = intentExtensionUI/intentExtensionUI.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z3TXJ872H6;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = intentExtensionUI/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = intentExtensionUI;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.rivo.shortcuts-example.shortcuts-example.intentExtensionUI";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		9ED29E9C2F47FA9A007204D2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = appIntentExtension/appIntentExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z3TXJ872H6;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = appIntentExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = appIntentExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.rivo.shortcuts-example.shortcuts-example.appIntentExtension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		9ED29E9D2F47FA9A007204D2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = appIntentExtension/appIntentExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z3TXJ872H6;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = appIntentExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = appIntentExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.rivo.shortcuts-example.shortcuts-example.appIntentExtension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
@@ -350,7 +883,68 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		9ED29E822F47FA34007204D2 /* Build configuration list for PBXNativeTarget "intentExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9ED29E832F47FA34007204D2 /* Debug */,
+				9ED29E842F47FA34007204D2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9ED29E862F47FA34007204D2 /* Build configuration list for PBXNativeTarget "intentExtensionUI" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9ED29E872F47FA34007204D2 /* Debug */,
+				9ED29E882F47FA34007204D2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9ED29E9B2F47FA9A007204D2 /* Build configuration list for PBXNativeTarget "appIntentExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9ED29E9C2F47FA9A007204D2 /* Debug */,
+				9ED29E9D2F47FA9A007204D2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		9E0351462F4BF88000D864AF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm/";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.30.6;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		9E0351472F4BF88000D864AF /* MLXEmbedders */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9E0351462F4BF88000D864AF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXEmbedders;
+		};
+		9E0351492F4BF88000D864AF /* MLXLLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9E0351462F4BF88000D864AF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXLLM;
+		};
+		9E03514B2F4BF88000D864AF /* MLXLMCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9E0351462F4BF88000D864AF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXLMCommon;
+		};
+		9E03514D2F4BF88000D864AF /* MLXVLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9E0351462F4BF88000D864AF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXVLM;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 9E901E8F2F2C4D010028581D /* Project object */;
 }

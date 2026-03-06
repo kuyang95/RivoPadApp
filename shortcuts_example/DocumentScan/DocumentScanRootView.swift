@@ -9,13 +9,18 @@ import SwiftUI
 import UIKit
 
 struct DocumentScanRootView: UIViewControllerRepresentable {
-    func makeUIViewController(context: Context) -> UIViewController {
-        let root = RootViewController()
-        let nav = UINavigationController(rootViewController: root)
-        return nav
+
+    @EnvironmentObject var appRouter: AppRouter
+
+    func makeUIViewController(context: Context) -> DocumentScannerViewController {
+        let vc = DocumentScannerViewController()
+
+        vc.onScanCompleted = { image in
+            appRouter.route = .OCRResult(image: image)
+        }
+
+        return vc
     }
 
-    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
-        // 업데이트 필요 없음
-    }
+    func updateUIViewController(_ uiViewController: DocumentScannerViewController, context: Context) {}
 }

@@ -6,62 +6,92 @@ import UIKit
 @MainActor
 final class ShortcutRouter: ObservableObject {
 
-    enum Destination: Identifiable {
-        case compareTwoTexts(text1: String, text2: String)
-        case importImage(url: URL)
-
-        var id: String {
-            switch self {
-            case .compareTwoTexts(let a, let b):
-                return "compare:\(a.hashValue):\(b.hashValue)"
-            case .importImage(let url):
-                return "image:\(url.absoluteString)"
-            }
-        }
+    enum IntentEvent: Hashable {
+        case documentQA(text1: String, text2: String, token: UUID)
+        case importImage(url: URL, token: UUID)
+        case imageQA(url: URL, question: String, token: UUID) 
+        case documentScanning
     }
 
-    @Published var destination: Destination?
-
-    // JSONValue에서 String 꺼내는 헬퍼
-    private func stringParam(_ key: String, from env: ShortcutEnvelope) -> String? {
-        guard let v = env.params[key] else { return nil }
-        if case .string(let s) = v { return s }
-        return nil
-    }
+    @Published var intentEvent: IntentEvent?
 
     func consumeLastIfNeeded() {
-        // ✅ 마지막 1개만 가져오기 (없으면 return)
+        
         guard let env = ShortcutBridge.takeLastEnvelope() else { return }
+        let token = UUID()
 
+        RVLogger.d("consumeLastIfNeeded \(env.route)")
+        
         switch env.route {
 
-        case .compareTwoTexts:
-            let t1 = stringParam("text1", from: env) ?? ""
-            let t2 = stringParam("text2", from: env) ?? ""
-            destination = .compareTwoTexts(text1: t1, text2: t2)
+        case .documentQA:
+            let t1 = (env.params["text1"]).flatMap {
+                if case .string(let s) = $0 { return s }
+                return nil
+            } ?? ""
+
+            let t2 = (env.params["text2"]).flatMap {
+                if case .string(let s) = $0 { return s }
+                return nil
+            } ?? ""
+
+            intentEvent = .documentQA(text1: t1, text2: t2, token: token)
+            
+        case .imageQA:
+
+            guard let ref = env.attachments.first(where: { $0.kind == .image }) else { return }
+
+            let dir = ShortcutBridge.attachmentsDir(for: env.id)
+            let url = dir.appendingPathComponent(ref.fileName)
+
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                print("⚠️ imageQA attachment missing")
+                return
+            }
+
+            let question = (env.params["question"]).flatMap {
+                if case .string(let s) = $0 { return s }
+                return nil
+            } ?? ""
+
+            RVLogger.d("intent는? \(url), \(question)")
+            intentEvent = .imageQA(url: url, question: question, token: token)
+
 
         case .importImage:
+
             guard let ref = env.attachments.first(where: { $0.kind == .image }) else { return }
-            let url = ShortcutBridge.attachmentsDirURL().appendingPathComponent(ref.fileName)
-            destination = .importImage(url: url)
+
+            let dir = ShortcutBridge.attachmentsDir(for: env.id)
+            let url = dir.appendingPathComponent(ref.fileName)
+
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                print("⚠️ attachment file missing")
+                return
+            }
+
+            intentEvent = .importImage(url: url, token: token)
 
         case .documentScanning:
-            // 필요하면 다른 화면으로 보내거나 처리
-            destination = nil
+            intentEvent = .documentScanning
         }
+
+        // 🔥 consume 이후 안전하게 삭제
+       // ShortcutBridge.cleanupAttachments(for: env.id)
     }
 
-    // (선택) 홈으로 돌아가고 싶을 때
     func reset() {
-        destination = nil
+        intentEvent = nil
     }
 }
+
 
 import Foundation
 
 enum ShortcutRoute: String, Codable {
-    case compareTwoTexts
+    case documentQA
     case importImage
+    case imageQA
     case documentScanning
 }
 
@@ -115,38 +145,59 @@ struct ShortcutEnvelope: Codable {
 }
 
 enum ShortcutBridge {
-    static let suiteName = "group.com.yourcompany.yourapp"
+
+    static let suiteName = "group.com.rivo.shortcuts.example"
     static let lastKey = "shortcut_last_envelope_v1"
     private static let lockQ = DispatchQueue(label: "ShortcutBridge.lock")
 
-    // attachments는 항상 이 폴더에 "마지막 1개"만 유지
-    static func attachmentsDirURL() -> URL {
-        let base = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: suiteName)!
-        let dir = base.appendingPathComponent("ShortcutLastAttachments", isDirectory: true)
+    // MARK: - Base Directory
+
+    private static func baseDir() -> URL {
+        let base = FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: suiteName)!
+        return base.appendingPathComponent("ShortcutEnvelopes", isDirectory: true)
+    }
+
+    static func attachmentsDir(for id: UUID) -> URL {
+        let dir = baseDir().appendingPathComponent(id.uuidString, isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
 
-    /// 새 인텐트 저장 시작할 때 호출: (1) 이전 Envelope 덮어쓸 준비, (2) 이전 attachments 싹 삭제
-    static func beginNewLastEnvelope() {
-        lockQ.sync {
-            // attachments 폴더 비우기
-            let dir = attachmentsDirURL()
-            let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
-            for f in files { try? FileManager.default.removeItem(at: f) }
+    // MARK: - Replace
+
+    static func replaceLastEnvelope(_ env: ShortcutEnvelope) async {
+
+        await withCheckedContinuation { continuation in
+            lockQ.async {
+
+                let fm = FileManager.default
+                let base = baseDir()
+                try? fm.createDirectory(at: base, withIntermediateDirectories: true)
+
+                let ud = UserDefaults(suiteName: suiteName)
+
+                // 🔥 1. 이전 envelope 읽기
+                if let data = ud?.data(forKey: lastKey),
+                   let oldEnv = try? JSONDecoder().decode(ShortcutEnvelope.self, from: data) {
+
+                    let oldDir = base.appendingPathComponent(oldEnv.id.uuidString)
+                    try? fm.removeItem(at: oldDir)
+                }
+
+                // 🔥 2. 새 envelope 저장
+                if let encoded = try? JSONEncoder().encode(env) {
+                    ud?.set(encoded, forKey: lastKey)
+                    ud?.synchronize()
+                }
+
+                continuation.resume()
+            }
         }
     }
 
-    /// “마지막 Envelope” 메타데이터 저장(덮어쓰기)
-    static func saveLastEnvelope(_ env: ShortcutEnvelope) {
-        lockQ.sync {
-            guard let ud = UserDefaults(suiteName: suiteName) else { return }
-            guard let data = try? JSONEncoder().encode(env) else { return }
-            ud.set(data, forKey: lastKey)
-        }
-    }
+    // MARK: - Peek
 
-    /// 마지막 Envelope 읽기(삭제 안 함)
     static func peekLastEnvelope() -> ShortcutEnvelope? {
         lockQ.sync {
             guard let ud = UserDefaults(suiteName: suiteName),
@@ -157,15 +208,26 @@ enum ShortcutBridge {
         }
     }
 
-    /// 마지막 Envelope “가져오면서” key 삭제 (주의: attachments는 아직 남아있음)
+    // MARK: - Take
+
     static func takeLastEnvelope() -> ShortcutEnvelope? {
         lockQ.sync {
             guard let ud = UserDefaults(suiteName: suiteName),
                   let data = ud.data(forKey: lastKey),
                   let env = try? JSONDecoder().decode(ShortcutEnvelope.self, from: data)
             else { return nil }
+
             ud.removeObject(forKey: lastKey)
             return env
+        }
+    }
+
+    // MARK: - Cleanup
+
+    static func cleanupAttachments(for id: UUID) {
+        lockQ.async {
+            let dir = baseDir().appendingPathComponent(id.uuidString)
+            try? FileManager.default.removeItem(at: dir)
         }
     }
 }

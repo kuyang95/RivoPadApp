@@ -3,154 +3,304 @@ import Vision
 import AVFoundation
 
 struct OCRResultView: View {
-    
+
     let image: UIImage
-    
-    @State private var extractedText: String = ""
-    @State private var lineBoxes: [TextBox2] = []
-    @State private var isExtracting = false
+
+    @StateObject private var vm = OCRResultViewModel()
+
     @State private var showBoxes: Bool = false
-    
+
+    @State private var hasActivatedPreview = false
+    @State private var previewHoldWorkItem: DispatchWorkItem?
+    @State private var isTouching: Bool = false
+
     @State private var isTTSEnabled: Bool = true
     @State private var isPreviewImageEnabled: Bool = true
+
     @State private var previewText: String? = nil
-    @State private var previewOnLeft: Bool = false
     @State private var lastPreviewIndex: Int? = nil
     @State private var previewCroppedImage: UIImage? = nil
-    
+
     @State private var ttsWorkItem: DispatchWorkItem?
-    
+
+    @State private var touchQuadrant: TouchQuadrant?
+
     var body: some View {
         ZStack {
+
             imageLayer
-            
-            // 🔥 오른쪽 상단 버튼
-            if !extractedText.isEmpty {
-                VStack {
-                    HStack(spacing: 14) {
-                        
-                        // 🔊 TTS 토글
-                        Button {
-                            isTTSEnabled.toggle()
-                            
-                            if !isTTSEnabled {
-                                ttsWorkItem?.cancel()
-                                TTSManager.shared.stop()
-                            }
-                            
-                        } label: {
-                            Image(systemName: isTTSEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(10)
-                                .background(.black.opacity(0.6))
-                                .clipShape(Circle())
-                        }
-                        
-                        // 🖼 프리뷰 이미지 토글
-                        Button {
-                            isPreviewImageEnabled.toggle()
-                        } label: {
-                            Image(systemName: isPreviewImageEnabled ? "eye.fill" : "eye.slash.fill")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(10)
-                                .background(.black.opacity(0.6))
-                                .clipShape(Circle())
-                        }
-                        
-                        // 🟨 강조 토글
-                        Button {
-                            showBoxes.toggle()
-                        } label: {
-                            Image(systemName: showBoxes ? "rectangle.slash" : "rectangle")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(10)
-                                .background(.black.opacity(0.6))
-                                .clipShape(Circle())
-                        }
-                        
-                        // 📋 복사
-                        Button {
-                            UIPasteboard.general.string = extractedText
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        } label: {
-                            Image(systemName: "doc.on.doc")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(10)
-                                .background(.black.opacity(0.6))
-                                .clipShape(Circle())
-                        }
-                    }
-                    .padding(.top, 12)
-                    .padding(.trailing, 16)
-                    
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, alignment: .topTrailing)
+
+            if vm.isExtracting {
+                ThinkingOverlayView(
+                    title: "텍스트 추출중",
+                    activeDotIndex: vm.activeDotIndex
+                )
+                .transition(.opacity)
             }
-            
-//            if let previewText {
-//                previewPanel(text: previewText)
-//            }
-            
-            if isExtracting {
-                ProgressView("텍스트 추출중...")
-                    .padding()
-                    .background(.ultraThinMaterial)
-                    .cornerRadius(12)
+
+            if vm.isGeneratingAI {
+                ThinkingOverlayView(
+                    title: "AI 답변 생성중",
+                    activeDotIndex: vm.activeDotIndex
+                )
+                .transition(.opacity)
+            }
+        }
+        .safeAreaInset(edge: .top) {
+            if !vm.extractedText.isEmpty {
+                topBar
             }
         }
         .overlay(
             Group {
-                if let previewText {
-                    previewPanel(text: previewText)
+                if hasActivatedPreview {
+                    previewPanel(text: previewText ?? "")
                 }
             }
         )
         .onAppear {
-            if extractedText.isEmpty {
-                runOCR()
+
+            if vm.extractedText.isEmpty {
+
+                if isTTSEnabled {
+                    TTSManager.shared.stop()
+                    TTSManager.shared.speak("텍스트 추출중")
+                }
+
+                vm.runOCR(image: image)
+            }
+
+            Task {
+                await vm.ensureModelLoaded()
             }
         }
     }
 }
 
-////////////////////////////////////////////////////////////
-// MARK: - Image Layer
-////////////////////////////////////////////////////////////
+enum TouchQuadrant {
+    case q1
+    case q2
+    case q3
+    case q4
+}
 
 extension OCRResultView {
-    
-    var imageLayer: some View {
+
+    private func quadrant(
+        for location: CGPoint,
+        imageRect: CGRect
+    ) -> TouchQuadrant? {
+        guard imageRect.contains(location) else { return nil }
+
+        let localX = location.x - imageRect.origin.x
+        let localY = location.y - imageRect.origin.y
+
+        let midX = imageRect.width / 2
+        let midY = imageRect.height / 2
+
+        if localX < midX && localY < midY { return .q1 }
+        if localX >= midX && localY < midY { return .q2 }
+        if localX < midX && localY >= midY { return .q3 }
+        return .q4
+    }
+}
+
+extension OCRResultView {
+
+    private var topBar: some View {
+
+        HStack(spacing: 10) {
+
+            // MARK: AI 질문 버튼
+
+            Button {
+
+                if vm.llmService.isLoading {
+                    TTSManager.shared.stop()
+                    TTSManager.shared.speak("모델 로딩중입니다")
+                    return
+                }
+
+                SoundEffectManager.shared.play(.recording)
+
+                Task {
+
+                    do {
+
+                        let stream = try await vm.sttManager.startRecording()
+
+                        for await question in stream {
+
+                            SoundEffectManager.shared.play(.startingLLM)
+
+                            await vm.runDocumentQA(
+                                question: question,
+                                isTTSEnabled: isTTSEnabled
+                            )
+                        }
+
+                    } catch {
+                        print(error)
+                    }
+                }
+
+            } label: {
+
+                ZStack {
+
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.black.opacity(0.65))
+                        .frame(height: 40)
+
+                    if vm.llmService.isLoading {
+
+                        ProgressView()
+                            .progressViewStyle(
+                                CircularProgressViewStyle(tint: .white)
+                            )
+
+                    } else {
+
+                        Text(vm.sttManager.isRecording ? "녹음중..." : "AI 질문")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                    }
+                }
+            }
+
+            // MARK: TTS
+
+            Button {
+
+                isTTSEnabled.toggle()
+
+                if !isTTSEnabled {
+                    ttsWorkItem?.cancel()
+                    TTSManager.shared.stop()
+                }
+
+            } label: {
+
+                toolbarTextButton(
+                    title: "음성",
+                    isOn: isTTSEnabled
+                )
+            }
+
+            // MARK: 이미지 preview
+
+            Button {
+
+                isPreviewImageEnabled.toggle()
+
+            } label: {
+
+                toolbarTextButton(
+                    title: "이미지",
+                    isOn: isPreviewImageEnabled
+                )
+            }
+
+            // MARK: OCR 박스
+
+            Button {
+
+                showBoxes.toggle()
+
+            } label: {
+
+                toolbarTextButton(
+                    title: "박스",
+                    isOn: showBoxes
+                )
+            }
+
+            // MARK: 복사
+
+            Button {
+
+                UIPasteboard.general.string = vm.extractedText
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+
+            } label: {
+
+                ZStack {
+
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.black.opacity(0.65))
+                        .frame(height: 40)
+
+                    Text("복사")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .background(
+            LinearGradient(
+                colors: [Color.black.opacity(0.4), Color.clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+    }
+}
+
+extension OCRResultView {
+
+    private var imageLayer: some View {
+
         GeometryReader { geo in
-            
+
             let fittedRect = AVMakeRect(
                 aspectRatio: image.size,
                 insideRect: CGRect(origin: .zero, size: geo.size)
             )
-            
+
             ZStack {
+
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
-                
+
                 overlayBoxes(fittedRect: fittedRect)
                     .opacity(showBoxes ? 1 : 0)
             }
             .contentShape(Rectangle())
             .gesture(
+
                 DragGesture(minimumDistance: 0)
+
                     .onChanged { value in
+
+                        if !isTouching {
+                            isTouching = true
+                            hasActivatedPreview = false
+                        }
+
+                        touchQuadrant = quadrant(
+                            for: value.location,
+                            imageRect: fittedRect
+                        )
+
                         handleTouch(
                             location: value.location,
                             containerSize: geo.size,
                             fittedRect: fittedRect
                         )
                     }
+
                     .onEnded { _ in
+
+                        isTouching = false
+                        hasActivatedPreview = false
+                        previewHoldWorkItem?.cancel()
+
                         clearPreviewAndStop()
                     }
             )
@@ -158,20 +308,17 @@ extension OCRResultView {
     }
 }
 
-////////////////////////////////////////////////////////////
-// MARK: - Overlay Boxes
-////////////////////////////////////////////////////////////
-
 extension OCRResultView {
-    
-    func overlayBoxes(fittedRect: CGRect) -> some View {
-        ForEach(lineBoxes.indices, id: \.self) { index in
-            
+
+    private func overlayBoxes(fittedRect: CGRect) -> some View {
+
+        ForEach(vm.lineBoxes.indices, id: \.self) { index in
+
             let rect = convertVisionRect(
-                lineBoxes[index].box,
+                vm.lineBoxes[index].box,
                 fittedRect: fittedRect
             )
-            
+
             Rectangle()
                 .stroke(Color.yellow, lineWidth: 2)
                 .background(Color.yellow.opacity(0.18))
@@ -181,256 +328,156 @@ extension OCRResultView {
     }
 }
 
-////////////////////////////////////////////////////////////
-// MARK: - Touch Handling + TTS
-////////////////////////////////////////////////////////////
-
 extension OCRResultView {
-    
-    func handleTouch(
-        location: CGPoint,
-        containerSize: CGSize,
-        fittedRect: CGRect
-    ) {
-        
-        guard fittedRect.contains(location) else {
-            clearPreviewAndStop()
-            return
-        }
-        
-        var hitIndex: Int? = nil
-        var bestArea: CGFloat = .greatestFiniteMagnitude
-        
-        for (idx, item) in lineBoxes.enumerated() {
-            let rect = convertVisionRect(item.box, fittedRect: fittedRect)
-            
-            if rect.contains(location) {
-                let area = rect.width * rect.height
-                if area < bestArea {
-                    bestArea = area
-                    hitIndex = idx
+
+    private func previewPanel(text: String) -> some View {
+
+        GeometryReader { geo in
+
+            let halfW = geo.size.width / 2
+            let halfH = geo.size.height / 2
+
+            guard let touch = touchQuadrant else {
+                return AnyView(EmptyView())
+            }
+
+            let showTopText = touch == .q3 || touch == .q4
+            let showBottomText = touch == .q1 || touch == .q2
+
+            let imageQuadrant: TouchQuadrant = {
+                switch touch {
+                case .q1: return .q2
+                case .q2: return .q1
+                case .q3: return .q4
+                case .q4: return .q3
                 }
-            }
-        }
-        
-        guard let idx = hitIndex else {
-            clearPreviewAndStop()
-            return
-        }
-        
-        previewOnLeft = location.x > containerSize.width / 2
-        
-        if lastPreviewIndex != idx {
-            
-            lastPreviewIndex = idx
-            previewText = lineBoxes[idx].text
-            previewCroppedImage = cropImage(from: lineBoxes[idx].box)
-            
-            ttsWorkItem?.cancel()
-            
-            if TTSManager.shared.isSpeaking {
-                TTSManager.shared.stop()
-            }
-            
-            let textToSpeak = lineBoxes[idx].text
-            
-            let workItem = DispatchWorkItem {
-                if lastPreviewIndex == idx && isTTSEnabled {
-                    TTSManager.shared.speak(textToSpeak)
+            }()
+
+            return AnyView(
+
+                ZStack {
+
+                    // MARK: TEXT PANEL (TOP)
+
+                    if showTopText {
+
+                        Text(text)
+                            .font(.system(size: 96, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(24)
+                            .frame(width: geo.size.width,
+                                   height: halfH,
+                                   alignment: .topLeading)
+                            .background(Color.black.opacity(0.92))
+                            .position(x: geo.size.width/2,
+                                      y: halfH/2)
+                    }
+
+                    // MARK: TEXT PANEL (BOTTOM)
+
+                    if showBottomText {
+
+                        Text(text)
+                            .font(.system(size: 96, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(24)
+                            .frame(width: geo.size.width,
+                                   height: halfH,
+                                   alignment: .topLeading)
+                            .background(Color.black.opacity(0.92))
+                            .position(x: geo.size.width/2,
+                                      y: geo.size.height - halfH/2)
+                    }
+
+                    // MARK: IMAGE PANEL
+
+                    if isPreviewImageEnabled,
+                       let img = previewCroppedImage {
+
+                        switch imageQuadrant {
+
+                        case .q1:
+
+                            imagePanel(img, width: halfW, height: halfH)
+                                .position(x: halfW/2,
+                                          y: halfH/2)
+
+                        case .q2:
+
+                            imagePanel(img, width: halfW, height: halfH)
+                                .position(x: geo.size.width - halfW/2,
+                                          y: halfH/2)
+
+                        case .q3:
+
+                            imagePanel(img, width: halfW, height: halfH)
+                                .position(x: halfW/2,
+                                          y: geo.size.height - halfH/2)
+
+                        case .q4:
+
+                            imagePanel(img, width: halfW, height: halfH)
+                                .position(x: geo.size.width - halfW/2,
+                                          y: geo.size.height - halfH/2)
+                        }
+                    }
                 }
-            }
-            
-            ttsWorkItem = workItem
-            
-            DispatchQueue.main.async {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
-            }
+            )
         }
+        .ignoresSafeArea()
     }
     
-    func clearPreviewAndStop() {
-        previewText = nil
-        previewCroppedImage = nil
-        lastPreviewIndex = nil
-        ttsWorkItem?.cancel()
-        
-        if TTSManager.shared.isSpeaking {
-            TTSManager.shared.stop()
+    private func imagePanel(_ img: UIImage,
+                            width: CGFloat,
+                            height: CGFloat) -> some View {
+
+        ZStack {
+
+            Color.black.opacity(0.92)
+
+            Image(uiImage: img)
+                .resizable()
+                .scaledToFit()
+                .padding(12)
         }
+        .frame(width: width, height: height)
     }
+
 }
 
-////////////////////////////////////////////////////////////
-// MARK: - Preview Panel
-////////////////////////////////////////////////////////////
-
 extension OCRResultView {
+
+    private func toolbarTextButton(
+           title: String,
+           isOn: Bool
+       ) -> some View {
+
+           ZStack {
+
+               RoundedRectangle(cornerRadius: 10)
+                   .fill(Color.black.opacity(0.65))
+                   .frame(height: 40)
+                   .frame(minWidth: 80)
+
+               Text("\(title) \(isOn ? "켬" : "끔")")
+                   .font(.system(size: 15, weight: .semibold))
+                   .foregroundColor(.white)
+                   .padding(.horizontal, 14)
+           }
+       }
     
-    func previewPanel(text: String) -> some View {
-        HStack(spacing: 0) {
-            if previewOnLeft {
-                panelContent(text)
-                Spacer(minLength: 0)
-            } else {
-                Spacer(minLength: 0)
-                panelContent(text)
-            }
-        }
-        .ignoresSafeArea()   // 🔥 상태바 영역까지 덮도록
-        .animation(.easeInOut(duration: 0.12), value: previewOnLeft)
-    }
-
-    func panelContent(_ text: String) -> some View {
-        
-        let panelWidth = UIScreen.main.bounds.width * 0.5
-        let panelHeight = UIScreen.main.bounds.height
-        
-        return VStack(spacing: 0) {
-            
-            if isPreviewImageEnabled,
-               let cropped = previewCroppedImage {
-                
-                // 🔥 이미지 ON → 상/하 50%
-                VStack(spacing: 0) {
-                    
-                    Text(text)
-                        .font(.system(size: 56, weight: .bold))   // 🔥 글자 크게
-                        .foregroundColor(.white)
-                        .padding(20)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    
-                    Divider().background(Color.white.opacity(0.4))
-                    
-                    Image(uiImage: cropped)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color.black)
-                }
-                
-            } else {
-                
-                // 🔥 이미지 OFF → 텍스트가 전체 높이 차지
-                Text(text)
-                    .font(.system(size: 80, weight: .bold))   // 🔥 더 크게
-                    .foregroundColor(.white)
-                    .padding(24)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
-        }
-        .frame(width: panelWidth, height: panelHeight)   // 🔥 항상 절반 전체 높이
-        .background(Color.black.opacity(0.92))
-    }
-}
-
-////////////////////////////////////////////////////////////
-// MARK: - OCR
-////////////////////////////////////////////////////////////
-
-extension OCRResultView {
-    
-    func runOCR() {
-        guard !isExtracting else { return }
-        isExtracting = true
-        
-        guard let cg = image.cgImage else { return }
-        
-        let request = VNRecognizeTextRequest { req, _ in
-            let observations = (req.results as? [VNRecognizedTextObservation]) ?? []
-            var boxes: [TextBox2] = []
-            
-            for obs in observations {
-                guard let best = obs.topCandidates(1).first else { continue }
-                boxes.append(TextBox2(text: best.string, box: obs.boundingBox))
-            }
-            
-            boxes = sortReadingOrder(boxes)
-            
-            DispatchQueue.main.async {
-                lineBoxes = boxes
-                extractedText = boxes.map(\.text).joined(separator: "\n")
-                isExtracting = false
-            }
-        }
-        
-        request.recognitionLevel = VNRequestTextRecognitionLevel.accurate
-        request.usesLanguageCorrection = true
-        request.recognitionLanguages = ["ko-KR", "en-US"]
-        request.minimumTextHeight = 0.02
-        
-        DispatchQueue.global(qos: .userInitiated).async {
-            try? VNImageRequestHandler(cgImage: cg, options: [:]).perform([request])
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////
-// MARK: - Crop Image (Padding 포함)
-////////////////////////////////////////////////////////////
-
-extension OCRResultView {
-    
-    func cropImage(from visionRect: CGRect) -> UIImage? {
-        
-        guard let cgImage = image.cgImage else { return nil }
-        
-        let width = CGFloat(cgImage.width)
-        let height = CGFloat(cgImage.height)
-        
-        let flipped = CGRect(
-            x: visionRect.origin.x,
-            y: 1 - visionRect.origin.y - visionRect.height,
-            width: visionRect.width,
-            height: visionRect.height
-        )
-        
-        var cropRect = CGRect(
-            x: flipped.origin.x * width,
-            y: flipped.origin.y * height,
-            width: flipped.width * width,
-            height: flipped.height * height
-        )
-        
-        // 🔥 약간의 padding 추가
-        let padding: CGFloat = 12
-        cropRect = cropRect.insetBy(dx: -padding, dy: -padding)
-        cropRect = cropRect.intersection(CGRect(x: 0, y: 0, width: width, height: height))
-        
-        guard let croppedCG = cgImage.cropping(to: cropRect) else { return nil }
-        
-        return UIImage(cgImage: croppedCG)
-    }
-    
-    func sortReadingOrder(_ boxes: [TextBox2]) -> [TextBox2] {
-        let tolerance: CGFloat = 0.02
-        
-        return boxes.sorted { a, b in
-            if abs(a.box.maxY - b.box.maxY) > tolerance {
-                return a.box.maxY > b.box.maxY
-            }
-            return a.box.minX < b.box.minX
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////
-// MARK: - Rect Conversion
-////////////////////////////////////////////////////////////
-
-extension OCRResultView {
-    
-    func convertVisionRect(
+    private func convertVisionRect(
         _ rect: CGRect,
         fittedRect: CGRect
     ) -> CGRect {
-        
+
         let flipped = CGRect(
             x: rect.origin.x,
             y: 1 - rect.origin.y - rect.height,
             width: rect.width,
             height: rect.height
         )
-        
+
         return CGRect(
             x: fittedRect.origin.x + flipped.origin.x * fittedRect.width,
             y: fittedRect.origin.y + flipped.origin.y * fittedRect.height,
@@ -440,7 +487,133 @@ extension OCRResultView {
     }
 }
 
-struct TextBox2 {
-    let text: String
-    let box: CGRect
+// MARK: - Touch Handling + TTS
+extension OCRResultView {
+
+    private func handleTouch(
+        location: CGPoint,
+        containerSize: CGSize,
+        fittedRect: CGRect
+    ) {
+
+        guard fittedRect.contains(location) else {
+
+            previewText = nil
+            previewCroppedImage = nil
+            lastPreviewIndex = nil
+
+            ttsWorkItem?.cancel()
+            TTSManager.shared.stop()
+
+            return
+        }
+
+        var hitIndex: Int? = nil
+        var bestArea: CGFloat = .greatestFiniteMagnitude
+
+        for (idx, item) in vm.lineBoxes.enumerated() {
+
+            let rect = convertVisionRect(
+                item.box,
+                fittedRect: fittedRect
+            )
+
+            if rect.contains(location) {
+
+                let area = rect.width * rect.height
+
+                if area < bestArea {
+                    bestArea = area
+                    hitIndex = idx
+                }
+            }
+        }
+
+        guard let idx = hitIndex else {
+
+            if hasActivatedPreview {
+
+                previewHoldWorkItem?.cancel()
+
+                let workItem = DispatchWorkItem {
+
+                    if isTouching {
+
+                        hasActivatedPreview = false
+                        clearPreviewAndStop()
+                    }
+                }
+
+                previewHoldWorkItem = workItem
+
+                DispatchQueue.main.asyncAfter(
+                    deadline: .now() + 1.0,
+                    execute: workItem
+                )
+            }
+
+            previewText = nil
+            previewCroppedImage = nil
+            lastPreviewIndex = nil
+
+            ttsWorkItem?.cancel()
+            TTSManager.shared.stop()
+
+            return
+        }
+
+        if lastPreviewIndex != idx {
+
+            hasActivatedPreview = true
+
+            previewHoldWorkItem?.cancel()
+
+            lastPreviewIndex = idx
+
+            previewText = vm.lineBoxes[idx].text
+
+            previewCroppedImage = vm.cropImage(
+                from: vm.lineBoxes[idx].box,
+                in: image
+            )
+
+            ttsWorkItem?.cancel()
+
+            TTSManager.shared.stop()
+
+            let textToSpeak = vm.lineBoxes[idx].text
+
+            let workItem = DispatchWorkItem {
+
+                if lastPreviewIndex == idx && isTTSEnabled {
+
+                    TTSManager.shared.speak(textToSpeak)
+                }
+            }
+
+            ttsWorkItem = workItem
+
+            DispatchQueue.main.asyncAfter(
+                deadline: .now() + 0.3,
+                execute: workItem
+            )
+        }
+    }
+}
+
+extension OCRResultView {
+
+    private func clearPreviewAndStop() {
+
+        previewText = nil
+        previewCroppedImage = nil
+        lastPreviewIndex = nil
+
+        ttsWorkItem?.cancel()
+
+        if TTSManager.shared.isSpeaking {
+
+            TTSManager.shared.stop()
+        }
+    }
 }

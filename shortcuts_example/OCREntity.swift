@@ -13,6 +13,9 @@ import VideoToolbox
 
 struct OCREntity: AppEntity, Identifiable {
 
+    // ✅ 이 줄이 빠져서 에러가 난 것
+     typealias DefaultQuery = OCREntityQuery
+    
     static var typeDisplayRepresentation =
         TypeDisplayRepresentation(name: "OCR 결과")
 
@@ -28,9 +31,12 @@ struct OCREntity: AppEntity, Identifiable {
 
     var displayRepresentation: DisplayRepresentation {
         DisplayRepresentation(
-            title: LocalizedStringResource(text.prefix(50))
+            title: LocalizedStringResource(
+                stringLiteral: String(text.prefix(50))
+            )
         )
     }
+
 }
 
 
