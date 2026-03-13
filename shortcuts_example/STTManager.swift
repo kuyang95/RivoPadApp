@@ -20,6 +20,7 @@ final class STTManager: ObservableObject {
 
     // MARK: - Recording State
     @Published private(set) var isRecording: Bool = false
+    @Published private(set) var amplitude: Float = 0
 
     // MARK: - Auto Stop Tuning
     private let silenceDurationRMS: TimeInterval = 4.0
@@ -62,7 +63,7 @@ final class STTManager: ObservableObject {
         self.speechRecognizer = recognizer
 
         let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+//        try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
@@ -86,9 +87,13 @@ final class STTManager: ObservableObject {
                 guard !didFinishStream else { return }
                 didFinishStream = true
                 Task { @MainActor in
-                    if let text { continuation.yield(text) }
-                    self.stopInternalCancel() // 여기서는 cancel로 완전 정리(최종)
+                    if let text {
+                        continuation.yield(text)
+                    }
+                    self.stopInternalCancel()
                     continuation.finish()
+
+            
                 }
             }
 
@@ -128,9 +133,16 @@ final class STTManager: ObservableObject {
                 if didEndAudio { return } // endAudio 이후엔 append 금지
 
                 request.append(buffer)
+                
+                // 🔹 음성 amplitude 계산
+                  let rms = Self.rmsValue(buffer: buffer)
+
+                  Task { @MainActor in
+                      // smoothing (UI가 덜 튐)
+                      self.amplitude = self.amplitude * 0.7 + rms * 0.3
+                  }
 
                 // RMS 기반 무음 감지
-                let rms = Self.rmsValue(buffer: buffer)
                 if rms >= self.rmsThreshold {
                     lastVoiceTime = Date()
                 } else {
@@ -167,14 +179,14 @@ final class STTManager: ObservableObject {
                     self.log("📝 result isFinal=\(result.isFinal) text=\(text)")
 
                     // partial 텍스트가 실제로 바뀌는 순간만 “업데이트 시각” 갱신
-                    if text != lastPartialText {
+                    if !text.isEmpty && text != lastPartialText {
                         lastPartialText = text
                         lastTextUpdateTime = Date()
                     }
 
                     if result.isFinal {
-                        // final 도착 → 완전 종료
-                        finishOnce(text.isEmpty ? nil : text)
+                        let finalText = text.isEmpty ? lastPartialText : text
+                        finishOnce(finalText.isEmpty ? nil : finalText)
                         return
                     }
                 }
@@ -192,6 +204,7 @@ final class STTManager: ObservableObject {
                 Task { @MainActor in
                     self.log("🧵 AsyncStream onTermination reason=\(reason)")
                     self.stopInternalCancel()
+                    
                 }
             }
         }
@@ -216,6 +229,7 @@ final class STTManager: ObservableObject {
 
         recognitionTask = nil
         recognitionRequest = nil
+        self.amplitude = 0
 
 //        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         log("🛑 STT fully stopped")

@@ -61,14 +61,14 @@ final class ChatViewModel: ObservableObject {
 
         do {
             isLoadingModel = true
-            llm.configureForIPadProM4_8GB()
+            llm.configureForIPadProM4_12GB()
 
             switch intent {
             case .imageAnalysis:
-                try await llm.loadQwen3_VL_8B()
+                try await llm.activateModel(.qwen3_vl_8b_4bit)
                 loadedKind = .vision
             case .documentQA:
-                try await llm.loadQwen3_8B()
+                try await llm.activateModel(.qwen3_8b_4bit)
                 loadedKind = .text
             }
 

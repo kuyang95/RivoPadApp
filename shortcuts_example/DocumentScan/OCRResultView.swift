@@ -108,13 +108,9 @@ extension OCRResultView {
 extension OCRResultView {
 
     private var topBar: some View {
-
         HStack(spacing: 10) {
 
-            // MARK: AI 질문 버튼
-
             Button {
-
                 if vm.llmService.isLoading {
                     TTSManager.shared.stop()
                     TTSManager.shared.speak("모델 로딩중입니다")
@@ -124,13 +120,10 @@ extension OCRResultView {
                 SoundEffectManager.shared.play(.recording)
 
                 Task {
-
                     do {
-
                         let stream = try await vm.sttManager.startRecording()
 
                         for await question in stream {
-
                             SoundEffectManager.shared.play(.startingLLM)
 
                             await vm.runDocumentQA(
@@ -138,29 +131,22 @@ extension OCRResultView {
                                 isTTSEnabled: isTTSEnabled
                             )
                         }
-
                     } catch {
                         print(error)
                     }
                 }
-
             } label: {
-
                 ZStack {
-
                     RoundedRectangle(cornerRadius: 10)
                         .fill(Color.black.opacity(0.65))
                         .frame(height: 40)
 
                     if vm.llmService.isLoading {
-
                         ProgressView()
                             .progressViewStyle(
                                 CircularProgressViewStyle(tint: .white)
                             )
-
                     } else {
-
                         Text(vm.sttManager.isRecording ? "녹음중..." : "AI 질문")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.white)
@@ -168,65 +154,64 @@ extension OCRResultView {
                     }
                 }
             }
-
-            // MARK: TTS
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("AI 질문")
+            .accessibilityValue(
+                vm.llmService.isLoading
+                ? "모델 로딩 중"
+                : (vm.sttManager.isRecording ? "녹음 중" : "준비됨")
+            )
+            .accessibilityHint("이중 탭하면 문서에 대해 질문할 수 있습니다")
 
             Button {
-
                 isTTSEnabled.toggle()
 
                 if !isTTSEnabled {
                     ttsWorkItem?.cancel()
                     TTSManager.shared.stop()
                 }
-
             } label: {
-
                 toolbarTextButton(
                     title: "음성",
                     isOn: isTTSEnabled
                 )
             }
-
-            // MARK: 이미지 preview
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("음성")
+            .accessibilityValue(isTTSEnabled ? "켜짐" : "꺼짐")
+            .accessibilityHint("이중 탭하면 음성 안내를 전환합니다")
 
             Button {
-
                 isPreviewImageEnabled.toggle()
-
             } label: {
-
                 toolbarTextButton(
                     title: "이미지",
                     isOn: isPreviewImageEnabled
                 )
             }
-
-            // MARK: OCR 박스
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("이미지 미리보기")
+            .accessibilityValue(isPreviewImageEnabled ? "켜짐" : "꺼짐")
+            .accessibilityHint("이중 탭하면 이미지 미리보기를 전환합니다")
 
             Button {
-
                 showBoxes.toggle()
-
             } label: {
-
                 toolbarTextButton(
                     title: "박스",
                     isOn: showBoxes
                 )
             }
-
-            // MARK: 복사
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("OCR 박스")
+            .accessibilityValue(showBoxes ? "켜짐" : "꺼짐")
+            .accessibilityHint("이중 탭하면 텍스트 박스 표시를 전환합니다")
 
             Button {
-
                 UIPasteboard.general.string = vm.extractedText
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-
             } label: {
-
                 ZStack {
-
                     RoundedRectangle(cornerRadius: 10)
                         .fill(Color.black.opacity(0.65))
                         .frame(height: 40)
@@ -237,6 +222,9 @@ extension OCRResultView {
                         .padding(.horizontal, 14)
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("복사")
+            .accessibilityHint("이중 탭하면 추출한 텍스트를 클립보드에 복사합니다")
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
@@ -301,6 +289,13 @@ extension OCRResultView {
                         hasActivatedPreview = false
                         previewHoldWorkItem?.cancel()
 
+                        // 마지막 터치 위치가 글자 박스 안이었는지 확인
+                         if let idx = lastPreviewIndex {
+                             let text = vm.lineBoxes[idx].text
+                             UIPasteboard.general.string = text
+                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                         }
+                        
                         clearPreviewAndStop()
                     }
             )

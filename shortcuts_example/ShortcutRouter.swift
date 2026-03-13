@@ -11,6 +11,7 @@ final class ShortcutRouter: ObservableObject {
         case importImage(url: URL, token: UUID)
         case imageQA(url: URL, question: String, token: UUID) 
         case documentScanning
+        case voiceQuery(image: UIImage?, document: String?)
     }
 
     @Published var intentEvent: IntentEvent?
@@ -74,6 +75,28 @@ final class ShortcutRouter: ObservableObject {
 
         case .documentScanning:
             intentEvent = .documentScanning
+            
+        case .voiceQuery:
+            RVLogger.d("무사히?0")
+            let document = env.params["document"].flatMap {
+                if case .string(let s) = $0 { return s }
+                return nil
+            }
+            
+            if document != nil {
+                intentEvent = .voiceQuery(image: nil, document: document)
+                return
+            }
+
+            let ref = env.attachments.first(where: { $0.kind == .image })
+
+            let dir = ShortcutBridge.attachmentsDir(for: env.id)
+            let url = dir.appendingPathComponent(ref!.fileName)
+
+            let image = UIImage(contentsOfFile: url.path)
+            
+            intentEvent = .voiceQuery(image: image, document: nil)
+            RVLogger.d("무사히?1")
         }
 
         // 🔥 consume 이후 안전하게 삭제
@@ -93,6 +116,7 @@ enum ShortcutRoute: String, Codable {
     case importImage
     case imageQA
     case documentScanning
+    case voiceQuery
 }
 
 // 필요하면 JSONValue는 이전에 쓰던 그대로 사용

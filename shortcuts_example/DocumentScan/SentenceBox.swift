@@ -125,6 +125,82 @@ final class DocumentTextExtractor {
             }
         }
     }
+    
+    func extractPlainText(from image: UIImage,
+                          completion: @escaping (Result<String, Error>) -> Void) {
+
+        guard let cgImage = image.cgImage else {
+            RVLogger.d("extractPlainText error: cgImage missing")
+            completion(.failure(ExtractError.cgImageMissing))
+            return
+        }
+
+        let request = VNRecognizeTextRequest { request, error in
+            if let error = error {
+                RVLogger.d("extractPlainText Vision error: \(error.localizedDescription)")
+                completion(.failure(error))
+                return
+            }
+
+            let observations = (request.results as? [VNRecognizedTextObservation]) ?? []
+            if observations.isEmpty {
+                RVLogger.d("extractPlainText error: no observations")
+                completion(.failure(ExtractError.noText))
+                return
+            }
+
+            var lines: [(text: String, bbox: CGRect)] = []
+            lines.reserveCapacity(observations.count)
+
+            for obs in observations {
+                guard let top = obs.topCandidates(1).first else { continue }
+                let text = top.string.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { continue }
+                lines.append((text, obs.boundingBox))
+            }
+
+            if lines.isEmpty {
+                RVLogger.d("extractPlainText error: lines empty after filtering")
+                completion(.failure(ExtractError.noText))
+                return
+            }
+
+            // Vision 좌표계 정렬 (위 → 아래, 좌 → 우)
+            lines.sort { a, b in
+                let aY = a.bbox.maxY
+                let bY = b.bbox.maxY
+                if abs(aY - bY) > 0.02 {
+                    return aY > bY
+                } else {
+                    return a.bbox.minX < b.bbox.minX
+                }
+            }
+
+            let text = lines.map { $0.text }.joined(separator: "\n")
+
+            completion(.success(text))
+        }
+
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = true
+        request.recognitionLanguages = ["ko-KR", "en-US", "ja-JP"]
+        request.minimumTextHeight = 0.015
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let handler = VNImageRequestHandler(
+                cgImage: cgImage,
+                orientation: image.cgImageOrientation,
+                options: [:]
+            )
+
+            do {
+                try handler.perform([request])
+            } catch {
+                RVLogger.d("extractPlainText handler.perform error: \(error.localizedDescription)")
+                completion(.failure(error))
+            }
+        }
+    }
 }
 
 // UIImageOrientation -> CGImagePropertyOrientation 변환

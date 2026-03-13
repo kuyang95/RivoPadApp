@@ -15,6 +15,8 @@ struct shortcuts_exampleApp: App {
     @State private var path = NavigationPath()   // ✅ App이 path 관리
 
     init() {
+        //UIApplication.shared.isIdleTimerDisabled = true
+        
            AppBootstrap.prepareAppGroup()
         _ = TTSManager.shared
         _ = SoundEffectManager.shared
@@ -44,12 +46,24 @@ struct shortcuts_exampleApp: App {
                             
                         case .imageQA(url: let url, question: let question, token: _):
                             LLMContentView(intent: .imageAnalysis(imageURL: url, question: question))
-                       
+                            
                         case .importImage(let url, _):
                             DocumentScanRootView()
                             
                         case .documentScanning:
-                           DocumentScanRootView()
+                            DocumentScanRootView()
+                            
+                        case .voiceQuery(image: let image, document: let document):
+                         
+                            if let image {
+                                  let _ = RVLogger.d("무사히?2")
+                                  VoiceQueryResponseView(source: .image(image))
+                              } else if let document {
+                                  let _ = RVLogger.d("무사히?2")
+                                  VoiceQueryResponseView(source: .text(document))
+                              } else {
+                                  EmptyView()
+                              }
                         }
                     }
                
@@ -57,7 +71,9 @@ struct shortcuts_exampleApp: App {
             .environmentObject(appRouter)
           //  .onAppear { router.consumeLastIfNeeded() }
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active { shortcutRouter.consumeLastIfNeeded() }
+                if phase == .active {
+                   //  UIApplication.shared.isIdleTimerDisabled = true
+                    shortcutRouter.consumeLastIfNeeded() }
             }
             .onChange(of: shortcutRouter.intentEvent) { _, dest in
                 guard let dest else { return }

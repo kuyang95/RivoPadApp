@@ -22,7 +22,10 @@ final class AppAudioManager {
                 mode: .default,
                 options: [
                     .defaultToSpeaker,
-                    .mixWithOthers
+                    .mixWithOthers,
+                    .allowBluetoothHFP,
+                    .allowBluetoothA2DP,
+                    .duckOthers
                 ]
             )
 

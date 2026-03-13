@@ -64,8 +64,8 @@ final class OCRResultViewModel: ObservableObject {
     // MARK: - Public: Model loading
     func ensureModelLoaded() async {
         do {
-            llmService.configureForIPadProM4_8GB()
-            try await llmService.ensureLoaded(.qwen3_8b_4bit)
+            llmService.configureForIPadProM4_12GB()
+            try await llmService.activateModel(.qwen3_8b_4bit)
             RVLogger.d("✅ ready: \(llmService.loadedModel.displayName)")
         } catch {
             RVLogger.d("❌ load failed: \(error)")
@@ -209,6 +209,12 @@ final class OCRResultViewModel: ObservableObject {
         stopThinkingAnimation()
         isGeneratingAI = false
 
+        if !aiAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+
+            UIPasteboard.general.string = aiAnswer
+        }
+
+        
         if isTTSEnabled, !aiAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             TTSManager.shared.speak(aiAnswer)
         }

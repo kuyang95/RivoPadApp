@@ -571,6 +571,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "shortcuts-example-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = VisionCraft;
 				INFOPLIST_KEY_NSCameraUsageDescription = "for document scan";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "음성 입력을 위해 필요합니다.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "음성 인식을 위해 필요합니다.";
@@ -633,6 +634,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "shortcuts-example-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = VisionCraft;
 				INFOPLIST_KEY_NSCameraUsageDescription = "for document scan";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "음성 입력을 위해 필요합니다.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "음성 인식을 위해 필요합니다.";
