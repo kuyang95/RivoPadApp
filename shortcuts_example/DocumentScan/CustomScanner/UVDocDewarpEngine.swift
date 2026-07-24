@@ -64,7 +64,16 @@ nonisolated enum UVDocGridSampler {
             )
         }
 
-        let expectedValueCount = grid.width * grid.height * 2
+        let (gridPointCount, gridPointCountOverflow) =
+            grid.width.multipliedReportingOverflow(by: grid.height)
+        let (expectedValueCount, gridValueCountOverflow) =
+            gridPointCount.multipliedReportingOverflow(by: 2)
+        guard !gridPointCountOverflow, !gridValueCountOverflow else {
+            throw UVDocGridError.invalidDimensions(
+                height: grid.height,
+                width: grid.width
+            )
+        }
         guard grid.values.count == expectedValueCount else {
             throw UVDocGridError.invalidValueCount(
                 expected: expectedValueCount,
@@ -80,7 +89,17 @@ nonisolated enum UVDocGridSampler {
             : 0
         let sourceXMaximum = Float(source.width - 1)
         let sourceYMaximum = Float(source.height - 1)
-        var output = [UInt8](repeating: 0, count: width * height * 4)
+        let (pixelCount, pixelCountOverflow) =
+            width.multipliedReportingOverflow(by: height)
+        let (outputByteCount, outputByteCountOverflow) =
+            pixelCount.multipliedReportingOverflow(by: 4)
+        guard !pixelCountOverflow, !outputByteCountOverflow else {
+            throw UVDocGridError.invalidDimensions(
+                height: height,
+                width: width
+            )
+        }
+        var output = [UInt8](repeating: 0, count: outputByteCount)
 
         for outputY in 0 ..< height {
             let gridY = Float(outputY) * gridYScale
@@ -101,21 +120,36 @@ nonisolated enum UVDocGridSampler {
                 let index01 = (gridY0Row + gridX1) * 2
                 let index10 = (gridY1Row + gridX0) * 2
                 let index11 = (gridY1Row + gridX1) * 2
-                let weight00 = (1 - fractionX) * (1 - fractionY)
-                let weight01 = fractionX * (1 - fractionY)
-                let weight10 = (1 - fractionX) * fractionY
-                let weight11 = fractionX * fractionY
-
-                let normalizedSourceX =
-                    weight00 * grid.values[index00]
-                    + weight01 * grid.values[index01]
-                    + weight10 * grid.values[index10]
-                    + weight11 * grid.values[index11]
-                let normalizedSourceY =
-                    weight00 * grid.values[index00 + 1]
-                    + weight01 * grid.values[index01 + 1]
-                    + weight10 * grid.values[index10 + 1]
-                    + weight11 * grid.values[index11 + 1]
+                let gridTopX = fma(
+                    grid.values[index01] - grid.values[index00],
+                    fractionX,
+                    grid.values[index00]
+                )
+                let gridBottomX = fma(
+                    grid.values[index11] - grid.values[index10],
+                    fractionX,
+                    grid.values[index10]
+                )
+                let normalizedSourceX = fma(
+                    gridBottomX - gridTopX,
+                    fractionY,
+                    gridTopX
+                )
+                let gridTopY = fma(
+                    grid.values[index01 + 1] - grid.values[index00 + 1],
+                    fractionX,
+                    grid.values[index00 + 1]
+                )
+                let gridBottomY = fma(
+                    grid.values[index11 + 1] - grid.values[index10 + 1],
+                    fractionX,
+                    grid.values[index10 + 1]
+                )
+                let normalizedSourceY = fma(
+                    gridBottomY - gridTopY,
+                    fractionY,
+                    gridTopY
+                )
                 guard normalizedSourceX.isFinite,
                       normalizedSourceY.isFinite else {
                     throw UVDocGridError.nonFiniteCoordinate
@@ -162,26 +196,29 @@ nonisolated enum UVDocGridSampler {
                     x: sourceX1,
                     y: sourceY1
                 )
-                let sourceWeight00 =
-                    (1 - sourceFractionX) * (1 - sourceFractionY)
-                let sourceWeight01 =
-                    sourceFractionX * (1 - sourceFractionY)
-                let sourceWeight10 =
-                    (1 - sourceFractionX) * sourceFractionY
-                let sourceWeight11 =
-                    sourceFractionX * sourceFractionY
                 let outputOffset = (outputRow + outputX) * 4
 
                 for channel in 0 ..< 4 {
-                    let value =
-                        sourceWeight00
-                        * Float(source.bytes[source00 + channel])
-                        + sourceWeight01
-                        * Float(source.bytes[source01 + channel])
-                        + sourceWeight10
-                        * Float(source.bytes[source10 + channel])
-                        + sourceWeight11
-                        * Float(source.bytes[source11 + channel])
+                    let topLeft = Float(source.bytes[source00 + channel])
+                    let top = fma(
+                        Float(source.bytes[source01 + channel]) - topLeft,
+                        sourceFractionX,
+                        topLeft
+                    )
+                    let bottomLeft = Float(
+                        source.bytes[source10 + channel]
+                    )
+                    let bottom = fma(
+                        Float(source.bytes[source11 + channel])
+                            - bottomLeft,
+                        sourceFractionX,
+                        bottomLeft
+                    )
+                    let value = fma(
+                        bottom - top,
+                        sourceFractionY,
+                        top
+                    )
                     output[outputOffset + channel] = UInt8(
                         clamping: Int(value)
                     )
@@ -199,34 +236,58 @@ nonisolated enum UVDocGridSampler {
 
 actor UVDocDewarpEngine: CurvedDocumentDewarping {
     nonisolated let backend: ScannerInferenceBackend
+    nonisolated let preferredWarpBackend: UVDocWarpBackend
 
     private let session: ScannerONNXSession
     private let imageBridge = ScannerCIImageBridge()
+    private let metalSampler: UVDocMetalGridSampler?
+    private(set) var lastWarpBackend: UVDocWarpBackend?
+    private(set) var lastMetalWarpErrorDescription: String?
 
     init(
         bundle: Bundle = .main,
-        backend: ScannerInferenceBackend = .coreML
+        backend: ScannerInferenceBackend = .coreML,
+        preferMetalWarp: Bool = true
     ) throws {
         let session = try ScannerONNXSession(
             descriptor: .curvedPageDewarper,
             bundle: bundle,
             backend: backend
         )
+        let metalState = Self.makeMetalSampler(
+            whenEnabled: preferMetalWarp
+        )
         self.backend = session.activeBackend
+        self.preferredWarpBackend = metalState.sampler == nil
+            ? .cpu
+            : .metal
         self.session = session
+        self.metalSampler = metalState.sampler
+        self.lastWarpBackend = nil
+        self.lastMetalWarpErrorDescription = metalState.errorDescription
     }
 
     init(
         modelURL: URL,
-        backend: ScannerInferenceBackend = .coreML
+        backend: ScannerInferenceBackend = .coreML,
+        preferMetalWarp: Bool = true
     ) throws {
         let session = try ScannerONNXSession(
             descriptor: .curvedPageDewarper,
             modelURL: modelURL,
             backend: backend
         )
+        let metalState = Self.makeMetalSampler(
+            whenEnabled: preferMetalWarp
+        )
         self.backend = session.activeBackend
+        self.preferredWarpBackend = metalState.sampler == nil
+            ? .cpu
+            : .metal
         self.session = session
+        self.metalSampler = metalState.sampler
+        self.lastWarpBackend = nil
+        self.lastMetalWarpErrorDescription = metalState.errorDescription
     }
 
     func dewarp(_ image: CIImage) async throws -> CIImage {
@@ -243,7 +304,38 @@ actor UVDocDewarpEngine: CurvedDocumentDewarping {
             )
         )
         let grid = try UVDocGridDecoder.decode(output)
-        let dewarped = try UVDocGridSampler.warp(source, with: grid)
+        let dewarped: ScannerRGBAImage
+        if let metalSampler {
+            do {
+                dewarped = try metalSampler.warp(source, with: grid)
+                lastWarpBackend = .metal
+                lastMetalWarpErrorDescription = nil
+            } catch {
+                lastMetalWarpErrorDescription = error.localizedDescription
+                dewarped = try UVDocGridSampler.warp(source, with: grid)
+                lastWarpBackend = .cpu
+            }
+        } else {
+            dewarped = try UVDocGridSampler.warp(source, with: grid)
+            lastWarpBackend = .cpu
+        }
         return imageBridge.ciImage(from: dewarped)
+    }
+
+    private static func makeMetalSampler(
+        whenEnabled isEnabled: Bool
+    ) -> (
+        sampler: UVDocMetalGridSampler?,
+        errorDescription: String?
+    ) {
+        guard isEnabled else {
+            return (nil, nil)
+        }
+
+        do {
+            return (try UVDocMetalGridSampler(), nil)
+        } catch {
+            return (nil, error.localizedDescription)
+        }
     }
 }

@@ -11,12 +11,16 @@ import UIKit
 struct DocumentScanRootView: UIViewControllerRepresentable {
 
     @EnvironmentObject var appRouter: AppRouter
+    @Environment(\.dismiss) private var dismiss
 
     func makeUIViewController(context: Context) -> DocumentScannerViewController {
         let vc = DocumentScannerViewController()
 
         vc.onScanCompleted = { image in
             appRouter.route = .OCRResult(image: image)
+        }
+        vc.onCancel = {
+            dismiss()
         }
 
         return vc

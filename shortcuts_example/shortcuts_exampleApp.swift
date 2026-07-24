@@ -16,8 +16,13 @@ struct shortcuts_exampleApp: App {
 
     init() {
         //UIApplication.shared.isIdleTimerDisabled = true
-        
-           AppBootstrap.prepareAppGroup()
+
+        guard ProcessInfo.processInfo.environment[
+            "XCTestConfigurationFilePath"
+        ] == nil else {
+            return
+        }
+        AppBootstrap.prepareAppGroup()
         _ = TTSManager.shared
         _ = SoundEffectManager.shared
         SoundEffectManager.shared.preloadAll()
@@ -94,5 +99,3 @@ struct shortcuts_exampleApp: App {
     }
         
 }
-
-

@@ -181,17 +181,41 @@ actor LCNetDocumentDetector: DocumentCornerDetecting {
     func detect(
         in frame: DocumentScannerFrame
     ) async throws -> DocumentDetection? {
-        let source: ScannerRGBAImage
+        let fullSource: ScannerRGBAImage
         do {
-            source = try .readingBGRA(frame.pixelBuffer)
+            return try await detect(
+                in: ScannerRGBAImage.readingBGRA(
+                    frame.pixelBuffer,
+                    cropRect: frame.cropRect
+                )
+            )
         } catch ScannerImageError.unsupportedPixelFormat(_) {
-            source = try imageBridge.rgbaImage(
+            fullSource = try imageBridge.rgbaImage(
                 from: CIImage(cvPixelBuffer: frame.pixelBuffer)
             )
         }
 
+        let source: ScannerRGBAImage
+        if let cropRect = frame.cropRect {
+            source = try fullSource.cropped(to: cropRect)
+        } else {
+            source = fullSource
+        }
+
         // Android runs LCNet in the sensor/crop coordinate space and applies
         // frame.orientation only when drawing its overlay. Do the same here.
+        return try await detect(in: source)
+    }
+
+    func detect(
+        in image: CIImage
+    ) async throws -> DocumentDetection? {
+        try await detect(in: imageBridge.rgbaImage(from: image))
+    }
+
+    func detect(
+        in source: ScannerRGBAImage
+    ) async throws -> DocumentDetection? {
         let prepared = AndroidScannerImageMath.letterboxedRGBTensor(
             from: source,
             size: 256

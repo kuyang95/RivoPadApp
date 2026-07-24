@@ -49,6 +49,15 @@ nonisolated struct ScannerRGBAImage: Equatable, Sendable {
     /// CameraX feeds Android's detector a rotation-free RGBA crop. This reads
     /// iOS BGRA camera memory into the same logical top-left RGB pixel order.
     static func readingBGRA(_ pixelBuffer: CVPixelBuffer) throws -> Self {
+        try readingBGRA(pixelBuffer, cropRect: nil)
+    }
+
+    /// Reads only the viewport ROI when supplied, avoiding a full-frame RGBA
+    /// allocation followed by a second crop copy on every analysis frame.
+    static func readingBGRA(
+        _ pixelBuffer: CVPixelBuffer,
+        cropRect: ScannerPixelRect?
+    ) throws -> Self {
         let format = CVPixelBufferGetPixelFormatType(pixelBuffer)
         guard format == kCVPixelFormatType_32BGRA else {
             throw ScannerImageError.unsupportedPixelFormat(format)
@@ -66,26 +75,55 @@ nonisolated struct ScannerRGBAImage: Equatable, Sendable {
             throw ScannerImageError.missingPixelBufferBaseAddress
         }
 
-        let width = CVPixelBufferGetWidth(pixelBuffer)
-        let height = CVPixelBufferGetHeight(pixelBuffer)
+        let bufferWidth = CVPixelBufferGetWidth(pixelBuffer)
+        let bufferHeight = CVPixelBufferGetHeight(pixelBuffer)
+        let rect = cropRect ?? ScannerPixelRect(
+            x: 0,
+            y: 0,
+            width: bufferWidth,
+            height: bufferHeight
+        )
+        guard rect.x >= 0,
+              rect.y >= 0,
+              rect.width > 0,
+              rect.height > 0,
+              rect.maxX <= bufferWidth,
+              rect.maxY <= bufferHeight else {
+            throw ScannerImageError.invalidDimensions(
+                width: rect.width,
+                height: rect.height
+            )
+        }
         let sourceBytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
         let source = baseAddress.assumingMemoryBound(to: UInt8.self)
-        var rgba = [UInt8](repeating: 0, count: width * height * 4)
+        var rgba = [UInt8](
+            repeating: 0,
+            count: rect.width * rect.height * 4
+        )
 
-        for y in 0 ..< height {
-            let sourceRow = source + (y * sourceBytesPerRow)
-            let destinationRow = y * width * 4
-            for x in 0 ..< width {
-                let sourceOffset = x * 4
-                let destinationOffset = destinationRow + sourceOffset
-                rgba[destinationOffset] = sourceRow[sourceOffset + 2]
-                rgba[destinationOffset + 1] = sourceRow[sourceOffset + 1]
-                rgba[destinationOffset + 2] = sourceRow[sourceOffset]
+        for destinationY in 0 ..< rect.height {
+            let sourceRow =
+                source + ((rect.y + destinationY) * sourceBytesPerRow)
+            let destinationRow = destinationY * rect.width * 4
+            for destinationX in 0 ..< rect.width {
+                let sourceOffset = (rect.x + destinationX) * 4
+                let destinationOffset =
+                    destinationRow + destinationX * 4
+                rgba[destinationOffset] =
+                    sourceRow[sourceOffset + 2]
+                rgba[destinationOffset + 1] =
+                    sourceRow[sourceOffset + 1]
+                rgba[destinationOffset + 2] =
+                    sourceRow[sourceOffset]
                 rgba[destinationOffset + 3] = sourceRow[sourceOffset + 3]
             }
         }
 
-        return try Self(width: width, height: height, bytes: rgba)
+        return try Self(
+            width: rect.width,
+            height: rect.height,
+            bytes: rgba
+        )
     }
 }
 

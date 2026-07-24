@@ -88,6 +88,10 @@ nonisolated struct DocumentScannerStateMachine: Sendable {
             state = .failed(.processingFailed)
             return [.stopCamera]
 
+        case (.reviewing, .resumeScanning):
+            state = .searching
+            return [.startCamera, .clearDetectionOverlay]
+
         case (
             .reviewing,
             .pageAccepted(let capturedPageCount, let continueScanning)

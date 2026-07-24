@@ -20,6 +20,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		9E5CB1002F6B000100000007 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9E901E8F2F2C4D010028581D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9E901E962F2C4D010028581D;
+			remoteInfo = shortcuts_example;
+		};
 		9ED29E7B2F47FA34007204D2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 9E901E8F2F2C4D010028581D /* Project object */;
@@ -70,6 +77,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		9E5CB1002F6B000100000001 /* shortcuts_exampleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = shortcuts_exampleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9E901E972F2C4D010028581D /* shortcuts_example.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = shortcuts_example.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9ED29E662F47FA34007204D2 /* intentExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = intentExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9ED29E672F47FA34007204D2 /* Intents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Intents.framework; path = System/Library/Frameworks/Intents.framework; sourceTree = SDKROOT; };
@@ -103,6 +111,11 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		9E5CB1002F6B000100000002 /* shortcuts_exampleTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = shortcuts_exampleTests;
+			sourceTree = "<group>";
+		};
 		9E901E992F2C4D020028581D /* shortcuts_example */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = shortcuts_example;
@@ -135,6 +148,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		9E5CB1002F6B000100000005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9E901E942F2C4D010028581D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -177,6 +197,7 @@
 			isa = PBXGroup;
 			children = (
 				9E901E992F2C4D020028581D /* shortcuts_example */,
+				9E5CB1002F6B000100000002 /* shortcuts_exampleTests */,
 				9ED29E692F47FA34007204D2 /* intentExtension */,
 				9ED29E742F47FA34007204D2 /* intentExtensionUI */,
 				9ED29E912F47FA9A007204D2 /* appIntentExtension */,
@@ -189,6 +210,7 @@
 			isa = PBXGroup;
 			children = (
 				9E901E972F2C4D010028581D /* shortcuts_example.app */,
+				9E5CB1002F6B000100000001 /* shortcuts_exampleTests.xctest */,
 				9ED29E662F47FA34007204D2 /* intentExtension.appex */,
 				9ED29E712F47FA34007204D2 /* intentExtensionUI.appex */,
 				9ED29E902F47FA9A007204D2 /* appIntentExtension.appex */,
@@ -208,6 +230,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		9E5CB1002F6B000100000003 /* shortcuts_exampleTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9E5CB1002F6B00010000000B /* Build configuration list for PBXNativeTarget "shortcuts_exampleTests" */;
+			buildPhases = (
+				9E5CB1002F6B000100000004 /* Sources */,
+				9E5CB1002F6B000100000005 /* Frameworks */,
+				9E5CB1002F6B000100000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				9E5CB1002F6B000100000008 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				9E5CB1002F6B000100000002 /* shortcuts_exampleTests */,
+			);
+			name = shortcuts_exampleTests;
+			packageProductDependencies = (
+			);
+			productName = shortcuts_exampleTests;
+			productReference = 9E5CB1002F6B000100000001 /* shortcuts_exampleTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		9E901E962F2C4D010028581D /* shortcuts_example */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 9E901EA22F2C4D030028581D /* Build configuration list for PBXNativeTarget "shortcuts_example" */;
@@ -316,6 +361,10 @@
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
+					9E5CB1002F6B000100000003 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 9E901E962F2C4D010028581D;
+					};
 					9E901E962F2C4D010028581D = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -349,6 +398,7 @@
 			projectRoot = "";
 			targets = (
 				9E901E962F2C4D010028581D /* shortcuts_example */,
+				9E5CB1002F6B000100000003 /* shortcuts_exampleTests */,
 				9ED29E652F47FA34007204D2 /* intentExtension */,
 				9ED29E702F47FA34007204D2 /* intentExtensionUI */,
 				9ED29E8F2F47FA9A007204D2 /* appIntentExtension */,
@@ -357,6 +407,13 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		9E5CB1002F6B000100000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9E901E952F2C4D010028581D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -388,6 +445,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		9E5CB1002F6B000100000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9E901E932F2C4D010028581D /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -419,6 +483,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		9E5CB1002F6B000100000008 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9E901E962F2C4D010028581D /* shortcuts_example */;
+			targetProxy = 9E5CB1002F6B000100000007 /* PBXContainerItemProxy */;
+		};
 		9ED29E7C2F47FA34007204D2 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 9ED29E702F47FA34007204D2 /* intentExtensionUI */;
@@ -437,6 +506,56 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		9E5CB1002F6B000100000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.rivo.shortcuts-example.shortcuts-exampleTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/shortcuts_example.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/shortcuts_example";
+				TEST_TARGET_NAME = shortcuts_example;
+			};
+			name = Debug;
+		};
+		9E5CB1002F6B00010000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.rivo.shortcuts-example.shortcuts-exampleTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/shortcuts_example.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/shortcuts_example";
+				TEST_TARGET_NAME = shortcuts_example;
+			};
+			name = Release;
+		};
 		9E901EA02F2C4D030028581D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -492,7 +611,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
-				MTL_FAST_MATH = YES;
+				MTL_FAST_MATH = NO;
 				ONLY_ACTIVE_ARCH = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -548,7 +667,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
-				MTL_FAST_MATH = YES;
+				MTL_FAST_MATH = NO;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -871,6 +990,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		9E5CB1002F6B00010000000B /* Build configuration list for PBXNativeTarget "shortcuts_exampleTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9E5CB1002F6B000100000009 /* Debug */,
+				9E5CB1002F6B00010000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		9E901E922F2C4D010028581D /* Build configuration list for PBXProject "shortcuts_example" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

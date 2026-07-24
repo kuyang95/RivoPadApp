@@ -9,6 +9,19 @@ nonisolated struct DocumentScannerFrame: @unchecked Sendable {
     let pixelBuffer: CVPixelBuffer
     let orientation: CGImagePropertyOrientation
     let timestamp: TimeInterval
+    let cropRect: ScannerPixelRect?
+
+    init(
+        pixelBuffer: CVPixelBuffer,
+        orientation: CGImagePropertyOrientation,
+        timestamp: TimeInterval,
+        cropRect: ScannerPixelRect? = nil
+    ) {
+        self.pixelBuffer = pixelBuffer
+        self.orientation = orientation
+        self.timestamp = timestamp
+        self.cropRect = cropRect
+    }
 }
 
 nonisolated protocol DocumentCornerDetecting: AnyObject, Sendable {

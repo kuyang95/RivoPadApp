@@ -107,6 +107,7 @@ nonisolated enum DocumentScanEvent: Equatable, Sendable {
     case captureFailed(ticket: UUID)
     case processingSucceeded(ticket: UUID, pageID: UUID)
     case processingFailed(ticket: UUID)
+    case resumeScanning
     case pageAccepted(capturedPageCount: Int, continueScanning: Bool)
     case pageRemoved
     case retry
