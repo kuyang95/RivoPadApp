@@ -21,6 +21,13 @@ nonisolated protocol CurvedDocumentDewarping: AnyObject, Sendable {
     func dewarp(_ image: CIImage) async throws -> CIImage
 }
 
+nonisolated protocol DocumentPerspectiveCorrecting: AnyObject, Sendable {
+    func correct(
+        _ image: CIImage,
+        using quad: DocumentQuad
+    ) async throws -> CIImage
+}
+
 nonisolated protocol DocumentImageEnhancing: AnyObject, Sendable {
     func enhance(_ image: CIImage) async throws -> CIImage
 }

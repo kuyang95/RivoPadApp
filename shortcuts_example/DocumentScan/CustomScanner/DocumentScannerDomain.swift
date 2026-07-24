@@ -145,18 +145,56 @@ nonisolated struct CustomDocumentScannerConfiguration: Equatable, Sendable {
 
 nonisolated struct ScannerModelDescriptor: Equatable, Sendable {
     let fileName: String
+    let inputName: String
+    let outputName: String
     let inputShape: [Int]
-    let outputShape: [Int?]
+    let outputShape: [Int]
+    let byteCount: Int
+    let sha256: String
 
     static let documentAligner = ScannerModelDescriptor(
         fileName: "lcnet100_doc_aligner.onnx",
+        inputName: "img",
+        outputName: "heatmap",
         inputShape: [1, 3, 256, 256],
-        outputShape: [1, 4, nil, nil]
+        outputShape: [1, 4, 128, 128],
+        byteCount: 4_767_987,
+        sha256: "f4117b786e3a18470f3865c93f3c2bd69d9b998edd60f385574a5c665e79594e"
     )
 
     static let curvedPageDewarper = ScannerModelDescriptor(
         fileName: "uvdoc.onnx",
+        inputName: "image",
+        outputName: "grid_2d",
         inputShape: [1, 3, 720, 496],
-        outputShape: [1, 2, 45, 31]
+        outputShape: [1, 2, 45, 31],
+        byteCount: 31_802_768,
+        sha256: "3fe34e4cce6df28dccd798af8d6054f254c7628eac9e3e2978965809553bc62b"
     )
+}
+
+nonisolated enum ScannerInferenceBackend: String, Equatable, Sendable {
+    /// Deterministic reference mode used for Android/iOS result comparison.
+    case cpuParity
+
+    /// Lets ONNX Runtime partition supported operators to Core ML and falls
+    /// back to its CPU provider for the remainder of the graph.
+    case coreML
+}
+
+nonisolated struct ScannerFloatTensor: Equatable, Sendable {
+    let values: [Float]
+    let shape: [Int]
+}
+
+nonisolated struct UVDocGrid: Equatable, Sendable {
+    let values: [Float]
+    let height: Int
+    let width: Int
+
+    init(values: [Float], height: Int = 45, width: Int = 31) {
+        self.values = values
+        self.height = height
+        self.width = width
+    }
 }

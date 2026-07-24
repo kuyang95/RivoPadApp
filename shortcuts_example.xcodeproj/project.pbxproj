@@ -11,6 +11,7 @@
 		9E03514A2F4BF88000D864AF /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = 9E0351492F4BF88000D864AF /* MLXLLM */; };
 		9E03514C2F4BF88000D864AF /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 9E03514B2F4BF88000D864AF /* MLXLMCommon */; };
 		9E03514E2F4BF88000D864AF /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = 9E03514D2F4BF88000D864AF /* MLXVLM */; };
+		9E5CA0012F6A000100000002 /* onnxruntime in Frameworks */ = {isa = PBXBuildFile; productRef = 9E5CA0012F6A000100000003 /* onnxruntime */; };
 		9ED29E682F47FA34007204D2 /* Intents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9ED29E672F47FA34007204D2 /* Intents.framework */; };
 		9ED29E732F47FA34007204D2 /* IntentsUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9ED29E722F47FA34007204D2 /* IntentsUI.framework */; };
 		9ED29E7D2F47FA34007204D2 /* intentExtensionUI.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9ED29E712F47FA34007204D2 /* intentExtensionUI.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -142,6 +143,7 @@
 				9E03514C2F4BF88000D864AF /* MLXLMCommon in Frameworks */,
 				9E03514E2F4BF88000D864AF /* MLXVLM in Frameworks */,
 				9E0351482F4BF88000D864AF /* MLXEmbedders in Frameworks */,
+				9E5CA0012F6A000100000002 /* onnxruntime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -232,6 +234,7 @@
 				9E0351492F4BF88000D864AF /* MLXLLM */,
 				9E03514B2F4BF88000D864AF /* MLXLMCommon */,
 				9E03514D2F4BF88000D864AF /* MLXVLM */,
+				9E5CA0012F6A000100000003 /* onnxruntime */,
 			);
 			productName = shortcuts_example;
 			productReference = 9E901E972F2C4D010028581D /* shortcuts_example.app */;
@@ -338,6 +341,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				9E0351462F4BF88000D864AF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
+				9E5CA0012F6A000100000001 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9E901E982F2C4D010028581D /* Products */;
@@ -923,6 +927,14 @@
 				minimumVersion = 2.30.6;
 			};
 		};
+		9E5CA0012F6A000100000001 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/microsoft/onnxruntime-swift-package-manager.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.24.2;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -945,6 +957,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 9E0351462F4BF88000D864AF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
 			productName = MLXVLM;
+		};
+		9E5CA0012F6A000100000003 /* onnxruntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9E5CA0012F6A000100000001 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */;
+			productName = onnxruntime;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

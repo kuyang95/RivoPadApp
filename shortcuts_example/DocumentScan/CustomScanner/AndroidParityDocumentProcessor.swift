@@ -1,0 +1,126 @@
+import CoreImage
+import Foundation
+
+/// Static captured-page pipeline. Live camera gates remain independent so a
+/// slow UVDoc pass can never block preview analysis.
+actor AndroidParityDocumentProcessor {
+    nonisolated let requestedInferenceBackend: ScannerInferenceBackend
+    private(set) var inferenceBackend: ScannerInferenceBackend?
+    private(set) var dewarperLoadErrorDescription: String?
+
+    private let perspectiveCorrector: any DocumentPerspectiveCorrecting
+    private var dewarper: (any CurvedDocumentDewarping)?
+    private let enhancer: any DocumentImageEnhancing
+    private let imageBridge = ScannerCIImageBridge()
+    private let outputLongEdgePixels: Int
+    private let modelBundle: Bundle?
+    private var dewarperInitializationAttempted: Bool
+
+    init(
+        bundle: Bundle = .main,
+        backend: ScannerInferenceBackend = .coreML,
+        outputLongEdgePixels: Int = 2_400
+    ) {
+        self.requestedInferenceBackend = backend
+        self.inferenceBackend = nil
+        self.dewarperLoadErrorDescription = nil
+        self.perspectiveCorrector = AndroidPerspectiveCorrector()
+        self.dewarper = nil
+        self.enhancer = AndroidDocumentColorEnhancer()
+        self.outputLongEdgePixels = outputLongEdgePixels
+        self.modelBundle = bundle
+        self.dewarperInitializationAttempted = false
+    }
+
+    init(
+        perspectiveCorrector: any DocumentPerspectiveCorrecting,
+        dewarper: any CurvedDocumentDewarping,
+        enhancer: any DocumentImageEnhancing,
+        backend: ScannerInferenceBackend,
+        outputLongEdgePixels: Int = 2_400
+    ) {
+        self.requestedInferenceBackend = backend
+        self.inferenceBackend = backend
+        self.dewarperLoadErrorDescription = nil
+        self.perspectiveCorrector = perspectiveCorrector
+        self.dewarper = dewarper
+        self.enhancer = enhancer
+        self.outputLongEdgePixels = outputLongEdgePixels
+        self.modelBundle = nil
+        self.dewarperInitializationAttempted = true
+    }
+
+    /// Loads UVDoc once on the processor actor. Camera setup can call this as a
+    /// prewarm, while `process` also invokes it lazily. Failure is recorded and
+    /// leaves perspective-only scanning available, matching Android's fallback.
+    @discardableResult
+    func prepareDewarper() -> Bool {
+        guard !dewarperInitializationAttempted else {
+            return dewarper != nil
+        }
+        dewarperInitializationAttempted = true
+
+        guard let modelBundle else {
+            return false
+        }
+
+        do {
+            let engine = try UVDocDewarpEngine(
+                bundle: modelBundle,
+                backend: requestedInferenceBackend
+            )
+            dewarper = engine
+            inferenceBackend = engine.backend
+            return true
+        } catch {
+            dewarperLoadErrorDescription = error.localizedDescription
+            return false
+        }
+    }
+
+    /// Mirrors capture processing after the capture-time LCNet result:
+    /// inset/perspective, upright rotation, UVDoc with graceful fallback,
+    /// long-edge normalization, then optional document color enhancement.
+    func process(
+        _ image: CIImage,
+        detectedQuad: DocumentQuad,
+        captureRotationDegrees: Int = 0,
+        enhanceColors: Bool = true
+    ) async throws -> CIImage {
+        let corrected = try await perspectiveCorrector.correct(
+            image,
+            using: detectedQuad
+        )
+        let correctedPixels = try imageBridge.rgbaImage(from: corrected)
+        let uprightPixels = AndroidScannerImageMath.rotatedClockwise(
+            correctedPixels,
+            degrees: captureRotationDegrees
+        )
+        let upright = imageBridge.ciImage(from: uprightPixels)
+
+        let dewarped: CIImage
+        if prepareDewarper(), let dewarper {
+            do {
+                dewarped = try await dewarper.dewarp(upright)
+            } catch {
+                // Android deliberately keeps the perspective crop if UVDoc
+                // inference fails, so scanning remains usable offline.
+                dewarped = upright
+            }
+        } else {
+            dewarped = upright
+        }
+
+        let dewarpedPixels = try imageBridge.rgbaImage(from: dewarped)
+        let normalizedPixels = AndroidScannerImageMath.normalizedLongEdge(
+            dewarpedPixels,
+            maximum: outputLongEdgePixels
+        )
+        let normalized = imageBridge.ciImage(from: normalizedPixels)
+
+        guard enhanceColors else {
+            return normalized
+        }
+        return try await enhancer.enhance(normalized)
+    }
+}
