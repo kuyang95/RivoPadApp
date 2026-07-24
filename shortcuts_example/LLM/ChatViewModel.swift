@@ -21,6 +21,8 @@ final class ChatViewModel: ObservableObject {
 
     let llm: LLMService
     private var genTask: Task<Void, Never>?
+    private var generationRequestID: UUID?
+    private let conversationID = LLMConversationID()
 
     // ✅ 이미지 분석 모드일 때 고정 이미지(후속 질문에도 계속 같이 보냄)
     private var pinnedCIImages: [CIImage] = []
@@ -61,7 +63,6 @@ final class ChatViewModel: ObservableObject {
 
         do {
             isLoadingModel = true
-            llm.configureForIPadProM4_12GB()
 
             switch intent {
             case .imageAnalysis:
@@ -155,9 +156,19 @@ final class ChatViewModel: ObservableObject {
     }
 
     func stop() {
+        generationRequestID = nil
         genTask?.cancel()
+        genTask = nil
         status = "Stopped"
         isInitialQueryRunning = false
+
+        Task {
+            await llm.cancelGeneration(for: conversationID)
+        }
+    }
+
+    func resetConversation() async {
+        await llm.resetConversation(conversationID)
     }
 
     // MARK: - Core streaming runner
@@ -167,10 +178,16 @@ final class ChatViewModel: ObservableObject {
     private func startStreamingResponse(mode: RunMode, system: String, prompt: String) {
         messages.append(.init(role: "assistant", text: "", image: nil))
         let assistantIndex = messages.count - 1
+        let requestID = UUID()
 
+        generationRequestID = requestID
         genTask?.cancel()
         genTask = Task {
             do {
+                guard generationRequestID == requestID else {
+                    throw CancellationError()
+                }
+
                 // ✅ 초기 실행에만 오버레이를 띄우고 싶다면, 여기서 판단
                 // 지금은 "첫 실행"에서만 overlay가 켜져야 하니,
                 // startDocumentQA/startImageAnalysis에서만 아래 플래그를 켜도록 분리하는 것도 가능.
@@ -182,71 +199,57 @@ final class ChatViewModel: ObservableObject {
                 let stream: AsyncThrowingStream<String, Error>
                 switch mode {
                 case .text:
-                    stream = try await llm.streamText(system: system, prompt: prompt)
+                    stream = try await llm.streamText(
+                        conversationID: conversationID,
+                        system: system,
+                        prompt: prompt
+                    )
                 case .vision:
-                    stream = try await llm.streamVision(system: system, prompt: prompt, images: pinnedCIImages)
+                    stream = try await llm.streamVision(
+                        conversationID: conversationID,
+                        system: system,
+                        prompt: prompt,
+                        images: pinnedCIImages
+                    )
                 }
 
-                await consumeStream50ms(stream, assistantIndex: assistantIndex)
+                try await consumeStream50ms(
+                    stream,
+                    assistantIndex: assistantIndex
+                )
+                guard generationRequestID == requestID else {
+                    throw CancellationError()
+                }
 
                 status = "Done"
                 isInitialQueryRunning = false
+                generationRequestID = nil
+            } catch is CancellationError {
+                guard generationRequestID == requestID else {
+                    return
+                }
+                status = "Stopped"
+                isInitialQueryRunning = false
+                generationRequestID = nil
             } catch {
+                guard generationRequestID == requestID else {
+                    return
+                }
+                messages[assistantIndex].text += "\n\n(스트림 오류: \(error))"
                 status = "Gen failed: \(error)"
                 isInitialQueryRunning = false
+                generationRequestID = nil
             }
         }
     }
 
-    // MARK: - Stream 소비 + <think> 제거(기존 로직 공통화)
+    // MARK: - Stream 소비 + <think> 제거
 
-    private func consumeStream(
-        _ stream: AsyncThrowingStream<String, Error>,
-        assistantIndex: Int
-    ) async {
-        var buffer = ""
-        var isInsideThink = false
-
-        do {
-            for try await chunk in stream {
-                if Task.isCancelled { break }
-                
-                RVLogger.d("chunk: \(chunk)")
-                
-                buffer += chunk
-
-                while true {
-                    if isInsideThink {
-                        if let endRange = buffer.range(of: "</think>") {
-                            buffer = String(buffer[endRange.upperBound...])
-                            isInsideThink = false
-                        } else {
-                            buffer = ""
-                            break
-                        }
-                    } else {
-                        if let startRange = buffer.range(of: "<think>") {
-                            let visiblePart = String(buffer[..<startRange.lowerBound])
-                            messages[assistantIndex].text += visiblePart
-                            buffer = String(buffer[startRange.upperBound...])
-                            isInsideThink = true
-                        } else {
-                            messages[assistantIndex].text += buffer
-                            buffer = ""
-                            break
-                        }
-                    }
-                }
-            }
-        } catch {
-            messages[assistantIndex].text += "\n\n(스트림 오류: \(error))"
-        }
-    }
-    
     private func consumeStream50ms(
         _ stream: AsyncThrowingStream<String, Error>,
         assistantIndex: Int
-    ) async {
+    ) async throws {
+        var thinkFilter = StreamingThinkFilter()
         var pending = ""
         let flushIntervalNs: UInt64 = 50_000_000 // 50ms
         var lastFlush = DispatchTime.now().uptimeNanoseconds
@@ -265,19 +268,20 @@ final class ChatViewModel: ObservableObject {
 
         do {
             for try await chunk in stream {
-                if Task.isCancelled { break }
+                try Task.checkCancellation()
 
-                RVLogger.d("chunk: \(chunk)")
-                pending += chunk
+                pending += thinkFilter.consume(chunk)
                 flushIfNeeded()
             }
 
+            pending += thinkFilter.finish()
             // 스트림 끝나면 남은 거 강제 반영
             flushIfNeeded(force: true)
 
         } catch {
+            pending += thinkFilter.finish()
             flushIfNeeded(force: true)
-            messages[assistantIndex].text += "\n\n(스트림 오류: \(error))"
+            throw error
         }
     }
 

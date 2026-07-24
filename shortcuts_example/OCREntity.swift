@@ -5,7 +5,6 @@
 
 import Foundation
 import AppIntents
-import VisualIntelligence
 import Vision
 import VideoToolbox
 
@@ -38,5 +37,4 @@ struct OCREntity: AppEntity, Identifiable {
     }
 
 }
-
 

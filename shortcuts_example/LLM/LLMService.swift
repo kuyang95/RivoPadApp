@@ -5,27 +5,42 @@
 //  Created by meee on 2/5/26.
 //
 
-import Foundation
-import Hub
-import MLXLMCommon
-import MLX
-import MLXLLM
-import MLXVLM
 import Combine
 import CoreImage
+import Foundation
+import Hub
+import MLX
+import MLXLLM
+import MLXLMCommon
+import MLXVLM
 
-enum LoadedModel: Equatable {
+enum LoadedModel: Equatable, Sendable {
     case none
     case qwen3_8b_4bit
     case qwen3_vl_8b_4bit
 
     var displayName: String {
         switch self {
-        case .none: return "None"
-        case .qwen3_8b_4bit: return "Qwen3-8B-4bit"
-        case .qwen3_vl_8b_4bit: return "Qwen3-VL-8B-Instruct-4bit"
+        case .none:
+            return "None"
+        case .qwen3_8b_4bit:
+            return "Qwen3-8B-4bit"
+        case .qwen3_vl_8b_4bit:
+            return "Qwen3-VL-8B-Instruct-4bit"
         }
     }
+}
+
+struct LLMConversationID: Hashable, Sendable {
+    let rawValue: UUID
+
+    init(_ rawValue: UUID = UUID()) {
+        self.rawValue = rawValue
+    }
+
+    static let legacy = LLMConversationID(
+        UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    )
 }
 
 @MainActor
@@ -33,15 +48,48 @@ final class LLMService: ObservableObject {
 
     static let shared = LLMService()
 
-    @Published var isLoading = false
-    @Published var isGenerating = false
+    @Published private(set) var isLoading = false
+    @Published private(set) var isGenerating = false
     @Published private(set) var loadedModel: LoadedModel = .none
+    @Published private(set) var inferencePolicy: LocalInferencePolicy?
 
-    private var session: ChatSession?
+    private struct LocalModelSpec {
+        let repoID: String
+        let isVision: Bool
+    }
+
+    private struct InFlightLoad {
+        let id: UUID
+        let requestID: UUID
+        let target: LoadedModel
+        let task: Task<ModelContainer, Error>
+    }
+
+    private struct SessionRecord {
+        let id: UUID
+        let conversationID: LLMConversationID
+        let system: String
+        let modelEpoch: UUID
+        let session: ChatSession
+    }
+
+    private var container: ModelContainer?
+    private var modelEpoch = UUID()
+    private var activeSession: SessionRecord?
+    private var inFlightLoad: InFlightLoad?
+    private var activationRequestID: UUID?
+    private var activationRequestedTarget: LoadedModel?
+
+    private var activeOperationID: UUID?
+    private var activeOperationConversationID: LLMConversationID?
+    private var generationID: UUID?
+    private var generationConversationID: LLMConversationID?
     private var generationTask: Task<Void, Never>?
 
+    private init() {}
+
     var isReady: Bool {
-        session != nil && loadedModel != .none && !isLoading
+        container != nil && loadedModel != .none && !isLoading
     }
 
     // MARK: - Local model store
@@ -53,16 +101,13 @@ final class LLMService: ObservableObject {
             appropriateFor: nil,
             create: true
         )
-        let dir = base.appendingPathComponent("HFModels", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
+        let directory = base.appendingPathComponent("HFModels", isDirectory: true)
+        try? FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        return directory
     }()
-
-    private struct LocalModelSpec {
-        let kind: LoadedModel
-        let repoId: String
-        let isVision: Bool
-    }
 
     private func spec(for target: LoadedModel) -> LocalModelSpec? {
         switch target {
@@ -71,15 +116,13 @@ final class LLMService: ObservableObject {
 
         case .qwen3_8b_4bit:
             return .init(
-                kind: .qwen3_8b_4bit,
-                repoId: "mlx-community/Qwen3-8B-4bit",
+                repoID: "mlx-community/Qwen3-8B-4bit",
                 isVision: false
             )
 
         case .qwen3_vl_8b_4bit:
             return .init(
-                kind: .qwen3_vl_8b_4bit,
-                repoId: "mlx-community/Qwen3-VL-8B-Instruct-4bit",
+                repoID: "mlx-community/Qwen3-VL-8B-Instruct-4bit",
                 isVision: true
             )
         }
@@ -92,18 +135,274 @@ final class LLMService: ObservableObject {
         )
     }
 
-    // MARK: - Memory config
+    // MARK: - Device-adaptive policy
 
-    func configureForIPadProM4_8GB() {
-        let gb = 1024 * 1024 * 1024
-        Memory.memoryLimit = 5 * gb
-        Memory.cacheLimit = 20 * 1024 * 1024
+    @discardableResult
+    func configureForCurrentDevice() -> LocalInferencePolicy {
+        let capabilities = DeviceCapabilityProfiler.snapshot()
+        let policy = LocalInferencePolicy.make(from: capabilities)
+
+        Memory.memoryLimit = policy.mlxMemoryLimitBytes
+        Memory.cacheLimit = policy.mlxCacheLimitBytes
+        inferencePolicy = policy
+
+        let mib = 1_048_576
+        RVLogger.d(
+            "🧭 Local AI profile=\(policy.memoryTier.rawValue) " +
+            "mlxLimit=\(policy.mlxMemoryLimitBytes / mib)MiB " +
+            "available=\(capabilities.availableAppMemoryBytes / UInt64(mib))MiB " +
+            "thermal=\(capabilities.thermalLevel.rawValue)"
+        )
+
+        return policy
     }
 
-    func configureForIPadProM4_12GB() {
-        let gb = 1024 * 1024 * 1024
-        Memory.memoryLimit = 5 * gb
-        Memory.cacheLimit = 20 * 1024 * 1024
+    // MARK: - Model activation
+
+    func activateModel(_ target: LoadedModel) async throws {
+        try await activateModel(
+            target,
+            preservingOperationID: nil
+        )
+    }
+
+    private func activateModel(
+        _ target: LoadedModel,
+        preservingOperationID: UUID?
+    ) async throws {
+        let requestID: UUID
+        if activationRequestedTarget == target,
+           let currentRequestID = activationRequestID {
+            requestID = currentRequestID
+        } else {
+            requestID = UUID()
+            activationRequestID = requestID
+            activationRequestedTarget = target
+            invalidateActiveOperation(except: preservingOperationID)
+        }
+
+        if target == .none {
+            await unloadCurrentModel(requestID: requestID)
+            return
+        }
+
+        while true {
+            try validateActivationRequest(requestID, target: target)
+
+            if loadedModel == target, container != nil {
+                return
+            }
+
+            if let load = inFlightLoad {
+                if load.target != target {
+                    load.task.cancel()
+                }
+
+                do {
+                    let loadedContainer = try await load.task.value
+                    let didCommit = commitLoadedContainer(
+                        loadedContainer,
+                        target: load.target,
+                        loadID: load.id,
+                        requestID: load.requestID
+                    )
+                    if !didCommit {
+                        clearLoadIfCurrent(load.id)
+                    }
+                } catch {
+                    clearLoadIfCurrent(load.id)
+                    if load.target == target,
+                       load.requestID == requestID,
+                       activationRequestID == requestID {
+                        throw error
+                    }
+                }
+
+                continue
+            }
+
+            try validateActivationRequest(requestID, target: target)
+            _ = configureForCurrentDevice()
+
+            guard let modelSpec = spec(for: target) else {
+                throw NSError(
+                    domain: "LLMService",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "잘못된 모델 타입입니다."]
+                )
+            }
+
+            let loadID = UUID()
+            let loadRequestID = requestID
+            let loadTask = Task { @MainActor [weak self] in
+                guard let self else {
+                    throw CancellationError()
+                }
+
+                try await self.prepareForModelSwitch(
+                    loadID: loadID,
+                    requestID: loadRequestID,
+                    target: target
+                )
+                try Task.checkCancellation()
+
+                let loadedContainer = try await self.loadContainer(
+                    for: modelSpec,
+                    allowDownloadIfNeeded: true
+                )
+                try Task.checkCancellation()
+                try self.validateLoad(
+                    loadID: loadID,
+                    requestID: loadRequestID,
+                    target: target
+                )
+                return loadedContainer
+            }
+
+            inFlightLoad = .init(
+                id: loadID,
+                requestID: requestID,
+                target: target,
+                task: loadTask
+            )
+            isLoading = true
+            RVLogger.d("🚀 모델 활성화 시작: \(target.displayName)")
+        }
+    }
+
+    @discardableResult
+    private func commitLoadedContainer(
+        _ loadedContainer: ModelContainer,
+        target: LoadedModel,
+        loadID: UUID,
+        requestID: UUID
+    ) -> Bool {
+        guard inFlightLoad?.id == loadID,
+              inFlightLoad?.requestID == requestID,
+              activationRequestID == requestID,
+              activationRequestedTarget == target else {
+            return false
+        }
+
+        container = loadedContainer
+        loadedModel = target
+        modelEpoch = UUID()
+        inFlightLoad = nil
+        isLoading = false
+
+        RVLogger.d("✅ 새 모델 활성화 완료: \(target.displayName)")
+        RVLogger.d(Memory.snapshot().description)
+        return true
+    }
+
+    private func clearLoadIfCurrent(_ loadID: UUID) {
+        guard inFlightLoad?.id == loadID else {
+            return
+        }
+
+        inFlightLoad = nil
+        isLoading = false
+    }
+
+    private func validateActivationRequest(
+        _ requestID: UUID,
+        target: LoadedModel
+    ) throws {
+        guard activationRequestID == requestID,
+              activationRequestedTarget == target else {
+            throw CancellationError()
+        }
+    }
+
+    private func validateLoad(
+        loadID: UUID,
+        requestID: UUID,
+        target: LoadedModel
+    ) throws {
+        guard inFlightLoad?.id == loadID,
+              inFlightLoad?.requestID == requestID else {
+            throw CancellationError()
+        }
+        try validateActivationRequest(requestID, target: target)
+    }
+
+    private func prepareForModelSwitch(
+        loadID: UUID,
+        requestID: UUID,
+        target: LoadedModel
+    ) async throws {
+        try validateLoad(
+            loadID: loadID,
+            requestID: requestID,
+            target: target
+        )
+        await stopActiveGeneration()
+        try validateLoad(
+            loadID: loadID,
+            requestID: requestID,
+            target: target
+        )
+
+        if let session = activeSession?.session {
+            await session.synchronize()
+            try validateLoad(
+                loadID: loadID,
+                requestID: requestID,
+                target: target
+            )
+        }
+
+        activeSession = nil
+        container = nil
+        loadedModel = .none
+        modelEpoch = UUID()
+        Memory.clearCache()
+        await Task.yield()
+        try validateLoad(
+            loadID: loadID,
+            requestID: requestID,
+            target: target
+        )
+    }
+
+    func unloadCurrentModel() async {
+        try? await activateModel(.none)
+    }
+
+    private func unloadCurrentModel(requestID: UUID) async {
+        if let load = inFlightLoad {
+            load.task.cancel()
+            _ = try? await load.task.value
+            clearLoadIfCurrent(load.id)
+        }
+
+        guard activationRequestID == requestID,
+              activationRequestedTarget == LoadedModel.none else {
+            return
+        }
+
+        await stopActiveGeneration()
+        guard activationRequestID == requestID,
+              activationRequestedTarget == LoadedModel.none else {
+            return
+        }
+
+        if let session = activeSession?.session {
+            await session.synchronize()
+            guard activationRequestID == requestID,
+                  activationRequestedTarget == LoadedModel.none else {
+                return
+            }
+        }
+
+        activeSession = nil
+        container = nil
+        loadedModel = .none
+        modelEpoch = UUID()
+        Memory.clearCache()
+
+        RVLogger.d("🗑️ unload 완료")
+        RVLogger.d(Memory.snapshot().description)
     }
 
     // MARK: - Local resolve / download
@@ -112,365 +411,492 @@ final class LLMService: ObservableObject {
         for spec: LocalModelSpec,
         allowDownload: Bool
     ) async throws -> URL {
+        RVLogger.d("📦 모델 확인 시작: \(spec.repoID)")
 
-        RVLogger.d("📦 모델 확인 시작: \(spec.repoId)")
-        RVLogger.d("📁 modelStoreURL: \(modelStoreURL.path)")
-
-        // 1) 먼저 오프라인으로 로컬 설치본 확인
         do {
             let offlineHub = makeHub(offlineOnly: true)
-            let localURL = try await offlineHub.snapshot(from: spec.repoId, matching: "*")
-            RVLogger.d("✅ 로컬 모델 발견: \(localURL.path)")
+            let localURL = try await offlineHub.snapshot(
+                from: spec.repoID,
+                matching: "*"
+            )
+            RVLogger.d("✅ 로컬 모델 발견: \(spec.repoID)")
             return localURL
         } catch {
-            RVLogger.d("ℹ️ 로컬 모델 없음 또는 메타데이터 불완전: \(spec.repoId)")
-            guard allowDownload else { throw error }
-        }
-
-        // 2) 없으면 그때만 다운로드
-        RVLogger.d("⬇️ 다운로드 시작: \(spec.repoId)")
-
-        let onlineHub = makeHub(offlineOnly: false)
-
-        var lastLoggedPercent = -1
-
-        let downloadedURL = try await onlineHub.snapshot(
-            from: spec.repoId,
-            matching: "*"
-        ) { progress in
-            let percent = Int(progress.fractionCompleted * 100)
-
-            // 로그 과다 방지: 5% 단위 + 100%
-            if percent >= lastLoggedPercent + 5 || percent == 100 {
-                lastLoggedPercent = percent
-                RVLogger.d(
-                    "⬇️ [\(spec.repoId)] 다운로드 진행률: \(percent)% " +
-                    "(\(progress.completedUnitCount)/\(progress.totalUnitCount))"
-                )
+            RVLogger.d("ℹ️ 로컬 모델 없음 또는 메타데이터 불완전: \(spec.repoID)")
+            guard allowDownload else {
+                throw error
             }
         }
 
-        RVLogger.d("✅ 다운로드 완료: \(downloadedURL.path)")
+        RVLogger.d("⬇️ 다운로드 시작: \(spec.repoID)")
+
+        let onlineHub = makeHub(offlineOnly: false)
+
+        let downloadedURL = try await onlineHub.snapshot(
+            from: spec.repoID,
+            matching: "*"
+        ) { _ in }
+
+        RVLogger.d("✅ 다운로드 완료: \(spec.repoID)")
         return downloadedURL
     }
 
-    // MARK: - Load
-
-    private func loadSession(
-        for target: LoadedModel,
+    private func loadContainer(
+        for spec: LocalModelSpec,
         allowDownloadIfNeeded: Bool
-    ) async throws -> ChatSession {
-
-        guard let spec = spec(for: target) else {
-            throw NSError(
-                domain: "LLMService",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "잘못된 모델 타입입니다."]
-            )
-        }
-
-        let modelDir = try await resolveLocalModelDirectory(
+    ) async throws -> ModelContainer {
+        let modelDirectory = try await resolveLocalModelDirectory(
             for: spec,
             allowDownload: allowDownloadIfNeeded
         )
 
-        do {
-            return try await makeChatSession(from: modelDir, spec: spec)
-
-        } catch {
-            RVLogger.d("❌ 1차 로컬 로드 실패: \(error)")
-
-            guard allowDownloadIfNeeded else {
-                throw error
-            }
-
-            RVLogger.d("🛠️ 로컬 캐시 삭제 후 재다운로드를 시도합니다: \(spec.repoId)")
-
-            do {
-                try deleteLocalModelCache(for: spec, resolvedModelDir: modelDir)
-            } catch {
-                RVLogger.d("⚠️ 캐시 삭제 중 오류: \(error)")
-            }
-
-            Memory.clearCache()
-            await Task.yield()
-
-            let redownloadedDir = try await redownloadModelDirectory(for: spec)
-
-            do {
-                return try await makeChatSession(from: redownloadedDir, spec: spec)
-            } catch {
-                RVLogger.d("❌ 재다운로드 후 로드도 실패: \(error)")
-                throw error
-            }
-        }
+        // A load failure can be caused by memory pressure or cancellation.
+        // Do not delete a multi-gigabyte model unless a future installer has
+        // positively identified a checksum mismatch.
+        return try await makeModelContainer(
+            from: modelDirectory,
+            spec: spec
+        )
     }
 
-    // MARK: - Activate / Unload
-
-    func activateModel(_ target: LoadedModel) async throws {
-        if isLoading { return }
-        if loadedModel == target, session != nil { return }
-
-        isLoading = true
-        defer { isLoading = false }
-
-        // 1) 생성 중지
-        generationTask?.cancel()
-        generationTask = nil
-        isGenerating = false
-
-        // 2) 기존 세션 해제
-        session = nil
-        loadedModel = .none
-
-        // 3) MLX 캐시 비우기
-        Memory.clearCache()
-
-        RVLogger.d("🧹 clearCache 이후")
-        RVLogger.d(Memory.snapshot().description)
-
-        // 4) 해제/캐시정리 타이밍 한 번 양보
-        await Task.yield()
-
-        RVLogger.d("🚀 모델 활성화 시작: \(target.displayName)")
-
-        switch target {
-        case .none:
-            RVLogger.d("ℹ️ target == .none 이므로 로드 없이 종료")
-            return
-
-        case .qwen3_8b_4bit:
-            let newSession = try await loadSession(
-                for: .qwen3_8b_4bit,
-                allowDownloadIfNeeded: true
-            )
-            session = newSession
-            loadedModel = .qwen3_8b_4bit
-
-        case .qwen3_vl_8b_4bit:
-            let newSession = try await loadSession(
-                for: .qwen3_vl_8b_4bit,
-                allowDownloadIfNeeded: true
-            )
-            session = newSession
-            loadedModel = .qwen3_vl_8b_4bit
-        }
-
-        RVLogger.d("✅ 새 모델 활성화 완료: \(loadedModel.displayName)")
-        RVLogger.d(Memory.snapshot().description)
-    }
-    
-    private func makeChatSession(
-        from modelDir: URL,
+    private func makeModelContainer(
+        from modelDirectory: URL,
         spec: LocalModelSpec
-    ) async throws -> ChatSession {
+    ) async throws -> ModelContainer {
+        RVLogger.d("🧠 로드 시작: \(spec.repoID)")
 
-        RVLogger.d("🧠 로드 시작: \(spec.repoId)")
-        RVLogger.d("📂 로드 경로: \(modelDir.path)")
-
-        let cfg = ModelConfiguration(directory: modelDir)
+        let configuration = ModelConfiguration(directory: modelDirectory)
         let hub = makeHub(offlineOnly: true)
 
-        var lastLoggedPercent = -1
-
         if spec.isVision {
-            let container = try await VLMModelFactory.shared.loadContainer(
+            let loadedContainer = try await VLMModelFactory.shared.loadContainer(
                 hub: hub,
-                configuration: cfg
-            ) { progress in
-                let percent = Int(progress.fractionCompleted * 100)
+                configuration: configuration
+            ) { _ in }
 
-                if percent >= lastLoggedPercent + 5 || percent == 100 {
-                    lastLoggedPercent = percent
-                    RVLogger.d("🧠 [\(spec.repoId)] VLM 로드 진행률: \(percent)%")
-                }
-            }
+            RVLogger.d("✅ VLM 로드 완료: \(spec.repoID)")
+            return loadedContainer
+        }
 
-            RVLogger.d("✅ VLM 로드 완료: \(spec.repoId)")
-            return ChatSession(container)
+        let loadedContainer = try await LLMModelFactory.shared.loadContainer(
+            hub: hub,
+            configuration: configuration
+        ) { _ in }
 
-        } else {
-            let container = try await LLMModelFactory.shared.loadContainer(
-                hub: hub,
-                configuration: cfg
-            ) { progress in
-                let percent = Int(progress.fractionCompleted * 100)
+        RVLogger.d("✅ LLM 로드 완료: \(spec.repoID)")
+        return loadedContainer
+    }
 
-                if percent >= lastLoggedPercent + 5 || percent == 100 {
-                    lastLoggedPercent = percent
-                    RVLogger.d("🧠 [\(spec.repoId)] LLM 로드 진행률: \(percent)%")
-                }
-            }
+    // MARK: - Conversation lifecycle
 
-            RVLogger.d("✅ LLM 로드 완료: \(spec.repoId)")
-            return ChatSession(container)
+    func resetConversation(_ conversationID: LLMConversationID) async {
+        if activeOperationConversationID == conversationID {
+            invalidateActiveOperation(except: nil)
+        }
+
+        if generationConversationID == conversationID {
+            await stopActiveGeneration()
+        }
+
+        guard let sessionRecord = activeSession,
+              sessionRecord.conversationID == conversationID else {
+            return
+        }
+
+        await sessionRecord.session.synchronize()
+        guard activeOperationConversationID != conversationID,
+              activeSession?.id == sessionRecord.id else {
+            return
+        }
+
+        activeSession = nil
+        await sessionRecord.session.clear()
+
+        if activeOperationConversationID == conversationID {
+            return
         }
     }
 
-    private func redownloadModelDirectory(
-        for spec: LocalModelSpec
-    ) async throws -> URL {
-
-        RVLogger.d("⬇️ 복구용 재다운로드 시작: \(spec.repoId)")
-
-        let onlineHub = makeHub(offlineOnly: false)
-        var lastLoggedPercent = -1
-
-        let downloadedURL = try await onlineHub.snapshot(
-            from: spec.repoId,
-            matching: "*"
-        ) { progress in
-            let percent = Int(progress.fractionCompleted * 100)
-
-            if percent >= lastLoggedPercent + 5 || percent == 100 {
-                lastLoggedPercent = percent
-                RVLogger.d(
-                    "⬇️ [\(spec.repoId)] 복구 다운로드 진행률: \(percent)% " +
-                    "(\(progress.completedUnitCount)/\(progress.totalUnitCount))"
-                )
-            }
+    func cancelGeneration(for conversationID: LLMConversationID) async {
+        if activeOperationConversationID == conversationID {
+            invalidateActiveOperation(except: nil)
         }
 
-        RVLogger.d("✅ 복구 다운로드 완료: \(downloadedURL.path)")
-        return downloadedURL
+        if generationConversationID == conversationID {
+            await stopActiveGeneration()
+        }
     }
-    
-    private func deleteLocalModelCache(
-        for spec: LocalModelSpec,
-        resolvedModelDir: URL?
+
+    private func session(
+        for conversationID: LLMConversationID,
+        system: String,
+        expectedModel: LoadedModel,
+        expectedModelEpoch: UUID,
+        operationID: UUID
+    ) async throws -> ChatSession {
+        try validateOperation(
+            operationID,
+            conversationID: conversationID,
+            expectedModel: expectedModel,
+            expectedModelEpoch: expectedModelEpoch
+        )
+        await stopActiveGeneration()
+        try validateOperation(
+            operationID,
+            conversationID: conversationID,
+            expectedModel: expectedModel,
+            expectedModelEpoch: expectedModelEpoch
+        )
+
+        if let activeSession,
+           activeSession.conversationID == conversationID,
+           activeSession.system == system,
+           activeSession.modelEpoch == expectedModelEpoch {
+            return activeSession.session
+        }
+
+        if let previousSession = activeSession {
+            await previousSession.session.synchronize()
+            try validateOperation(
+                operationID,
+                conversationID: conversationID,
+                expectedModel: expectedModel,
+                expectedModelEpoch: expectedModelEpoch
+            )
+
+            activeSession = nil
+            await previousSession.session.clear()
+            try validateOperation(
+                operationID,
+                conversationID: conversationID,
+                expectedModel: expectedModel,
+                expectedModelEpoch: expectedModelEpoch
+            )
+        }
+
+        try validateOperation(
+            operationID,
+            conversationID: conversationID,
+            expectedModel: expectedModel,
+            expectedModelEpoch: expectedModelEpoch
+        )
+        guard let container else {
+            throw CancellationError()
+        }
+
+        let newSession = ChatSession(
+            container,
+            instructions: system,
+            generateParameters: generationParameters(for: expectedModel)
+        )
+        activeSession = .init(
+            id: UUID(),
+            conversationID: conversationID,
+            system: system,
+            modelEpoch: expectedModelEpoch,
+            session: newSession
+        )
+        return newSession
+    }
+
+    private func beginOperation(
+        for conversationID: LLMConversationID
+    ) -> UUID {
+        let operationID = UUID()
+        activeOperationID = operationID
+        activeOperationConversationID = conversationID
+        return operationID
+    }
+
+    private func invalidateActiveOperation(except operationID: UUID?) {
+        guard activeOperationID != operationID else {
+            return
+        }
+        activeOperationID = nil
+        activeOperationConversationID = nil
+    }
+
+    private func clearOperationIfCurrent(_ operationID: UUID) {
+        guard activeOperationID == operationID else {
+            return
+        }
+        activeOperationID = nil
+        activeOperationConversationID = nil
+    }
+
+    private func validateOperation(
+        _ operationID: UUID,
+        conversationID: LLMConversationID,
+        expectedModel: LoadedModel,
+        expectedModelEpoch: UUID
     ) throws {
-
-        let fm = FileManager.default
-
-        var targets: [URL] = []
-
-        if let resolvedModelDir {
-            targets.append(resolvedModelDir)
-        }
-
-        let repoDir = modelStoreURL
-            .appendingPathComponent("models", isDirectory: true)
-            .appendingPathComponent(spec.repoId, isDirectory: true)
-
-        targets.append(repoDir)
-
-        var removedPaths = Set<String>()
-
-        for url in targets {
-            let path = url.path
-
-            guard !removedPaths.contains(path) else { continue }
-            guard fm.fileExists(atPath: path) else { continue }
-
-            RVLogger.d("🗑️ 로컬 모델 캐시 삭제: \(path)")
-            try fm.removeItem(at: url)
-            removedPaths.insert(path)
+        guard activeOperationID == operationID,
+              activeOperationConversationID == conversationID,
+              loadedModel == expectedModel,
+              modelEpoch == expectedModelEpoch,
+              container != nil else {
+            throw CancellationError()
         }
     }
 
+    private func generationParameters(
+        for model: LoadedModel
+    ) -> GenerateParameters {
+        let policy = inferencePolicy
+            ?? LocalInferencePolicy.make(from: DeviceCapabilityProfiler.snapshot())
 
-    func unloadCurrentModel() {
-        generationTask?.cancel()
+        let maxTokens: Int
+        let maxKVSize: Int
+
+        switch model {
+        case .qwen3_vl_8b_4bit:
+            maxTokens = policy.visionMaxTokens
+            maxKVSize = policy.visionMaxKVSize
+        case .qwen3_8b_4bit, .none:
+            maxTokens = policy.textMaxTokens
+            maxKVSize = policy.textMaxKVSize
+        }
+
+        return .init(
+            maxTokens: maxTokens,
+            maxKVSize: maxKVSize,
+            kvBits: policy.kvBits,
+            kvGroupSize: policy.kvGroupSize,
+            quantizedKVStart: policy.quantizedKVStart,
+            temperature: 0.6,
+            topP: 0.9,
+            prefillStepSize: 512
+        )
+    }
+
+    // MARK: - Streaming
+
+    func streamText(
+        conversationID: LLMConversationID,
+        system: String,
+        prompt: String
+    ) async throws -> AsyncThrowingStream<String, Error> {
+        let expectedModel = LoadedModel.qwen3_8b_4bit
+        let operationID = beginOperation(for: conversationID)
+
+        do {
+            try await activateModel(
+                expectedModel,
+                preservingOperationID: operationID
+            )
+            let expectedModelEpoch = modelEpoch
+            try validateOperation(
+                operationID,
+                conversationID: conversationID,
+                expectedModel: expectedModel,
+                expectedModelEpoch: expectedModelEpoch
+            )
+
+            let session = try await session(
+                for: conversationID,
+                system: system,
+                expectedModel: expectedModel,
+                expectedModelEpoch: expectedModelEpoch,
+                operationID: operationID
+            )
+
+            return makeTextStream(
+                session: session,
+                conversationID: conversationID,
+                operationID: operationID,
+                prompt: prompt
+            )
+        } catch {
+            clearOperationIfCurrent(operationID)
+            throw error
+        }
+    }
+
+    func streamVision(
+        conversationID: LLMConversationID,
+        system: String,
+        prompt: String,
+        images: [CIImage]
+    ) async throws -> AsyncThrowingStream<String, Error> {
+        let expectedModel = LoadedModel.qwen3_vl_8b_4bit
+        let operationID = beginOperation(for: conversationID)
+
+        do {
+            try await activateModel(
+                expectedModel,
+                preservingOperationID: operationID
+            )
+            let expectedModelEpoch = modelEpoch
+            try validateOperation(
+                operationID,
+                conversationID: conversationID,
+                expectedModel: expectedModel,
+                expectedModelEpoch: expectedModelEpoch
+            )
+
+            let session = try await session(
+                for: conversationID,
+                system: system,
+                expectedModel: expectedModel,
+                expectedModelEpoch: expectedModelEpoch,
+                operationID: operationID
+            )
+
+            return makeVisionStream(
+                session: session,
+                conversationID: conversationID,
+                operationID: operationID,
+                prompt: prompt,
+                images: images
+            )
+        } catch {
+            clearOperationIfCurrent(operationID)
+            throw error
+        }
+    }
+
+    func streamText(
+        system: String,
+        prompt: String
+    ) async throws -> AsyncThrowingStream<String, Error> {
+        try await streamText(
+            conversationID: .legacy,
+            system: system,
+            prompt: prompt
+        )
+    }
+
+    func streamVision(
+        system: String,
+        prompt: String,
+        images: [CIImage]
+    ) async throws -> AsyncThrowingStream<String, Error> {
+        try await streamVision(
+            conversationID: .legacy,
+            system: system,
+            prompt: prompt,
+            images: images
+        )
+    }
+
+    func respond(_ prompt: String) async throws -> String {
+        let stream = try await streamText(
+            conversationID: .legacy,
+            system: "",
+            prompt: prompt
+        )
+
+        var response = ""
+        for try await chunk in stream {
+            response += chunk
+        }
+        return response
+    }
+
+    private func makeTextStream(
+        session: ChatSession,
+        conversationID: LLMConversationID,
+        operationID: UUID,
+        prompt: String
+    ) -> AsyncThrowingStream<String, Error> {
+        let stream = session.streamResponse(to: prompt)
+        return managedStream(
+            stream,
+            conversationID: conversationID,
+            operationID: operationID
+        )
+    }
+
+    private func makeVisionStream(
+        session: ChatSession,
+        conversationID: LLMConversationID,
+        operationID: UUID,
+        prompt: String,
+        images: [CIImage]
+    ) -> AsyncThrowingStream<String, Error> {
+        let userImages: [UserInput.Image] = images.map { .ciImage($0) }
+        let stream = session.streamResponse(
+            to: prompt,
+            images: userImages,
+            videos: []
+        )
+        return managedStream(
+            stream,
+            conversationID: conversationID,
+            operationID: operationID
+        )
+    }
+
+    private func managedStream(
+        _ source: AsyncThrowingStream<String, Error>,
+        conversationID: LLMConversationID,
+        operationID: UUID
+    ) -> AsyncThrowingStream<String, Error> {
+        generationID = operationID
+        generationConversationID = conversationID
+        isGenerating = true
+
+        return AsyncThrowingStream { continuation in
+            let task = Task { @MainActor [weak self] in
+                do {
+                    guard self?.activeOperationID == operationID else {
+                        throw CancellationError()
+                    }
+
+                    for try await chunk in source {
+                        try Task.checkCancellation()
+                        guard self?.activeOperationID == operationID else {
+                            throw CancellationError()
+                        }
+                        continuation.yield(chunk)
+                    }
+                    continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish(throwing: CancellationError())
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+
+                self?.finishGeneration(operationID)
+            }
+
+            generationTask = task
+
+            continuation.onTermination = { _ in
+                task.cancel()
+                Task { @MainActor [weak self] in
+                    self?.finishGeneration(operationID)
+                }
+            }
+        }
+    }
+
+    private func stopActiveGeneration() async {
+        guard let task = generationTask else {
+            return
+        }
+
+        generationID = nil
+        generationConversationID = nil
+        generationTask = nil
+        isGenerating = false
+        task.cancel()
+
+        if let session = activeSession?.session {
+            await session.synchronize()
+        }
+    }
+
+    private func finishGeneration(_ id: UUID) {
+        guard generationID == id else {
+            return
+        }
+
+        generationID = nil
+        generationConversationID = nil
         generationTask = nil
         isGenerating = false
 
-        session = nil
-        loadedModel = .none
-        Memory.clearCache()
-
-        RVLogger.d("🗑️ unload 완료")
-        RVLogger.d(Memory.snapshot().description)
-    }
-
-    // MARK: - Respond / Stream
-
-    func respond(_ prompt: String) async throws -> String {
-        guard let session else {
-            throw NSError(domain: "LLM", code: 1)
-        }
-
-        isGenerating = true
-        defer { isGenerating = false }
-
-        return try await session.respond(to: prompt)
-    }
-
-    func streamText(system: String, prompt: String) async throws -> AsyncThrowingStream<String, Error> {
-        guard let session else {
-            throw NSError(domain: "LLM", code: 1)
-        }
-
-        session.instructions = system
-        isGenerating = true
-
-        return AsyncThrowingStream { continuation in
-            let task = Task {
-                do {
-                    let stream = session.streamResponse(to: prompt)
-                    for try await chunk in stream {
-                        continuation.yield(chunk)
-                    }
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-
-                await MainActor.run {
-                    self.isGenerating = false
-                    self.generationTask = nil
-                }
-            }
-
-            self.generationTask = task
-
-            continuation.onTermination = { _ in
-                task.cancel()
-                Task { @MainActor in
-                    self.isGenerating = false
-                    self.generationTask = nil
-                }
-            }
-        }
-    }
-
-    func streamVision(system: String, prompt: String, images: [CIImage]) async throws -> AsyncThrowingStream<String, Error> {
-        guard let session else {
-            throw NSError(domain: "LLM", code: 1)
-        }
-
-        session.instructions = system
-        isGenerating = true
-
-        let uiImages: [UserInput.Image] = images.map { .ciImage($0) }
-
-        return AsyncThrowingStream { continuation in
-            let task = Task {
-                do {
-                    let stream = session.streamResponse(to: prompt, images: uiImages, videos: [])
-                    for try await chunk in stream {
-                        continuation.yield(chunk)
-                    }
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-
-                await MainActor.run {
-                    self.isGenerating = false
-                    self.generationTask = nil
-                }
-            }
-
-            self.generationTask = task
-
-            continuation.onTermination = { _ in
-                task.cancel()
-                Task { @MainActor in
-                    self.isGenerating = false
-                    self.generationTask = nil
-                }
-            }
-        }
+        clearOperationIfCurrent(id)
     }
 }

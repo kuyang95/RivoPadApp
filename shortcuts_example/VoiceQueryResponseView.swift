@@ -174,6 +174,7 @@ struct VoiceQueryResponseView: View {
     @State private var pendingQuestion: String?
     @State private var pendingDocument: String?
     @State private var pendingImage: UIImage?
+    @State private var conversationID = LLMConversationID()
     
   
     
@@ -232,6 +233,11 @@ struct VoiceQueryResponseView: View {
 
             case .text:
                 handleTextQuery()
+            }
+        }
+        .onDisappear {
+            Task {
+                await LLMService.shared.resetConversation(conversationID)
             }
         }
     }
@@ -347,8 +353,6 @@ struct VoiceQueryResponseView: View {
         let service = LLMService.shared
 
         do {
-
-            service.configureForIPadProM4_12GB()
             try await service.activateModel(.qwen3_8b_4bit)
 
         } catch {
@@ -360,11 +364,9 @@ struct VoiceQueryResponseView: View {
 
         let service = LLMService.shared
 
-        guard let ciImage = CIImage(image: image) else { return }
+        guard CIImage(image: image) != nil else { return }
 
         do {
-
-            service.configureForIPadProM4_12GB()
             try await service.activateModel(.qwen3_vl_8b_4bit)
 
         } catch {
@@ -395,7 +397,8 @@ struct VoiceQueryResponseView: View {
     private func startModelAndSTTForImage(_ image: UIImage) {
 
         pendingImage = image
-         pendingDocument = nil
+        pendingDocument = nil
+        let service = LLMService.shared
          
         messages.append(
             Message(
@@ -412,13 +415,7 @@ struct VoiceQueryResponseView: View {
             async let sttTask = startSTT()
 
             async let modelTask: Void = {
-
-                let service = LLMService.shared
-
-                service.configureForIPadProM4_12GB()
-
                 try await service.activateModel(.qwen3_vl_8b_4bit)
-
             }()
 
             do {
@@ -454,7 +451,8 @@ struct VoiceQueryResponseView: View {
     private func startModelAndSTTForText(_ text: String) {
 
         pendingImage = nil
-           pendingDocument = text
+        pendingDocument = text
+        let service = LLMService.shared
         
         RVLogger.d("들어온 텍스트: \(text)")
         
@@ -473,9 +471,6 @@ struct VoiceQueryResponseView: View {
             async let sttTask = startSTT()
 
             async let modelTask: Void = {
-                let service = LLMService.shared
-
-                service.configureForIPadProM4_12GB()
                 try await service.activateModel(.qwen3_8b_4bit)
             }()
 
@@ -555,6 +550,7 @@ struct VoiceQueryResponseView: View {
             guard let ciImage = CIImage(image: image) else { return }
 
             let stream = try? await service.streamVision(
+                conversationID: conversationID,
                 system: systemPromptVLM,
                 prompt: question,
                 images: [ciImage]
@@ -573,6 +569,7 @@ struct VoiceQueryResponseView: View {
             """
 
             let stream = try? await service.streamText(
+                conversationID: conversationID,
                 system: systemPromptLLM,
                 prompt: prompt
             )
@@ -609,65 +606,35 @@ struct VoiceQueryResponseView: View {
 
         let answerIndex = messages.count - 1
 
-        var buffer = ""
-        var isInsideThink = false
+        var thinkFilter = StreamingThinkFilter()
         var finalText = ""
 
         do {
             for try await chunk in stream {
-                buffer += chunk
-
-                while true {
-                    if isInsideThink {
-                        if let endRange = buffer.range(of: "</think>") {
-                            buffer = String(buffer[endRange.upperBound...])
-                            isInsideThink = false
-                        } else {
-                            buffer = ""
-                            break
-                        }
-                    } else {
-                        if let startRange = buffer.range(of: "<think>") {
-                            let visiblePart = String(buffer[..<startRange.lowerBound])
-
-                            if !visiblePart.isEmpty {
-                                finalText += visiblePart
-
-                                await MainActor.run {
-                                    messages[answerIndex].text = finalText
-                                }
-                            }
-
-                            buffer = String(buffer[startRange.upperBound...])
-                            isInsideThink = true
-                        } else {
-                            let visiblePart = buffer
-
-                            if !visiblePart.isEmpty {
-                                finalText += visiblePart
-
-                                await MainActor.run {
-                                    messages[answerIndex].text = finalText
-                                }
-                            }
-
-                            buffer = ""
-                            break
-                        }
+                let visibleText = thinkFilter.consume(chunk)
+                if !visibleText.isEmpty {
+                    finalText += visibleText
+                    await MainActor.run {
+                        messages[answerIndex].text = finalText
                     }
                 }
             }
 
+            finalText += thinkFilter.finish()
             if !finalText.isEmpty {
                 await MainActor.run {
+                    messages[answerIndex].text = finalText
                     tts.speak(finalText)
                 }
             }
 
+        } catch is CancellationError {
+            return
         } catch {
+            finalText += thinkFilter.finish()
             await MainActor.run {
                 messages[answerIndex].text =
-                    (messages[answerIndex].text ?? "") + "\n\n(스트림 오류)"
+                    finalText + "\n\n(스트림 오류)"
             }
 
             print("LLM stream error:", error)

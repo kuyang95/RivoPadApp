@@ -69,9 +69,10 @@ struct OCRResultView: View {
 
                 vm.runOCR(image: image)
             }
-
+        }
+        .onDisappear {
             Task {
-                await vm.ensureModelLoaded()
+                await vm.resetConversation()
             }
         }
     }

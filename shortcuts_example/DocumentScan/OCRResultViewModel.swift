@@ -17,6 +17,7 @@ final class OCRResultViewModel: ObservableObject {
     // MARK: - Dependencies
     let sttManager = STTManager.shared
     let llmService = LLMService.shared
+    private let conversationID = LLMConversationID()
 
     
     // MARK: - OCR State
@@ -62,14 +63,13 @@ final class OCRResultViewModel: ObservableObject {
        }
 
     // MARK: - Public: Model loading
-    func ensureModelLoaded() async {
-        do {
-            llmService.configureForIPadProM4_12GB()
-            try await llmService.activateModel(.qwen3_8b_4bit)
-            RVLogger.d("✅ ready: \(llmService.loadedModel.displayName)")
-        } catch {
-            RVLogger.d("❌ load failed: \(error)")
-        }
+    func ensureModelLoaded() async throws {
+        try await llmService.activateModel(.qwen3_8b_4bit)
+        RVLogger.d("✅ ready: \(llmService.loadedModel.displayName)")
+    }
+
+    func resetConversation() async {
+        await llmService.resetConversation(conversationID)
     }
 
     // MARK: - Animation
@@ -199,7 +199,12 @@ final class OCRResultViewModel: ObservableObject {
         """
 
         do {
-            let stream = try await llmService.streamText(system: systemForDocumentQA, prompt: fullPrompt)
+            try await ensureModelLoaded()
+            let stream = try await llmService.streamText(
+                conversationID: conversationID,
+                system: systemForDocumentQA,
+                prompt: fullPrompt
+            )
             try await consumeAIStream(stream)
             aiStatus = "Done"
         } catch {
@@ -222,9 +227,8 @@ final class OCRResultViewModel: ObservableObject {
 
     // MARK: - Stream consumer (with <think> stripping)
     private func consumeAIStream(_ stream: AsyncThrowingStream<String, Error>) async throws {
-        var buffer = ""
+        var thinkFilter = StreamingThinkFilter()
         var pending = ""
-        var isInsideThink = false
 
         let flushIntervalNs: UInt64 = 50_000_000
         var lastFlush = DispatchTime.now().uptimeNanoseconds
@@ -245,34 +249,11 @@ final class OCRResultViewModel: ObservableObject {
         for try await chunk in stream {
             if Task.isCancelled { break }
 
-            buffer += chunk
-
-            while true {
-                if isInsideThink {
-                    if let endRange = buffer.range(of: "</think>") {
-                        buffer = String(buffer[endRange.upperBound...])
-                        isInsideThink = false
-                    } else {
-                        buffer = ""
-                        break
-                    }
-                } else {
-                    if let startRange = buffer.range(of: "<think>") {
-                        let visiblePart = String(buffer[..<startRange.lowerBound])
-                        pending += visiblePart
-                        buffer = String(buffer[startRange.upperBound...])
-                        isInsideThink = true
-                    } else {
-                        pending += buffer
-                        buffer = ""
-                        break
-                    }
-                }
-            }
-
+            pending += thinkFilter.consume(chunk)
             await flush()
         }
 
+        pending += thinkFilter.finish()
         await flush(force: true)
     }
 

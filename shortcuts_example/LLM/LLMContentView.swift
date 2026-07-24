@@ -15,7 +15,7 @@ struct LLMContentView: View {
 
     init(intent: ChatIntentInput) {
         self.intent = intent
-        let service = LLMService()
+        let service = LLMService.shared
         _vm = StateObject(wrappedValue: ChatViewModel(llm: service))
         
         switch intent {
@@ -78,6 +78,12 @@ struct LLMContentView: View {
             // ✅ 초기 메시지 세팅(문서는 표시 X)
             vm.runInitialIntent(intent)
         }
+        .onDisappear {
+            vm.stop()
+            Task {
+                await vm.resetConversation()
+            }
+        }
     }
 }
 
@@ -118,4 +124,3 @@ private struct MessageRow: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
-
