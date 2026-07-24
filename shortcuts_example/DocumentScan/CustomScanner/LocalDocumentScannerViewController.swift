@@ -4,14 +4,16 @@ import CoreMedia
 import UIKit
 
 nonisolated private struct ScannerAnalysisPayload: Sendable {
-    let image: ScannerRGBAImage
+    let modelInput: ScannerPreparedTensor
     let transform: ScannerViewportTransform
     let sharpness: Double
+    let preprocessingMilliseconds: Double
     let generation: Int
 }
 
 nonisolated private struct ScannerPreparedStill: Sendable {
     let image: ScannerRGBAImage
+    let transform: ScannerViewportTransform
     let sharpness: Double
 }
 
@@ -60,13 +62,15 @@ final class LocalDocumentScannerViewController: UIViewController {
         let ticket: UUID
         let viewport: ScannerViewportConfiguration
         let previewDetection: DocumentDetection?
+        let previewTransform: ScannerViewportTransform?
         let previewSharpness: Double
         let captureRotationDegrees: Int
         let photoSettingsID: Int64
+        let requestedAt: TimeInterval
         var photoData: Data?
     }
 
-    private let configuration = CustomDocumentScannerConfiguration
+    nonisolated private let configuration = CustomDocumentScannerConfiguration
         .androidParitySeed
     private var stateMachine = DocumentScannerStateMachine()
     private var gateEvaluator = DocumentCaptureGateEvaluator()
@@ -92,6 +96,7 @@ final class LocalDocumentScannerViewController: UIViewController {
     nonisolated private let frameAdmission =
         ScannerFrameAdmissionController(framesPerSecond: 10)
     private let motionMonitor = ScannerMotionMonitor()
+    private let diagnostics = ScannerDiagnostics()
     private var captureDevice: AVCaptureDevice?
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
     private var previewRotationObservation: NSKeyValueObservation?
@@ -100,6 +105,8 @@ final class LocalDocumentScannerViewController: UIViewController {
     private var pendingCapture: PendingCapture?
     private var manualFocusTickets = Set<UUID>()
     private var sessionInterrupted = false
+    private var interruptionStartedAt: TimeInterval?
+    private var recoveryStartedAt: TimeInterval?
 
     private let renderContext = CIContext(options: [
         .cacheIntermediates: false
@@ -219,6 +226,7 @@ final class LocalDocumentScannerViewController: UIViewController {
         view.backgroundColor = .black
         setupInterface()
         observeCaptureSession()
+        diagnostics.logEnvironment()
         prepareModels()
         send(.start)
     }
@@ -377,13 +385,23 @@ final class LocalDocumentScannerViewController: UIViewController {
     }
 
     private func prepareModels() {
-        detectorLoadTask = Task { [weak self] in
+        let scannerDiagnostics = diagnostics
+        detectorLoadTask = Task { [weak self, scannerDiagnostics] in
+            let startedAt = ProcessInfo.processInfo.systemUptime
             do {
                 let loadedDetector = try await Task.detached(
                     priority: .userInitiated
                 ) {
                     try LCNetDocumentDetector(backend: .coreML)
                 }.value
+                scannerDiagnostics.logDuration(
+                    "lcnetLoad",
+                    milliseconds: ScannerDiagnostics.milliseconds(
+                        since: startedAt
+                    ),
+                    details: "success=true"
+                )
+                scannerDiagnostics.logResource("lcnetLoaded")
                 guard !Task.isCancelled, let self else {
                     return
                 }
@@ -394,6 +412,14 @@ final class LocalDocumentScannerViewController: UIViewController {
                     setStatus("문서를 화면 안에 맞춰주세요.")
                 }
             } catch {
+                scannerDiagnostics.logDuration(
+                    "lcnetLoad",
+                    milliseconds: ScannerDiagnostics.milliseconds(
+                        since: startedAt
+                    ),
+                    details: "success=false"
+                )
+                scannerDiagnostics.logResource("lcnetLoadFailed")
                 guard !Task.isCancelled, let self else {
                     return
                 }
@@ -407,8 +433,18 @@ final class LocalDocumentScannerViewController: UIViewController {
         }
 
         let documentProcessor = processor
-        dewarperPrewarmTask = Task { [weak self, documentProcessor] in
-            _ = await documentProcessor.prepareDewarper()
+        dewarperPrewarmTask = Task {
+            [weak self, documentProcessor, scannerDiagnostics] in
+            let startedAt = ProcessInfo.processInfo.systemUptime
+            let succeeded = await documentProcessor.prepareDewarper()
+            scannerDiagnostics.logDuration(
+                "uvdocLoad",
+                milliseconds: ScannerDiagnostics.milliseconds(
+                    since: startedAt
+                ),
+                details: "success=\(succeeded)"
+            )
+            scannerDiagnostics.logResource("uvdocLoaded")
             guard !Task.isCancelled, let self else {
                 return
             }
@@ -564,8 +600,15 @@ final class LocalDocumentScannerViewController: UIViewController {
     @objc nonisolated private func captureSessionWasInterrupted(
         _ notification: Notification
     ) {
+        let reasonCode = (
+            notification.userInfo?[
+                AVCaptureSessionInterruptionReasonKey
+            ] as? NSNumber
+        )?.intValue
         Task { @MainActor [weak self] in
-            self?.handleCaptureSessionInterruption()
+            self?.handleCaptureSessionInterruption(
+                reasonCode: reasonCode
+            )
         }
     }
 
@@ -595,7 +638,17 @@ final class LocalDocumentScannerViewController: UIViewController {
         }
     }
 
-    private func handleCaptureSessionInterruption() {
+    private func handleCaptureSessionInterruption(
+        reasonCode: Int? = nil
+    ) {
+        if interruptionStartedAt == nil {
+            interruptionStartedAt = ProcessInfo.processInfo.systemUptime
+        }
+        recoveryStartedAt = nil
+        diagnostics.logEvent(
+            "cameraInterrupted",
+            details: "reason=\(reasonCode ?? -1) running=\(session.isRunning)"
+        )
         sessionInterrupted = true
         frameAdmission.invalidateViewport()
         gateEvaluator.reset()
@@ -621,11 +674,23 @@ final class LocalDocumentScannerViewController: UIViewController {
     }
 
     private func resumeAfterCaptureSessionInterruption() {
+        if let interruptionStartedAt {
+            diagnostics.logDuration(
+                "cameraInterruption",
+                milliseconds: ScannerDiagnostics.milliseconds(
+                    since: interruptionStartedAt
+                )
+            )
+        }
+        interruptionStartedAt = nil
         sessionInterrupted = false
         guard isViewActive else {
+            recoveryStartedAt = nil
             updateControls()
             return
         }
+        recoveryStartedAt = ProcessInfo.processInfo.systemUptime
+        diagnostics.logEvent("cameraResumeRequested")
         applyPreviewRotationAndViewport()
         switch stateMachine.state {
         case .idle:
@@ -642,6 +707,11 @@ final class LocalDocumentScannerViewController: UIViewController {
         code: Int,
         description: String
     ) {
+        diagnostics.logEvent(
+            "cameraRuntimeError",
+            details: "code=\(code) mediaReset="
+                + "\(code == AVError.Code.mediaServicesWereReset.rawValue)"
+        )
         if code == AVError.Code.mediaServicesWereReset.rawValue {
             handleCaptureSessionInterruption()
             resumeAfterCaptureSessionInterruption()
@@ -756,6 +826,15 @@ final class LocalDocumentScannerViewController: UIViewController {
         rotationCoordinator = coordinator
         cameraConfigured = true
         session.commitConfiguration()
+        let sourceDimensions = CMVideoFormatDescriptionGetDimensions(
+            device.activeFormat.formatDescription
+        )
+        diagnostics.logCamera(
+            formatWidth: sourceDimensions.width,
+            formatHeight: sourceDimensions.height,
+            fieldOfView: device.activeFormat.videoFieldOfView,
+            zoomFactor: device.videoZoomFactor
+        )
         previewRotationObservation = coordinator.observe(
             \.videoRotationAngleForHorizonLevelPreview,
             options: [.initial, .new]
@@ -790,6 +869,8 @@ final class LocalDocumentScannerViewController: UIViewController {
     }
 
     private func stopCamera() {
+        interruptionStartedAt = nil
+        recoveryStartedAt = nil
         motionMonitor.stop()
         restoreContinuousFocus()
         let cameraSession = session
@@ -831,20 +912,40 @@ final class LocalDocumentScannerViewController: UIViewController {
             return
         }
 
+        let inferenceStartedAt = ProcessInfo.processInfo.systemUptime
         do {
-            let detection = try await detector.detect(in: payload.image)
+            let detection = try await detector.detect(
+                prepared: payload.modelInput
+            )
+            diagnostics.recordLiveInference(
+                milliseconds: ScannerDiagnostics.milliseconds(
+                    since: inferenceStartedAt
+                ),
+                preprocessingMilliseconds:
+                    payload.preprocessingMilliseconds,
+                detected: detection != nil
+            )
             guard frameAdmission.isCurrent(generation: payload.generation),
                   isViewActive,
                   acceptsAnalysisFrames else {
                 return
+            }
+            if let recoveryStartedAt {
+                diagnostics.logDuration(
+                    "cameraRecoveryToFirstInference",
+                    milliseconds: ScannerDiagnostics.milliseconds(
+                        since: recoveryStartedAt
+                    )
+                )
+                self.recoveryStartedAt = nil
             }
 
             let deviceStill = motionMonitor.isStill()
             let focusReady = cameraFocusReady
             let sensorGates = gateEvaluator.evaluate(
                 detection: detection,
-                imageWidth: payload.image.width,
-                imageHeight: payload.image.height,
+                imageWidth: payload.transform.rawCropRect.width,
+                imageHeight: payload.transform.rawCropRect.height,
                 sharpness: detection == nil ? 0 : payload.sharpness,
                 deviceStill: deviceStill,
                 focusReady: focusReady
@@ -884,6 +985,12 @@ final class LocalDocumentScannerViewController: UIViewController {
             updateStatus(for: gates)
             send(.frameEvaluated(gates))
         } catch {
+            diagnostics.logDuration(
+                "liveLCNetFailure",
+                milliseconds: ScannerDiagnostics.milliseconds(
+                    since: inferenceStartedAt
+                )
+            )
             guard frameAdmission.isCurrent(generation: payload.generation),
                   isViewActive,
                   acceptsAnalysisFrames else {
@@ -967,7 +1074,24 @@ final class LocalDocumentScannerViewController: UIViewController {
     private func lockFocus(ticket: UUID) {
         setStatus("초점을 고정하는 중입니다.")
         focusTask?.cancel()
-        focusTask = Task { [weak self] in
+        let scannerDiagnostics = diagnostics
+        let focusStartedAt = ProcessInfo.processInfo.systemUptime
+        scannerDiagnostics.logEvent(
+            "focusRequested",
+            details: "ticket=\(ticket.uuidString.prefix(8))"
+        )
+        focusTask = Task { [weak self, scannerDiagnostics] in
+            var outcome = "cancelled"
+            defer {
+                scannerDiagnostics.logDuration(
+                    "focusLock",
+                    milliseconds: ScannerDiagnostics.milliseconds(
+                        since: focusStartedAt
+                    ),
+                    ticket: ticket,
+                    details: "outcome=\(outcome)"
+                )
+            }
             guard let self else {
                 return
             }
@@ -975,6 +1099,7 @@ final class LocalDocumentScannerViewController: UIViewController {
                 return
             }
             guard let device = captureDevice else {
+                outcome = "unavailable"
                 manualFocusTickets.remove(ticket)
                 focusTask = nil
                 send(.focusLockFailed(ticket: ticket))
@@ -991,6 +1116,7 @@ final class LocalDocumentScannerViewController: UIViewController {
                 }
                 device.unlockForConfiguration()
             } catch {
+                outcome = "configurationFailed"
                 manualFocusTickets.remove(ticket)
                 restoreContinuousFocus()
                 focusTask = nil
@@ -1017,6 +1143,7 @@ final class LocalDocumentScannerViewController: UIViewController {
             let manual = manualFocusTickets.contains(ticket)
             guard !device.isAdjustingFocus,
                   manual || motionMonitor.isStill() else {
+                outcome = "unstable"
                 manualFocusTickets.remove(ticket)
                 restoreContinuousFocus()
                 focusTask = nil
@@ -1031,9 +1158,11 @@ final class LocalDocumentScannerViewController: UIViewController {
                     device.focusMode = .locked
                 }
                 device.unlockForConfiguration()
+                outcome = "success"
                 focusTask = nil
                 send(.focusLocked(ticket: ticket))
             } catch {
+                outcome = "configurationFailed"
                 manualFocusTickets.remove(ticket)
                 restoreContinuousFocus()
                 focusTask = nil
@@ -1063,16 +1192,24 @@ final class LocalDocumentScannerViewController: UIViewController {
         let settings = AVCapturePhotoSettings()
         settings.flashMode = .off
         settings.photoQualityPrioritization = .speed
+        let requestedAt = ProcessInfo.processInfo.systemUptime
         pendingCapture = PendingCapture(
             ticket: ticket,
             viewport: viewport,
             previewDetection: live?.detection,
+            previewTransform: live?.transform,
             previewSharpness: live?.sharpness ?? 0,
             captureRotationDegrees: captureRotation,
             photoSettingsID: settings.uniqueID,
+            requestedAt: requestedAt,
             photoData: nil
         )
 
+        diagnostics.logEvent(
+            "photoRequested",
+            details: "ticket=\(ticket.uuidString.prefix(8))"
+        )
+        diagnostics.logResource("photoRequested", ticket: ticket)
         setStatus("문서를 촬영합니다.", announce: true)
         photoOutput.capturePhoto(with: settings, delegate: self)
     }
@@ -1094,17 +1231,37 @@ final class LocalDocumentScannerViewController: UIViewController {
         let documentProcessor = processor
         let scannerConfiguration = configuration
         let bridge = imageBridge
+        let scannerDiagnostics = diagnostics
+        let resourceSampler = diagnostics.beginProcessing(ticket: ticket)
         processingTask = Task {
             [weak self,
              stillDetector,
              documentProcessor,
              scannerConfiguration,
-             bridge] in
+             bridge,
+             scannerDiagnostics,
+             resourceSampler] in
+            var outcome = "cancelled"
+            defer {
+                resourceSampler?.finish(outcome: outcome)
+            }
             do {
                 try Task.checkCancellation()
+                var stageStartedAt = ProcessInfo.processInfo.systemUptime
                 let prepared = try await Self.prepareStill(
                     data,
                     viewport: capture.viewport
+                )
+                scannerDiagnostics.logDuration(
+                    "stillPrepare",
+                    milliseconds: ScannerDiagnostics.milliseconds(
+                        since: stageStartedAt
+                    ),
+                    ticket: ticket
+                )
+                scannerDiagnostics.logResource(
+                    "stillPrepared",
+                    ticket: ticket
                 )
                 try Task.checkCancellation()
                 if capture.previewSharpness > 0,
@@ -1115,13 +1272,45 @@ final class LocalDocumentScannerViewController: UIViewController {
                     throw LocalDocumentScannerError.captureTooBlurry
                 }
 
+                stageStartedAt = ProcessInfo.processInfo.systemUptime
                 let stillDetection = try await stillDetector?.detect(
                     in: prepared.image
                 )
+                scannerDiagnostics.logDuration(
+                    "stillLCNet",
+                    milliseconds: ScannerDiagnostics.milliseconds(
+                        since: stageStartedAt
+                    ),
+                    ticket: ticket,
+                    details: "available=\(stillDetector != nil) "
+                        + "detected=\(stillDetection != nil)"
+                )
                 try Task.checkCancellation()
+                if let previewDetection = capture.previewDetection,
+                   let previewTransform = capture.previewTransform,
+                   let stillDetection {
+                    scannerDiagnostics.logFOV(
+                        ScannerFOVComparison.compare(
+                            liveQuad: previewDetection.quad,
+                            liveTransform: previewTransform,
+                            stillQuad: stillDetection.quad,
+                            stillTransform: prepared.transform
+                        ),
+                        liveTransform: previewTransform,
+                        stillTransform: prepared.transform,
+                        ticket: ticket
+                    )
+                } else if capture.previewDetection != nil {
+                    scannerDiagnostics.logEvent(
+                        "fovUnavailable",
+                        details: "ticket=\(ticket.uuidString.prefix(8)) "
+                            + "stillDetected=\(stillDetection != nil)"
+                    )
+                }
                 let detection =
                     stillDetection ?? capture.previewDetection
                 let output: CIImage
+                stageStartedAt = ProcessInfo.processInfo.systemUptime
                 if let detection {
                     output = try await documentProcessor.process(
                         bridge.ciImage(from: prepared.image),
@@ -1145,22 +1334,39 @@ final class LocalDocumentScannerViewController: UIViewController {
                         from: AndroidDocumentColorMath.enhance(normalized)
                     )
                 }
+                scannerDiagnostics.logDuration(
+                    "documentProcess",
+                    milliseconds: ScannerDiagnostics.milliseconds(
+                        since: stageStartedAt
+                    ),
+                    ticket: ticket,
+                    details: "quadAvailable=\(detection != nil)"
+                )
 
                 try Task.checkCancellation()
                 guard let self, isProcessing(ticket: ticket) else {
                     return
                 }
+                stageStartedAt = ProcessInfo.processInfo.systemUptime
                 guard let cgImage = renderContext.createCGImage(
                     output,
                     from: output.extent.integral
                 ) else {
                     throw LocalDocumentScannerError.renderFailed
                 }
+                scannerDiagnostics.logDuration(
+                    "renderCGImage",
+                    milliseconds: ScannerDiagnostics.milliseconds(
+                        since: stageStartedAt
+                    ),
+                    ticket: ticket
+                )
                 let image = UIImage(
                     cgImage: cgImage,
                     scale: 1,
                     orientation: .up
                 )
+                outcome = "success"
                 let pageID = UUID()
                 pendingCapture = nil
                 manualFocusTickets.remove(ticket)
@@ -1176,6 +1382,7 @@ final class LocalDocumentScannerViewController: UIViewController {
             } catch is CancellationError {
                 return
             } catch {
+                outcome = "failure"
                 guard !Task.isCancelled,
                       let self,
                       isProcessing(ticket: ticket) else {
@@ -1218,6 +1425,7 @@ final class LocalDocumentScannerViewController: UIViewController {
             let cropped = try raw.cropped(to: transform.rawCropRect)
             return ScannerPreparedStill(
                 image: cropped,
+                transform: transform,
                 sharpness: AndroidScannerFrameQuality.laplacianVariance(
                     of: cropped
                 )
@@ -1360,6 +1568,7 @@ extension LocalDocumentScannerViewController:
             return
         }
 
+        let preprocessingStartedAt = ProcessInfo.processInfo.systemUptime
         do {
             guard let transform = ScannerViewportTransform(
                 rawWidth: CVPixelBufferGetWidth(pixelBuffer),
@@ -1368,16 +1577,41 @@ extension LocalDocumentScannerViewController:
             ) else {
                 throw LocalDocumentScannerError.missingViewport
             }
-            let image = try ScannerRGBAImage.readingBGRA(
+            let letterbox = AndroidScannerImageMath.letterboxTransform(
+                sourceWidth: transform.rawCropRect.width,
+                sourceHeight: transform.rawCropRect.height,
+                size: configuration.liveAnalysisLongEdgePixels
+            )
+            let detectorImage = try ScannerRGBAImage.readingBGRA(
                 pixelBuffer,
-                cropRect: transform.rawCropRect
+                cropRect: transform.rawCropRect,
+                outputWidth: letterbox.scaledWidth,
+                outputHeight: letterbox.scaledHeight
+            )
+            let modelInput = AndroidScannerImageMath
+                .letterboxedRGBTensor(
+                    fromResized: detectorImage,
+                    letterbox: letterbox
+                )
+            let sharpnessSample = try ScannerRGBAImage.readingBGRA(
+                pixelBuffer,
+                cropRect: transform.rawCropRect,
+                outputWidth: configuration.laplacianSampleWidth,
+                outputHeight: configuration.laplacianSampleHeight
+            )
+            let sharpness = AndroidScannerFrameQuality.laplacianVariance(
+                of: sharpnessSample,
+                sampleWidth: configuration.laplacianSampleWidth,
+                sampleHeight: configuration.laplacianSampleHeight
             )
             let payload = ScannerAnalysisPayload(
-                image: image,
+                modelInput: modelInput,
                 transform: transform,
-                sharpness: AndroidScannerFrameQuality.laplacianVariance(
-                    of: image
-                ),
+                sharpness: sharpness,
+                preprocessingMilliseconds:
+                    ScannerDiagnostics.milliseconds(
+                        since: preprocessingStartedAt
+                    ),
                 generation: viewport.generation
             )
             let admission = frameAdmission
@@ -1400,6 +1634,7 @@ extension LocalDocumentScannerViewController: AVCapturePhotoCaptureDelegate {
         didFinishProcessingPhoto photo: AVCapturePhoto,
         error: Error?
     ) {
+        let callbackAt = ProcessInfo.processInfo.systemUptime
         let data = error == nil ? photo.fileDataRepresentation() : nil
         let errorDescription = error?.localizedDescription
         let photoSettingsID = photo.resolvedSettings.uniqueID
@@ -1409,6 +1644,15 @@ extension LocalDocumentScannerViewController: AVCapturePhotoCaptureDelegate {
                   pending.photoSettingsID == photoSettingsID else {
                 return
             }
+            diagnostics.logDuration(
+                "shutterToPhotoData",
+                milliseconds: max(
+                    (callbackAt - pending.requestedAt) * 1_000,
+                    0
+                ),
+                ticket: pending.ticket,
+                details: "success=\(data != nil)"
+            )
             guard let data else {
                 pendingCapture = nil
                 manualFocusTickets.remove(pending.ticket)

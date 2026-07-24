@@ -220,6 +220,12 @@ actor LCNetDocumentDetector: DocumentCornerDetecting {
             from: source,
             size: 256
         )
+        return try await detect(prepared: prepared)
+    }
+
+    func detect(
+        prepared: ScannerPreparedTensor
+    ) async throws -> DocumentDetection? {
         guard let letterbox = prepared.letterbox else {
             return nil
         }

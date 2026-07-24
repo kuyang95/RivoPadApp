@@ -129,6 +129,7 @@ nonisolated enum DocumentScanEffect: Equatable, Sendable {
 
 nonisolated struct CustomDocumentScannerConfiguration: Equatable, Sendable {
     var analysisFramesPerSecond = 10
+    var liveAnalysisLongEdgePixels = 256
     var stableFrameCount = 7
     var consecutiveGatePassCount = 3
     var cornerStandardDeviationPixels = 30.0

@@ -13,6 +13,7 @@ struct shortcuts_exampleApp: App {
     @StateObject private var appRouter = AppRouter()
 
     @State private var path = NavigationPath()   // ✅ App이 path 관리
+    @State private var didHandleDirectScannerLaunch = false
 
     init() {
         //UIApplication.shared.isIdleTimerDisabled = true
@@ -74,6 +75,9 @@ struct shortcuts_exampleApp: App {
                
             }
             .environmentObject(appRouter)
+            .task {
+                openScannerFromLaunchArgumentsIfNeeded()
+            }
           //  .onAppear { router.consumeLastIfNeeded() }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
@@ -97,5 +101,34 @@ struct shortcuts_exampleApp: App {
             
         }.environment(\.font, .custom("NanumSquareRoundOTFEB", size: 16))
     }
-        
+
+    private func openScannerFromLaunchArgumentsIfNeeded() {
+        guard !didHandleDirectScannerLaunch,
+              Self.shouldOpenScanner(
+                  arguments: ProcessInfo.processInfo.arguments,
+                  environment: ProcessInfo.processInfo.environment
+              ) else {
+            return
+        }
+        didHandleDirectScannerLaunch = true
+        path = NavigationPath()
+        path.append(AppRoute.documentScanning)
+    }
+
+    static func shouldOpenScanner(
+        arguments: [String],
+        environment: [String: String]
+    ) -> Bool {
+        guard environment["XCTestConfigurationFilePath"] == nil else {
+            return false
+        }
+        if arguments.contains("--scanner-open-scanner") {
+            return true
+        }
+        guard let index = arguments.firstIndex(of: "-ScannerOpenScanner"),
+              arguments.indices.contains(index + 1) else {
+            return false
+        }
+        return arguments[index + 1] != "0"
+    }
 }

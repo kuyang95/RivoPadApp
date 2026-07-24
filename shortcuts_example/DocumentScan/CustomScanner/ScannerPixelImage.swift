@@ -58,9 +58,72 @@ nonisolated struct ScannerRGBAImage: Equatable, Sendable {
         _ pixelBuffer: CVPixelBuffer,
         cropRect: ScannerPixelRect?
     ) throws -> Self {
+        let bufferWidth = CVPixelBufferGetWidth(pixelBuffer)
+        let bufferHeight = CVPixelBufferGetHeight(pixelBuffer)
+        let rect = cropRect ?? ScannerPixelRect(
+            x: 0,
+            y: 0,
+            width: bufferWidth,
+            height: bufferHeight
+        )
+        return try readingBGRA(
+            pixelBuffer,
+            cropRect: rect,
+            outputWidth: rect.width,
+            outputHeight: rect.height
+        )
+    }
+
+    /// Samples a camera ROI directly into a bounded RGBA image instead of
+    /// allocating and converting every source pixel first.
+    static func readingBGRA(
+        _ pixelBuffer: CVPixelBuffer,
+        cropRect: ScannerPixelRect,
+        maximumLongEdge: Int
+    ) throws -> Self {
+        guard maximumLongEdge > 0 else {
+            throw ScannerImageError.invalidDimensions(
+                width: maximumLongEdge,
+                height: maximumLongEdge
+            )
+        }
+        let sourceLongEdge = max(cropRect.width, cropRect.height)
+        guard sourceLongEdge > 0 else {
+            throw ScannerImageError.invalidDimensions(
+                width: cropRect.width,
+                height: cropRect.height
+            )
+        }
+        let scale = min(
+            Float(maximumLongEdge) / Float(sourceLongEdge),
+            1
+        )
+        return try readingBGRA(
+            pixelBuffer,
+            cropRect: cropRect,
+            outputWidth: max(Int(Float(cropRect.width) * scale), 1),
+            outputHeight: max(Int(Float(cropRect.height) * scale), 1)
+        )
+    }
+
+    /// Half-pixel-center bilinear BGRA-to-RGBA sampling with edge replication.
+    /// This matches `AndroidScannerImageMath.resizeBilinear` without creating
+    /// the full-resolution intermediate camera image.
+    static func readingBGRA(
+        _ pixelBuffer: CVPixelBuffer,
+        cropRect: ScannerPixelRect,
+        outputWidth: Int,
+        outputHeight: Int
+    ) throws -> Self {
         let format = CVPixelBufferGetPixelFormatType(pixelBuffer)
         guard format == kCVPixelFormatType_32BGRA else {
             throw ScannerImageError.unsupportedPixelFormat(format)
+        }
+        guard outputWidth > 0, outputHeight > 0 else {
+            throw ScannerImageError.invalidDimensions(
+                width: outputWidth,
+                height: outputHeight
+            )
         }
 
         let lockResult = CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
@@ -77,51 +140,94 @@ nonisolated struct ScannerRGBAImage: Equatable, Sendable {
 
         let bufferWidth = CVPixelBufferGetWidth(pixelBuffer)
         let bufferHeight = CVPixelBufferGetHeight(pixelBuffer)
-        let rect = cropRect ?? ScannerPixelRect(
-            x: 0,
-            y: 0,
-            width: bufferWidth,
-            height: bufferHeight
-        )
-        guard rect.x >= 0,
-              rect.y >= 0,
-              rect.width > 0,
-              rect.height > 0,
-              rect.maxX <= bufferWidth,
-              rect.maxY <= bufferHeight else {
+        guard cropRect.x >= 0,
+              cropRect.y >= 0,
+              cropRect.width > 0,
+              cropRect.height > 0,
+              cropRect.maxX <= bufferWidth,
+              cropRect.maxY <= bufferHeight else {
             throw ScannerImageError.invalidDimensions(
-                width: rect.width,
-                height: rect.height
+                width: cropRect.width,
+                height: cropRect.height
             )
         }
         let sourceBytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
         let source = baseAddress.assumingMemoryBound(to: UInt8.self)
         var rgba = [UInt8](
             repeating: 0,
-            count: rect.width * rect.height * 4
+            count: outputWidth * outputHeight * 4
         )
+        let sourceMaximumX = Float(cropRect.width - 1)
+        let sourceMaximumY = Float(cropRect.height - 1)
+        let xScale = Float(cropRect.width) / Float(outputWidth)
+        let yScale = Float(cropRect.height) / Float(outputHeight)
+        let sourceChannels = [2, 1, 0, 3]
 
-        for destinationY in 0 ..< rect.height {
-            let sourceRow =
-                source + ((rect.y + destinationY) * sourceBytesPerRow)
-            let destinationRow = destinationY * rect.width * 4
-            for destinationX in 0 ..< rect.width {
-                let sourceOffset = (rect.x + destinationX) * 4
+        for destinationY in 0 ..< outputHeight {
+            let mappedY = min(
+                max(
+                    (Float(destinationY) + 0.5) * yScale - 0.5,
+                    0
+                ),
+                sourceMaximumY
+            )
+            let sourceY0 = Int(mappedY)
+            let sourceY1 = min(sourceY0 + 1, cropRect.height - 1)
+            let yWeight = mappedY - Float(sourceY0)
+            let topRow = source + (
+                (cropRect.y + sourceY0) * sourceBytesPerRow
+            )
+            let bottomRow = source + (
+                (cropRect.y + sourceY1) * sourceBytesPerRow
+            )
+            let destinationRow = destinationY * outputWidth * 4
+
+            for destinationX in 0 ..< outputWidth {
+                let mappedX = min(
+                    max(
+                        (Float(destinationX) + 0.5) * xScale - 0.5,
+                        0
+                    ),
+                    sourceMaximumX
+                )
+                let sourceX0 = Int(mappedX)
+                let sourceX1 = min(sourceX0 + 1, cropRect.width - 1)
+                let xWeight = mappedX - Float(sourceX0)
+                let leftOffset = (cropRect.x + sourceX0) * 4
+                let rightOffset = (cropRect.x + sourceX1) * 4
                 let destinationOffset =
                     destinationRow + destinationX * 4
-                rgba[destinationOffset] =
-                    sourceRow[sourceOffset + 2]
-                rgba[destinationOffset + 1] =
-                    sourceRow[sourceOffset + 1]
-                rgba[destinationOffset + 2] =
-                    sourceRow[sourceOffset]
-                rgba[destinationOffset + 3] = sourceRow[sourceOffset + 3]
+                let weight00 = (1 - xWeight) * (1 - yWeight)
+                let weight01 = xWeight * (1 - yWeight)
+                let weight10 = (1 - xWeight) * yWeight
+                let weight11 = xWeight * yWeight
+
+                for destinationChannel in 0 ..< 4 {
+                    let sourceChannel =
+                        sourceChannels[destinationChannel]
+                    let value =
+                        weight00 * Float(
+                            topRow[leftOffset + sourceChannel]
+                        )
+                        + weight01 * Float(
+                            topRow[rightOffset + sourceChannel]
+                        )
+                        + weight10 * Float(
+                            bottomRow[leftOffset + sourceChannel]
+                        )
+                        + weight11 * Float(
+                            bottomRow[rightOffset + sourceChannel]
+                        )
+                    rgba[destinationOffset + destinationChannel] = UInt8(
+                        clamping: Int(value.rounded())
+                    )
+                }
             }
         }
 
         return try Self(
-            width: rect.width,
-            height: rect.height,
+            width: outputWidth,
+            height: outputHeight,
             bytes: rgba
         )
     }

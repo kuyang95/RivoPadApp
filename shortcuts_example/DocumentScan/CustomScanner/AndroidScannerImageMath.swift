@@ -23,47 +23,81 @@ nonisolated enum AndroidScannerImageMath {
         from image: ScannerRGBAImage,
         size: Int
     ) -> ScannerPreparedTensor {
-        let scale = Float(size) / Float(max(image.width, image.height))
-        let scaledWidth = max(Int(Float(image.width) * scale), 1)
-        let scaledHeight = max(Int(Float(image.height) * scale), 1)
-        let padX = (size - scaledWidth) / 2
-        let padY = (size - scaledHeight) / 2
+        let letterbox = letterboxTransform(
+            sourceWidth: image.width,
+            sourceHeight: image.height,
+            size: size
+        )
         let resized = resizeBilinear(
             image,
-            width: scaledWidth,
-            height: scaledHeight
+            width: letterbox.scaledWidth,
+            height: letterbox.scaledHeight
         )
+        return letterboxedRGBTensor(
+            fromResized: resized,
+            letterbox: letterbox
+        )
+    }
 
-        let planeSize = size * size
+    static func letterboxTransform(
+        sourceWidth: Int,
+        sourceHeight: Int,
+        size: Int
+    ) -> ScannerLetterboxTransform {
+        precondition(sourceWidth > 0 && sourceHeight > 0 && size > 0)
+        let scale = Float(size) / Float(max(sourceWidth, sourceHeight))
+        let scaledWidth = max(Int(Float(sourceWidth) * scale), 1)
+        let scaledHeight = max(Int(Float(sourceHeight) * scale), 1)
+        return ScannerLetterboxTransform(
+            originalWidth: sourceWidth,
+            originalHeight: sourceHeight,
+            scaledWidth: scaledWidth,
+            scaledHeight: scaledHeight,
+            padX: (size - scaledWidth) / 2,
+            padY: (size - scaledHeight) / 2,
+            canvasSize: size
+        )
+    }
+
+    /// Builds the model tensor from pixels already sampled to the shared
+    /// letterbox plan. This prevents a second resize when camera preprocessing
+    /// has produced the exact LCNet dimensions directly.
+    static func letterboxedRGBTensor(
+        fromResized image: ScannerRGBAImage,
+        letterbox: ScannerLetterboxTransform
+    ) -> ScannerPreparedTensor {
+        precondition(
+            image.width == letterbox.scaledWidth
+                && image.height == letterbox.scaledHeight
+        )
+        let planeSize = letterbox.canvasSize * letterbox.canvasSize
         var tensor = [Float](repeating: 0, count: planeSize * 3)
 
-        for y in 0 ..< scaledHeight {
-            let destinationY = y + padY
-            for x in 0 ..< scaledWidth {
-                let destinationX = x + padX
-                let sourceOffset = resized.byteOffset(x: x, y: y)
-                let destinationIndex = destinationY * size + destinationX
+        for y in 0 ..< image.height {
+            let destinationY = y + letterbox.padY
+            for x in 0 ..< image.width {
+                let destinationX = x + letterbox.padX
+                let sourceOffset = image.byteOffset(x: x, y: y)
+                let destinationIndex =
+                    destinationY * letterbox.canvasSize + destinationX
                 tensor[destinationIndex] =
-                    Float(resized.bytes[sourceOffset]) / 255
+                    Float(image.bytes[sourceOffset]) / 255
                 tensor[planeSize + destinationIndex] =
-                    Float(resized.bytes[sourceOffset + 1]) / 255
+                    Float(image.bytes[sourceOffset + 1]) / 255
                 tensor[(planeSize * 2) + destinationIndex] =
-                    Float(resized.bytes[sourceOffset + 2]) / 255
+                    Float(image.bytes[sourceOffset + 2]) / 255
             }
         }
 
         return ScannerPreparedTensor(
             values: tensor,
-            shape: [1, 3, size, size],
-            letterbox: ScannerLetterboxTransform(
-                originalWidth: image.width,
-                originalHeight: image.height,
-                scaledWidth: scaledWidth,
-                scaledHeight: scaledHeight,
-                padX: padX,
-                padY: padY,
-                canvasSize: size
-            )
+            shape: [
+                1,
+                3,
+                letterbox.canvasSize,
+                letterbox.canvasSize
+            ],
+            letterbox: letterbox
         )
     }
 

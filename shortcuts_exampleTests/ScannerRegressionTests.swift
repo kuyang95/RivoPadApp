@@ -6,6 +6,178 @@ import XCTest
 @testable import shortcuts_example
 
 final class ScannerRegressionTests: XCTestCase {
+    func testScannerDiagnosticsRequireExplicitOptIn() {
+        XCTAssertFalse(
+            ScannerDiagnostics.isRequested(
+                arguments: ["VisionCraft"],
+                environment: [:]
+            )
+        )
+        XCTAssertTrue(
+            ScannerDiagnostics.isRequested(
+                arguments: ["VisionCraft"],
+                environment: ["SCANNER_DIAGNOSTICS": "1"]
+            )
+        )
+        XCTAssertTrue(
+            ScannerDiagnostics.isRequested(
+                arguments: ["VisionCraft", "--scanner-diagnostics"],
+                environment: [:]
+            )
+        )
+        XCTAssertFalse(
+            ScannerDiagnostics.isRequested(
+                arguments: [
+                    "VisionCraft",
+                    "-ScannerDiagnostics",
+                    "0"
+                ],
+                environment: [:]
+            )
+        )
+        XCTAssertTrue(
+            ScannerDiagnostics.isRequested(
+                arguments: [
+                    "VisionCraft",
+                    "-ScannerDiagnostics",
+                    "1"
+                ],
+                environment: [:]
+            )
+        )
+    }
+
+    func testDirectScannerLaunchArgumentsDoNotAffectHostedTests() {
+        XCTAssertTrue(
+            shortcuts_exampleApp.shouldOpenScanner(
+                arguments: [
+                    "VisionCraft",
+                    "-ScannerOpenScanner",
+                    "1"
+                ],
+                environment: [:]
+            )
+        )
+        XCTAssertTrue(
+            shortcuts_exampleApp.shouldOpenScanner(
+                arguments: ["VisionCraft", "--scanner-open-scanner"],
+                environment: [:]
+            )
+        )
+        XCTAssertFalse(
+            shortcuts_exampleApp.shouldOpenScanner(
+                arguments: [
+                    "VisionCraft",
+                    "-ScannerOpenScanner",
+                    "1"
+                ],
+                environment: [
+                    "XCTestConfigurationFilePath": "/tmp/tests.xctest"
+                ]
+            )
+        )
+    }
+
+    func testMotionGateFallsOpenWhenSamplesNeverArrive() {
+        XCTAssertFalse(
+            ScannerMotionMonitor.shouldFallOpen(
+                sampleCount: 0,
+                requiredSampleCount: 16,
+                elapsed: 0.99,
+                timeout: 1
+            )
+        )
+        XCTAssertTrue(
+            ScannerMotionMonitor.shouldFallOpen(
+                sampleCount: 0,
+                requiredSampleCount: 16,
+                elapsed: 1,
+                timeout: 1
+            )
+        )
+        XCTAssertFalse(
+            ScannerMotionMonitor.shouldFallOpen(
+                sampleCount: 16,
+                requiredSampleCount: 16,
+                elapsed: 5,
+                timeout: 1
+            )
+        )
+    }
+
+    func testFOVComparisonProjectsEachRasterIntoPreviewSpace() throws {
+        let configuration = ScannerViewportConfiguration(
+            previewWidth: 1_000,
+            previewHeight: 700,
+            previewRotationDegrees: 0,
+            generation: 1
+        )
+        let liveTransform = try XCTUnwrap(
+            ScannerViewportTransform(
+                rawWidth: 1_000,
+                rawHeight: 700,
+                configuration: configuration
+            )
+        )
+        let stillTransform = try XCTUnwrap(
+            ScannerViewportTransform(
+                rawWidth: 4_000,
+                rawHeight: 2_800,
+                configuration: configuration
+            )
+        )
+        let liveQuad = DocumentQuad(
+            topLeft: NormalizedPoint(x: 0.2, y: 0.2),
+            topRight: NormalizedPoint(x: 0.8, y: 0.2),
+            bottomRight: NormalizedPoint(x: 0.8, y: 0.8),
+            bottomLeft: NormalizedPoint(x: 0.2, y: 0.8)
+        )
+        let equal = ScannerFOVComparison.compare(
+            liveQuad: liveQuad,
+            liveTransform: liveTransform,
+            stillQuad: liveQuad,
+            stillTransform: stillTransform
+        )
+        XCTAssertEqual(
+            equal.meanCornerErrorPercentOfPreviewDiagonal,
+            0,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            equal.maximumCornerErrorPercentOfPreviewDiagonal,
+            0,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(equal.boundingBoxScaleX, 1, accuracy: 0.000_001)
+        XCTAssertEqual(equal.boundingBoxScaleY, 1, accuracy: 0.000_001)
+
+        let shiftedQuad = DocumentQuad(
+            topLeft: NormalizedPoint(x: 0.25, y: 0.2),
+            topRight: NormalizedPoint(x: 0.85, y: 0.2),
+            bottomRight: NormalizedPoint(x: 0.85, y: 0.8),
+            bottomLeft: NormalizedPoint(x: 0.25, y: 0.8)
+        )
+        let shifted = ScannerFOVComparison.compare(
+            liveQuad: liveQuad,
+            liveTransform: liveTransform,
+            stillQuad: shiftedQuad,
+            stillTransform: stillTransform
+        )
+        let expectedPercent = 50 / hypot(1_000.0, 700.0) * 100
+        XCTAssertEqual(
+            shifted.meanCornerErrorPercentOfPreviewDiagonal,
+            expectedPercent,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            shifted.centroidDriftPercentOfPreviewDiagonal,
+            expectedPercent,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(shifted.boundingBoxScaleX, 1, accuracy: 0.000_001)
+        XCTAssertEqual(shifted.boundingBoxScaleY, 1, accuracy: 0.000_001)
+    }
+
     func testDocumentQuadAreaAndCaptureGates() {
         let quad = DocumentQuad(
             topLeft: NormalizedPoint(x: 0.1, y: 0.2),
@@ -197,6 +369,41 @@ final class ScannerRegressionTests: XCTestCase {
         )
     }
 
+    func testLCNetLetterboxPlanPreservesFloatTruncationBoundary() {
+        XCTAssertEqual(
+            AndroidScannerImageMath.letterboxTransform(
+                sourceWidth: 3_024,
+                sourceHeight: 3_024,
+                size: 256
+            ),
+            ScannerLetterboxTransform(
+                originalWidth: 3_024,
+                originalHeight: 3_024,
+                scaledWidth: 255,
+                scaledHeight: 255,
+                padX: 0,
+                padY: 0,
+                canvasSize: 256
+            )
+        )
+        XCTAssertEqual(
+            AndroidScannerImageMath.letterboxTransform(
+                sourceWidth: 2_268,
+                sourceHeight: 3_024,
+                size: 256
+            ),
+            ScannerLetterboxTransform(
+                originalWidth: 2_268,
+                originalHeight: 3_024,
+                scaledWidth: 192,
+                scaledHeight: 255,
+                padX: 32,
+                padY: 0,
+                canvasSize: 256
+            )
+        )
+    }
+
     func testCoreImageRasterizationKeepsVisualTopRowFirst() throws {
         let top = CIImage(
             color: CIColor(red: 1, green: 0, blue: 0, alpha: 1)
@@ -273,6 +480,78 @@ final class ScannerRegressionTests: XCTestCase {
             101, 61, 21, 255,
             102, 62, 22, 255
         ])
+
+        let full = try ScannerRGBAImage.readingBGRA(pixelBuffer)
+        let directFullResize = try ScannerRGBAImage.readingBGRA(
+            pixelBuffer,
+            cropRect: ScannerPixelRect(
+                x: 0,
+                y: 0,
+                width: 3,
+                height: 3
+            ),
+            outputWidth: 2,
+            outputHeight: 2
+        )
+        XCTAssertEqual(
+            directFullResize,
+            AndroidScannerImageMath.resizeBilinear(
+                full,
+                width: 2,
+                height: 2
+            )
+        )
+
+        let tallCropRect = ScannerPixelRect(
+            x: 1,
+            y: 0,
+            width: 2,
+            height: 3
+        )
+        let expectedTallCrop = AndroidScannerImageMath.resizeBilinear(
+            try full.cropped(to: tallCropRect),
+            width: 1,
+            height: 2
+        )
+        XCTAssertEqual(
+            try ScannerRGBAImage.readingBGRA(
+                pixelBuffer,
+                cropRect: tallCropRect,
+                outputWidth: 1,
+                outputHeight: 2
+            ),
+            expectedTallCrop
+        )
+        XCTAssertEqual(
+            try ScannerRGBAImage.readingBGRA(
+                pixelBuffer,
+                cropRect: tallCropRect,
+                maximumLongEdge: 2
+            ),
+            expectedTallCrop
+        )
+
+        let referenceCrop = try full.cropped(to: tallCropRect)
+        let referenceTensor = AndroidScannerImageMath
+            .letterboxedRGBTensor(from: referenceCrop, size: 4)
+        let letterbox = AndroidScannerImageMath.letterboxTransform(
+            sourceWidth: tallCropRect.width,
+            sourceHeight: tallCropRect.height,
+            size: 4
+        )
+        let directModelImage = try ScannerRGBAImage.readingBGRA(
+            pixelBuffer,
+            cropRect: tallCropRect,
+            outputWidth: letterbox.scaledWidth,
+            outputHeight: letterbox.scaledHeight
+        )
+        XCTAssertEqual(
+            AndroidScannerImageMath.letterboxedRGBTensor(
+                fromResized: directModelImage,
+                letterbox: letterbox
+            ),
+            referenceTensor
+        )
     }
 
     func testCaptureGateRequiresSevenStableFramesAndRejectsJitter() {
