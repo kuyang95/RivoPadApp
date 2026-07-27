@@ -66,6 +66,41 @@ final class ScannerRegressionTests: XCTestCase {
         XCTAssertEqual(enabled.trace(ticket: ticket)?.ticket, ticket)
     }
 
+    func testUVDocBenchmarkRequiresExplicitOptIn() {
+        XCTAssertFalse(
+            ScannerDiagnostics.isUVDocBenchmarkRequested(
+                arguments: ["VisionCraft"],
+                environment: [:]
+            )
+        )
+        XCTAssertTrue(
+            ScannerDiagnostics.isUVDocBenchmarkRequested(
+                arguments: [
+                    "VisionCraft",
+                    "-ScannerBenchmarkUVDoc",
+                    "1"
+                ],
+                environment: [:]
+            )
+        )
+        XCTAssertFalse(
+            ScannerDiagnostics.isUVDocBenchmarkRequested(
+                arguments: [
+                    "VisionCraft",
+                    "-ScannerBenchmarkUVDoc",
+                    "0"
+                ],
+                environment: [:]
+            )
+        )
+        XCTAssertTrue(
+            ScannerDiagnostics.isUVDocBenchmarkRequested(
+                arguments: ["VisionCraft"],
+                environment: ["SCANNER_BENCHMARK_UVDOC": "1"]
+            )
+        )
+    }
+
     func testDirectScannerLaunchArgumentsDoNotAffectHostedTests() {
         XCTAssertTrue(
             shortcuts_exampleApp.shouldOpenScanner(
@@ -1059,6 +1094,31 @@ final class ScannerRegressionTests: XCTestCase {
             maximumChannelDifference(metal.bytes, cpu.bytes),
             1
         )
+    }
+
+    func testPixelNativePerspectiveMatchesCIImageAdapter() async throws {
+        let source = try patternedImage(width: 16, height: 12)
+        let quad = DocumentQuad(
+            topLeft: NormalizedPoint(x: 0.08, y: 0.12),
+            topRight: NormalizedPoint(x: 0.92, y: 0.08),
+            bottomRight: NormalizedPoint(x: 0.88, y: 0.91),
+            bottomLeft: NormalizedPoint(x: 0.11, y: 0.86)
+        )
+        let corrector = AndroidPerspectiveCorrector(
+            metalSampler: nil
+        )
+        let pixelNative = try await corrector.correctPixels(
+            source,
+            using: quad
+        )
+        let bridge = ScannerCIImageBridge()
+        let adapted = try await corrector.correct(
+            bridge.ciImage(from: source),
+            using: quad
+        )
+        let adaptedPixels = try bridge.rgbaImage(from: adapted)
+
+        XCTAssertEqual(pixelNative, adaptedPixels)
     }
 
     private func passingGates(

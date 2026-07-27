@@ -435,6 +435,15 @@ actor AndroidPerspectiveCorrector: DocumentPerspectiveCorrecting {
         using quad: DocumentQuad
     ) async throws -> CIImage {
         let source = try imageBridge.rgbaImage(from: image)
+        return imageBridge.ciImage(
+            from: try correctPixels(source, using: quad)
+        )
+    }
+
+    func correctPixels(
+        _ source: ScannerRGBAImage,
+        using quad: DocumentQuad
+    ) throws -> ScannerRGBAImage {
         let corners = AndroidPerspectiveMath.pixelCorners(
             from: quad,
             imageWidth: source.width,
@@ -468,6 +477,6 @@ actor AndroidPerspectiveCorrector: DocumentPerspectiveCorrecting {
             )
             lastWarpBackend = .cpu
         }
-        return imageBridge.ciImage(from: corrected)
+        return corrected
     }
 }

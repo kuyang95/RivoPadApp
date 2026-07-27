@@ -393,6 +393,15 @@ final class LocalDocumentScannerViewController: UIViewController {
 
     private func prepareModels() {
         let scannerDiagnostics = diagnostics
+        if ScannerDiagnostics.isUVDocBenchmarkRequested() {
+            detectorLoadTask = Task {
+                await Task.detached(priority: .userInitiated) {
+                    await scannerDiagnostics.runUVDocBackendBenchmark()
+                }.value
+            }
+            return
+        }
+
         let detectorBackend: ScannerInferenceBackend = .cpuParity
         detectorLoadTask = Task {
             [weak self, scannerDiagnostics, detectorBackend] in
@@ -1326,7 +1335,7 @@ final class LocalDocumentScannerViewController: UIViewController {
                 stageStartedAt = ProcessInfo.processInfo.systemUptime
                 if let detection {
                     output = try await documentProcessor.process(
-                        bridge.ciImage(from: prepared.image),
+                        prepared.image,
                         detectedQuad: detection.quad,
                         captureRotationDegrees:
                             capture.captureRotationDegrees,

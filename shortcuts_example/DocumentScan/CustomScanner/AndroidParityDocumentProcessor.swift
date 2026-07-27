@@ -97,22 +97,50 @@ actor AndroidParityDocumentProcessor {
         enhanceColors: Bool = true,
         trace: ScannerProcessingTrace? = nil
     ) async throws -> CIImage {
+        try await process(
+            imageBridge.rgbaImage(from: image),
+            detectedQuad: detectedQuad,
+            captureRotationDegrees: captureRotationDegrees,
+            enhanceColors: enhanceColors,
+            trace: trace
+        )
+    }
+
+    /// Pixel-native entry point used by the camera pipeline. It avoids
+    /// materializing three intermediate CIImage/RGBA copies between the Metal
+    /// perspective, UVDoc, normalization, and enhancement stages.
+    func process(
+        _ source: ScannerRGBAImage,
+        detectedQuad: DocumentQuad,
+        captureRotationDegrees: Int = 0,
+        enhanceColors: Bool = true,
+        trace: ScannerProcessingTrace? = nil
+    ) async throws -> CIImage {
         let perspectiveStage = trace?.beginStage("perspectiveCorrect")
-        let corrected: CIImage
+        let correctedPixels: ScannerRGBAImage
+        var perspectiveBackend = "custom"
         do {
-            corrected = try await perspectiveCorrector.correct(
-                image,
-                using: detectedQuad
-            )
-            var details = "input=\(Self.dimensions(of: image)) "
-                + "output=\(Self.dimensions(of: corrected))"
             if let androidCorrector =
                 perspectiveCorrector as? AndroidPerspectiveCorrector {
-                let backend = await androidCorrector.lastWarpBackend
-                details += " backend=\(backend?.rawValue ?? "unknown")"
+                correctedPixels = try await androidCorrector.correctPixels(
+                    source,
+                    using: detectedQuad
+                )
+                perspectiveBackend =
+                    await androidCorrector.lastWarpBackend?.rawValue
+                    ?? "unknown"
+            } else {
+                let corrected = try await perspectiveCorrector.correct(
+                    imageBridge.ciImage(from: source),
+                    using: detectedQuad
+                )
+                correctedPixels = try imageBridge.rgbaImage(from: corrected)
             }
             perspectiveStage?.finish(
-                details: details
+                details: "input=\(source.width)x\(source.height) "
+                    + "output=\(correctedPixels.width)x"
+                    + "\(correctedPixels.height) "
+                    + "backend=\(perspectiveBackend) pixelNative=true"
             )
         } catch {
             perspectiveStage?.finish(
@@ -123,48 +151,50 @@ actor AndroidParityDocumentProcessor {
             throw error
         }
 
-        let uprightStage = trace?.beginStage("uprightRasterize")
-        let correctedPixels: ScannerRGBAImage
-        do {
-            correctedPixels = try imageBridge.rgbaImage(from: corrected)
-        } catch {
-            uprightStage?.finish(
-                outcome: error is CancellationError
-                    ? "cancelled"
-                    : "failure"
-            )
-            throw error
-        }
+        let uprightStage = trace?.beginStage("uprightRotate")
         let uprightPixels = AndroidScannerImageMath.rotatedClockwise(
             correctedPixels,
             degrees: captureRotationDegrees
         )
-        let upright = imageBridge.ciImage(from: uprightPixels)
         uprightStage?.finish(
             details: "input=\(correctedPixels.width)x"
                 + "\(correctedPixels.height) "
                 + "output=\(uprightPixels.width)x"
                 + "\(uprightPixels.height) "
-                + "rotation=\(captureRotationDegrees)"
+                + "rotation=\(captureRotationDegrees) pixelNative=true"
         )
 
-        let dewarped: CIImage
+        let dewarpedPixels: ScannerRGBAImage
         if prepareDewarper(), let dewarper {
             let dewarpStage = trace?.beginStage("uvdocTotal")
             do {
-                if let traceableDewarper =
-                    dewarper as? any TraceableCurvedDocumentDewarping {
-                    dewarped = try await traceableDewarper.dewarp(
-                        upright,
+                if let uvdocEngine = dewarper as? UVDocDewarpEngine {
+                    dewarpedPixels = try await uvdocEngine.dewarpPixels(
+                        uprightPixels,
                         trace: trace
                     )
+                } else if let traceableDewarper =
+                    dewarper as? any TraceableCurvedDocumentDewarping {
+                    let dewarped = try await traceableDewarper.dewarp(
+                        imageBridge.ciImage(from: uprightPixels),
+                        trace: trace
+                    )
+                    dewarpedPixels = try imageBridge.rgbaImage(
+                        from: dewarped
+                    )
                 } else {
-                    dewarped = try await dewarper.dewarp(upright)
+                    let dewarped = try await dewarper.dewarp(
+                        imageBridge.ciImage(from: uprightPixels)
+                    )
+                    dewarpedPixels = try imageBridge.rgbaImage(
+                        from: dewarped
+                    )
                 }
                 dewarpStage?.finish(
                     details: "backend="
                         + "\(inferenceBackend?.rawValue ?? "unavailable") "
-                        + "output=\(Self.dimensions(of: dewarped))"
+                        + "output=\(dewarpedPixels.width)x"
+                        + "\(dewarpedPixels.height) pixelNative=true"
                 )
             } catch {
                 // Android deliberately keeps the perspective crop if UVDoc
@@ -174,30 +204,13 @@ actor AndroidParityDocumentProcessor {
                     details: "backend="
                         + "\(inferenceBackend?.rawValue ?? "unavailable")"
                 )
-                dewarped = upright
+                dewarpedPixels = uprightPixels
             }
         } else {
             trace?.beginStage("uvdocTotal").finish(
                 outcome: "unavailable"
             )
-            dewarped = upright
-        }
-
-        let outputRasterizeStage = trace?.beginStage("outputRasterize")
-        let dewarpedPixels: ScannerRGBAImage
-        do {
-            dewarpedPixels = try imageBridge.rgbaImage(from: dewarped)
-            outputRasterizeStage?.finish(
-                details: "output=\(dewarpedPixels.width)x"
-                    + "\(dewarpedPixels.height)"
-            )
-        } catch {
-            outputRasterizeStage?.finish(
-                outcome: error is CancellationError
-                    ? "cancelled"
-                    : "failure"
-            )
-            throw error
+            dewarpedPixels = uprightPixels
         }
 
         let normalizeStage = trace?.beginStage("outputNormalize")

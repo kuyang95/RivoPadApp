@@ -9,6 +9,14 @@ import os
 /// No image data, recognized text, document points, or device identifiers are
 /// persisted or emitted.
 nonisolated final class ScannerDiagnostics: @unchecked Sendable {
+    private struct InferenceBenchmarkResult: Sendable {
+        let requestedBackend: ScannerInferenceBackend
+        let activeBackend: ScannerInferenceBackend
+        let loadMilliseconds: Double
+        let samples: [Double]
+        let output: [Float]
+    }
+
     private let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier
             ?? "com.rivo.shortcuts-example",
@@ -150,6 +158,73 @@ nonisolated final class ScannerDiagnostics: @unchecked Sendable {
                 + " detectionRatePct="
                 + Self.decimal(detectionRate, digits: 1)
         )
+    }
+
+    func runUVDocBackendBenchmark() async {
+        guard isEnabled,
+              Self.isUVDocBenchmarkRequested() else {
+            return
+        }
+
+        emit("uvdocBenchmark started warmups=2 samples=8")
+        var cpuReference: [Float]?
+        for requestedBackend in [
+            ScannerInferenceBackend.cpuParity,
+            .coreML
+        ] {
+            do {
+                let result = try await Self.benchmarkUVDoc(
+                    requestedBackend: requestedBackend,
+                    warmupCount: 2,
+                    sampleCount: 8
+                )
+                let sorted = result.samples.sorted()
+                let maximumReferenceDifference: Float
+                if let cpuReference {
+                    maximumReferenceDifference = zip(
+                        cpuReference,
+                        result.output
+                    ).reduce(Float.zero) { difference, pair in
+                        max(difference, abs(pair.0 - pair.1))
+                    }
+                } else {
+                    cpuReference = result.output
+                    maximumReferenceDifference = 0
+                }
+                emit(
+                    "uvdocBenchmark requested="
+                        + "\(result.requestedBackend.rawValue) "
+                        + "active=\(result.activeBackend.rawValue) "
+                        + "loadMs="
+                        + Self.decimal(
+                            result.loadMilliseconds,
+                            digits: 2
+                        )
+                        + " p50ms="
+                        + Self.decimal(
+                            Self.percentile(0.50, in: sorted),
+                            digits: 2
+                        )
+                        + " p95ms="
+                        + Self.decimal(
+                            Self.percentile(0.95, in: sorted),
+                            digits: 2
+                        )
+                        + " maxCPUReferenceDifference="
+                        + Self.decimal(
+                            Double(maximumReferenceDifference),
+                            digits: 6
+                        )
+                )
+            } catch {
+                emit(
+                    "uvdocBenchmark requested="
+                        + "\(requestedBackend.rawValue) failed=true "
+                        + "error=\(error.localizedDescription)"
+                )
+            }
+        }
+        emit("uvdocBenchmark finished")
     }
 
     func logResource(_ stage: String, ticket: UUID? = nil) {
@@ -326,6 +401,68 @@ nonisolated final class ScannerDiagnostics: @unchecked Sendable {
             return false
         }
         return arguments[index + 1] != "0"
+    }
+
+    static func isUVDocBenchmarkRequested(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        environment: [String: String] =
+            ProcessInfo.processInfo.environment
+    ) -> Bool {
+        if environment["SCANNER_BENCHMARK_UVDOC"] == "1" {
+            return true
+        }
+        if arguments.contains("--scanner-benchmark-uvdoc") {
+            return true
+        }
+        guard let index = arguments.firstIndex(
+            of: "-ScannerBenchmarkUVDoc"
+        ),
+        arguments.indices.contains(index + 1) else {
+            return false
+        }
+        return arguments[index + 1] != "0"
+    }
+
+    private static func benchmarkUVDoc(
+        requestedBackend: ScannerInferenceBackend,
+        warmupCount: Int,
+        sampleCount: Int
+    ) async throws -> InferenceBenchmarkResult {
+        let loadStartedAt = ProcessInfo.processInfo.systemUptime
+        let session = try ScannerONNXSession(
+            descriptor: .curvedPageDewarper,
+            backend: requestedBackend
+        )
+        let loadMilliseconds = milliseconds(since: loadStartedAt)
+        let descriptor = ScannerModelDescriptor.curvedPageDewarper
+        let input = ScannerFloatTensor(
+            values: [Float](
+                repeating: 0,
+                count: descriptor.inputShape.reduce(1, *)
+            ),
+            shape: descriptor.inputShape
+        )
+
+        for _ in 0 ..< warmupCount {
+            _ = try await session.run(input)
+        }
+
+        var samples: [Double] = []
+        samples.reserveCapacity(sampleCount)
+        var output: [Float] = []
+        for _ in 0 ..< sampleCount {
+            let startedAt = ProcessInfo.processInfo.systemUptime
+            let result = try await session.run(input)
+            samples.append(milliseconds(since: startedAt))
+            output = result.values
+        }
+        return InferenceBenchmarkResult(
+            requestedBackend: requestedBackend,
+            activeBackend: session.activeBackend,
+            loadMilliseconds: loadMilliseconds,
+            samples: samples,
+            output: output
+        )
     }
 
     private static func physicalFootprintBytes() -> UInt64 {

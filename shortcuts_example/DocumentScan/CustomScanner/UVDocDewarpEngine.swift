@@ -339,6 +339,19 @@ actor UVDocDewarpEngine: TraceableCurvedDocumentDewarping {
             throw error
         }
 
+        let dewarped = try await dewarpPixels(source, trace: trace)
+        let outputBridgeStage = trace?.beginStage("uvdocOutputBridge")
+        let result = imageBridge.ciImage(from: dewarped)
+        outputBridgeStage?.finish(
+            details: "output=\(dewarped.width)x\(dewarped.height)"
+        )
+        return result
+    }
+
+    func dewarpPixels(
+        _ source: ScannerRGBAImage,
+        trace: ScannerProcessingTrace?
+    ) async throws -> ScannerRGBAImage {
         let preprocessStage = trace?.beginStage("uvdocPreprocess")
         let prepared: ScannerPreparedTensor
         if let metalImageSampler {
@@ -474,13 +487,7 @@ actor UVDocDewarpEngine: TraceableCurvedDocumentDewarping {
             }
             lastWarpBackend = .cpu
         }
-
-        let outputBridgeStage = trace?.beginStage("uvdocOutputBridge")
-        let result = imageBridge.ciImage(from: dewarped)
-        outputBridgeStage?.finish(
-            details: "output=\(dewarped.width)x\(dewarped.height)"
-        )
-        return result
+        return dewarped
     }
 
     private static func makeMetalSampler(
