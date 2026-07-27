@@ -34,6 +34,14 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         let outputHeight: UInt32
     }
 
+    private struct RotationUniforms {
+        let sourceWidth: UInt32
+        let sourceHeight: UInt32
+        let outputWidth: UInt32
+        let outputHeight: UInt32
+        let quarterTurnsClockwise: UInt32
+    }
+
     private struct PerspectiveUniforms {
         let sourceWidth: UInt32
         let sourceHeight: UInt32
@@ -139,6 +147,8 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
 
     private static let resizeKernelName =
         "androidResizeBilinearRGBA8"
+    private static let rotationKernelName =
+        "androidRotateRGBA8"
     private static let perspectiveKernelName =
         "androidPerspectiveWarpRGBA8"
     private static let colorKernelName =
@@ -154,6 +164,7 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
     private let commandQueue: any MTLCommandQueue
     private let textureCache: CVMetalTextureCache
     private let resizePipeline: any MTLComputePipelineState
+    private let rotationPipeline: any MTLComputePipelineState
     private let perspectivePipeline: any MTLComputePipelineState
     private let colorPipeline: any MTLComputePipelineState
     private let stretchedTensorPipeline: any MTLComputePipelineState
@@ -192,6 +203,11 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
             device: device,
             library: library
         )
+        let rotationPipeline = try Self.makePipeline(
+            named: Self.rotationKernelName,
+            device: device,
+            library: library
+        )
         let perspectivePipeline = try Self.makePipeline(
             named: Self.perspectiveKernelName,
             device: device,
@@ -222,6 +238,7 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         self.commandQueue = commandQueue
         self.textureCache = textureCache
         self.resizePipeline = resizePipeline
+        self.rotationPipeline = rotationPipeline
         self.perspectivePipeline = perspectivePipeline
         self.colorPipeline = colorPipeline
         self.stretchedTensorPipeline = stretchedTensorPipeline
@@ -265,6 +282,40 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
             source,
             width: max(Int(Float(source.width) * scale), 1),
             height: max(Int(Float(source.height) * scale), 1)
+        )
+    }
+
+    func rotatedClockwise(
+        _ source: ScannerRGBAImage,
+        degrees: Int
+    ) throws -> ScannerRGBAImage {
+        let normalizedDegrees = ((degrees % 360) + 360) % 360
+        guard normalizedDegrees != 0 else {
+            return source
+        }
+        precondition(
+            normalizedDegrees == 90
+                || normalizedDegrees == 180
+                || normalizedDegrees == 270
+        )
+
+        let swapsDimensions =
+            normalizedDegrees == 90 || normalizedDegrees == 270
+        let outputWidth = swapsDimensions ? source.height : source.width
+        let outputHeight = swapsDimensions ? source.width : source.height
+        var uniforms = try RotationUniforms(
+            sourceWidth: checkedDimension(source.width),
+            sourceHeight: checkedDimension(source.height),
+            outputWidth: checkedDimension(outputWidth),
+            outputHeight: checkedDimension(outputHeight),
+            quarterTurnsClockwise: UInt32(normalizedDegrees / 90)
+        )
+        return try execute(
+            source,
+            outputWidth: outputWidth,
+            outputHeight: outputHeight,
+            pipeline: rotationPipeline,
+            uniforms: &uniforms
         )
     }
 

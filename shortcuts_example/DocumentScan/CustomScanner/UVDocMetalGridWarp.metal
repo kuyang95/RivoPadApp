@@ -137,6 +137,14 @@ struct AndroidResizeUniforms {
     uint outputHeight;
 };
 
+struct AndroidRotationUniforms {
+    uint sourceWidth;
+    uint sourceHeight;
+    uint outputWidth;
+    uint outputHeight;
+    uint quarterTurnsClockwise;
+};
+
 struct AndroidPerspectiveUniforms {
     uint sourceWidth;
     uint sourceHeight;
@@ -247,6 +255,48 @@ kernel void androidResizeBilinearRGBA8(
     const uint outputIndex =
         outputPosition.y * uniforms.outputWidth + outputPosition.x;
     output[outputIndex] = scannerRoundedRGBA8(sampled);
+}
+
+/// Exact top-left row-major cardinal rotation matching
+/// `AndroidScannerImageMath.rotatedClockwise`.
+kernel void androidRotateRGBA8(
+    device const uchar4 *source [[buffer(0)]],
+    device uchar4 *output [[buffer(1)]],
+    constant AndroidRotationUniforms &uniforms [[buffer(2)]],
+    uint2 outputPosition [[thread_position_in_grid]]
+) {
+    if (outputPosition.x >= uniforms.outputWidth
+        || outputPosition.y >= uniforms.outputHeight) {
+        return;
+    }
+
+    uint2 sourcePosition;
+    switch (uniforms.quarterTurnsClockwise) {
+    case 1:
+        sourcePosition = uint2(
+            outputPosition.y,
+            uniforms.sourceHeight - 1 - outputPosition.x
+        );
+        break;
+    case 2:
+        sourcePosition = uint2(
+            uniforms.sourceWidth - 1 - outputPosition.x,
+            uniforms.sourceHeight - 1 - outputPosition.y
+        );
+        break;
+    default:
+        sourcePosition = uint2(
+            uniforms.sourceWidth - 1 - outputPosition.y,
+            outputPosition.x
+        );
+        break;
+    }
+
+    const uint sourceIndex =
+        sourcePosition.y * uniforms.sourceWidth + sourcePosition.x;
+    const uint outputIndex =
+        outputPosition.y * uniforms.outputWidth + outputPosition.x;
+    output[outputIndex] = source[sourceIndex];
 }
 
 /// Android-compatible stretched resize and `/255` NCHW tensor conversion.

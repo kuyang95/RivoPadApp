@@ -1031,6 +1031,27 @@ final class ScannerRegressionTests: XCTestCase {
         )
     }
 
+    func testMetalCardinalRotationsMatchAndroidCPUReference() throws {
+        guard MTLCreateSystemDefaultDevice() != nil else {
+            throw XCTSkip("Metal is unavailable on this test destination")
+        }
+        let source = try patternedImage(width: 13, height: 9)
+        let sampler = try AndroidMetalImageSampler()
+
+        for degrees in [0, 90, 180, 270] {
+            let cpu = AndroidScannerImageMath.rotatedClockwise(
+                source,
+                degrees: degrees
+            )
+            let metal = try sampler.rotatedClockwise(
+                source,
+                degrees: degrees
+            )
+
+            XCTAssertEqual(metal, cpu, "rotation \(degrees)")
+        }
+    }
+
     func testMetalStretchedTensorMatchesAndroidCPUReference() throws {
         guard MTLCreateSystemDefaultDevice() != nil else {
             throw XCTSkip("Metal is unavailable on this test destination")

@@ -152,16 +152,41 @@ actor AndroidParityDocumentProcessor {
         }
 
         let uprightStage = trace?.beginStage("uprightRotate")
-        let uprightPixels = AndroidScannerImageMath.rotatedClockwise(
-            correctedPixels,
-            degrees: captureRotationDegrees
-        )
+        let normalizedRotation =
+            ((captureRotationDegrees % 360) + 360) % 360
+        let uprightPixels: ScannerRGBAImage
+        let rotationBackend: String
+        if normalizedRotation == 0 {
+            uprightPixels = correctedPixels
+            rotationBackend = "passthrough"
+        } else if let metalImageSampler {
+            do {
+                uprightPixels = try metalImageSampler.rotatedClockwise(
+                    correctedPixels,
+                    degrees: normalizedRotation
+                )
+                rotationBackend = "metal"
+            } catch {
+                uprightPixels = AndroidScannerImageMath.rotatedClockwise(
+                    correctedPixels,
+                    degrees: normalizedRotation
+                )
+                rotationBackend = "cpuFallback"
+            }
+        } else {
+            uprightPixels = AndroidScannerImageMath.rotatedClockwise(
+                correctedPixels,
+                degrees: normalizedRotation
+            )
+            rotationBackend = "cpu"
+        }
         uprightStage?.finish(
             details: "input=\(correctedPixels.width)x"
                 + "\(correctedPixels.height) "
                 + "output=\(uprightPixels.width)x"
                 + "\(uprightPixels.height) "
-                + "rotation=\(captureRotationDegrees) pixelNative=true"
+                + "rotation=\(normalizedRotation) "
+                + "backend=\(rotationBackend) pixelNative=true"
         )
 
         let dewarpedPixels: ScannerRGBAImage
