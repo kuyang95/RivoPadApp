@@ -415,6 +415,15 @@ nonisolated enum AndroidPerspectiveMath {
 
 actor AndroidPerspectiveCorrector: DocumentPerspectiveCorrecting {
     private let imageBridge = ScannerCIImageBridge()
+    private let metalSampler: AndroidMetalImageSampler?
+    private(set) var lastWarpBackend: UVDocWarpBackend?
+
+    init(preferMetalWarp: Bool = true) {
+        metalSampler = preferMetalWarp
+            ? try? AndroidMetalImageSampler()
+            : nil
+        lastWarpBackend = nil
+    }
 
     func correct(
         _ image: CIImage,
@@ -429,11 +438,31 @@ actor AndroidPerspectiveCorrector: DocumentPerspectiveCorrecting {
         let outputSize = AndroidPerspectiveMath.outputSize(
             for: corners
         )
-        let corrected = try AndroidPerspectiveMath.warp(
-            source,
-            orderedCorners: corners,
-            outputSize: outputSize
-        )
+        let corrected: ScannerRGBAImage
+        if let metalSampler {
+            do {
+                corrected = try metalSampler.perspectiveWarp(
+                    source,
+                    orderedCorners: corners,
+                    outputSize: outputSize
+                )
+                lastWarpBackend = .metal
+            } catch {
+                corrected = try AndroidPerspectiveMath.warp(
+                    source,
+                    orderedCorners: corners,
+                    outputSize: outputSize
+                )
+                lastWarpBackend = .cpu
+            }
+        } else {
+            corrected = try AndroidPerspectiveMath.warp(
+                source,
+                orderedCorners: corners,
+                outputSize: outputSize
+            )
+            lastWarpBackend = .cpu
+        }
         return imageBridge.ciImage(from: corrected)
     }
 }

@@ -129,3 +129,154 @@ kernel void uvdocGridWarpRGBA8(
         outputPosition.y * uniforms.outputWidth + outputPosition.x;
     output[outputIndex] = uchar4(truncated);
 }
+
+struct AndroidResizeUniforms {
+    uint sourceWidth;
+    uint sourceHeight;
+    uint outputWidth;
+    uint outputHeight;
+};
+
+struct AndroidPerspectiveUniforms {
+    uint sourceWidth;
+    uint sourceHeight;
+    uint outputWidth;
+    uint outputHeight;
+    float a;
+    float b;
+    float c;
+    float d;
+    float e;
+    float f;
+    float g;
+    float h;
+};
+
+inline float4 scannerBilinearSampleRGBA8(
+    device const uchar4 *source,
+    uint sourceWidth,
+    uint sourceHeight,
+    float sourceX,
+    float sourceY
+) {
+    const uint sourceX0 = uint(sourceX);
+    const uint sourceY0 = uint(sourceY);
+    const uint sourceX1 = min(sourceX0 + 1, sourceWidth - 1);
+    const uint sourceY1 = min(sourceY0 + 1, sourceHeight - 1);
+    const float fractionX = sourceX - float(sourceX0);
+    const float fractionY = sourceY - float(sourceY0);
+    const float weight00 = (1.0f - fractionX) * (1.0f - fractionY);
+    const float weight01 = fractionX * (1.0f - fractionY);
+    const float weight10 = (1.0f - fractionX) * fractionY;
+    const float weight11 = fractionX * fractionY;
+    const uint sourceIndex00 = sourceY0 * sourceWidth + sourceX0;
+    const uint sourceIndex01 = sourceY0 * sourceWidth + sourceX1;
+    const uint sourceIndex10 = sourceY1 * sourceWidth + sourceX0;
+    const uint sourceIndex11 = sourceY1 * sourceWidth + sourceX1;
+
+    return weight00 * float4(source[sourceIndex00])
+        + weight01 * float4(source[sourceIndex01])
+        + weight10 * float4(source[sourceIndex10])
+        + weight11 * float4(source[sourceIndex11]);
+}
+
+inline uchar4 scannerRoundedRGBA8(float4 value) {
+    const float4 rounded = round(clamp(
+        value,
+        float4(0.0f),
+        float4(255.0f)
+    ));
+    return uchar4(uint4(rounded));
+}
+
+/// Half-pixel-center bilinear resize matching
+/// `AndroidScannerImageMath.resizeBilinear`.
+kernel void androidResizeBilinearRGBA8(
+    device const uchar4 *source [[buffer(0)]],
+    device uchar4 *output [[buffer(1)]],
+    constant AndroidResizeUniforms &uniforms [[buffer(2)]],
+    uint2 outputPosition [[thread_position_in_grid]]
+) {
+    if (outputPosition.x >= uniforms.outputWidth
+        || outputPosition.y >= uniforms.outputHeight) {
+        return;
+    }
+
+    const float sourceXMaximum = float(uniforms.sourceWidth - 1);
+    const float sourceYMaximum = float(uniforms.sourceHeight - 1);
+    const float xScale =
+        float(uniforms.sourceWidth) / float(uniforms.outputWidth);
+    const float yScale =
+        float(uniforms.sourceHeight) / float(uniforms.outputHeight);
+    const float sourceX = clamp(
+        (float(outputPosition.x) + 0.5f) * xScale - 0.5f,
+        0.0f,
+        sourceXMaximum
+    );
+    const float sourceY = clamp(
+        (float(outputPosition.y) + 0.5f) * yScale - 0.5f,
+        0.0f,
+        sourceYMaximum
+    );
+    const float4 sampled = scannerBilinearSampleRGBA8(
+        source,
+        uniforms.sourceWidth,
+        uniforms.sourceHeight,
+        sourceX,
+        sourceY
+    );
+    const uint outputIndex =
+        outputPosition.y * uniforms.outputWidth + outputPosition.x;
+    output[outputIndex] = scannerRoundedRGBA8(sampled);
+}
+
+/// Unit-square homography and bilinear sampling matching
+/// `AndroidPerspectiveMath.warp`.
+kernel void androidPerspectiveWarpRGBA8(
+    device const uchar4 *source [[buffer(0)]],
+    device uchar4 *output [[buffer(1)]],
+    constant AndroidPerspectiveUniforms &uniforms [[buffer(2)]],
+    uint2 outputPosition [[thread_position_in_grid]]
+) {
+    if (outputPosition.x >= uniforms.outputWidth
+        || outputPosition.y >= uniforms.outputHeight) {
+        return;
+    }
+
+    const float unitX =
+        (float(outputPosition.x) + 0.5f) / float(uniforms.outputWidth);
+    const float unitY =
+        (float(outputPosition.y) + 0.5f) / float(uniforms.outputHeight);
+    const float denominator =
+        uniforms.g * unitX + uniforms.h * unitY + 1.0f;
+    const float geometricSourceX = (
+        uniforms.a * unitX
+        + uniforms.b * unitY
+        + uniforms.c
+    ) / denominator;
+    const float geometricSourceY = (
+        uniforms.d * unitX
+        + uniforms.e * unitY
+        + uniforms.f
+    ) / denominator;
+    const float sourceX = clamp(
+        geometricSourceX - 0.5f,
+        0.0f,
+        float(uniforms.sourceWidth - 1)
+    );
+    const float sourceY = clamp(
+        geometricSourceY - 0.5f,
+        0.0f,
+        float(uniforms.sourceHeight - 1)
+    );
+    const float4 sampled = scannerBilinearSampleRGBA8(
+        source,
+        uniforms.sourceWidth,
+        uniforms.sourceHeight,
+        sourceX,
+        sourceY
+    );
+    const uint outputIndex =
+        outputPosition.y * uniforms.outputWidth + outputPosition.x;
+    output[outputIndex] = scannerRoundedRGBA8(sampled);
+}

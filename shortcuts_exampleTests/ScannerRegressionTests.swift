@@ -844,6 +844,61 @@ final class ScannerRegressionTests: XCTestCase {
         XCTAssertEqual(nonlinearMetal, nonlinearCPU)
     }
 
+    func testMetalResizeMatchesAndroidCPUReference() throws {
+        guard MTLCreateSystemDefaultDevice() != nil else {
+            throw XCTSkip("Metal is unavailable on this test destination")
+        }
+        let source = try patternedImage(width: 13, height: 9)
+        let cpu = AndroidScannerImageMath.resizeBilinear(
+            source,
+            width: 19,
+            height: 14
+        )
+        let metal = try AndroidMetalImageSampler().resizeBilinear(
+            source,
+            width: 19,
+            height: 14
+        )
+
+        XCTAssertEqual(metal.width, cpu.width)
+        XCTAssertEqual(metal.height, cpu.height)
+        XCTAssertLessThanOrEqual(
+            maximumChannelDifference(metal.bytes, cpu.bytes),
+            1
+        )
+    }
+
+    func testMetalPerspectiveMatchesAndroidCPUReference() throws {
+        guard MTLCreateSystemDefaultDevice() != nil else {
+            throw XCTSkip("Metal is unavailable on this test destination")
+        }
+        let source = try patternedImage(width: 16, height: 12)
+        let corners = [
+            ScannerPixelPoint(x: 1.2, y: 1.1),
+            ScannerPixelPoint(x: 14.5, y: 0.7),
+            ScannerPixelPoint(x: 13.8, y: 10.6),
+            ScannerPixelPoint(x: 0.6, y: 10.2)
+        ]
+        let outputSize = ScannerPixelSize(width: 21, height: 17)
+        let cpu = try AndroidPerspectiveMath.warp(
+            source,
+            orderedCorners: corners,
+            outputSize: outputSize
+        )
+        let metal = try AndroidMetalImageSampler().perspectiveWarp(
+            source,
+            orderedCorners: corners,
+            outputSize: outputSize
+        )
+
+        XCTAssertEqual(metal.width, cpu.width)
+        XCTAssertEqual(metal.height, cpu.height)
+        XCTAssertLessThanOrEqual(
+            maximumChannelDifference(metal.bytes, cpu.bytes),
+            1
+        )
+    }
+
     private func passingGates(
         quad: DocumentQuad = DocumentQuad(
             topLeft: NormalizedPoint(x: 0.1, y: 0.1),
@@ -878,6 +933,37 @@ final class ScannerRegressionTests: XCTestCase {
     private func redChannelValues(in image: ScannerRGBAImage) -> [UInt8] {
         stride(from: 0, to: image.bytes.count, by: 4).map {
             image.bytes[$0]
+        }
+    }
+
+    private func patternedImage(
+        width: Int,
+        height: Int
+    ) throws -> ScannerRGBAImage {
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(width * height * 4)
+        for y in 0 ..< height {
+            for x in 0 ..< width {
+                bytes.append(UInt8((x * 19 + y * 7) % 256))
+                bytes.append(UInt8((x * 5 + y * 23 + 31) % 256))
+                bytes.append(UInt8((x * 29 + y * 3 + 17) % 256))
+                bytes.append(255)
+            }
+        }
+        return try ScannerRGBAImage(
+            width: width,
+            height: height,
+            bytes: bytes
+        )
+    }
+
+    private func maximumChannelDifference(
+        _ first: [UInt8],
+        _ second: [UInt8]
+    ) -> Int {
+        XCTAssertEqual(first.count, second.count)
+        return zip(first, second).reduce(0) { maximum, values in
+            max(maximum, abs(Int(values.0) - Int(values.1)))
         }
     }
 }

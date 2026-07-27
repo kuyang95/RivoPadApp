@@ -12,6 +12,7 @@ actor AndroidParityDocumentProcessor {
     private var dewarper: (any CurvedDocumentDewarping)?
     private let enhancer: any DocumentImageEnhancing
     private let imageBridge = ScannerCIImageBridge()
+    private let metalImageSampler: AndroidMetalImageSampler?
     private let outputLongEdgePixels: Int
     private let modelBundle: Bundle?
     private var dewarperInitializationAttempted: Bool
@@ -27,6 +28,7 @@ actor AndroidParityDocumentProcessor {
         self.perspectiveCorrector = AndroidPerspectiveCorrector()
         self.dewarper = nil
         self.enhancer = AndroidDocumentColorEnhancer()
+        self.metalImageSampler = try? AndroidMetalImageSampler()
         self.outputLongEdgePixels = outputLongEdgePixels
         self.modelBundle = bundle
         self.dewarperInitializationAttempted = false
@@ -45,6 +47,7 @@ actor AndroidParityDocumentProcessor {
         self.perspectiveCorrector = perspectiveCorrector
         self.dewarper = dewarper
         self.enhancer = enhancer
+        self.metalImageSampler = try? AndroidMetalImageSampler()
         self.outputLongEdgePixels = outputLongEdgePixels
         self.modelBundle = nil
         self.dewarperInitializationAttempted = true
@@ -95,9 +98,15 @@ actor AndroidParityDocumentProcessor {
                 image,
                 using: detectedQuad
             )
+            var details = "input=\(Self.dimensions(of: image)) "
+                + "output=\(Self.dimensions(of: corrected))"
+            if let androidCorrector =
+                perspectiveCorrector as? AndroidPerspectiveCorrector {
+                let backend = await androidCorrector.lastWarpBackend
+                details += " backend=\(backend?.rawValue ?? "unknown")"
+            }
             perspectiveStage?.finish(
-                details: "input=\(Self.dimensions(of: image)) "
-                    + "output=\(Self.dimensions(of: corrected))"
+                details: details
             )
         } catch {
             perspectiveStage?.finish(
@@ -186,16 +195,44 @@ actor AndroidParityDocumentProcessor {
         }
 
         let normalizeStage = trace?.beginStage("outputNormalize")
-        let normalizedPixels = AndroidScannerImageMath.normalizedLongEdge(
-            dewarpedPixels,
-            maximum: outputLongEdgePixels
-        )
+        let normalizedPixels: ScannerRGBAImage
+        let normalizationBackend: String
+        if max(dewarpedPixels.width, dewarpedPixels.height)
+            > outputLongEdgePixels,
+           let metalImageSampler {
+            do {
+                normalizedPixels = try metalImageSampler
+                    .normalizedLongEdge(
+                        dewarpedPixels,
+                        maximum: outputLongEdgePixels
+                    )
+                normalizationBackend = "metal"
+            } catch {
+                normalizedPixels = AndroidScannerImageMath
+                    .normalizedLongEdge(
+                        dewarpedPixels,
+                        maximum: outputLongEdgePixels
+                    )
+                normalizationBackend = "cpuFallback"
+            }
+        } else {
+            normalizedPixels = AndroidScannerImageMath.normalizedLongEdge(
+                dewarpedPixels,
+                maximum: outputLongEdgePixels
+            )
+            normalizationBackend =
+                max(dewarpedPixels.width, dewarpedPixels.height)
+                    > outputLongEdgePixels
+                ? "cpu"
+                : "passthrough"
+        }
         let normalized = imageBridge.ciImage(from: normalizedPixels)
         normalizeStage?.finish(
             details: "input=\(dewarpedPixels.width)x"
                 + "\(dewarpedPixels.height) "
                 + "output=\(normalizedPixels.width)x"
-                + "\(normalizedPixels.height)"
+                + "\(normalizedPixels.height) "
+                + "backend=\(normalizationBackend)"
         )
 
         guard enhanceColors else {
