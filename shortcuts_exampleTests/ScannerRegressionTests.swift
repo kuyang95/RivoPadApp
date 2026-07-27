@@ -699,12 +699,17 @@ final class ScannerRegressionTests: XCTestCase {
             outputWidth: 4,
             outputHeight: 3
         )
+        let cpuFullCrop = try ScannerRGBAImage.readingBGRA(
+            pixelBuffer,
+            cropRect: cropRect
+        )
         let metal = try AndroidMetalImageSampler().prepareLiveFrame(
             pixelBuffer,
             cropRect: cropRect,
             letterbox: letterbox,
             sharpnessWidth: 4,
-            sharpnessHeight: 3
+            sharpnessHeight: 3,
+            includeFullResolutionCrop: true
         )
 
         XCTAssertEqual(metal.modelInput.shape, cpuTensor.shape)
@@ -731,6 +736,16 @@ final class ScannerRegressionTests: XCTestCase {
             maximumChannelDifference(
                 metal.sharpnessSample.bytes,
                 cpuSharpness.bytes
+            ),
+            1
+        )
+        let metalFullCrop = try XCTUnwrap(metal.fullResolutionCrop)
+        XCTAssertEqual(metalFullCrop.width, cpuFullCrop.width)
+        XCTAssertEqual(metalFullCrop.height, cpuFullCrop.height)
+        XCTAssertLessThanOrEqual(
+            maximumChannelDifference(
+                metalFullCrop.bytes,
+                cpuFullCrop.bytes
             ),
             1
         )

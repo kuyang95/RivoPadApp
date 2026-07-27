@@ -5,6 +5,17 @@ import Metal
 nonisolated struct AndroidMetalLiveFramePreparation: Sendable {
     let modelInput: ScannerPreparedTensor
     let sharpnessSample: ScannerRGBAImage
+    let fullResolutionCrop: ScannerRGBAImage?
+
+    init(
+        modelInput: ScannerPreparedTensor,
+        sharpnessSample: ScannerRGBAImage,
+        fullResolutionCrop: ScannerRGBAImage? = nil
+    ) {
+        self.modelInput = modelInput
+        self.sharpnessSample = sharpnessSample
+        self.fullResolutionCrop = fullResolutionCrop
+    }
 }
 
 nonisolated enum AndroidMetalImageError: Error, Equatable, Sendable {
@@ -436,7 +447,8 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         cropRect: ScannerPixelRect,
         letterbox: ScannerLetterboxTransform,
         sharpnessWidth: Int,
-        sharpnessHeight: Int
+        sharpnessHeight: Int,
+        includeFullResolutionCrop: Bool = false
     ) throws -> AndroidMetalLiveFramePreparation {
         let format = CVPixelBufferGetPixelFormatType(pixelBuffer)
         guard format == kCVPixelFormatType_32BGRA else {
@@ -483,8 +495,16 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
             sharpnessHeight,
             4
         )
+        let fullCropByteCount = try checkedProduct(
+            cropRect.width,
+            cropRect.height,
+            4
+        )
         try validateBufferLength(tensorByteCount)
         try validateBufferLength(sharpnessByteCount)
+        if includeFullResolutionCrop {
+            try validateBufferLength(fullCropByteCount)
+        }
 
         let sourceTexture = try cameraTexture(
             from: pixelBuffer,
@@ -509,6 +529,20 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
             throw AndroidMetalImageError.bufferAllocationFailed(
                 label: "camera sharpness sample"
             )
+        }
+        let fullCropBuffer: (any MTLBuffer)?
+        if includeFullResolutionCrop {
+            guard let buffer = device.makeBuffer(
+                length: fullCropByteCount,
+                options: .storageModeShared
+            ) else {
+                throw AndroidMetalImageError.bufferAllocationFailed(
+                    label: "camera full-resolution crop"
+                )
+            }
+            fullCropBuffer = buffer
+        } else {
+            fullCropBuffer = nil
         }
 
         let checkedSourceWidth = try checkedDimension(sourceWidth)
@@ -547,6 +581,24 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
             outputHeight: try checkedDimension(sharpnessHeight),
             canvasWidth: try checkedDimension(sharpnessWidth),
             canvasHeight: try checkedDimension(sharpnessHeight),
+            padX: 0,
+            padY: 0,
+            padding0: 0,
+            padding1: 0,
+            padding2: 0
+        )
+        var fullCropUniforms = CameraSampleUniforms(
+            sourceWidth: checkedSourceWidth,
+            sourceHeight: checkedSourceHeight,
+            sourceBytesPerRow: 0,
+            cropX: checkedCropX,
+            cropY: checkedCropY,
+            cropWidth: checkedCropWidth,
+            cropHeight: checkedCropHeight,
+            outputWidth: checkedCropWidth,
+            outputHeight: checkedCropHeight,
+            canvasWidth: checkedCropWidth,
+            canvasHeight: checkedCropHeight,
             padX: 0,
             padY: 0,
             padding0: 0,
@@ -592,6 +644,22 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
                 width: sharpnessWidth,
                 height: sharpnessHeight
             )
+            if let fullCropBuffer {
+                encoder.setComputePipelineState(cameraResizePipeline)
+                encoder.setTexture(sourceTexture.texture, index: 0)
+                encoder.setBuffer(fullCropBuffer, offset: 0, index: 0)
+                encoder.setBytes(
+                    &fullCropUniforms,
+                    length: MemoryLayout<CameraSampleUniforms>.stride,
+                    index: 1
+                )
+                dispatchThreads(
+                    encoder: encoder,
+                    pipeline: cameraResizePipeline,
+                    width: cropRect.width,
+                    height: cropRect.height
+                )
+            }
             encoder.endEncoding()
             commandBuffer.commit()
             commandBuffer.waitUntilCompleted()
@@ -620,6 +688,23 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
                 count: sharpnessByteCount
             )
         )
+        let fullResolutionCrop: ScannerRGBAImage?
+        if let fullCropBuffer {
+            let fullCropPointer = fullCropBuffer.contents()
+                .assumingMemoryBound(to: UInt8.self)
+            fullResolutionCrop = try ScannerRGBAImage(
+                width: cropRect.width,
+                height: cropRect.height,
+                bytes: Array(
+                    UnsafeBufferPointer(
+                        start: fullCropPointer,
+                        count: fullCropByteCount
+                    )
+                )
+            )
+        } else {
+            fullResolutionCrop = nil
+        }
         return AndroidMetalLiveFramePreparation(
             modelInput: ScannerPreparedTensor(
                 values: tensorValues,
@@ -635,7 +720,8 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
                 width: sharpnessWidth,
                 height: sharpnessHeight,
                 bytes: sharpnessBytes
-            )
+            ),
+            fullResolutionCrop: fullResolutionCrop
         )
     }
 

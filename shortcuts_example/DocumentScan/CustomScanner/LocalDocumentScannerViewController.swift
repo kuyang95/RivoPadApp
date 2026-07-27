@@ -14,6 +14,7 @@ nonisolated private struct ScannerAnalysisPayload: Sendable {
 
 nonisolated private struct ScannerPreparedStill: Sendable {
     let image: ScannerRGBAImage
+    let modelInput: ScannerPreparedTensor?
     let transform: ScannerViewportTransform
     let sharpness: Double
     let sourceBackend: String
@@ -1218,8 +1219,8 @@ final class LocalDocumentScannerViewController: UIViewController {
         )
         let uncompressedFormats = photoOutput.availablePhotoPixelFormatTypes
         let preferredFormats: [OSType] = [
-            kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
             kCVPixelFormatType_32BGRA,
+            kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
             kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
         ]
         let requestedPixelFormat = preferredFormats.first {
@@ -1280,6 +1281,7 @@ final class LocalDocumentScannerViewController: UIViewController {
         let documentProcessor = processor
         let scannerConfiguration = configuration
         let bridge = imageBridge
+        let stillMetalSampler = liveMetalSampler
         let scannerDiagnostics = diagnostics
         let resourceSampler = diagnostics.beginProcessing(ticket: ticket)
         let processingTrace = diagnostics.trace(ticket: ticket)
@@ -1293,6 +1295,7 @@ final class LocalDocumentScannerViewController: UIViewController {
              documentProcessor,
              scannerConfiguration,
              bridge,
+             stillMetalSampler,
              scannerDiagnostics,
              resourceSampler,
              processingTrace] in
@@ -1305,7 +1308,14 @@ final class LocalDocumentScannerViewController: UIViewController {
                 var stageStartedAt = ProcessInfo.processInfo.systemUptime
                 let prepared = try await Self.prepareStill(
                     capturedPhoto,
-                    viewport: capture.viewport
+                    viewport: capture.viewport,
+                    metalSampler: stillMetalSampler,
+                    detectorInputSize:
+                        scannerConfiguration.liveAnalysisLongEdgePixels,
+                    sharpnessWidth:
+                        scannerConfiguration.laplacianSampleWidth,
+                    sharpnessHeight:
+                        scannerConfiguration.laplacianSampleHeight
                 )
                 scannerDiagnostics.logDuration(
                     "stillPrepare",
@@ -1329,9 +1339,16 @@ final class LocalDocumentScannerViewController: UIViewController {
                 }
 
                 stageStartedAt = ProcessInfo.processInfo.systemUptime
-                let stillDetection = try await stillDetector?.detect(
-                    in: prepared.image
-                )
+                let stillDetection: DocumentDetection?
+                if let modelInput = prepared.modelInput {
+                    stillDetection = try await stillDetector?.detect(
+                        prepared: modelInput
+                    )
+                } else {
+                    stillDetection = try await stillDetector?.detect(
+                        in: prepared.image
+                    )
+                }
                 scannerDiagnostics.logDuration(
                     "stillLCNet",
                     milliseconds: ScannerDiagnostics.milliseconds(
@@ -1339,7 +1356,9 @@ final class LocalDocumentScannerViewController: UIViewController {
                     ),
                     ticket: ticket,
                     details: "available=\(stillDetector != nil) "
-                        + "detected=\(stillDetection != nil)"
+                        + "detected=\(stillDetection != nil) "
+                        + "preprocess="
+                        + (prepared.modelInput == nil ? "detector" : "prepared")
                 )
                 try Task.checkCancellation()
                 if let previewDetection = capture.previewDetection,
@@ -1461,29 +1480,30 @@ final class LocalDocumentScannerViewController: UIViewController {
 
     nonisolated private static func prepareStill(
         _ photo: ScannerCapturedPhoto,
-        viewport: ScannerViewportConfiguration
+        viewport: ScannerViewportConfiguration,
+        metalSampler: AndroidMetalImageSampler?,
+        detectorInputSize: Int,
+        sharpnessWidth: Int,
+        sharpnessHeight: Int
     ) async throws -> ScannerPreparedStill {
         try await Task.detached(priority: .userInitiated) {
             let bridge = ScannerCIImageBridge()
-            let rawCIImage: CIImage
             let rawWidth: Int
             let rawHeight: Int
-            let sourceBackend: String
+            let decodedDataImage: CIImage?
             if let pixelBuffer = photo.pixelBuffer {
-                rawCIImage = CIImage(cvPixelBuffer: pixelBuffer)
                 rawWidth = CVPixelBufferGetWidth(pixelBuffer)
                 rawHeight = CVPixelBufferGetHeight(pixelBuffer)
-                sourceBackend = "pixelBuffer"
+                decodedDataImage = nil
             } else if let data = photo.encodedData,
                       let decoded = CIImage(
                           data: data,
                           options: [.applyOrientationProperty: false]
                       ) {
-                rawCIImage = decoded
                 let extent = decoded.extent.integral
                 rawWidth = Int(extent.width)
                 rawHeight = Int(extent.height)
-                sourceBackend = "encodedData"
+                decodedDataImage = decoded
             } else {
                 throw LocalDocumentScannerError.photoDecodeFailed
             }
@@ -1494,12 +1514,64 @@ final class LocalDocumentScannerViewController: UIViewController {
             ) else {
                 throw LocalDocumentScannerError.missingViewport
             }
+            if let pixelBuffer = photo.pixelBuffer,
+               CVPixelBufferGetPixelFormatType(pixelBuffer)
+                == kCVPixelFormatType_32BGRA,
+               let metalSampler {
+                do {
+                    let letterbox =
+                        AndroidScannerImageMath.letterboxTransform(
+                            sourceWidth: transform.rawCropRect.width,
+                            sourceHeight: transform.rawCropRect.height,
+                            size: detectorInputSize
+                        )
+                    let prepared = try metalSampler.prepareLiveFrame(
+                        pixelBuffer,
+                        cropRect: transform.rawCropRect,
+                        letterbox: letterbox,
+                        sharpnessWidth: sharpnessWidth,
+                        sharpnessHeight: sharpnessHeight,
+                        includeFullResolutionCrop: true
+                    )
+                    guard let cropped = prepared.fullResolutionCrop else {
+                        throw LocalDocumentScannerError.photoDecodeFailed
+                    }
+                    return ScannerPreparedStill(
+                        image: cropped,
+                        modelInput: prepared.modelInput,
+                        transform: transform,
+                        sharpness:
+                            AndroidScannerFrameQuality.laplacianVariance(
+                                of: prepared.sharpnessSample,
+                                sampleWidth: sharpnessWidth,
+                                sampleHeight: sharpnessHeight
+                            ),
+                        sourceBackend: "pixelBufferMetalBGRA"
+                    )
+                } catch {
+                    // Some capture buffers may not be Metal-compatible.
+                    // Preserve the Core Image path on those devices.
+                }
+            }
+
+            let rawCIImage: CIImage
+            let sourceBackend: String
+            if let pixelBuffer = photo.pixelBuffer {
+                rawCIImage = CIImage(cvPixelBuffer: pixelBuffer)
+                sourceBackend = "pixelBufferCoreImage"
+            } else if let decoded = decodedDataImage {
+                rawCIImage = decoded
+                sourceBackend = "encodedData"
+            } else {
+                throw LocalDocumentScannerError.photoDecodeFailed
+            }
             let cropped = try bridge.rgbaImage(
                 from: rawCIImage,
                 topLeftCropRect: transform.rawCropRect
             )
             return ScannerPreparedStill(
                 image: cropped,
+                modelInput: nil,
                 transform: transform,
                 sharpness: AndroidScannerFrameQuality.laplacianVariance(
                     of: cropped
