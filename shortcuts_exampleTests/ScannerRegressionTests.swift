@@ -573,6 +573,116 @@ final class ScannerRegressionTests: XCTestCase {
         )
     }
 
+    func testMetalCameraPreparationMatchesPaddedBGRAReference() throws {
+        guard MTLCreateSystemDefaultDevice() != nil else {
+            throw XCTSkip("Metal is unavailable on this test destination")
+        }
+        var optionalPixelBuffer: CVPixelBuffer?
+        let attributes = [
+            kCVPixelBufferBytesPerRowAlignmentKey as String: 64,
+            kCVPixelBufferMetalCompatibilityKey as String: true,
+            kCVPixelBufferIOSurfacePropertiesKey as String: NSDictionary()
+        ] as CFDictionary
+        XCTAssertEqual(
+            CVPixelBufferCreate(
+                kCFAllocatorDefault,
+                5,
+                4,
+                kCVPixelFormatType_32BGRA,
+                attributes,
+                &optionalPixelBuffer
+            ),
+            kCVReturnSuccess
+        )
+        let pixelBuffer = try XCTUnwrap(optionalPixelBuffer)
+        XCTAssertGreaterThan(CVPixelBufferGetBytesPerRow(pixelBuffer), 20)
+        XCTAssertEqual(
+            CVPixelBufferLockBaseAddress(pixelBuffer, []),
+            kCVReturnSuccess
+        )
+        guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else {
+            CVPixelBufferUnlockBaseAddress(pixelBuffer, [])
+            return XCTFail("Pixel buffer must expose writable storage")
+        }
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+        let storage = baseAddress.assumingMemoryBound(to: UInt8.self)
+        for y in 0 ..< 4 {
+            for x in 0 ..< 5 {
+                let offset = y * bytesPerRow + x * 4
+                storage[offset] = UInt8((x * 11 + y * 17) % 256)
+                storage[offset + 1] =
+                    UInt8((x * 31 + y * 7 + 13) % 256)
+                storage[offset + 2] =
+                    UInt8((x * 19 + y * 23 + 29) % 256)
+                storage[offset + 3] = 255
+            }
+        }
+        CVPixelBufferUnlockBaseAddress(pixelBuffer, [])
+
+        let cropRect = ScannerPixelRect(
+            x: 1,
+            y: 1,
+            width: 3,
+            height: 2
+        )
+        let letterbox = AndroidScannerImageMath.letterboxTransform(
+            sourceWidth: cropRect.width,
+            sourceHeight: cropRect.height,
+            size: 7
+        )
+        let detectorImage = try ScannerRGBAImage.readingBGRA(
+            pixelBuffer,
+            cropRect: cropRect,
+            outputWidth: letterbox.scaledWidth,
+            outputHeight: letterbox.scaledHeight
+        )
+        let cpuTensor = AndroidScannerImageMath.letterboxedRGBTensor(
+            fromResized: detectorImage,
+            letterbox: letterbox
+        )
+        let cpuSharpness = try ScannerRGBAImage.readingBGRA(
+            pixelBuffer,
+            cropRect: cropRect,
+            outputWidth: 4,
+            outputHeight: 3
+        )
+        let metal = try AndroidMetalImageSampler().prepareLiveFrame(
+            pixelBuffer,
+            cropRect: cropRect,
+            letterbox: letterbox,
+            sharpnessWidth: 4,
+            sharpnessHeight: 3
+        )
+
+        XCTAssertEqual(metal.modelInput.shape, cpuTensor.shape)
+        XCTAssertEqual(metal.modelInput.letterbox, letterbox)
+        let maximumTensorDifference = zip(
+            metal.modelInput.values,
+            cpuTensor.values
+        ).reduce(Float.zero) { current, values in
+            max(current, abs(values.0 - values.1))
+        }
+        XCTAssertLessThanOrEqual(
+            maximumTensorDifference,
+            (1.0 / 255.0) + Float.ulpOfOne
+        )
+        XCTAssertEqual(
+            metal.sharpnessSample.width,
+            cpuSharpness.width
+        )
+        XCTAssertEqual(
+            metal.sharpnessSample.height,
+            cpuSharpness.height
+        )
+        XCTAssertLessThanOrEqual(
+            maximumChannelDifference(
+                metal.sharpnessSample.bytes,
+                cpuSharpness.bytes
+            ),
+            1
+        )
+    }
+
     func testCaptureGateRequiresSevenStableFramesAndRejectsJitter() {
         var evaluator = DocumentCaptureGateEvaluator()
         let stableDetection = DocumentDetection(

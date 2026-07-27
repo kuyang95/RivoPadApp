@@ -85,6 +85,8 @@ nonisolated final class ScannerDiagnostics: @unchecked Sendable {
     func recordLiveInference(
         milliseconds: Double,
         preprocessingMilliseconds: Double,
+        preprocessingBackend: UVDocWarpBackend,
+        inferenceBackend: ScannerInferenceBackend,
         detected: Bool
     ) {
         guard isEnabled else {
@@ -133,6 +135,8 @@ nonisolated final class ScannerDiagnostics: @unchecked Sendable {
             / Double(max(samples.count, 1)) * 100
         emit(
             "liveLCNet samples=\(samples.count) "
+                + "preprocessBackend=\(preprocessingBackend.rawValue) "
+                + "inferenceBackend=\(inferenceBackend.rawValue) "
                 + "p50ms=\(Self.decimal(p50, digits: 2)) "
                 + "p95ms=\(Self.decimal(p95, digits: 2)) "
                 + "preprocessP50ms="

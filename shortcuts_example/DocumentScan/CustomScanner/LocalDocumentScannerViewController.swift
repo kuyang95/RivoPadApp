@@ -8,6 +8,7 @@ nonisolated private struct ScannerAnalysisPayload: Sendable {
     let transform: ScannerViewportTransform
     let sharpness: Double
     let preprocessingMilliseconds: Double
+    let preprocessingBackend: UVDocWarpBackend
     let generation: Int
 }
 
@@ -95,6 +96,12 @@ final class LocalDocumentScannerViewController: UIViewController {
     )
     nonisolated private let frameAdmission =
         ScannerFrameAdmissionController(framesPerSecond: 10)
+    nonisolated private let liveMetalSampler =
+        try? AndroidMetalImageSampler()
+    nonisolated private let forceCPULivePreprocessing =
+        ProcessInfo.processInfo.arguments.contains(
+            "-ScannerForceCPULivePreprocessing"
+        )
     private let motionMonitor = ScannerMotionMonitor()
     private let diagnostics = ScannerDiagnostics()
     private var captureDevice: AVCaptureDevice?
@@ -386,13 +393,15 @@ final class LocalDocumentScannerViewController: UIViewController {
 
     private func prepareModels() {
         let scannerDiagnostics = diagnostics
-        detectorLoadTask = Task { [weak self, scannerDiagnostics] in
+        let detectorBackend: ScannerInferenceBackend = .cpuParity
+        detectorLoadTask = Task {
+            [weak self, scannerDiagnostics, detectorBackend] in
             let startedAt = ProcessInfo.processInfo.systemUptime
             do {
                 let loadedDetector = try await Task.detached(
                     priority: .userInitiated
                 ) {
-                    try LCNetDocumentDetector(backend: .coreML)
+                    try LCNetDocumentDetector(backend: detectorBackend)
                 }.value
                 scannerDiagnostics.logDuration(
                     "lcnetLoad",
@@ -923,6 +932,8 @@ final class LocalDocumentScannerViewController: UIViewController {
                 ),
                 preprocessingMilliseconds:
                     payload.preprocessingMilliseconds,
+                preprocessingBackend: payload.preprocessingBackend,
+                inferenceBackend: detector.backend,
                 detected: detection != nil
             )
             guard frameAdmission.isCurrent(generation: payload.generation),
@@ -1585,23 +1596,49 @@ extension LocalDocumentScannerViewController:
                 sourceHeight: transform.rawCropRect.height,
                 size: configuration.liveAnalysisLongEdgePixels
             )
-            let detectorImage = try ScannerRGBAImage.readingBGRA(
-                pixelBuffer,
-                cropRect: transform.rawCropRect,
-                outputWidth: letterbox.scaledWidth,
-                outputHeight: letterbox.scaledHeight
-            )
-            let modelInput = AndroidScannerImageMath
-                .letterboxedRGBTensor(
-                    fromResized: detectorImage,
-                    letterbox: letterbox
+            let modelInput: ScannerPreparedTensor
+            let sharpnessSample: ScannerRGBAImage
+            let preprocessingBackend: UVDocWarpBackend
+            if !forceCPULivePreprocessing, let liveMetalSampler {
+                do {
+                    let prepared = try liveMetalSampler.prepareLiveFrame(
+                        pixelBuffer,
+                        cropRect: transform.rawCropRect,
+                        letterbox: letterbox,
+                        sharpnessWidth:
+                            configuration.laplacianSampleWidth,
+                        sharpnessHeight:
+                            configuration.laplacianSampleHeight
+                    )
+                    modelInput = prepared.modelInput
+                    sharpnessSample = prepared.sharpnessSample
+                    preprocessingBackend = .metal
+                } catch {
+                    let prepared = try Self.prepareLiveFrameOnCPU(
+                        pixelBuffer,
+                        cropRect: transform.rawCropRect,
+                        letterbox: letterbox,
+                        sharpnessWidth:
+                            configuration.laplacianSampleWidth,
+                        sharpnessHeight:
+                            configuration.laplacianSampleHeight
+                    )
+                    modelInput = prepared.modelInput
+                    sharpnessSample = prepared.sharpnessSample
+                    preprocessingBackend = .cpu
+                }
+            } else {
+                let prepared = try Self.prepareLiveFrameOnCPU(
+                    pixelBuffer,
+                    cropRect: transform.rawCropRect,
+                    letterbox: letterbox,
+                    sharpnessWidth: configuration.laplacianSampleWidth,
+                    sharpnessHeight: configuration.laplacianSampleHeight
                 )
-            let sharpnessSample = try ScannerRGBAImage.readingBGRA(
-                pixelBuffer,
-                cropRect: transform.rawCropRect,
-                outputWidth: configuration.laplacianSampleWidth,
-                outputHeight: configuration.laplacianSampleHeight
-            )
+                modelInput = prepared.modelInput
+                sharpnessSample = prepared.sharpnessSample
+                preprocessingBackend = .cpu
+            }
             let sharpness = AndroidScannerFrameQuality.laplacianVariance(
                 of: sharpnessSample,
                 sampleWidth: configuration.laplacianSampleWidth,
@@ -1615,6 +1652,7 @@ extension LocalDocumentScannerViewController:
                     ScannerDiagnostics.milliseconds(
                         since: preprocessingStartedAt
                     ),
+                preprocessingBackend: preprocessingBackend,
                 generation: viewport.generation
             )
             let admission = frameAdmission
@@ -1628,6 +1666,35 @@ extension LocalDocumentScannerViewController:
         } catch {
             frameAdmission.finishFrame()
         }
+    }
+
+    nonisolated private static func prepareLiveFrameOnCPU(
+        _ pixelBuffer: CVPixelBuffer,
+        cropRect: ScannerPixelRect,
+        letterbox: ScannerLetterboxTransform,
+        sharpnessWidth: Int,
+        sharpnessHeight: Int
+    ) throws -> AndroidMetalLiveFramePreparation {
+        let detectorImage = try ScannerRGBAImage.readingBGRA(
+            pixelBuffer,
+            cropRect: cropRect,
+            outputWidth: letterbox.scaledWidth,
+            outputHeight: letterbox.scaledHeight
+        )
+        let modelInput = AndroidScannerImageMath.letterboxedRGBTensor(
+            fromResized: detectorImage,
+            letterbox: letterbox
+        )
+        let sharpnessSample = try ScannerRGBAImage.readingBGRA(
+            pixelBuffer,
+            cropRect: cropRect,
+            outputWidth: sharpnessWidth,
+            outputHeight: sharpnessHeight
+        )
+        return AndroidMetalLiveFramePreparation(
+            modelInput: modelInput,
+            sharpnessSample: sharpnessSample
+        )
     }
 }
 

@@ -1,5 +1,11 @@
+import CoreVideo
 import Foundation
 import Metal
+
+nonisolated struct AndroidMetalLiveFramePreparation: Sendable {
+    let modelInput: ScannerPreparedTensor
+    let sharpnessSample: ScannerRGBAImage
+}
 
 nonisolated enum AndroidMetalImageError: Error, Equatable, Sendable {
     case metalUnavailable
@@ -7,6 +13,8 @@ nonisolated enum AndroidMetalImageError: Error, Equatable, Sendable {
     case defaultLibraryUnavailable
     case kernelUnavailable(name: String)
     case pipelineCreationFailed(description: String)
+    case textureCacheCreationFailed(status: CVReturn)
+    case textureCreationFailed(status: CVReturn)
     case dimensionsExceedMetalLimits
     case bufferTooLarge(byteCount: Int, maximum: Int)
     case bufferAllocationFailed(label: String)
@@ -53,6 +61,25 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         let blueScale: Float
         let gamma: Float
         let saturationBoost: Float
+    }
+
+    private struct CameraSampleUniforms {
+        let sourceWidth: UInt32
+        let sourceHeight: UInt32
+        let sourceBytesPerRow: UInt32
+        let cropX: UInt32
+        let cropY: UInt32
+        let cropWidth: UInt32
+        let cropHeight: UInt32
+        let outputWidth: UInt32
+        let outputHeight: UInt32
+        let canvasWidth: UInt32
+        let canvasHeight: UInt32
+        let padX: UInt32
+        let padY: UInt32
+        let padding0: UInt32
+        let padding1: UInt32
+        let padding2: UInt32
     }
 
     private struct Homography {
@@ -118,13 +145,20 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         "androidDocumentColorEnhanceRGBA8"
     private static let stretchedTensorKernelName =
         "androidStretchedRGBTensorNCHW"
+    private static let cameraTensorKernelName =
+        "androidCameraLetterboxRGBTensorNCHW"
+    private static let cameraResizeKernelName =
+        "androidCameraCropResizeRGBA8"
 
     private let device: any MTLDevice
     private let commandQueue: any MTLCommandQueue
+    private let textureCache: CVMetalTextureCache
     private let resizePipeline: any MTLComputePipelineState
     private let perspectivePipeline: any MTLComputePipelineState
     private let colorPipeline: any MTLComputePipelineState
     private let stretchedTensorPipeline: any MTLComputePipelineState
+    private let cameraTensorPipeline: any MTLComputePipelineState
+    private let cameraResizePipeline: any MTLComputePipelineState
 
     init(
         device requestedDevice: (any MTLDevice)? = nil,
@@ -135,6 +169,20 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         }
         guard let commandQueue = device.makeCommandQueue() else {
             throw AndroidMetalImageError.commandQueueUnavailable
+        }
+        var optionalTextureCache: CVMetalTextureCache?
+        let textureCacheStatus = CVMetalTextureCacheCreate(
+            kCFAllocatorDefault,
+            nil,
+            device,
+            nil,
+            &optionalTextureCache
+        )
+        guard textureCacheStatus == kCVReturnSuccess,
+              let textureCache = optionalTextureCache else {
+            throw AndroidMetalImageError.textureCacheCreationFailed(
+                status: textureCacheStatus
+            )
         }
         guard let library = requestedLibrary ?? device.makeDefaultLibrary() else {
             throw AndroidMetalImageError.defaultLibraryUnavailable
@@ -159,13 +207,26 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
             device: device,
             library: library
         )
+        let cameraTensorPipeline = try Self.makePipeline(
+            named: Self.cameraTensorKernelName,
+            device: device,
+            library: library
+        )
+        let cameraResizePipeline = try Self.makePipeline(
+            named: Self.cameraResizeKernelName,
+            device: device,
+            library: library
+        )
 
         self.device = device
         self.commandQueue = commandQueue
+        self.textureCache = textureCache
         self.resizePipeline = resizePipeline
         self.perspectivePipeline = perspectivePipeline
         self.colorPipeline = colorPipeline
         self.stretchedTensorPipeline = stretchedTensorPipeline
+        self.cameraTensorPipeline = cameraTensorPipeline
+        self.cameraResizePipeline = cameraResizePipeline
     }
 
     func resizeBilinear(
@@ -317,6 +378,216 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         )
     }
 
+    /// Creates LCNet's letterboxed tensor and the capture-gate sharpness
+    /// sample from one zero-copy BGRA camera texture and command buffer.
+    func prepareLiveFrame(
+        _ pixelBuffer: CVPixelBuffer,
+        cropRect: ScannerPixelRect,
+        letterbox: ScannerLetterboxTransform,
+        sharpnessWidth: Int,
+        sharpnessHeight: Int
+    ) throws -> AndroidMetalLiveFramePreparation {
+        let format = CVPixelBufferGetPixelFormatType(pixelBuffer)
+        guard format == kCVPixelFormatType_32BGRA else {
+            throw ScannerImageError.unsupportedPixelFormat(format)
+        }
+        let sourceWidth = CVPixelBufferGetWidth(pixelBuffer)
+        let sourceHeight = CVPixelBufferGetHeight(pixelBuffer)
+        guard cropRect.x >= 0,
+              cropRect.y >= 0,
+              cropRect.width > 0,
+              cropRect.height > 0,
+              cropRect.maxX <= sourceWidth,
+              cropRect.maxY <= sourceHeight,
+              letterbox.originalWidth == cropRect.width,
+              letterbox.originalHeight == cropRect.height,
+              letterbox.scaledWidth > 0,
+              letterbox.scaledHeight > 0,
+              letterbox.canvasSize > 0,
+              letterbox.padX >= 0,
+              letterbox.padY >= 0,
+              letterbox.padX + letterbox.scaledWidth
+                <= letterbox.canvasSize,
+              letterbox.padY + letterbox.scaledHeight
+                <= letterbox.canvasSize,
+              sharpnessWidth > 0,
+              sharpnessHeight > 0 else {
+            throw ScannerImageError.invalidDimensions(
+                width: cropRect.width,
+                height: cropRect.height
+            )
+        }
+
+        let tensorValueCount = try checkedProduct(
+            letterbox.canvasSize,
+            letterbox.canvasSize,
+            3
+        )
+        let tensorByteCount = try checkedProduct(
+            tensorValueCount,
+            MemoryLayout<Float>.stride
+        )
+        let sharpnessByteCount = try checkedProduct(
+            sharpnessWidth,
+            sharpnessHeight,
+            4
+        )
+        try validateBufferLength(tensorByteCount)
+        try validateBufferLength(sharpnessByteCount)
+
+        let sourceTexture = try cameraTexture(
+            from: pixelBuffer,
+            width: sourceWidth,
+            height: sourceHeight
+        )
+        defer {
+            withExtendedLifetime(sourceTexture.reference) {}
+        }
+        guard let tensorBuffer = device.makeBuffer(
+            length: tensorByteCount,
+            options: .storageModeShared
+        ) else {
+            throw AndroidMetalImageError.bufferAllocationFailed(
+                label: "camera tensor"
+            )
+        }
+        guard let sharpnessBuffer = device.makeBuffer(
+            length: sharpnessByteCount,
+            options: .storageModeShared
+        ) else {
+            throw AndroidMetalImageError.bufferAllocationFailed(
+                label: "camera sharpness sample"
+            )
+        }
+
+        let checkedSourceWidth = try checkedDimension(sourceWidth)
+        let checkedSourceHeight = try checkedDimension(sourceHeight)
+        let checkedCropX = try checkedUnsigned(cropRect.x)
+        let checkedCropY = try checkedUnsigned(cropRect.y)
+        let checkedCropWidth = try checkedDimension(cropRect.width)
+        let checkedCropHeight = try checkedDimension(cropRect.height)
+        var tensorUniforms = CameraSampleUniforms(
+            sourceWidth: checkedSourceWidth,
+            sourceHeight: checkedSourceHeight,
+            sourceBytesPerRow: 0,
+            cropX: checkedCropX,
+            cropY: checkedCropY,
+            cropWidth: checkedCropWidth,
+            cropHeight: checkedCropHeight,
+            outputWidth: try checkedDimension(letterbox.scaledWidth),
+            outputHeight: try checkedDimension(letterbox.scaledHeight),
+            canvasWidth: try checkedDimension(letterbox.canvasSize),
+            canvasHeight: try checkedDimension(letterbox.canvasSize),
+            padX: try checkedUnsigned(letterbox.padX),
+            padY: try checkedUnsigned(letterbox.padY),
+            padding0: 0,
+            padding1: 0,
+            padding2: 0
+        )
+        var sharpnessUniforms = CameraSampleUniforms(
+            sourceWidth: checkedSourceWidth,
+            sourceHeight: checkedSourceHeight,
+            sourceBytesPerRow: 0,
+            cropX: checkedCropX,
+            cropY: checkedCropY,
+            cropWidth: checkedCropWidth,
+            cropHeight: checkedCropHeight,
+            outputWidth: try checkedDimension(sharpnessWidth),
+            outputHeight: try checkedDimension(sharpnessHeight),
+            canvasWidth: try checkedDimension(sharpnessWidth),
+            canvasHeight: try checkedDimension(sharpnessHeight),
+            padX: 0,
+            padY: 0,
+            padding0: 0,
+            padding1: 0,
+            padding2: 0
+        )
+
+        do {
+            guard let commandBuffer = commandQueue.makeCommandBuffer() else {
+                throw AndroidMetalImageError.commandBufferUnavailable
+            }
+            guard let encoder =
+                commandBuffer.makeComputeCommandEncoder() else {
+                throw AndroidMetalImageError.commandEncoderUnavailable
+            }
+
+            encoder.setComputePipelineState(cameraTensorPipeline)
+            encoder.setTexture(sourceTexture.texture, index: 0)
+            encoder.setBuffer(tensorBuffer, offset: 0, index: 0)
+            encoder.setBytes(
+                &tensorUniforms,
+                length: MemoryLayout<CameraSampleUniforms>.stride,
+                index: 1
+            )
+            dispatchThreads(
+                encoder: encoder,
+                pipeline: cameraTensorPipeline,
+                width: letterbox.canvasSize,
+                height: letterbox.canvasSize
+            )
+
+            encoder.setComputePipelineState(cameraResizePipeline)
+            encoder.setTexture(sourceTexture.texture, index: 0)
+            encoder.setBuffer(sharpnessBuffer, offset: 0, index: 0)
+            encoder.setBytes(
+                &sharpnessUniforms,
+                length: MemoryLayout<CameraSampleUniforms>.stride,
+                index: 1
+            )
+            dispatchThreads(
+                encoder: encoder,
+                pipeline: cameraResizePipeline,
+                width: sharpnessWidth,
+                height: sharpnessHeight
+            )
+            encoder.endEncoding()
+            commandBuffer.commit()
+            commandBuffer.waitUntilCompleted()
+
+            guard commandBuffer.status == .completed else {
+                throw AndroidMetalImageError.executionFailed(
+                    description: commandBuffer.error?.localizedDescription
+                        ?? "command status \(commandBuffer.status.rawValue)"
+                )
+            }
+        }
+
+        let tensorPointer = tensorBuffer.contents()
+            .assumingMemoryBound(to: Float.self)
+        let tensorValues = Array(
+            UnsafeBufferPointer(
+                start: tensorPointer,
+                count: tensorValueCount
+            )
+        )
+        let sharpnessPointer = sharpnessBuffer.contents()
+            .assumingMemoryBound(to: UInt8.self)
+        let sharpnessBytes = Array(
+            UnsafeBufferPointer(
+                start: sharpnessPointer,
+                count: sharpnessByteCount
+            )
+        )
+        return AndroidMetalLiveFramePreparation(
+            modelInput: ScannerPreparedTensor(
+                values: tensorValues,
+                shape: [
+                    1,
+                    3,
+                    letterbox.canvasSize,
+                    letterbox.canvasSize
+                ],
+                letterbox: letterbox
+            ),
+            sharpnessSample: try ScannerRGBAImage(
+                width: sharpnessWidth,
+                height: sharpnessHeight,
+                bytes: sharpnessBytes
+            )
+        )
+    }
+
     private func execute<Uniforms>(
         _ source: ScannerRGBAImage,
         outputWidth: Int,
@@ -446,6 +717,83 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
             throw AndroidMetalImageError.dimensionsExceedMetalLimits
         }
         return UInt32(value)
+    }
+
+    private func checkedUnsigned(_ value: Int) throws -> UInt32 {
+        guard value >= 0, value <= Int(UInt32.max) else {
+            throw AndroidMetalImageError.dimensionsExceedMetalLimits
+        }
+        return UInt32(value)
+    }
+
+    private func checkedProduct(_ factors: Int...) throws -> Int {
+        var product = 1
+        for factor in factors {
+            guard factor >= 0 else {
+                throw AndroidMetalImageError.dimensionsExceedMetalLimits
+            }
+            let (next, overflow) =
+                product.multipliedReportingOverflow(by: factor)
+            guard !overflow else {
+                throw AndroidMetalImageError.dimensionsExceedMetalLimits
+            }
+            product = next
+        }
+        return product
+    }
+
+    private func cameraTexture(
+        from pixelBuffer: CVPixelBuffer,
+        width: Int,
+        height: Int
+    ) throws -> (
+        reference: CVMetalTexture,
+        texture: any MTLTexture
+    ) {
+        var optionalTexture: CVMetalTexture?
+        let status = CVMetalTextureCacheCreateTextureFromImage(
+            kCFAllocatorDefault,
+            textureCache,
+            pixelBuffer,
+            nil,
+            .bgra8Unorm,
+            width,
+            height,
+            0,
+            &optionalTexture
+        )
+        guard status == kCVReturnSuccess,
+              let reference = optionalTexture,
+              let texture = CVMetalTextureGetTexture(reference) else {
+            throw AndroidMetalImageError.textureCreationFailed(
+                status: status
+            )
+        }
+        return (reference, texture)
+    }
+
+    private func dispatchThreads(
+        encoder: any MTLComputeCommandEncoder,
+        pipeline: any MTLComputePipelineState,
+        width: Int,
+        height: Int
+    ) {
+        let threadWidth = pipeline.threadExecutionWidth
+        let threadHeight = max(
+            1,
+            min(
+                8,
+                pipeline.maxTotalThreadsPerThreadgroup / threadWidth
+            )
+        )
+        encoder.dispatchThreads(
+            MTLSize(width: width, height: height, depth: 1),
+            threadsPerThreadgroup: MTLSize(
+                width: threadWidth,
+                height: threadHeight,
+                depth: 1
+            )
+        )
     }
 
     private func validateBufferLength(_ byteCount: Int) throws {

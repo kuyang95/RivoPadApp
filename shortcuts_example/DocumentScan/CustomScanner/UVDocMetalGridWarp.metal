@@ -152,6 +152,25 @@ struct AndroidPerspectiveUniforms {
     float h;
 };
 
+struct AndroidCameraSampleUniforms {
+    uint sourceWidth;
+    uint sourceHeight;
+    uint sourceBytesPerRow;
+    uint cropX;
+    uint cropY;
+    uint cropWidth;
+    uint cropHeight;
+    uint outputWidth;
+    uint outputHeight;
+    uint canvasWidth;
+    uint canvasHeight;
+    uint padX;
+    uint padY;
+    uint padding0;
+    uint padding1;
+    uint padding2;
+};
+
 inline float4 scannerBilinearSampleRGBA8(
     device const uchar4 *source,
     uint sourceWidth,
@@ -275,6 +294,136 @@ kernel void androidStretchedRGBTensorNCHW(
     output[outputIndex] = float(quantized.r) / 255.0f;
     output[planeSize + outputIndex] = float(quantized.g) / 255.0f;
     output[(planeSize * 2) + outputIndex] = float(quantized.b) / 255.0f;
+}
+
+inline float4 scannerBilinearSampleCameraBGRA8(
+    texture2d<float, access::read> source,
+    constant AndroidCameraSampleUniforms &uniforms,
+    float sourceX,
+    float sourceY
+) {
+    const uint sourceX0 = uint(sourceX);
+    const uint sourceY0 = uint(sourceY);
+    const uint sourceX1 = min(sourceX0 + 1, uniforms.sourceWidth - 1);
+    const uint sourceY1 = min(sourceY0 + 1, uniforms.sourceHeight - 1);
+    const float fractionX = sourceX - float(sourceX0);
+    const float fractionY = sourceY - float(sourceY0);
+    const float weight00 = (1.0f - fractionX) * (1.0f - fractionY);
+    const float weight01 = fractionX * (1.0f - fractionY);
+    const float weight10 = (1.0f - fractionX) * fractionY;
+    const float weight11 = fractionX * fractionY;
+
+    const float4 rgba00 =
+        source.read(uint2(sourceX0, sourceY0)) * 255.0f;
+    const float4 rgba01 =
+        source.read(uint2(sourceX1, sourceY0)) * 255.0f;
+    const float4 rgba10 =
+        source.read(uint2(sourceX0, sourceY1)) * 255.0f;
+    const float4 rgba11 =
+        source.read(uint2(sourceX1, sourceY1)) * 255.0f;
+
+    return weight00 * rgba00
+        + weight01 * rgba01
+        + weight10 * rgba10
+        + weight11 * rgba11;
+}
+
+inline float2 scannerCameraSourcePosition(
+    constant AndroidCameraSampleUniforms &uniforms,
+    uint2 outputPosition
+) {
+    const float sourceXMaximum = float(uniforms.cropWidth - 1);
+    const float sourceYMaximum = float(uniforms.cropHeight - 1);
+    const float xScale =
+        float(uniforms.cropWidth) / float(uniforms.outputWidth);
+    const float yScale =
+        float(uniforms.cropHeight) / float(uniforms.outputHeight);
+    const float sourceX = float(uniforms.cropX) + clamp(
+        (float(outputPosition.x) + 0.5f) * xScale - 0.5f,
+        0.0f,
+        sourceXMaximum
+    );
+    const float sourceY = float(uniforms.cropY) + clamp(
+        (float(outputPosition.y) + 0.5f) * yScale - 0.5f,
+        0.0f,
+        sourceYMaximum
+    );
+    return float2(sourceX, sourceY);
+}
+
+/// Direct padded-BGRA camera crop to LCNet letterbox tensor.
+kernel void androidCameraLetterboxRGBTensorNCHW(
+    texture2d<float, access::read> source [[texture(0)]],
+    device float *output [[buffer(0)]],
+    constant AndroidCameraSampleUniforms &uniforms [[buffer(1)]],
+    uint2 canvasPosition [[thread_position_in_grid]]
+) {
+    if (canvasPosition.x >= uniforms.canvasWidth
+        || canvasPosition.y >= uniforms.canvasHeight) {
+        return;
+    }
+    const uint canvasIndex =
+        canvasPosition.y * uniforms.canvasWidth + canvasPosition.x;
+    const uint planeSize = uniforms.canvasWidth * uniforms.canvasHeight;
+    const bool inside =
+        canvasPosition.x >= uniforms.padX
+        && canvasPosition.y >= uniforms.padY
+        && canvasPosition.x < uniforms.padX + uniforms.outputWidth
+        && canvasPosition.y < uniforms.padY + uniforms.outputHeight;
+    if (!inside) {
+        output[canvasIndex] = 0.0f;
+        output[planeSize + canvasIndex] = 0.0f;
+        output[(planeSize * 2) + canvasIndex] = 0.0f;
+        return;
+    }
+
+    const uint2 outputPosition = uint2(
+        canvasPosition.x - uniforms.padX,
+        canvasPosition.y - uniforms.padY
+    );
+    const float2 sourcePosition = scannerCameraSourcePosition(
+        uniforms,
+        outputPosition
+    );
+    const uchar4 quantized = scannerRoundedRGBA8(
+        scannerBilinearSampleCameraBGRA8(
+            source,
+            uniforms,
+            sourcePosition.x,
+            sourcePosition.y
+        )
+    );
+    output[canvasIndex] = float(quantized.r) / 255.0f;
+    output[planeSize + canvasIndex] = float(quantized.g) / 255.0f;
+    output[(planeSize * 2) + canvasIndex] =
+        float(quantized.b) / 255.0f;
+}
+
+/// Direct padded-BGRA camera crop to the small RGBA sharpness sample.
+kernel void androidCameraCropResizeRGBA8(
+    texture2d<float, access::read> source [[texture(0)]],
+    device uchar4 *output [[buffer(0)]],
+    constant AndroidCameraSampleUniforms &uniforms [[buffer(1)]],
+    uint2 outputPosition [[thread_position_in_grid]]
+) {
+    if (outputPosition.x >= uniforms.outputWidth
+        || outputPosition.y >= uniforms.outputHeight) {
+        return;
+    }
+    const float2 sourcePosition = scannerCameraSourcePosition(
+        uniforms,
+        outputPosition
+    );
+    const uint outputIndex =
+        outputPosition.y * uniforms.outputWidth + outputPosition.x;
+    output[outputIndex] = scannerRoundedRGBA8(
+        scannerBilinearSampleCameraBGRA8(
+            source,
+            uniforms,
+            sourcePosition.x,
+            sourcePosition.y
+        )
+    );
 }
 
 /// Unit-square homography and bilinear sampling matching
