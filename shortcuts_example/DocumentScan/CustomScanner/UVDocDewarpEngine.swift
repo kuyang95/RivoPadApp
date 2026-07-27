@@ -241,13 +241,19 @@ actor UVDocDewarpEngine: TraceableCurvedDocumentDewarping {
     private let session: ScannerONNXSession
     private let imageBridge = ScannerCIImageBridge()
     private let metalSampler: UVDocMetalGridSampler?
+    private let metalImageSampler: AndroidMetalImageSampler?
+    private(set) var lastPreprocessBackend: UVDocWarpBackend?
+    private(set) var lastMetalPreprocessErrorDescription: String?
     private(set) var lastWarpBackend: UVDocWarpBackend?
     private(set) var lastMetalWarpErrorDescription: String?
 
     init(
         bundle: Bundle = .main,
         backend: ScannerInferenceBackend = .coreML,
-        preferMetalWarp: Bool = true
+        preferMetalWarp: Bool = true,
+        preferMetalPreprocess: Bool = true,
+        metalImageSampler requestedImageSampler:
+            AndroidMetalImageSampler? = nil
     ) throws {
         let session = try ScannerONNXSession(
             descriptor: .curvedPageDewarper,
@@ -257,12 +263,20 @@ actor UVDocDewarpEngine: TraceableCurvedDocumentDewarping {
         let metalState = Self.makeMetalSampler(
             whenEnabled: preferMetalWarp
         )
+        let imageSamplerState = Self.makeImageSampler(
+            requested: requestedImageSampler,
+            whenEnabled: preferMetalPreprocess
+        )
         self.backend = session.activeBackend
         self.preferredWarpBackend = metalState.sampler == nil
             ? .cpu
             : .metal
         self.session = session
         self.metalSampler = metalState.sampler
+        self.metalImageSampler = imageSamplerState.sampler
+        self.lastPreprocessBackend = nil
+        self.lastMetalPreprocessErrorDescription =
+            imageSamplerState.errorDescription
         self.lastWarpBackend = nil
         self.lastMetalWarpErrorDescription = metalState.errorDescription
     }
@@ -270,7 +284,10 @@ actor UVDocDewarpEngine: TraceableCurvedDocumentDewarping {
     init(
         modelURL: URL,
         backend: ScannerInferenceBackend = .coreML,
-        preferMetalWarp: Bool = true
+        preferMetalWarp: Bool = true,
+        preferMetalPreprocess: Bool = true,
+        metalImageSampler requestedImageSampler:
+            AndroidMetalImageSampler? = nil
     ) throws {
         let session = try ScannerONNXSession(
             descriptor: .curvedPageDewarper,
@@ -280,12 +297,20 @@ actor UVDocDewarpEngine: TraceableCurvedDocumentDewarping {
         let metalState = Self.makeMetalSampler(
             whenEnabled: preferMetalWarp
         )
+        let imageSamplerState = Self.makeImageSampler(
+            requested: requestedImageSampler,
+            whenEnabled: preferMetalPreprocess
+        )
         self.backend = session.activeBackend
         self.preferredWarpBackend = metalState.sampler == nil
             ? .cpu
             : .metal
         self.session = session
         self.metalSampler = metalState.sampler
+        self.metalImageSampler = imageSamplerState.sampler
+        self.lastPreprocessBackend = nil
+        self.lastMetalPreprocessErrorDescription =
+            imageSamplerState.errorDescription
         self.lastWarpBackend = nil
         self.lastMetalWarpErrorDescription = metalState.errorDescription
     }
@@ -315,14 +340,38 @@ actor UVDocDewarpEngine: TraceableCurvedDocumentDewarping {
         }
 
         let preprocessStage = trace?.beginStage("uvdocPreprocess")
-        let prepared = AndroidScannerImageMath.stretchedRGBTensor(
-            from: source,
-            width: 496,
-            height: 720
-        )
+        let prepared: ScannerPreparedTensor
+        if let metalImageSampler {
+            do {
+                prepared = try metalImageSampler.stretchedRGBTensor(
+                    source,
+                    width: 496,
+                    height: 720
+                )
+                lastPreprocessBackend = .metal
+                lastMetalPreprocessErrorDescription = nil
+            } catch {
+                prepared = AndroidScannerImageMath.stretchedRGBTensor(
+                    from: source,
+                    width: 496,
+                    height: 720
+                )
+                lastPreprocessBackend = .cpu
+                lastMetalPreprocessErrorDescription =
+                    error.localizedDescription
+            }
+        } else {
+            prepared = AndroidScannerImageMath.stretchedRGBTensor(
+                from: source,
+                width: 496,
+                height: 720
+            )
+            lastPreprocessBackend = .cpu
+        }
         preprocessStage?.finish(
             details: "input=\(source.width)x\(source.height) "
-                + "output=496x720"
+                + "output=496x720 backend="
+                + "\(lastPreprocessBackend?.rawValue ?? "unknown")"
         )
 
         let inferenceStage = trace?.beginStage("uvdocInference")
@@ -446,6 +495,26 @@ actor UVDocDewarpEngine: TraceableCurvedDocumentDewarping {
 
         do {
             return (try UVDocMetalGridSampler(), nil)
+        } catch {
+            return (nil, error.localizedDescription)
+        }
+    }
+
+    private static func makeImageSampler(
+        requested: AndroidMetalImageSampler?,
+        whenEnabled isEnabled: Bool
+    ) -> (
+        sampler: AndroidMetalImageSampler?,
+        errorDescription: String?
+    ) {
+        guard isEnabled else {
+            return (nil, nil)
+        }
+        if let requested {
+            return (requested, nil)
+        }
+        do {
+            return (try AndroidMetalImageSampler(), nil)
         } catch {
             return (nil, error.localizedDescription)
         }

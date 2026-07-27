@@ -15,9 +15,9 @@ nonisolated enum AndroidMetalImageError: Error, Equatable, Sendable {
     case executionFailed(description: String)
 }
 
-/// GPU equivalents of the scanner's Android-compatible perspective and
-/// half-pixel resize loops. Buffers remain RGBA8 so every model and image
-/// boundary keeps the existing top-left, row-major contract.
+/// GPU equivalents of the scanner's Android-compatible perspective, resize,
+/// color, and tensor-preparation loops. Image boundaries remain top-left
+/// row-major RGBA8; model preprocessing emits the existing NCHW Float layout.
 nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
     private struct ResizeUniforms {
         let sourceWidth: UInt32
@@ -116,12 +116,15 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         "androidPerspectiveWarpRGBA8"
     private static let colorKernelName =
         "androidDocumentColorEnhanceRGBA8"
+    private static let stretchedTensorKernelName =
+        "androidStretchedRGBTensorNCHW"
 
     private let device: any MTLDevice
     private let commandQueue: any MTLCommandQueue
     private let resizePipeline: any MTLComputePipelineState
     private let perspectivePipeline: any MTLComputePipelineState
     private let colorPipeline: any MTLComputePipelineState
+    private let stretchedTensorPipeline: any MTLComputePipelineState
 
     init(
         device requestedDevice: (any MTLDevice)? = nil,
@@ -151,12 +154,18 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
             device: device,
             library: library
         )
+        let stretchedTensorPipeline = try Self.makePipeline(
+            named: Self.stretchedTensorKernelName,
+            device: device,
+            library: library
+        )
 
         self.device = device
         self.commandQueue = commandQueue
         self.resizePipeline = resizePipeline
         self.perspectivePipeline = perspectivePipeline
         self.colorPipeline = colorPipeline
+        self.stretchedTensorPipeline = stretchedTensorPipeline
     }
 
     func resizeBilinear(
@@ -258,6 +267,56 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         )
     }
 
+    /// Combines Android's quantized bilinear resize and RGB-to-NCHW
+    /// conversion in one GPU dispatch, avoiding an intermediate RGBA image.
+    func stretchedRGBTensor(
+        _ source: ScannerRGBAImage,
+        width: Int,
+        height: Int
+    ) throws -> ScannerPreparedTensor {
+        let (pixelCount, pixelCountOverflow) =
+            width.multipliedReportingOverflow(by: height)
+        let (valueCount, valueCountOverflow) =
+            pixelCount.multipliedReportingOverflow(by: 3)
+        let (outputByteCount, outputByteCountOverflow) =
+            valueCount.multipliedReportingOverflow(
+                by: MemoryLayout<Float>.stride
+            )
+        guard !pixelCountOverflow,
+              !valueCountOverflow,
+              !outputByteCountOverflow else {
+            throw AndroidMetalImageError.dimensionsExceedMetalLimits
+        }
+
+        var uniforms = try ResizeUniforms(
+            sourceWidth: checkedDimension(source.width),
+            sourceHeight: checkedDimension(source.height),
+            outputWidth: checkedDimension(width),
+            outputHeight: checkedDimension(height)
+        )
+        let outputBuffer = try executeBuffer(
+            source,
+            outputWidth: width,
+            outputHeight: height,
+            outputByteCount: outputByteCount,
+            pipeline: stretchedTensorPipeline,
+            uniforms: &uniforms
+        )
+        let outputPointer = outputBuffer.contents()
+            .assumingMemoryBound(to: Float.self)
+        let values = Array(
+            UnsafeBufferPointer(
+                start: outputPointer,
+                count: valueCount
+            )
+        )
+        return ScannerPreparedTensor(
+            values: values,
+            shape: [1, 3, height, width],
+            letterbox: nil
+        )
+    }
+
     private func execute<Uniforms>(
         _ source: ScannerRGBAImage,
         outputWidth: Int,
@@ -272,6 +331,37 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         guard !pixelCountOverflow, !outputByteCountOverflow else {
             throw AndroidMetalImageError.dimensionsExceedMetalLimits
         }
+        let outputBuffer = try executeBuffer(
+            source,
+            outputWidth: outputWidth,
+            outputHeight: outputHeight,
+            outputByteCount: outputByteCount,
+            pipeline: pipeline,
+            uniforms: &uniforms
+        )
+        let outputPointer = outputBuffer.contents()
+            .assumingMemoryBound(to: UInt8.self)
+        let bytes = Array(
+            UnsafeBufferPointer(
+                start: outputPointer,
+                count: outputByteCount
+            )
+        )
+        return try ScannerRGBAImage(
+            width: outputWidth,
+            height: outputHeight,
+            bytes: bytes
+        )
+    }
+
+    private func executeBuffer<Uniforms>(
+        _ source: ScannerRGBAImage,
+        outputWidth: Int,
+        outputHeight: Int,
+        outputByteCount: Int,
+        pipeline: any MTLComputePipelineState,
+        uniforms: inout Uniforms
+    ) throws -> any MTLBuffer {
         try validateBufferLength(source.bytes.count)
         try validateBufferLength(outputByteCount)
 
@@ -348,19 +438,7 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         // The command buffer no longer needs its copied input. Releasing it
         // before materializing the output array lowers full-page peak memory.
         sourceBuffer = nil
-        let outputPointer = outputBuffer.contents()
-            .assumingMemoryBound(to: UInt8.self)
-        let bytes = Array(
-            UnsafeBufferPointer(
-                start: outputPointer,
-                count: outputByteCount
-            )
-        )
-        return try ScannerRGBAImage(
-            width: outputWidth,
-            height: outputHeight,
-            bytes: bytes
-        )
+        return outputBuffer
     }
 
     private func checkedDimension(_ value: Int) throws -> UInt32 {

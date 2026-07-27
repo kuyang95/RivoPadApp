@@ -230,6 +230,53 @@ kernel void androidResizeBilinearRGBA8(
     output[outputIndex] = scannerRoundedRGBA8(sampled);
 }
 
+/// Android-compatible stretched resize and `/255` NCHW tensor conversion.
+/// The bilinear result is quantized to RGBA8 before normalization, matching
+/// `Bitmap.createScaledBitmap` followed by channel extraction.
+kernel void androidStretchedRGBTensorNCHW(
+    device const uchar4 *source [[buffer(0)]],
+    device float *output [[buffer(1)]],
+    constant AndroidResizeUniforms &uniforms [[buffer(2)]],
+    uint2 outputPosition [[thread_position_in_grid]]
+) {
+    if (outputPosition.x >= uniforms.outputWidth
+        || outputPosition.y >= uniforms.outputHeight) {
+        return;
+    }
+
+    const float sourceXMaximum = float(uniforms.sourceWidth - 1);
+    const float sourceYMaximum = float(uniforms.sourceHeight - 1);
+    const float xScale =
+        float(uniforms.sourceWidth) / float(uniforms.outputWidth);
+    const float yScale =
+        float(uniforms.sourceHeight) / float(uniforms.outputHeight);
+    const float sourceX = clamp(
+        (float(outputPosition.x) + 0.5f) * xScale - 0.5f,
+        0.0f,
+        sourceXMaximum
+    );
+    const float sourceY = clamp(
+        (float(outputPosition.y) + 0.5f) * yScale - 0.5f,
+        0.0f,
+        sourceYMaximum
+    );
+    const uchar4 quantized = scannerRoundedRGBA8(
+        scannerBilinearSampleRGBA8(
+            source,
+            uniforms.sourceWidth,
+            uniforms.sourceHeight,
+            sourceX,
+            sourceY
+        )
+    );
+    const uint outputIndex =
+        outputPosition.y * uniforms.outputWidth + outputPosition.x;
+    const uint planeSize = uniforms.outputWidth * uniforms.outputHeight;
+    output[outputIndex] = float(quantized.r) / 255.0f;
+    output[planeSize + outputIndex] = float(quantized.g) / 255.0f;
+    output[(planeSize * 2) + outputIndex] = float(quantized.b) / 255.0f;
+}
+
 /// Unit-square homography and bilinear sampling matching
 /// `AndroidPerspectiveMath.warp`.
 kernel void androidPerspectiveWarpRGBA8(

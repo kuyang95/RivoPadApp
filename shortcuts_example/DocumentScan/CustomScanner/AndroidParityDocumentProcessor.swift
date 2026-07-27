@@ -75,7 +75,8 @@ actor AndroidParityDocumentProcessor {
         do {
             let engine = try UVDocDewarpEngine(
                 bundle: modelBundle,
-                backend: requestedInferenceBackend
+                backend: requestedInferenceBackend,
+                metalImageSampler: metalImageSampler
             )
             dewarper = engine
             inferenceBackend = engine.backend

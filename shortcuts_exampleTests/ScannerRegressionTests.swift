@@ -868,6 +868,35 @@ final class ScannerRegressionTests: XCTestCase {
         )
     }
 
+    func testMetalStretchedTensorMatchesAndroidCPUReference() throws {
+        guard MTLCreateSystemDefaultDevice() != nil else {
+            throw XCTSkip("Metal is unavailable on this test destination")
+        }
+        let source = try patternedImage(width: 37, height: 29)
+        let cpu = AndroidScannerImageMath.stretchedRGBTensor(
+            from: source,
+            width: 53,
+            height: 41
+        )
+        let metal = try AndroidMetalImageSampler().stretchedRGBTensor(
+            source,
+            width: 53,
+            height: 41
+        )
+
+        XCTAssertEqual(metal.shape, cpu.shape)
+        XCTAssertNil(metal.letterbox)
+        XCTAssertEqual(metal.values.count, cpu.values.count)
+        let maximumDifference = zip(metal.values, cpu.values)
+            .reduce(Float.zero) { current, values in
+                max(current, abs(values.0 - values.1))
+            }
+        XCTAssertLessThanOrEqual(
+            maximumDifference,
+            (1.0 / 255.0) + Float.ulpOfOne
+        )
+    }
+
     func testMetalDocumentColorMatchesAndroidCPUReference() throws {
         guard MTLCreateSystemDefaultDevice() != nil else {
             throw XCTSkip("Metal is unavailable on this test destination")
