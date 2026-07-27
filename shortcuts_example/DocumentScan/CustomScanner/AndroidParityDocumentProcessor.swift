@@ -22,13 +22,18 @@ actor AndroidParityDocumentProcessor {
         backend: ScannerInferenceBackend = .coreML,
         outputLongEdgePixels: Int = 2_400
     ) {
+        let metalImageSampler = try? AndroidMetalImageSampler()
         self.requestedInferenceBackend = backend
         self.inferenceBackend = nil
         self.dewarperLoadErrorDescription = nil
-        self.perspectiveCorrector = AndroidPerspectiveCorrector()
+        self.perspectiveCorrector = AndroidPerspectiveCorrector(
+            metalSampler: metalImageSampler
+        )
         self.dewarper = nil
-        self.enhancer = AndroidDocumentColorEnhancer()
-        self.metalImageSampler = try? AndroidMetalImageSampler()
+        self.enhancer = AndroidDocumentColorEnhancer(
+            metalSampler: metalImageSampler
+        )
+        self.metalImageSampler = metalImageSampler
         self.outputLongEdgePixels = outputLongEdgePixels
         self.modelBundle = bundle
         self.dewarperInitializationAttempted = false
@@ -226,7 +231,6 @@ actor AndroidParityDocumentProcessor {
                 ? "cpu"
                 : "passthrough"
         }
-        let normalized = imageBridge.ciImage(from: normalizedPixels)
         normalizeStage?.finish(
             details: "input=\(dewarpedPixels.width)x"
                 + "\(dewarpedPixels.height) "
@@ -236,9 +240,34 @@ actor AndroidParityDocumentProcessor {
         )
 
         guard enhanceColors else {
-            return normalized
+            return imageBridge.ciImage(from: normalizedPixels)
         }
         let enhanceStage = trace?.beginStage("colorEnhance")
+        if let androidEnhancer =
+            enhancer as? AndroidDocumentColorEnhancer {
+            let enhancedPixels = await androidEnhancer.enhancePixels(
+                normalizedPixels
+            )
+            let performance = await androidEnhancer.lastPerformance
+            let enhanced = imageBridge.ciImage(from: enhancedPixels)
+            let performanceDetails = performance.map {
+                " backend=\($0.backend.rawValue) "
+                    + "statisticsMs="
+                    + String(format: "%.2f", $0.statisticsMilliseconds)
+                    + " applyMs="
+                    + String(format: "%.2f", $0.applyMilliseconds)
+            } ?? ""
+            enhanceStage?.finish(
+                details: "input=\(normalizedPixels.width)x"
+                    + "\(normalizedPixels.height) "
+                    + "output=\(enhancedPixels.width)x"
+                    + "\(enhancedPixels.height)"
+                    + performanceDetails
+            )
+            return enhanced
+        }
+
+        let normalized = imageBridge.ciImage(from: normalizedPixels)
         do {
             let enhanced = try await enhancer.enhance(normalized)
             enhanceStage?.finish(

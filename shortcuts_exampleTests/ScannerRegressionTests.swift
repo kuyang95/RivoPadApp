@@ -868,6 +868,29 @@ final class ScannerRegressionTests: XCTestCase {
         )
     }
 
+    func testMetalDocumentColorMatchesAndroidCPUReference() throws {
+        guard MTLCreateSystemDefaultDevice() != nil else {
+            throw XCTSkip("Metal is unavailable on this test destination")
+        }
+        let source = try patternedImage(width: 37, height: 29)
+        let parameters = AndroidDocumentColorMath.parameters(for: source)
+        let cpu = AndroidDocumentColorMath.enhance(
+            source,
+            parameters: parameters
+        )
+        let metal = try AndroidMetalImageSampler().enhanceDocument(
+            source,
+            parameters: parameters
+        )
+
+        XCTAssertEqual(metal.width, cpu.width)
+        XCTAssertEqual(metal.height, cpu.height)
+        XCTAssertLessThanOrEqual(
+            maximumChannelDifference(metal.bytes, cpu.bytes),
+            1
+        )
+    }
+
     func testMetalPerspectiveMatchesAndroidCPUReference() throws {
         guard MTLCreateSystemDefaultDevice() != nil else {
             throw XCTSkip("Metal is unavailable on this test destination")

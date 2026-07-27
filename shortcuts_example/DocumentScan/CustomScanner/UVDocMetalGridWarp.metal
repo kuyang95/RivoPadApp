@@ -280,3 +280,86 @@ kernel void androidPerspectiveWarpRGBA8(
         outputPosition.y * uniforms.outputWidth + outputPosition.x;
     output[outputIndex] = scannerRoundedRGBA8(sampled);
 }
+
+struct AndroidDocumentColorUniforms {
+    uint sourceWidth;
+    uint sourceHeight;
+    uint outputWidth;
+    uint outputHeight;
+    float blackPoint;
+    float toneRange;
+    float redScale;
+    float greenScale;
+    float blueScale;
+    float gamma;
+    float saturationBoost;
+};
+
+/// Per-pixel half of `AndroidDocumentColorMath.enhance`. Histogram and white
+/// balance parameters stay on CPU; independent tone mapping runs in parallel.
+kernel void androidDocumentColorEnhanceRGBA8(
+    device const uchar4 *source [[buffer(0)]],
+    device uchar4 *output [[buffer(1)]],
+    constant AndroidDocumentColorUniforms &uniforms [[buffer(2)]],
+    uint2 position [[thread_position_in_grid]]
+) {
+    if (position.x >= uniforms.outputWidth
+        || position.y >= uniforms.outputHeight) {
+        return;
+    }
+
+    const uint index = position.y * uniforms.sourceWidth + position.x;
+    const uchar4 input = source[index];
+    float red = float(input.r) * uniforms.redScale;
+    float green = float(input.g) * uniforms.greenScale;
+    float blue = float(input.b) * uniforms.blueScale;
+    const float balancedLuminance = max(
+        0.299f * red + 0.587f * green + 0.114f * blue,
+        1.0f
+    );
+    const float normalized = clamp(
+        (balancedLuminance - uniforms.blackPoint) / uniforms.toneRange,
+        0.0f,
+        1.0f
+    );
+    const float toned = pow(normalized, uniforms.gamma);
+    const float targetLuminance = toned * 255.0f;
+    const float luminanceScale = targetLuminance / balancedLuminance;
+    red *= luminanceScale;
+    green *= luminanceScale;
+    blue *= luminanceScale;
+
+    red = targetLuminance
+        + (red - targetLuminance) * uniforms.saturationBoost;
+    green = targetLuminance
+        + (green - targetLuminance) * uniforms.saturationBoost;
+    blue = targetLuminance
+        + (blue - targetLuminance) * uniforms.saturationBoost;
+
+    const float chroma =
+        max(max(red, green), blue) - min(min(red, green), blue);
+    const float smoothAmount = clamp(
+        (toned - 0.68f) / (0.96f - 0.68f),
+        0.0f,
+        1.0f
+    );
+    const float smoothPaper =
+        smoothAmount * smoothAmount * (3.0f - 2.0f * smoothAmount);
+    const float paperWhitening = smoothPaper
+        * (1.0f - clamp(chroma / 110.0f, 0.0f, 0.75f))
+        * 0.58f;
+    red += (255.0f - red) * paperWhitening;
+    green += (255.0f - green) * paperWhitening;
+    blue += (255.0f - blue) * paperWhitening;
+
+    const float textDarkening =
+        clamp((0.36f - toned) / 0.36f, 0.0f, 1.0f) * 0.12f;
+    red *= 1.0f - textDarkening;
+    green *= 1.0f - textDarkening;
+    blue *= 1.0f - textDarkening;
+
+    const uchar4 enhanced = scannerRoundedRGBA8(
+        float4(red, green, blue, float(input.a))
+    );
+    output[index] = enhanced;
+}

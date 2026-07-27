@@ -173,34 +173,36 @@ nonisolated final class UVDocMetalGridSampler: @unchecked Sendable {
         try validateBufferLength(gridByteCount)
         try validateBufferLength(outputByteCount)
 
-        let sourceBuffer = try source.bytes.withUnsafeBytes { storage in
-            guard let baseAddress = storage.baseAddress,
-                  let buffer = device.makeBuffer(
-                      bytes: baseAddress,
-                      length: storage.count,
-                      options: .storageModeShared
-                  ) else {
-                throw UVDocMetalWarpError.bufferAllocationFailed(
-                    label: "source"
-                )
+        var sourceBuffer: (any MTLBuffer)? =
+            try source.bytes.withUnsafeBytes { storage in
+                guard let baseAddress = storage.baseAddress,
+                      let buffer = device.makeBuffer(
+                          bytes: baseAddress,
+                          length: storage.count,
+                          options: .storageModeShared
+                      ) else {
+                    throw UVDocMetalWarpError.bufferAllocationFailed(
+                        label: "source"
+                    )
+                }
+                buffer.label = "UVDoc source RGBA8"
+                return buffer
             }
-            buffer.label = "UVDoc source RGBA8"
-            return buffer
-        }
-        let gridBuffer = try grid.values.withUnsafeBytes { storage in
-            guard let baseAddress = storage.baseAddress,
-                  let buffer = device.makeBuffer(
-                      bytes: baseAddress,
-                      length: storage.count,
-                      options: .storageModeShared
-                  ) else {
-                throw UVDocMetalWarpError.bufferAllocationFailed(
-                    label: "grid"
-                )
+        var gridBuffer: (any MTLBuffer)? =
+            try grid.values.withUnsafeBytes { storage in
+                guard let baseAddress = storage.baseAddress,
+                      let buffer = device.makeBuffer(
+                          bytes: baseAddress,
+                          length: storage.count,
+                          options: .storageModeShared
+                      ) else {
+                    throw UVDocMetalWarpError.bufferAllocationFailed(
+                        label: "grid"
+                    )
+                }
+                buffer.label = "UVDoc normalized grid"
+                return buffer
             }
-            buffer.label = "UVDoc normalized grid"
-            return buffer
-        }
         guard let outputBuffer = device.makeBuffer(
             length: outputByteCount,
             options: .storageModeShared
@@ -208,19 +210,6 @@ nonisolated final class UVDocMetalGridSampler: @unchecked Sendable {
             throw UVDocMetalWarpError.bufferAllocationFailed(label: "output")
         }
         outputBuffer.label = "UVDoc output RGBA8"
-
-        guard let commandBuffer = commandQueue.makeCommandBuffer() else {
-            throw UVDocMetalWarpError.commandBufferUnavailable
-        }
-        commandBuffer.label = "UVDoc grid warp"
-        guard let encoder = commandBuffer.makeComputeCommandEncoder() else {
-            throw UVDocMetalWarpError.commandEncoderUnavailable
-        }
-        encoder.label = "UVDoc RGBA8 grid warp"
-        encoder.setComputePipelineState(pipeline)
-        encoder.setBuffer(sourceBuffer, offset: 0, index: 0)
-        encoder.setBuffer(gridBuffer, offset: 0, index: 1)
-        encoder.setBuffer(outputBuffer, offset: 0, index: 2)
 
         var uniforms = Uniforms(
             sourceWidth: UInt32(source.width),
@@ -230,39 +219,54 @@ nonisolated final class UVDocMetalGridSampler: @unchecked Sendable {
             gridWidth: UInt32(grid.width),
             gridHeight: UInt32(grid.height)
         )
-        encoder.setBytes(
-            &uniforms,
-            length: MemoryLayout<Uniforms>.stride,
-            index: 3
-        )
+        do {
+            guard let commandBuffer = commandQueue.makeCommandBuffer() else {
+                throw UVDocMetalWarpError.commandBufferUnavailable
+            }
+            commandBuffer.label = "UVDoc grid warp"
+            guard let encoder =
+                commandBuffer.makeComputeCommandEncoder() else {
+                throw UVDocMetalWarpError.commandEncoderUnavailable
+            }
+            encoder.label = "UVDoc RGBA8 grid warp"
+            encoder.setComputePipelineState(pipeline)
+            encoder.setBuffer(sourceBuffer, offset: 0, index: 0)
+            encoder.setBuffer(gridBuffer, offset: 0, index: 1)
+            encoder.setBuffer(outputBuffer, offset: 0, index: 2)
+            encoder.setBytes(
+                &uniforms,
+                length: MemoryLayout<Uniforms>.stride,
+                index: 3
+            )
+            let threadWidth = pipeline.threadExecutionWidth
+            let threadHeight = max(
+                1,
+                min(
+                    8,
+                    pipeline.maxTotalThreadsPerThreadgroup / threadWidth
+                )
+            )
+            encoder.dispatchThreads(
+                MTLSize(width: width, height: height, depth: 1),
+                threadsPerThreadgroup: MTLSize(
+                    width: threadWidth,
+                    height: threadHeight,
+                    depth: 1
+                )
+            )
+            encoder.endEncoding()
+            commandBuffer.commit()
+            commandBuffer.waitUntilCompleted()
 
-        let threadWidth = pipeline.threadExecutionWidth
-        let threadHeight = max(
-            1,
-            min(
-                8,
-                pipeline.maxTotalThreadsPerThreadgroup / threadWidth
-            )
-        )
-        encoder.dispatchThreads(
-            MTLSize(width: width, height: height, depth: 1),
-            threadsPerThreadgroup: MTLSize(
-                width: threadWidth,
-                height: threadHeight,
-                depth: 1
-            )
-        )
-        encoder.endEncoding()
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
-
-        guard commandBuffer.status == .completed else {
-            throw UVDocMetalWarpError.executionFailed(
-                description: commandBuffer.error?.localizedDescription
-                    ?? "command status \(commandBuffer.status.rawValue)"
-            )
+            guard commandBuffer.status == .completed else {
+                throw UVDocMetalWarpError.executionFailed(
+                    description: commandBuffer.error?.localizedDescription
+                        ?? "command status \(commandBuffer.status.rawValue)"
+                )
+            }
         }
-
+        sourceBuffer = nil
+        gridBuffer = nil
         let outputPointer = outputBuffer.contents()
             .assumingMemoryBound(to: UInt8.self)
         let output = Array(

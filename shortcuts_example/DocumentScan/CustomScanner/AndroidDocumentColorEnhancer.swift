@@ -1,34 +1,49 @@
 import CoreImage
 import Foundation
 
+nonisolated struct AndroidDocumentColorParameters: Equatable, Sendable {
+    let blackPoint: Int
+    let whitePoint: Int
+    let redScale: Float
+    let greenScale: Float
+    let blueScale: Float
+    let gamma: Double
+    let saturationBoost: Float
+
+    var toneRange: Float {
+        Float(max(whitePoint - blackPoint, 1))
+    }
+}
+
+nonisolated struct AndroidDocumentColorPerformance: Equatable, Sendable {
+    let backend: UVDocWarpBackend
+    let statisticsMilliseconds: Double
+    let applyMilliseconds: Double
+}
+
 nonisolated enum AndroidDocumentColorMath {
     private static let maximumStatisticsSamples = 120_000
     private static let minimumToneRange = 48
     private static let documentGamma = 0.82
     private static let saturationBoost: Float = 1.08
 
-    private struct ToneStatistics {
-        let blackPoint: Int
-        let whitePoint: Int
-        let redScale: Float
-        let greenScale: Float
-        let blueScale: Float
+    static func enhance(_ source: ScannerRGBAImage) -> ScannerRGBAImage {
+        enhance(source, parameters: parameters(for: source))
     }
 
-    static func enhance(_ source: ScannerRGBAImage) -> ScannerRGBAImage {
-        let statistics = computeStatistics(source)
-        let toneRange = Float(
-            max(statistics.whitePoint - statistics.blackPoint, 1)
-        )
+    static func enhance(
+        _ source: ScannerRGBAImage,
+        parameters: AndroidDocumentColorParameters
+    ) -> ScannerRGBAImage {
         var result = source
 
         for pixelIndex in 0 ..< source.width * source.height {
             let offset = pixelIndex * 4
-            var red = Float(source.bytes[offset]) * statistics.redScale
+            var red = Float(source.bytes[offset]) * parameters.redScale
             var green =
-                Float(source.bytes[offset + 1]) * statistics.greenScale
+                Float(source.bytes[offset + 1]) * parameters.greenScale
             var blue =
-                Float(source.bytes[offset + 2]) * statistics.blueScale
+                Float(source.bytes[offset + 2]) * parameters.blueScale
 
             let balancedLuminance = max(
                 luminance(red: red, green: green, blue: blue),
@@ -38,13 +53,15 @@ nonisolated enum AndroidDocumentColorMath {
                 max(
                     (
                         balancedLuminance
-                        - Float(statistics.blackPoint)
-                    ) / toneRange,
+                        - Float(parameters.blackPoint)
+                    ) / parameters.toneRange,
                     0
                 ),
                 1
             )
-            let toned = Float(pow(Double(normalized), documentGamma))
+            let toned = Float(
+                pow(Double(normalized), parameters.gamma)
+            )
             let targetLuminance = toned * 255
             let luminanceScale = targetLuminance / balancedLuminance
 
@@ -53,11 +70,11 @@ nonisolated enum AndroidDocumentColorMath {
             blue *= luminanceScale
 
             red = targetLuminance
-                + (red - targetLuminance) * saturationBoost
+                + (red - targetLuminance) * parameters.saturationBoost
             green = targetLuminance
-                + (green - targetLuminance) * saturationBoost
+                + (green - targetLuminance) * parameters.saturationBoost
             blue = targetLuminance
-                + (blue - targetLuminance) * saturationBoost
+                + (blue - targetLuminance) * parameters.saturationBoost
 
             let chroma = max(red, green, blue) - min(red, green, blue)
             let paperWhitening =
@@ -86,9 +103,15 @@ nonisolated enum AndroidDocumentColorMath {
         return result
     }
 
+    static func parameters(
+        for image: ScannerRGBAImage
+    ) -> AndroidDocumentColorParameters {
+        computeStatistics(image)
+    }
+
     private static func computeStatistics(
         _ image: ScannerRGBAImage
-    ) -> ToneStatistics {
+    ) -> AndroidDocumentColorParameters {
         let pixelCount = image.width * image.height
         let sampleStep = max(pixelCount / maximumStatisticsSamples, 1)
         var rawHistogram = [Int](repeating: 0, count: 256)
@@ -108,12 +131,14 @@ nonisolated enum AndroidDocumentColorMath {
         }
 
         guard sampleCount > 0 else {
-            return ToneStatistics(
+            return AndroidDocumentColorParameters(
                 blackPoint: 0,
                 whitePoint: 255,
                 redScale: 1,
                 greenScale: 1,
-                blueScale: 1
+                blueScale: 1,
+                gamma: documentGamma,
+                saturationBoost: saturationBoost
             )
         }
 
@@ -194,12 +219,14 @@ nonisolated enum AndroidDocumentColorMath {
             whitePoint = min(middle + minimumToneRange / 2, 255)
         }
 
-        return ToneStatistics(
+        return AndroidDocumentColorParameters(
             blackPoint: blackPoint,
             whitePoint: whitePoint,
             redScale: redScale,
             greenScale: greenScale,
-            blueScale: blueScale
+            blueScale: blueScale,
+            gamma: documentGamma,
+            saturationBoost: saturationBoost
         )
     }
 
@@ -263,11 +290,64 @@ nonisolated enum AndroidDocumentColorMath {
 
 actor AndroidDocumentColorEnhancer: DocumentImageEnhancing {
     private let imageBridge = ScannerCIImageBridge()
+    private let metalSampler: AndroidMetalImageSampler?
+    private(set) var lastPerformance: AndroidDocumentColorPerformance?
+
+    init(preferMetal: Bool = true) {
+        metalSampler = preferMetal
+            ? try? AndroidMetalImageSampler()
+            : nil
+        lastPerformance = nil
+    }
+
+    init(metalSampler: AndroidMetalImageSampler?) {
+        self.metalSampler = metalSampler
+        lastPerformance = nil
+    }
 
     func enhance(_ image: CIImage) async throws -> CIImage {
         let source = try imageBridge.rgbaImage(from: image)
-        return imageBridge.ciImage(
-            from: AndroidDocumentColorMath.enhance(source)
+        return imageBridge.ciImage(from: enhancePixels(source))
+    }
+
+    func enhancePixels(
+        _ source: ScannerRGBAImage
+    ) -> ScannerRGBAImage {
+        var startedAt = ProcessInfo.processInfo.systemUptime
+        let parameters = AndroidDocumentColorMath.parameters(for: source)
+        let statisticsMilliseconds =
+            ScannerDiagnostics.milliseconds(since: startedAt)
+
+        startedAt = ProcessInfo.processInfo.systemUptime
+        let enhanced: ScannerRGBAImage
+        let backend: UVDocWarpBackend
+        if let metalSampler {
+            do {
+                enhanced = try metalSampler.enhanceDocument(
+                    source,
+                    parameters: parameters
+                )
+                backend = .metal
+            } catch {
+                enhanced = AndroidDocumentColorMath.enhance(
+                    source,
+                    parameters: parameters
+                )
+                backend = .cpu
+            }
+        } else {
+            enhanced = AndroidDocumentColorMath.enhance(
+                source,
+                parameters: parameters
+            )
+            backend = .cpu
+        }
+        lastPerformance = AndroidDocumentColorPerformance(
+            backend: backend,
+            statisticsMilliseconds: statisticsMilliseconds,
+            applyMilliseconds:
+                ScannerDiagnostics.milliseconds(since: startedAt)
         )
+        return enhanced
     }
 }

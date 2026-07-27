@@ -425,6 +425,11 @@ actor AndroidPerspectiveCorrector: DocumentPerspectiveCorrecting {
         lastWarpBackend = nil
     }
 
+    init(metalSampler: AndroidMetalImageSampler?) {
+        self.metalSampler = metalSampler
+        lastWarpBackend = nil
+    }
+
     func correct(
         _ image: CIImage,
         using quad: DocumentQuad

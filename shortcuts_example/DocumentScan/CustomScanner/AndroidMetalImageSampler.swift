@@ -41,6 +41,20 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         let h: Float
     }
 
+    private struct ColorUniforms {
+        let sourceWidth: UInt32
+        let sourceHeight: UInt32
+        let outputWidth: UInt32
+        let outputHeight: UInt32
+        let blackPoint: Float
+        let toneRange: Float
+        let redScale: Float
+        let greenScale: Float
+        let blueScale: Float
+        let gamma: Float
+        let saturationBoost: Float
+    }
+
     private struct Homography {
         let a: Float
         let b: Float
@@ -100,11 +114,14 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         "androidResizeBilinearRGBA8"
     private static let perspectiveKernelName =
         "androidPerspectiveWarpRGBA8"
+    private static let colorKernelName =
+        "androidDocumentColorEnhanceRGBA8"
 
     private let device: any MTLDevice
     private let commandQueue: any MTLCommandQueue
     private let resizePipeline: any MTLComputePipelineState
     private let perspectivePipeline: any MTLComputePipelineState
+    private let colorPipeline: any MTLComputePipelineState
 
     init(
         device requestedDevice: (any MTLDevice)? = nil,
@@ -129,11 +146,17 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
             device: device,
             library: library
         )
+        let colorPipeline = try Self.makePipeline(
+            named: Self.colorKernelName,
+            device: device,
+            library: library
+        )
 
         self.device = device
         self.commandQueue = commandQueue
         self.resizePipeline = resizePipeline
         self.perspectivePipeline = perspectivePipeline
+        self.colorPipeline = colorPipeline
     }
 
     func resizeBilinear(
@@ -209,6 +232,32 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         )
     }
 
+    func enhanceDocument(
+        _ source: ScannerRGBAImage,
+        parameters: AndroidDocumentColorParameters
+    ) throws -> ScannerRGBAImage {
+        var uniforms = try ColorUniforms(
+            sourceWidth: checkedDimension(source.width),
+            sourceHeight: checkedDimension(source.height),
+            outputWidth: checkedDimension(source.width),
+            outputHeight: checkedDimension(source.height),
+            blackPoint: Float(parameters.blackPoint),
+            toneRange: parameters.toneRange,
+            redScale: parameters.redScale,
+            greenScale: parameters.greenScale,
+            blueScale: parameters.blueScale,
+            gamma: Float(parameters.gamma),
+            saturationBoost: parameters.saturationBoost
+        )
+        return try execute(
+            source,
+            outputWidth: source.width,
+            outputHeight: source.height,
+            pipeline: colorPipeline,
+            uniforms: &uniforms
+        )
+    }
+
     private func execute<Uniforms>(
         _ source: ScannerRGBAImage,
         outputWidth: Int,
@@ -226,19 +275,20 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         try validateBufferLength(source.bytes.count)
         try validateBufferLength(outputByteCount)
 
-        let sourceBuffer = try source.bytes.withUnsafeBytes { storage in
-            guard let baseAddress = storage.baseAddress,
-                  let buffer = device.makeBuffer(
-                      bytes: baseAddress,
-                      length: storage.count,
-                      options: .storageModeShared
-                  ) else {
-                throw AndroidMetalImageError.bufferAllocationFailed(
-                    label: "source"
-                )
+        var sourceBuffer: (any MTLBuffer)? =
+            try source.bytes.withUnsafeBytes { storage in
+                guard let baseAddress = storage.baseAddress,
+                      let buffer = device.makeBuffer(
+                          bytes: baseAddress,
+                          length: storage.count,
+                          options: .storageModeShared
+                      ) else {
+                    throw AndroidMetalImageError.bufferAllocationFailed(
+                        label: "source"
+                    )
+                }
+                return buffer
             }
-            return buffer
-        }
         guard let outputBuffer = device.makeBuffer(
             length: outputByteCount,
             options: .storageModeShared
@@ -247,51 +297,57 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
                 label: "output"
             )
         }
-        guard let commandBuffer = commandQueue.makeCommandBuffer() else {
-            throw AndroidMetalImageError.commandBufferUnavailable
-        }
-        guard let encoder = commandBuffer.makeComputeCommandEncoder() else {
-            throw AndroidMetalImageError.commandEncoderUnavailable
-        }
+        do {
+            guard let commandBuffer = commandQueue.makeCommandBuffer() else {
+                throw AndroidMetalImageError.commandBufferUnavailable
+            }
+            guard let encoder =
+                commandBuffer.makeComputeCommandEncoder() else {
+                throw AndroidMetalImageError.commandEncoderUnavailable
+            }
 
-        encoder.setComputePipelineState(pipeline)
-        encoder.setBuffer(sourceBuffer, offset: 0, index: 0)
-        encoder.setBuffer(outputBuffer, offset: 0, index: 1)
-        encoder.setBytes(
-            &uniforms,
-            length: MemoryLayout<Uniforms>.stride,
-            index: 2
-        )
-        let threadWidth = pipeline.threadExecutionWidth
-        let threadHeight = max(
-            1,
-            min(
-                8,
-                pipeline.maxTotalThreadsPerThreadgroup / threadWidth
+            encoder.setComputePipelineState(pipeline)
+            encoder.setBuffer(sourceBuffer, offset: 0, index: 0)
+            encoder.setBuffer(outputBuffer, offset: 0, index: 1)
+            encoder.setBytes(
+                &uniforms,
+                length: MemoryLayout<Uniforms>.stride,
+                index: 2
             )
-        )
-        encoder.dispatchThreads(
-            MTLSize(
-                width: outputWidth,
-                height: outputHeight,
-                depth: 1
-            ),
-            threadsPerThreadgroup: MTLSize(
-                width: threadWidth,
-                height: threadHeight,
-                depth: 1
+            let threadWidth = pipeline.threadExecutionWidth
+            let threadHeight = max(
+                1,
+                min(
+                    8,
+                    pipeline.maxTotalThreadsPerThreadgroup / threadWidth
+                )
             )
-        )
-        encoder.endEncoding()
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
+            encoder.dispatchThreads(
+                MTLSize(
+                    width: outputWidth,
+                    height: outputHeight,
+                    depth: 1
+                ),
+                threadsPerThreadgroup: MTLSize(
+                    width: threadWidth,
+                    height: threadHeight,
+                    depth: 1
+                )
+            )
+            encoder.endEncoding()
+            commandBuffer.commit()
+            commandBuffer.waitUntilCompleted()
 
-        guard commandBuffer.status == .completed else {
-            throw AndroidMetalImageError.executionFailed(
-                description: commandBuffer.error?.localizedDescription
-                    ?? "command status \(commandBuffer.status.rawValue)"
-            )
+            guard commandBuffer.status == .completed else {
+                throw AndroidMetalImageError.executionFailed(
+                    description: commandBuffer.error?.localizedDescription
+                        ?? "command status \(commandBuffer.status.rawValue)"
+                )
+            }
         }
+        // The command buffer no longer needs its copied input. Releasing it
+        // before materializing the output array lowers full-page peak memory.
+        sourceBuffer = nil
         let outputPointer = outputBuffer.contents()
             .assumingMemoryBound(to: UInt8.self)
         let bytes = Array(
