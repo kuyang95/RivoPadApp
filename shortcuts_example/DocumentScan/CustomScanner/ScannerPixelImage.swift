@@ -292,6 +292,48 @@ nonisolated final class ScannerCIImageBridge: @unchecked Sendable {
         )
     }
 
+    /// Rasterizes only a top-left-origin ROI. Core Image crop geometry uses a
+    /// bottom-left origin, so convert the scanner rect before rendering.
+    func rgbaImage(
+        from image: CIImage,
+        topLeftCropRect cropRect: ScannerPixelRect
+    ) throws -> ScannerRGBAImage {
+        let extent = image.extent.integral
+        guard !extent.isInfinite else {
+            throw ScannerImageError.imageHasInfiniteExtent
+        }
+        let width = Int(extent.width)
+        let height = Int(extent.height)
+        guard cropRect.x >= 0,
+              cropRect.y >= 0,
+              cropRect.width > 0,
+              cropRect.height > 0,
+              cropRect.maxX <= width,
+              cropRect.maxY <= height else {
+            throw ScannerImageError.invalidDimensions(
+                width: cropRect.width,
+                height: cropRect.height
+            )
+        }
+        let coreImageCrop = CGRect(
+            x: extent.minX + CGFloat(cropRect.x),
+            y: extent.maxY - CGFloat(cropRect.maxY),
+            width: CGFloat(cropRect.width),
+            height: CGFloat(cropRect.height)
+        )
+        return try rgbaImage(from: image.cropped(to: coreImageCrop))
+    }
+
+    func rgbaImage(
+        from pixelBuffer: CVPixelBuffer,
+        topLeftCropRect cropRect: ScannerPixelRect
+    ) throws -> ScannerRGBAImage {
+        try rgbaImage(
+            from: CIImage(cvPixelBuffer: pixelBuffer),
+            topLeftCropRect: cropRect
+        )
+    }
+
     func ciImage(from image: ScannerRGBAImage) -> CIImage {
         let bytesPerRow = image.width * 4
         return CIImage(

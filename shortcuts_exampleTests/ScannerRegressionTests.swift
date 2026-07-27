@@ -481,6 +481,24 @@ final class ScannerRegressionTests: XCTestCase {
         ])
     }
 
+    func testCoreImageTopLeftCropMatchesPixelCrop() throws {
+        let source = try patternedImage(width: 11, height: 8)
+        let cropRect = ScannerPixelRect(
+            x: 2,
+            y: 1,
+            width: 6,
+            height: 5
+        )
+        let expected = try source.cropped(to: cropRect)
+        let bridge = ScannerCIImageBridge()
+        let cropped = try bridge.rgbaImage(
+            from: bridge.ciImage(from: source),
+            topLeftCropRect: cropRect
+        )
+
+        XCTAssertEqual(cropped, expected)
+    }
+
     func testPaddedBGRAPixelBufferCropProducesTopLeftRGBA() throws {
         var optionalPixelBuffer: CVPixelBuffer?
         let attributes = [

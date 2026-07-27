@@ -16,6 +16,12 @@ nonisolated private struct ScannerPreparedStill: Sendable {
     let image: ScannerRGBAImage
     let transform: ScannerViewportTransform
     let sharpness: Double
+    let sourceBackend: String
+}
+
+nonisolated private struct ScannerCapturedPhoto: @unchecked Sendable {
+    let pixelBuffer: CVPixelBuffer?
+    let encodedData: Data?
 }
 
 nonisolated private enum LocalDocumentScannerError: Error {
@@ -68,6 +74,7 @@ final class LocalDocumentScannerViewController: UIViewController {
         let captureRotationDegrees: Int
         let photoSettingsID: Int64
         let requestedAt: TimeInterval
+        var photoPixelBuffer: CVPixelBuffer?
         var photoData: Data?
     }
 
@@ -1209,7 +1216,26 @@ final class LocalDocumentScannerViewController: UIViewController {
                 ).rounded()
             )
         )
-        let settings = AVCapturePhotoSettings()
+        let uncompressedFormats = photoOutput.availablePhotoPixelFormatTypes
+        let preferredFormats: [OSType] = [
+            kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
+            kCVPixelFormatType_32BGRA,
+            kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+        ]
+        let requestedPixelFormat = preferredFormats.first {
+            uncompressedFormats.contains($0)
+        }
+        let settings: AVCapturePhotoSettings
+        if let requestedPixelFormat {
+            settings = AVCapturePhotoSettings(
+                format: [
+                    kCVPixelBufferPixelFormatTypeKey as String:
+                        requestedPixelFormat
+                ]
+            )
+        } else {
+            settings = AVCapturePhotoSettings()
+        }
         settings.flashMode = .off
         settings.photoQualityPrioritization = .speed
         let requestedAt = ProcessInfo.processInfo.systemUptime
@@ -1222,12 +1248,14 @@ final class LocalDocumentScannerViewController: UIViewController {
             captureRotationDegrees: captureRotation,
             photoSettingsID: settings.uniqueID,
             requestedAt: requestedAt,
+            photoPixelBuffer: nil,
             photoData: nil
         )
 
         diagnostics.logEvent(
             "photoRequested",
-            details: "ticket=\(ticket.uuidString.prefix(8))"
+            details: "ticket=\(ticket.uuidString.prefix(8)) "
+                + "pixelFormat=\(requestedPixelFormat ?? 0)"
         )
         diagnostics.logResource("photoRequested", ticket: ticket)
         setStatus("문서를 촬영합니다.", announce: true)
@@ -1237,7 +1265,8 @@ final class LocalDocumentScannerViewController: UIViewController {
     private func processPhoto(ticket: UUID) {
         guard let capture = pendingCapture,
               capture.ticket == ticket,
-              let data = capture.photoData else {
+              capture.photoPixelBuffer != nil
+                || capture.photoData != nil else {
             failProcessing(
                 ticket: ticket,
                 error: LocalDocumentScannerError.photoDataUnavailable
@@ -1254,6 +1283,10 @@ final class LocalDocumentScannerViewController: UIViewController {
         let scannerDiagnostics = diagnostics
         let resourceSampler = diagnostics.beginProcessing(ticket: ticket)
         let processingTrace = diagnostics.trace(ticket: ticket)
+        let capturedPhoto = ScannerCapturedPhoto(
+            pixelBuffer: capture.photoPixelBuffer,
+            encodedData: capture.photoData
+        )
         processingTask = Task {
             [weak self,
              stillDetector,
@@ -1271,7 +1304,7 @@ final class LocalDocumentScannerViewController: UIViewController {
                 try Task.checkCancellation()
                 var stageStartedAt = ProcessInfo.processInfo.systemUptime
                 let prepared = try await Self.prepareStill(
-                    data,
+                    capturedPhoto,
                     viewport: capture.viewport
                 )
                 scannerDiagnostics.logDuration(
@@ -1279,7 +1312,8 @@ final class LocalDocumentScannerViewController: UIViewController {
                     milliseconds: ScannerDiagnostics.milliseconds(
                         since: stageStartedAt
                     ),
-                    ticket: ticket
+                    ticket: ticket,
+                    details: "source=\(prepared.sourceBackend)"
                 )
                 scannerDiagnostics.logResource(
                     "stillPrepared",
@@ -1426,32 +1460,51 @@ final class LocalDocumentScannerViewController: UIViewController {
     }
 
     nonisolated private static func prepareStill(
-        _ data: Data,
+        _ photo: ScannerCapturedPhoto,
         viewport: ScannerViewportConfiguration
     ) async throws -> ScannerPreparedStill {
         try await Task.detached(priority: .userInitiated) {
-            guard let rawCIImage = CIImage(
-                data: data,
-                options: [.applyOrientationProperty: false]
-            ) else {
+            let bridge = ScannerCIImageBridge()
+            let rawCIImage: CIImage
+            let rawWidth: Int
+            let rawHeight: Int
+            let sourceBackend: String
+            if let pixelBuffer = photo.pixelBuffer {
+                rawCIImage = CIImage(cvPixelBuffer: pixelBuffer)
+                rawWidth = CVPixelBufferGetWidth(pixelBuffer)
+                rawHeight = CVPixelBufferGetHeight(pixelBuffer)
+                sourceBackend = "pixelBuffer"
+            } else if let data = photo.encodedData,
+                      let decoded = CIImage(
+                          data: data,
+                          options: [.applyOrientationProperty: false]
+                      ) {
+                rawCIImage = decoded
+                let extent = decoded.extent.integral
+                rawWidth = Int(extent.width)
+                rawHeight = Int(extent.height)
+                sourceBackend = "encodedData"
+            } else {
                 throw LocalDocumentScannerError.photoDecodeFailed
             }
-            let bridge = ScannerCIImageBridge()
-            let raw = try bridge.rgbaImage(from: rawCIImage)
             guard let transform = ScannerViewportTransform(
-                rawWidth: raw.width,
-                rawHeight: raw.height,
+                rawWidth: rawWidth,
+                rawHeight: rawHeight,
                 configuration: viewport
             ) else {
                 throw LocalDocumentScannerError.missingViewport
             }
-            let cropped = try raw.cropped(to: transform.rawCropRect)
+            let cropped = try bridge.rgbaImage(
+                from: rawCIImage,
+                topLeftCropRect: transform.rawCropRect
+            )
             return ScannerPreparedStill(
                 image: cropped,
                 transform: transform,
                 sharpness: AndroidScannerFrameQuality.laplacianVariance(
                     of: cropped
-                )
+                ),
+                sourceBackend: sourceBackend
             )
         }.value
     }
@@ -1714,7 +1767,10 @@ extension LocalDocumentScannerViewController: AVCapturePhotoCaptureDelegate {
         error: Error?
     ) {
         let callbackAt = ProcessInfo.processInfo.systemUptime
-        let data = error == nil ? photo.fileDataRepresentation() : nil
+        let pixelBuffer = error == nil ? photo.pixelBuffer : nil
+        let data = error == nil && pixelBuffer == nil
+            ? photo.fileDataRepresentation()
+            : nil
         let errorDescription = error?.localizedDescription
         let photoSettingsID = photo.resolvedSettings.uniqueID
         Task { @MainActor [weak self] in
@@ -1730,9 +1786,11 @@ extension LocalDocumentScannerViewController: AVCapturePhotoCaptureDelegate {
                     0
                 ),
                 ticket: pending.ticket,
-                details: "success=\(data != nil)"
+                details: "success=\(pixelBuffer != nil || data != nil) "
+                    + "source="
+                    + (pixelBuffer == nil ? "encodedData" : "pixelBuffer")
             )
-            guard let data else {
+            guard pixelBuffer != nil || data != nil else {
                 pendingCapture = nil
                 manualFocusTickets.remove(pending.ticket)
                 restoreContinuousFocus()
@@ -1745,6 +1803,7 @@ extension LocalDocumentScannerViewController: AVCapturePhotoCaptureDelegate {
                 )
                 return
             }
+            pendingCapture?.photoPixelBuffer = pixelBuffer
             pendingCapture?.photoData = data
             send(.photoCaptured(ticket: pending.ticket))
         }
