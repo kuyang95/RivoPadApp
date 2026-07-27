@@ -234,7 +234,7 @@ nonisolated enum UVDocGridSampler {
     }
 }
 
-actor UVDocDewarpEngine: CurvedDocumentDewarping {
+actor UVDocDewarpEngine: TraceableCurvedDocumentDewarping {
     nonisolated let backend: ScannerInferenceBackend
     nonisolated let preferredWarpBackend: UVDocWarpBackend
 
@@ -291,35 +291,147 @@ actor UVDocDewarpEngine: CurvedDocumentDewarping {
     }
 
     func dewarp(_ image: CIImage) async throws -> CIImage {
-        let source = try imageBridge.rgbaImage(from: image)
+        try await dewarp(image, trace: nil)
+    }
+
+    func dewarp(
+        _ image: CIImage,
+        trace: ScannerProcessingTrace?
+    ) async throws -> CIImage {
+        let sourceStage = trace?.beginStage("uvdocSourceRasterize")
+        let source: ScannerRGBAImage
+        do {
+            source = try imageBridge.rgbaImage(from: image)
+            sourceStage?.finish(
+                details: "output=\(source.width)x\(source.height)"
+            )
+        } catch {
+            sourceStage?.finish(
+                outcome: error is CancellationError
+                    ? "cancelled"
+                    : "failure"
+            )
+            throw error
+        }
+
+        let preprocessStage = trace?.beginStage("uvdocPreprocess")
         let prepared = AndroidScannerImageMath.stretchedRGBTensor(
             from: source,
             width: 496,
             height: 720
         )
-        let output = try await session.run(
-            ScannerFloatTensor(
-                values: prepared.values,
-                shape: prepared.shape
-            )
+        preprocessStage?.finish(
+            details: "input=\(source.width)x\(source.height) "
+                + "output=496x720"
         )
-        let grid = try UVDocGridDecoder.decode(output)
+
+        let inferenceStage = trace?.beginStage("uvdocInference")
+        let output: ScannerFloatTensor
+        do {
+            output = try await session.run(
+                ScannerFloatTensor(
+                    values: prepared.values,
+                    shape: prepared.shape
+                )
+            )
+            inferenceStage?.finish(
+                details: "backend=\(backend.rawValue) "
+                    + "elements=\(output.values.count)"
+            )
+        } catch {
+            inferenceStage?.finish(
+                outcome: error is CancellationError
+                    ? "cancelled"
+                    : "failure",
+                details: "backend=\(backend.rawValue)"
+            )
+            throw error
+        }
+
+        let decodeStage = trace?.beginStage("uvdocGridDecode")
+        let grid: UVDocGrid
+        do {
+            grid = try UVDocGridDecoder.decode(output)
+            decodeStage?.finish(
+                details: "output=\(grid.width)x\(grid.height)"
+            )
+        } catch {
+            decodeStage?.finish(
+                outcome: error is CancellationError
+                    ? "cancelled"
+                    : "failure"
+            )
+            throw error
+        }
+
         let dewarped: ScannerRGBAImage
         if let metalSampler {
+            let metalWarpStage = trace?.beginStage("uvdocMetalWarp")
             do {
                 dewarped = try metalSampler.warp(source, with: grid)
                 lastWarpBackend = .metal
                 lastMetalWarpErrorDescription = nil
+                metalWarpStage?.finish(
+                    details: "input=\(source.width)x\(source.height) "
+                        + "output=\(dewarped.width)x\(dewarped.height)"
+                )
             } catch {
+                metalWarpStage?.finish(
+                    outcome: error is CancellationError
+                        ? "cancelled"
+                        : "failure",
+                    details: "fallback=cpu"
+                )
                 lastMetalWarpErrorDescription = error.localizedDescription
-                dewarped = try UVDocGridSampler.warp(source, with: grid)
+                let cpuWarpStage = trace?.beginStage("uvdocCPUWarp")
+                do {
+                    dewarped = try UVDocGridSampler.warp(
+                        source,
+                        with: grid
+                    )
+                    cpuWarpStage?.finish(
+                        details: "input=\(source.width)x\(source.height) "
+                            + "output=\(dewarped.width)x"
+                            + "\(dewarped.height) fallback=true"
+                    )
+                } catch {
+                    cpuWarpStage?.finish(
+                        outcome: error is CancellationError
+                            ? "cancelled"
+                            : "failure",
+                        details: "fallback=true"
+                    )
+                    throw error
+                }
                 lastWarpBackend = .cpu
             }
         } else {
-            dewarped = try UVDocGridSampler.warp(source, with: grid)
+            let cpuWarpStage = trace?.beginStage("uvdocCPUWarp")
+            do {
+                dewarped = try UVDocGridSampler.warp(source, with: grid)
+                cpuWarpStage?.finish(
+                    details: "input=\(source.width)x\(source.height) "
+                        + "output=\(dewarped.width)x\(dewarped.height) "
+                        + "fallback=false"
+                )
+            } catch {
+                cpuWarpStage?.finish(
+                    outcome: error is CancellationError
+                        ? "cancelled"
+                        : "failure",
+                    details: "fallback=false"
+                )
+                throw error
+            }
             lastWarpBackend = .cpu
         }
-        return imageBridge.ciImage(from: dewarped)
+
+        let outputBridgeStage = trace?.beginStage("uvdocOutputBridge")
+        let result = imageBridge.ciImage(from: dewarped)
+        outputBridgeStage?.finish(
+            details: "output=\(dewarped.width)x\(dewarped.height)"
+        )
+        return result
     }
 
     private static func makeMetalSampler(

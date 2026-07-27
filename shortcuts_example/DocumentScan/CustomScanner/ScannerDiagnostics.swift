@@ -173,6 +173,16 @@ nonisolated final class ScannerDiagnostics: @unchecked Sendable {
         )
     }
 
+    func trace(ticket: UUID) -> ScannerProcessingTrace? {
+        guard isEnabled else {
+            return nil
+        }
+        return ScannerProcessingTrace(
+            diagnostics: self,
+            ticket: ticket
+        )
+    }
+
     func logFOV(
         _ comparison: ScannerFOVComparison,
         liveTransform: ScannerViewportTransform,
@@ -244,6 +254,37 @@ nonisolated final class ScannerDiagnostics: @unchecked Sendable {
                 + "minDirtyLimitRemainingMB="
                 + "\(Self.megabytes(minimumAvailableBytes)) "
                 + "maxThermal=\(Self.thermalName(maximumThermalRank))"
+        )
+    }
+
+    fileprivate func logStageSummary(
+        stage: String,
+        ticket: UUID,
+        outcome: String,
+        elapsedMilliseconds: Double,
+        baseline: ScannerResourceSnapshot,
+        final: ScannerResourceSnapshot,
+        details: String
+    ) {
+        let detailsText = details.isEmpty ? "" : " \(details)"
+        let deltaMegabytes = Self.signedMegabytesDelta(
+            from: baseline.footprintBytes,
+            to: final.footprintBytes
+        )
+        emit(
+            "stageSummary stage=\(stage) "
+                + "ticket=\(ticket.uuidString.prefix(8)) "
+                + "outcome=\(outcome) "
+                + "elapsedMs="
+                + Self.decimal(elapsedMilliseconds, digits: 2)
+                + " startMB=\(Self.megabytes(baseline.footprintBytes)) "
+                + "endMB=\(Self.megabytes(final.footprintBytes)) "
+                + "deltaMB=\(deltaMegabytes) "
+                + "dirtyLimitRemainingMB="
+                + "\(Self.megabytes(final.availableBytes)) "
+                + "thermal=\(Self.thermalName(final.thermalRank)) "
+                + "lowPower=\(final.lowPowerModeEnabled)"
+                + detailsText
         )
     }
 
@@ -372,6 +413,16 @@ nonisolated final class ScannerDiagnostics: @unchecked Sendable {
         bytes / 1_048_576
     }
 
+    private static func signedMegabytesDelta(
+        from start: UInt64,
+        to end: UInt64
+    ) -> Int64 {
+        if end >= start {
+            return Int64((end - start) / 1_048_576)
+        }
+        return -Int64((start - end) / 1_048_576)
+    }
+
     private static func decimal(
         _ value: Double,
         digits: Int
@@ -389,6 +440,72 @@ nonisolated struct ScannerResourceSnapshot: Equatable, Sendable {
     let availableBytes: UInt64
     let thermalRank: Int
     let lowPowerModeEnabled: Bool
+}
+
+nonisolated struct ScannerProcessingTrace: Sendable {
+    private let diagnostics: ScannerDiagnostics
+    let ticket: UUID
+
+    fileprivate init(
+        diagnostics: ScannerDiagnostics,
+        ticket: UUID
+    ) {
+        self.diagnostics = diagnostics
+        self.ticket = ticket
+    }
+
+    func beginStage(_ stage: String) -> ScannerStageSampler {
+        ScannerStageSampler(
+            diagnostics: diagnostics,
+            ticket: ticket,
+            stage: stage
+        )
+    }
+}
+
+nonisolated final class ScannerStageSampler: @unchecked Sendable {
+    private let diagnostics: ScannerDiagnostics
+    private let ticket: UUID
+    private let stage: String
+    private let startedAt = ProcessInfo.processInfo.systemUptime
+    private let baseline = ScannerDiagnostics.resourceSnapshot()
+    private let lock = NSLock()
+    private var finished = false
+
+    fileprivate init(
+        diagnostics: ScannerDiagnostics,
+        ticket: UUID,
+        stage: String
+    ) {
+        self.diagnostics = diagnostics
+        self.ticket = ticket
+        self.stage = stage
+    }
+
+    func finish(
+        outcome: String = "success",
+        details: String = ""
+    ) {
+        let finalSnapshot = ScannerDiagnostics.resourceSnapshot()
+        lock.lock()
+        guard !finished else {
+            lock.unlock()
+            return
+        }
+        finished = true
+        lock.unlock()
+
+        diagnostics.logStageSummary(
+            stage: stage,
+            ticket: ticket,
+            outcome: outcome,
+            elapsedMilliseconds:
+                ScannerDiagnostics.milliseconds(since: startedAt),
+            baseline: baseline,
+            final: finalSnapshot,
+            details: details
+        )
+    }
 }
 
 nonisolated final class ScannerResourceSampler: @unchecked Sendable {

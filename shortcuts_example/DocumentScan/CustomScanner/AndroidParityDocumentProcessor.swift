@@ -85,42 +85,143 @@ actor AndroidParityDocumentProcessor {
         _ image: CIImage,
         detectedQuad: DocumentQuad,
         captureRotationDegrees: Int = 0,
-        enhanceColors: Bool = true
+        enhanceColors: Bool = true,
+        trace: ScannerProcessingTrace? = nil
     ) async throws -> CIImage {
-        let corrected = try await perspectiveCorrector.correct(
-            image,
-            using: detectedQuad
-        )
-        let correctedPixels = try imageBridge.rgbaImage(from: corrected)
+        let perspectiveStage = trace?.beginStage("perspectiveCorrect")
+        let corrected: CIImage
+        do {
+            corrected = try await perspectiveCorrector.correct(
+                image,
+                using: detectedQuad
+            )
+            perspectiveStage?.finish(
+                details: "input=\(Self.dimensions(of: image)) "
+                    + "output=\(Self.dimensions(of: corrected))"
+            )
+        } catch {
+            perspectiveStage?.finish(
+                outcome: error is CancellationError
+                    ? "cancelled"
+                    : "failure"
+            )
+            throw error
+        }
+
+        let uprightStage = trace?.beginStage("uprightRasterize")
+        let correctedPixels: ScannerRGBAImage
+        do {
+            correctedPixels = try imageBridge.rgbaImage(from: corrected)
+        } catch {
+            uprightStage?.finish(
+                outcome: error is CancellationError
+                    ? "cancelled"
+                    : "failure"
+            )
+            throw error
+        }
         let uprightPixels = AndroidScannerImageMath.rotatedClockwise(
             correctedPixels,
             degrees: captureRotationDegrees
         )
         let upright = imageBridge.ciImage(from: uprightPixels)
+        uprightStage?.finish(
+            details: "input=\(correctedPixels.width)x"
+                + "\(correctedPixels.height) "
+                + "output=\(uprightPixels.width)x"
+                + "\(uprightPixels.height) "
+                + "rotation=\(captureRotationDegrees)"
+        )
 
         let dewarped: CIImage
         if prepareDewarper(), let dewarper {
+            let dewarpStage = trace?.beginStage("uvdocTotal")
             do {
-                dewarped = try await dewarper.dewarp(upright)
+                if let traceableDewarper =
+                    dewarper as? any TraceableCurvedDocumentDewarping {
+                    dewarped = try await traceableDewarper.dewarp(
+                        upright,
+                        trace: trace
+                    )
+                } else {
+                    dewarped = try await dewarper.dewarp(upright)
+                }
+                dewarpStage?.finish(
+                    details: "backend="
+                        + "\(inferenceBackend?.rawValue ?? "unavailable") "
+                        + "output=\(Self.dimensions(of: dewarped))"
+                )
             } catch {
                 // Android deliberately keeps the perspective crop if UVDoc
                 // inference fails, so scanning remains usable offline.
+                dewarpStage?.finish(
+                    outcome: "fallback",
+                    details: "backend="
+                        + "\(inferenceBackend?.rawValue ?? "unavailable")"
+                )
                 dewarped = upright
             }
         } else {
+            trace?.beginStage("uvdocTotal").finish(
+                outcome: "unavailable"
+            )
             dewarped = upright
         }
 
-        let dewarpedPixels = try imageBridge.rgbaImage(from: dewarped)
+        let outputRasterizeStage = trace?.beginStage("outputRasterize")
+        let dewarpedPixels: ScannerRGBAImage
+        do {
+            dewarpedPixels = try imageBridge.rgbaImage(from: dewarped)
+            outputRasterizeStage?.finish(
+                details: "output=\(dewarpedPixels.width)x"
+                    + "\(dewarpedPixels.height)"
+            )
+        } catch {
+            outputRasterizeStage?.finish(
+                outcome: error is CancellationError
+                    ? "cancelled"
+                    : "failure"
+            )
+            throw error
+        }
+
+        let normalizeStage = trace?.beginStage("outputNormalize")
         let normalizedPixels = AndroidScannerImageMath.normalizedLongEdge(
             dewarpedPixels,
             maximum: outputLongEdgePixels
         )
         let normalized = imageBridge.ciImage(from: normalizedPixels)
+        normalizeStage?.finish(
+            details: "input=\(dewarpedPixels.width)x"
+                + "\(dewarpedPixels.height) "
+                + "output=\(normalizedPixels.width)x"
+                + "\(normalizedPixels.height)"
+        )
 
         guard enhanceColors else {
             return normalized
         }
-        return try await enhancer.enhance(normalized)
+        let enhanceStage = trace?.beginStage("colorEnhance")
+        do {
+            let enhanced = try await enhancer.enhance(normalized)
+            enhanceStage?.finish(
+                details: "input=\(normalizedPixels.width)x"
+                    + "\(normalizedPixels.height) "
+                    + "output=\(Self.dimensions(of: enhanced))"
+            )
+            return enhanced
+        } catch {
+            enhanceStage?.finish(
+                outcome: error is CancellationError
+                    ? "cancelled"
+                    : "failure"
+            )
+            throw error
+        }
+    }
+
+    private nonisolated static func dimensions(of image: CIImage) -> String {
+        let extent = image.extent.integral
+        return "\(Int(extent.width))x\(Int(extent.height))"
     }
 }

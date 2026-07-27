@@ -34,6 +34,15 @@ nonisolated protocol CurvedDocumentDewarping: AnyObject, Sendable {
     func dewarp(_ image: CIImage) async throws -> CIImage
 }
 
+nonisolated protocol TraceableCurvedDocumentDewarping:
+    CurvedDocumentDewarping
+{
+    func dewarp(
+        _ image: CIImage,
+        trace: ScannerProcessingTrace?
+    ) async throws -> CIImage
+}
+
 nonisolated protocol DocumentPerspectiveCorrecting: AnyObject, Sendable {
     func correct(
         _ image: CIImage,

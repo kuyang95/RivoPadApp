@@ -1233,6 +1233,7 @@ final class LocalDocumentScannerViewController: UIViewController {
         let bridge = imageBridge
         let scannerDiagnostics = diagnostics
         let resourceSampler = diagnostics.beginProcessing(ticket: ticket)
+        let processingTrace = diagnostics.trace(ticket: ticket)
         processingTask = Task {
             [weak self,
              stillDetector,
@@ -1240,7 +1241,8 @@ final class LocalDocumentScannerViewController: UIViewController {
              scannerConfiguration,
              bridge,
              scannerDiagnostics,
-             resourceSampler] in
+             resourceSampler,
+             processingTrace] in
             var outcome = "cancelled"
             defer {
                 resourceSampler?.finish(outcome: outcome)
@@ -1317,7 +1319,8 @@ final class LocalDocumentScannerViewController: UIViewController {
                         detectedQuad: detection.quad,
                         captureRotationDegrees:
                             capture.captureRotationDegrees,
-                        enhanceColors: true
+                        enhanceColors: true,
+                        trace: processingTrace
                     )
                 } else {
                     let upright = AndroidScannerImageMath.rotatedClockwise(

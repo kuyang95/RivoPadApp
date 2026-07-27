@@ -47,6 +47,25 @@ final class ScannerRegressionTests: XCTestCase {
         )
     }
 
+    func testScannerProcessingTraceRequiresEnabledDiagnostics() {
+        let ticket = UUID()
+        let disabled = ScannerDiagnostics(
+            arguments: ["VisionCraft"],
+            environment: [:]
+        )
+        XCTAssertNil(disabled.trace(ticket: ticket))
+
+        let enabled = ScannerDiagnostics(
+            arguments: [
+                "VisionCraft",
+                "-ScannerDiagnostics",
+                "1"
+            ],
+            environment: [:]
+        )
+        XCTAssertEqual(enabled.trace(ticket: ticket)?.ticket, ticket)
+    }
+
     func testDirectScannerLaunchArgumentsDoNotAffectHostedTests() {
         XCTAssertTrue(
             shortcuts_exampleApp.shouldOpenScanner(
