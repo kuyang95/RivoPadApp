@@ -45,6 +45,18 @@ struct shortcuts_exampleApp: App {
                                     conversationID: conversationID
                                 )
                             )
+                        case .localDocument(let fileURL):
+                            LocalDocumentView(fileURL: fileURL)
+                        case .documentQuestion(
+                            let document,
+                            let question
+                        ):
+                            LLMContentView(
+                                intent: .documentQA(
+                                    document: document,
+                                    question: question
+                                )
+                            )
                         case .documentScanning:
                             DocumentScanRootView()
                                 .toolbar(.hidden, for: .navigationBar)

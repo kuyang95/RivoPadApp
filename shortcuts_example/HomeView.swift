@@ -1,7 +1,11 @@
 import SwiftUI
+import UniformTypeIdentifiers
+import UIKit
 
 struct HomeView: View {
     @EnvironmentObject var appRouter: AppRouter
+    @State private var isFileImporterPresented = false
+    @State private var fileImportError: String?
     
     var body: some View {
         ZStack {
@@ -37,7 +41,7 @@ struct HomeView: View {
                 }
                 
                 Button {
-                    print("파일에서 tapped")
+                    isFileImporterPresented = true
                 } label: {
                     Text("파일")
                         .font(.system(size: 56, weight: .bold))
@@ -47,6 +51,76 @@ struct HomeView: View {
                         .background(Color.black)
                         .cornerRadius(28)
                 }
+                .accessibilityHint(
+                    "이미지, PDF 또는 텍스트 파일을 엽니다."
+                )
+            }
+        }
+        .fileImporter(
+            isPresented: $isFileImporterPresented,
+            allowedContentTypes: [.image, .pdf, .plainText],
+            allowsMultipleSelection: false
+        ) { result in
+            handleFileImport(result)
+        }
+        .alert(
+            "파일을 열 수 없습니다",
+            isPresented: Binding(
+                get: { fileImportError != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        fileImportError = nil
+                    }
+                }
+            )
+        ) {
+            Button("확인", role: .cancel) {
+                fileImportError = nil
+            }
+        } message: {
+            Text(fileImportError ?? "")
+        }
+    }
+
+    private func handleFileImport(
+        _ result: Result<[URL], Error>
+    ) {
+        Task {
+            do {
+                guard let sourceURL = try result.get().first else {
+                    return
+                }
+                let contentType = try sourceURL.resourceValues(
+                    forKeys: [.contentTypeKey]
+                ).contentType
+                    ?? UTType(
+                        filenameExtension: sourceURL.pathExtension
+                    )
+
+                if contentType?.conforms(to: .image) == true {
+                    let didAccess = sourceURL
+                        .startAccessingSecurityScopedResource()
+                    defer {
+                        if didAccess {
+                            sourceURL
+                                .stopAccessingSecurityScopedResource()
+                        }
+                    }
+                    let data = try Data(contentsOf: sourceURL)
+                    guard let image = UIImage(data: data) else {
+                        throw CocoaError(.fileReadCorruptFile)
+                    }
+                    appRouter.route = .OCRResult(image: image)
+                } else {
+                    let importedURL = try await
+                        LocalDocumentImportService.shared
+                        .importDocument(from: sourceURL)
+                    appRouter.route = .localDocument(
+                        fileURL: importedURL
+                    )
+                }
+            } catch {
+                fileImportError = error.localizedDescription
             }
         }
     }
