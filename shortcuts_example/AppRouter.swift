@@ -14,6 +14,8 @@ final class AppRouter: ObservableObject {
 }
 
 enum AppRoute: Hashable {
+    case chatHistory
+    case localChat(conversationID: UUID?)
     case documentScanning
     case OCRResult(image: UIImage)
 }

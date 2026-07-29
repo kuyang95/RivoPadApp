@@ -37,6 +37,14 @@ struct shortcuts_exampleApp: App {
                     .environmentObject(shortcutRouter)
                     .navigationDestination(for: AppRoute.self) { event in
                         switch event {
+                        case .chatHistory:
+                            ChatHistoryView()
+                        case .localChat(let conversationID):
+                            LLMContentView(
+                                intent: .textChat(
+                                    conversationID: conversationID
+                                )
+                            )
                         case .documentScanning:
                             DocumentScanRootView()
                                 .toolbar(.hidden, for: .navigationBar)
@@ -53,7 +61,7 @@ struct shortcuts_exampleApp: App {
                         case .imageQA(url: let url, question: let question, token: _):
                             LLMContentView(intent: .imageAnalysis(imageURL: url, question: question))
                             
-                        case .importImage(let url, _):
+                        case .importImage:
                             DocumentScanRootView()
                             
                         case .documentScanning:

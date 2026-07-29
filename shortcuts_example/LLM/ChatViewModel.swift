@@ -7,10 +7,25 @@ import UIKit
 final class ChatViewModel: ObservableObject {
 
     struct Msg: Identifiable {
-        let id = UUID()
-        let role: String              // "user" / "assistant"
-        var text: String = ""
-        var image: UIImage? = nil     // user 이미지 1장 표시용
+        let id: UUID
+        let role: String
+        var text: String
+        var image: UIImage?
+        let createdAt: Date
+
+        init(
+            id: UUID = UUID(),
+            role: String,
+            text: String = "",
+            image: UIImage? = nil,
+            createdAt: Date = Date()
+        ) {
+            self.id = id
+            self.role = role
+            self.text = text
+            self.image = image
+            self.createdAt = createdAt
+        }
     }
 
     @Published var messages: [Msg] = []
@@ -18,11 +33,21 @@ final class ChatViewModel: ObservableObject {
     @Published var status: String = ""
     @Published var isLoadingModel: Bool = false
     @Published var isInitialQueryRunning: Bool = false
+    @Published var isGenerating: Bool = false
+    @Published var historyErrorDescription: String?
 
     let llm: LLMService
     private var genTask: Task<Void, Never>?
+    private var cleanupTask: Task<Void, Never>?
     private var generationRequestID: UUID?
-    private let conversationID = LLMConversationID()
+    private let conversationID: LLMConversationID
+    private let historyStore: ChatHistoryStore
+    private let persistsHistory: Bool
+    private let storedConversationID: UUID
+    private var conversationCreatedAt: Date
+    private var conversationUpdatedAt: Date
+    private var needsContextReplay = false
+    private var didPrepare = false
 
     // ✅ 이미지 분석 모드일 때 고정 이미지(후속 질문에도 계속 같이 보냄)
     private var pinnedCIImages: [CIImage] = []
@@ -33,8 +58,31 @@ final class ChatViewModel: ObservableObject {
 
     private enum LoadedKind { case text, vision }
 
-    init(llm: LLMService) {
+    var canSend: Bool {
+        didLoadOnce
+            && !isLoadingModel
+            && !isGenerating
+            && !input.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ).isEmpty
+    }
+
+    init(
+        llm: LLMService,
+        historyStore: ChatHistoryStore = .shared,
+        storedConversationID: UUID = UUID(),
+        persistsHistory: Bool = false
+    ) {
         self.llm = llm
+        self.historyStore = historyStore
+        self.storedConversationID = storedConversationID
+        self.persistsHistory = persistsHistory
+        self.conversationID = LLMConversationID(
+            storedConversationID
+        )
+        let now = Date()
+        self.conversationCreatedAt = now
+        self.conversationUpdatedAt = now
     }
 
     // MARK: - System Prompts (모드별로 다르게)
@@ -56,10 +104,43 @@ final class ChatViewModel: ObservableObject {
         """
     }
 
-    // MARK: - Load Model (Intent에 따라 1회만)
+    private var systemForGeneralChat: String {
+        """
+        너는 iPad에서 완전히 로컬로 실행되는 한국어 AI 도우미야.
+        사용자의 질문에 정확하고 명확하게 답하고, 확실하지 않은 내용은
+        추측해서 단정하지 마.
+        """
+    }
 
-    func loadModel(for intent: ChatIntentInput) async {
-        guard !didLoadOnce else { return }
+    // MARK: - Prepare and load
+
+    func prepare(for intent: ChatIntentInput) async {
+        guard !didPrepare else {
+            return
+        }
+        didPrepare = true
+
+        if case .textChat = intent, persistsHistory {
+            await restoreConversation()
+        }
+
+        guard await loadModel(for: intent) else {
+            return
+        }
+
+        switch intent {
+        case .textChat:
+            break
+        case .imageAnalysis, .documentQA:
+            runInitialIntent(intent)
+        }
+    }
+
+    @discardableResult
+    func loadModel(for intent: ChatIntentInput) async -> Bool {
+        guard !didLoadOnce else {
+            return true
+        }
 
         do {
             isLoadingModel = true
@@ -68,17 +149,20 @@ final class ChatViewModel: ObservableObject {
             case .imageAnalysis:
                 try await llm.activateModel(.qwen3_vl_8b_4bit)
                 loadedKind = .vision
-            case .documentQA:
+            case .textChat, .documentQA:
                 try await llm.activateModel(.qwen3_8b_4bit)
                 loadedKind = .text
             }
 
             didLoadOnce = true
             isLoadingModel = false
-            status = "Ready"
+            status = "준비됨"
+            return true
         } catch {
             isLoadingModel = false
-            status = "Load failed: \(error)"
+            status = "모델 로드 실패"
+            historyErrorDescription = error.localizedDescription
+            return false
         }
     }
 
@@ -86,6 +170,9 @@ final class ChatViewModel: ObservableObject {
 
     func runInitialIntent(_ intent: ChatIntentInput) {
         switch intent {
+        case .textChat:
+            return
+
         case .imageAnalysis(let imageURL, let question):
 
             do {
@@ -117,6 +204,32 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
+    private func restoreConversation() async {
+        do {
+            guard let stored = try await historyStore.conversation(
+                id: storedConversationID
+            ) else {
+                return
+            }
+
+            conversationCreatedAt = stored.createdAt
+            conversationUpdatedAt = stored.updatedAt
+            messages = stored.messages.map {
+                Msg(
+                    id: $0.id,
+                    role: $0.role.rawValue,
+                    text: $0.text,
+                    createdAt: $0.createdAt
+                )
+            }
+            needsContextReplay = !messages.isEmpty
+        } catch {
+            historyErrorDescription =
+                "대화 기록을 불러오지 못했습니다: "
+                + error.localizedDescription
+        }
+    }
+
     // MARK: - Start flows (초기 실행 전용 이름)
 
     private func startDocumentQA(document: String, question: String) {
@@ -140,35 +253,84 @@ final class ChatViewModel: ObservableObject {
 
     func sendUserMessage() {
         let prompt = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !prompt.isEmpty else { return }
+        guard !prompt.isEmpty,
+              didLoadOnce,
+              !isLoadingModel,
+              !isGenerating else {
+            return
+        }
         input = ""
 
+        let modelPrompt: String
+        if persistsHistory, needsContextReplay {
+            modelPrompt = ChatTranscriptBuilder.replayPrompt(
+                messages: storedMessages(),
+                newPrompt: prompt
+            )
+            needsContextReplay = false
+        } else {
+            modelPrompt = prompt
+        }
         messages.append(.init(role: "user", text: prompt, image: nil))
+        conversationUpdatedAt = Date()
 
         // ✅ 로드된 모델 종류에 따라 텍스트/비전 분기
         switch loadedKind {
         case .vision:
-            startStreamingResponse(mode: .vision, system: systemForImageAnalysis, prompt: prompt)
+            startStreamingResponse(
+                mode: .vision,
+                system: systemForImageAnalysis,
+                prompt: modelPrompt
+            )
         case .text, .none:
-            // .none은 로드 전에 호출된 비정상 케이스인데, 일단 text로 처리(또는 return 해도 됨)
-            startStreamingResponse(mode: .text, system: systemForDocumentQA, prompt: prompt)
+            startStreamingResponse(
+                mode: .text,
+                system: persistsHistory
+                    ? systemForGeneralChat
+                    : systemForDocumentQA,
+                prompt: modelPrompt
+            )
         }
     }
 
     func stop() {
-        generationRequestID = nil
-        genTask?.cancel()
-        genTask = nil
-        status = "Stopped"
-        isInitialQueryRunning = false
-
-        Task {
-            await llm.cancelGeneration(for: conversationID)
-        }
+        cancelLocalGeneration(status: "중지됨")
+        scheduleCleanup(resetSession: false)
     }
 
     func resetConversation() async {
         await llm.resetConversation(conversationID)
+    }
+
+    func closeConversation() {
+        cancelLocalGeneration(status: nil)
+        scheduleCleanup(resetSession: true)
+    }
+
+    private func cancelLocalGeneration(status: String?) {
+        generationRequestID = nil
+        genTask?.cancel()
+        genTask = nil
+        if let status {
+            self.status = status
+        }
+        isInitialQueryRunning = false
+        isGenerating = false
+    }
+
+    private func scheduleCleanup(resetSession: Bool) {
+        cleanupTask?.cancel()
+        cleanupTask = Task {
+            await llm.cancelGeneration(for: conversationID)
+            guard !Task.isCancelled else {
+                return
+            }
+            await persistConversation()
+            guard resetSession, !Task.isCancelled else {
+                return
+            }
+            await resetConversation()
+        }
     }
 
     // MARK: - Core streaming runner
@@ -188,13 +350,13 @@ final class ChatViewModel: ObservableObject {
                     throw CancellationError()
                 }
 
-                // ✅ 초기 실행에만 오버레이를 띄우고 싶다면, 여기서 판단
-                // 지금은 "첫 실행"에서만 overlay가 켜져야 하니,
-                // startDocumentQA/startImageAnalysis에서만 아래 플래그를 켜도록 분리하는 것도 가능.
-                if messages.count <= 3 { // 대충: 초기 intent 메시지 직후
+                // 문서/이미지의 첫 분석에만 전체 화면 진행 표시를 사용한다.
+                if !persistsHistory, messages.count <= 3 {
                     isInitialQueryRunning = true
                 }
-                status = "Generating…"
+                isGenerating = true
+                status = "답변 생성 중…"
+                await persistConversation()
 
                 let stream: AsyncThrowingStream<String, Error>
                 switch mode {
@@ -221,24 +383,34 @@ final class ChatViewModel: ObservableObject {
                     throw CancellationError()
                 }
 
-                status = "Done"
+                conversationUpdatedAt = Date()
+                status = "완료"
                 isInitialQueryRunning = false
+                isGenerating = false
                 generationRequestID = nil
+                await persistConversation()
             } catch is CancellationError {
                 guard generationRequestID == requestID else {
                     return
                 }
-                status = "Stopped"
+                conversationUpdatedAt = Date()
+                status = "중지됨"
                 isInitialQueryRunning = false
+                isGenerating = false
                 generationRequestID = nil
+                await persistConversation()
             } catch {
                 guard generationRequestID == requestID else {
                     return
                 }
                 messages[assistantIndex].text += "\n\n(스트림 오류: \(error))"
-                status = "Gen failed: \(error)"
+                conversationUpdatedAt = Date()
+                status = "답변 생성 실패"
+                historyErrorDescription = error.localizedDescription
                 isInitialQueryRunning = false
+                isGenerating = false
                 generationRequestID = nil
+                await persistConversation()
             }
         }
     }
@@ -295,6 +467,60 @@ final class ChatViewModel: ObservableObject {
         Question:
         \(question)
         """
+    }
+
+    // MARK: - Local history
+
+    private func persistConversation() async {
+        guard persistsHistory else {
+            return
+        }
+
+        let storedMessages = storedMessages()
+        guard !storedMessages.isEmpty else {
+            return
+        }
+
+        let titleSource = storedMessages.first(where: {
+            $0.role == .user
+        })?.text ?? ""
+        let conversation = StoredChatConversation(
+            id: storedConversationID,
+            title: StoredChatConversation.title(
+                from: titleSource
+            ),
+            createdAt: conversationCreatedAt,
+            updatedAt: conversationUpdatedAt,
+            messages: storedMessages
+        )
+
+        do {
+            try await historyStore.upsert(conversation)
+        } catch {
+            historyErrorDescription =
+                "대화 기록을 저장하지 못했습니다: "
+                + error.localizedDescription
+        }
+    }
+
+    private func storedMessages() -> [StoredChatMessage] {
+        messages.compactMap { message in
+            let text = message.text.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            guard !text.isEmpty,
+                  let role = StoredChatRole(
+                      rawValue: message.role
+                  ) else {
+                return nil
+            }
+            return StoredChatMessage(
+                id: message.id,
+                role: role,
+                text: text,
+                createdAt: message.createdAt
+            )
+        }
     }
 
     // MARK: - UIImage -> CIImage
