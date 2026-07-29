@@ -20,6 +20,7 @@ enum AppRoute: Hashable {
     case documentQuestion(document: String, question: String)
     case readerLibrary
     case epubReader(fileURL: URL)
+    case rivoRemote
     case cameraTools
     case magnifier
     case liveTextReader

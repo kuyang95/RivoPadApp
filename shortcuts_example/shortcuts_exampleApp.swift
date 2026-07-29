@@ -11,6 +11,10 @@ struct shortcuts_exampleApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var shortcutRouter = ShortcutRouter()
     @StateObject private var appRouter = AppRouter()
+    @StateObject private var rivoRemoteManager =
+        RivoRemoteManager()
+    @StateObject private var rivoRemoteControlCenter =
+        RivoRemoteControlCenter()
 
     @State private var path = NavigationPath()   // ✅ App이 path 관리
     @State private var didHandleDirectScannerLaunch = false
@@ -61,6 +65,8 @@ struct shortcuts_exampleApp: App {
                             ReaderLibraryView()
                         case .epubReader(let fileURL):
                             EPUBReaderView(fileURL: fileURL)
+                        case .rivoRemote:
+                            RivoRemoteView()
                         case .cameraTools:
                             CameraToolsView()
                         case .magnifier:
@@ -115,6 +121,20 @@ struct shortcuts_exampleApp: App {
                
             }
             .environmentObject(appRouter)
+            .environmentObject(rivoRemoteManager)
+            .overlay {
+                if rivoRemoteControlCenter.isMenuPresented {
+                    RivoQuickMenuOverlay(
+                        controlCenter: rivoRemoteControlCenter,
+                        onCommand: performRivoRemoteCommand
+                    )
+                }
+            }
+            .animation(
+                .easeInOut(duration: 0.2),
+                value:
+                    rivoRemoteControlCenter.isMenuPresented
+            )
             .task {
                 openScannerFromLaunchArgumentsIfNeeded()
             }
@@ -137,6 +157,18 @@ struct shortcuts_exampleApp: App {
                 guard let route else { return }
                 path.append(route)
                 appRouter.route = nil
+            }
+            .onChange(
+                of: rivoRemoteManager.eventSequence
+            ) { _, _ in
+                guard let input =
+                        rivoRemoteManager.lastInput else {
+                    return
+                }
+                if let command =
+                    rivoRemoteControlCenter.receive(input) {
+                    performRivoRemoteCommand(command)
+                }
             }
             
         }.environment(\.font, .custom("NanumSquareRoundOTFEB", size: 16))
@@ -170,5 +202,34 @@ struct shortcuts_exampleApp: App {
             return false
         }
         return arguments[index + 1] != "0"
+    }
+
+    private func performRivoRemoteCommand(
+        _ command: RivoRemoteCommand
+    ) {
+        switch command {
+        case .stopSpeech:
+            TTSManager.shared.stop()
+        case .home:
+            path = NavigationPath()
+        case .navigate(let destination):
+            let route: AppRoute
+            switch destination {
+            case .aiChat:
+                route = .localChat(conversationID: nil)
+            case .reader:
+                route = .readerLibrary
+            case .magnifier:
+                route = .magnifier
+            case .liveTextReader:
+                route = .liveTextReader
+            case .scanner:
+                route = .documentScanning
+            case .remoteSettings:
+                route = .rivoRemote
+            }
+            path = NavigationPath()
+            path.append(route)
+        }
     }
 }
