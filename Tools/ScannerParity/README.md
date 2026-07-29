@@ -4,6 +4,10 @@ This tool locks the iOS scanner to the VisionCraft Android model contracts.
 It verifies bundled model sizes and SHA-256 hashes, the DocAligner test-card
 corner result, and a deterministic UVDoc grid result.
 
+Deferred product work, known performance debt, and the real-device baseline
+are tracked in [BACKLOG.md](BACKLOG.md). Check that file before resuming scanner
+implementation.
+
 Run it from any directory:
 
 ```sh
