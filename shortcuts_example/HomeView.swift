@@ -29,7 +29,7 @@ struct HomeView: View {
                 )
 
                 Button {
-                    appRouter.route = .documentScanning
+                    appRouter.route = .cameraTools
                 } label: {
                     Text("카메라")
                         .font(.system(size: 56, weight: .bold))
@@ -39,6 +39,9 @@ struct HomeView: View {
                         .background(Color.black)
                         .cornerRadius(28)
                 }
+                .accessibilityHint(
+                    "카메라 돋보기 또는 문서 스캐너를 선택합니다."
+                )
                 
                 Button {
                     isFileImporterPresented = true

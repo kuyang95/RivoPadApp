@@ -18,6 +18,8 @@ enum AppRoute: Hashable {
     case localChat(conversationID: UUID?)
     case localDocument(fileURL: URL)
     case documentQuestion(document: String, question: String)
+    case cameraTools
+    case magnifier
     case documentScanning
     case OCRResult(image: UIImage)
 }

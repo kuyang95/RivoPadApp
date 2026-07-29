@@ -57,6 +57,15 @@ struct shortcuts_exampleApp: App {
                                     question: question
                                 )
                             )
+                        case .cameraTools:
+                            CameraToolsView()
+                        case .magnifier:
+                            MagnifierView()
+                                .toolbar(
+                                    .hidden,
+                                    for: .navigationBar
+                                )
+                                .ignoresSafeArea()
                         case .documentScanning:
                             DocumentScanRootView()
                                 .toolbar(.hidden, for: .navigationBar)
