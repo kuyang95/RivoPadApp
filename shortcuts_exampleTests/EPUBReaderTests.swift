@@ -267,6 +267,119 @@ final class EPUBReaderTests: XCTestCase {
         )
     }
 
+    func testReadAloudSequenceInterleavesTTSAndAudio()
+    {
+        let chapter = EPUBChapter(
+            id: "mixed",
+            title: "혼합 읽기",
+            href: "text.xhtml",
+            text:
+                "첫 텍스트 문단\n\n"
+                + "오디오 연결 문단\n\n"
+                + "마지막 텍스트 문단",
+            fragmentSegmentIndexes: [
+                "audio": 1,
+            ]
+        )
+        let audioItems = [
+            EPUBMediaOverlayItem(
+                id: "overlay.smil#first",
+                smilPath: "overlay.smil",
+                textPath: "text.xhtml",
+                textFragmentID: "audio",
+                audioPath: "audio.mp3",
+                clipBeginSeconds: 0,
+                clipEndSeconds: 1,
+                playOrder: 1
+            ),
+            EPUBMediaOverlayItem(
+                id: "overlay.smil#second",
+                smilPath: "overlay.smil",
+                textPath: "text.xhtml",
+                textFragmentID: "audio",
+                audioPath: "audio.mp3",
+                clipBeginSeconds: 1,
+                clipEndSeconds: 2,
+                playOrder: 2
+            ),
+        ]
+        let book = EPUBBook(
+            identifier: "mixed",
+            title: "혼합",
+            creator: nil,
+            language: "ko",
+            chapters: [chapter],
+            mediaOverlayItems: audioItems
+        )
+
+        let steps = EPUBReadAloudSequence
+            .steps(for: book)
+
+        XCTAssertEqual(
+            steps.map(\.audioItemIndex),
+            [nil, 0, 1, nil]
+        )
+        XCTAssertEqual(
+            steps.map(\.segmentIndex),
+            [0, 1, 1, 2]
+        )
+        XCTAssertEqual(
+            steps.map(\.text),
+            [
+                "첫 텍스트 문단",
+                "오디오 연결 문단",
+                "오디오 연결 문단",
+                "마지막 텍스트 문단",
+            ]
+        )
+        XCTAssertEqual(
+            EPUBReadAloudSequence.stepIndex(
+                chapterIndex: 0,
+                segmentIndex: 2,
+                in: steps
+            ),
+            3
+        )
+    }
+
+    func testReadAloudLanguageUsesMetadataAndScript()
+    {
+        XCTAssertEqual(
+            EPUBReadAloudLanguageResolver
+                .language(
+                    declared: nil,
+                    sample: "한국어 본문입니다."
+                ),
+            "ko-KR"
+        )
+        XCTAssertEqual(
+            EPUBReadAloudLanguageResolver
+                .language(
+                    declared: nil,
+                    sample:
+                        "日本語のテキストです。"
+                ),
+            "ja-JP"
+        )
+        XCTAssertEqual(
+            EPUBReadAloudLanguageResolver
+                .language(
+                    declared: "en_US",
+                    sample:
+                        "An English publication"
+                ),
+            "en-US"
+        )
+        XCTAssertEqual(
+            EPUBReadAloudLanguageResolver
+                .language(
+                    declared: "ko",
+                    sample: "한국어"
+                ),
+            "ko"
+        )
+    }
+
     func testMediaOverlayAudioExtractsToPrivateTemporaryFile()
         async throws
     {

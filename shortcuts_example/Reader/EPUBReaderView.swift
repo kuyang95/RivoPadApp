@@ -554,8 +554,6 @@ struct EPUBReaderView: View {
     @AppStorage("reader.epub.speechRate")
     private var speechRate = 1.0
 
-    private let tts = TTSManager.shared
-
     init(fileURL: URL) {
         _viewModel = StateObject(
             wrappedValue: EPUBReaderViewModel(
@@ -631,17 +629,12 @@ struct EPUBReaderView: View {
                 )
             }
         }
-        .onChange(of: viewModel.currentChapterIndex) {
-            _, _ in
-            tts.stop()
-        }
         .onChange(
             of: mediaOverlayPlayer.currentLocation
         ) { _, location in
             guard let location else {
                 return
             }
-            tts.stop()
             viewModel.selectChapter(
                 location.chapterIndex,
                 segmentIndex: location.segmentIndex
@@ -653,7 +646,6 @@ struct EPUBReaderView: View {
         }
         .onDisappear {
             viewModel.flushProgress()
-            tts.stop()
             mediaOverlayPlayer.stop()
         }
         .sheet(isPresented: $isContentsPresented) {
@@ -854,9 +846,9 @@ struct EPUBReaderView: View {
             }
             .disabled(viewModel.currentChapterIndex <= 0)
 
-            if mediaOverlayPlayer.hasAudio {
+            if mediaOverlayPlayer.canPlay {
                 Button(
-                    "이전 오디오",
+                    "이전 읽기 위치",
                     systemImage:
                         "backward.end.fill"
                 ) {
@@ -884,7 +876,7 @@ struct EPUBReaderView: View {
                 )
 
                 Button(
-                    "다음 오디오",
+                    "다음 읽기 위치",
                     systemImage:
                         "forward.end.fill"
                 ) {
@@ -897,15 +889,33 @@ struct EPUBReaderView: View {
                 if mediaOverlayPlayer.isLoading {
                     ProgressView()
                 } else {
-                    Text(
-                        mediaOverlayPlayer
-                            .positionDescription
-                    )
-                    .font(
-                        .caption.monospacedDigit()
+                    VStack(spacing: 2) {
+                        if !mediaOverlayPlayer
+                            .playbackModeDescription
+                            .isEmpty {
+                            Text(
+                                mediaOverlayPlayer
+                                    .playbackModeDescription
+                            )
+                            .font(.caption2)
+                        }
+                        Text(
+                            mediaOverlayPlayer
+                                .positionDescription
+                        )
+                        .font(
+                            .caption
+                            .monospacedDigit()
+                        )
+                    }
+                    .accessibilityElement(
+                        children: .combine
                     )
                     .accessibilityLabel(
-                        "오디오 위치 "
+                        "읽기 방식 "
+                        + mediaOverlayPlayer
+                            .playbackModeDescription
+                        + ", 위치 "
                         + mediaOverlayPlayer
                             .positionDescription
                     )
@@ -917,34 +927,6 @@ struct EPUBReaderView: View {
                         .font(.caption)
                         .foregroundStyle(.red)
                         .lineLimit(2)
-                }
-            } else {
-                Button(
-                    "읽기",
-                    systemImage: "play.fill"
-                ) {
-                    guard let text =
-                            viewModel
-                            .currentChapter?.text else {
-                        return
-                    }
-                    tts.speak(
-                        text,
-                        rate:
-                            Float(
-                                speechRate * 0.5
-                            )
-                    )
-                }
-                .disabled(
-                    viewModel.currentChapter == nil
-                )
-
-                Button(
-                    "정지",
-                    systemImage: "stop.fill"
-                ) {
-                    tts.stop()
                 }
             }
 
