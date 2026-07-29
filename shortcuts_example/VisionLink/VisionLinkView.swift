@@ -78,6 +78,43 @@ struct VisionLinkView: View {
                 .foregroundStyle(.green)
             }
 
+            if let status =
+                manager.remoteFeatureStatus {
+                HStack(spacing: 12) {
+                    if status.isWorking {
+                        ProgressView()
+                    } else {
+                        Image(
+                            systemName:
+                                status.stage == "error"
+                                ? "exclamationmark.triangle.fill"
+                                : "checkmark.circle.fill"
+                        )
+                        .foregroundStyle(
+                            status.stage == "error"
+                                ? Color.red
+                                : Color.green
+                        )
+                    }
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(
+                            "원격 "
+                                + status.feature.title
+                        )
+                        .font(.headline)
+                        Text(status.message)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityElement(
+                    children: .combine
+                )
+            }
+
             if let progress = manager.incomingTransfer {
                 VStack(
                     alignment: .leading,
@@ -442,7 +479,11 @@ struct VisionLinkView: View {
                 systemImage: "checkmark.circle.fill"
             )
             Label(
-                "원격 OCR·AI·번역은 다음 구현 대상",
+                "원격 OCR·이미지 설명·번역",
+                systemImage: "checkmark.circle.fill"
+            )
+            Label(
+                "원격 AI 대화·실시간 읽기는 다음 구현 대상",
                 systemImage: "arrow.forward.circle"
             )
             .foregroundStyle(.secondary)

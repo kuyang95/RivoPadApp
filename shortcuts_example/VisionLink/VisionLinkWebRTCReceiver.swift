@@ -219,6 +219,51 @@ final class VisionLinkWebRTCReceiver: NSObject {
         peerConnection = nil
     }
 
+    @discardableResult
+    func sendFeatureProgress(
+        requestID: String,
+        feature: VisionLinkRemoteFeature,
+        stage: String
+    ) -> Bool {
+        sendControl(
+            VisionLinkFeatureControl.progress(
+                requestID: requestID,
+                feature: feature,
+                stage: stage
+            )
+        )
+    }
+
+    @discardableResult
+    func sendFeatureResult(
+        requestID: String,
+        feature: VisionLinkRemoteFeature,
+        text: String
+    ) -> Bool {
+        sendControl(
+            VisionLinkFeatureControl.result(
+                requestID: requestID,
+                feature: feature,
+                text: text
+            )
+        )
+    }
+
+    @discardableResult
+    func sendFeatureError(
+        requestID: String,
+        feature: VisionLinkRemoteFeature,
+        message: String
+    ) -> Bool {
+        sendControl(
+            VisionLinkFeatureControl.error(
+                requestID: requestID,
+                feature: feature,
+                message: message
+            )
+        )
+    }
+
     private func createAndSetAnswer(
         for peerConnection: RTCPeerConnection
     ) async throws {
@@ -391,16 +436,7 @@ final class VisionLinkWebRTCReceiver: NSObject {
         for action in actions {
             switch action {
             case .sendControl(let data):
-                guard let dataChannel,
-                      dataChannel.readyState == .open else {
-                    continue
-                }
-                _ = dataChannel.sendData(
-                    RTCDataBuffer(
-                        data: data,
-                        isBinary: false
-                    )
-                )
+                _ = sendControl(data)
             case .event(let event):
                 delegate?.webRTCReceiver(
                     self,
@@ -408,6 +444,20 @@ final class VisionLinkWebRTCReceiver: NSObject {
                 )
             }
         }
+    }
+
+    @discardableResult
+    private func sendControl(_ data: Data) -> Bool {
+        guard let dataChannel,
+              dataChannel.readyState == .open else {
+            return false
+        }
+        return dataChannel.sendData(
+            RTCDataBuffer(
+                data: data,
+                isBinary: false
+            )
+        )
     }
 
     private func fail(_ message: String) {

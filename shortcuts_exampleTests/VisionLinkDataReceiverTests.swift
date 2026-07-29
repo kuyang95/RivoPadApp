@@ -409,6 +409,335 @@ final class VisionLinkDataReceiverTests:
         )
     }
 
+    func testFeatureImageCompletesIntoTemporaryRequest()
+        async throws
+    {
+        let fixture = makeFixture()
+        defer { fixture.remove() }
+        let payload = pngPayload()
+
+        let startActions = await fixture.receiver
+            .receive(
+                .control(
+                    controlData(
+                        [
+                            "type": "file-start",
+                            "transferId": "feature-file-1",
+                            "requestId": "request-1",
+                            "purpose":
+                                "visioncraft-feature",
+                            "feature": "ocr",
+                            "name": "page.png",
+                            "kind": "image",
+                            "mimeType": "image/png",
+                            "size": payload.count,
+                        ]
+                    )
+                )
+            )
+        XCTAssertEqual(
+            controlType(in: startActions),
+            "file-accepted"
+        )
+        _ = await fixture.receiver.receive(
+            .binary(payload)
+        )
+
+        let finishActions = await fixture.receiver
+            .receive(
+                .control(
+                    controlData(
+                        [
+                            "type": "file-end",
+                            "transferId": "feature-file-1",
+                            "size": payload.count,
+                            "sha256": sha256(payload),
+                        ]
+                    )
+                )
+            )
+
+        XCTAssertEqual(
+            controlType(in: finishActions),
+            "file-complete"
+        )
+        let request = try XCTUnwrap(
+            remoteFeatureRequest(
+                in: finishActions
+            )
+        )
+        guard case .image(let imageRequest) =
+                request else {
+            return XCTFail("이미지 기능 요청이어야 합니다.")
+        }
+        XCTAssertEqual(
+            imageRequest.requestID,
+            "request-1"
+        )
+        XCTAssertEqual(
+            imageRequest.feature,
+            .ocr
+        )
+        XCTAssertEqual(
+            try Data(
+                contentsOf: imageRequest.fileURL
+            ),
+            payload
+        )
+        XCTAssertTrue(
+            imageRequest.fileURL.path
+                .contains("/Partial/Features/")
+        )
+        XCTAssertEqual(
+            try directoryContents(fixture.destination),
+            []
+        )
+        XCTAssertNil(receivedFile(in: finishActions))
+    }
+
+    func testInvalidFeatureImageMetadataIsRejected()
+        async
+    {
+        let fixture = makeFixture()
+        defer { fixture.remove() }
+
+        let invalidKind = await fixture.receiver
+            .receive(
+                .control(
+                    controlData(
+                        [
+                            "type": "file-start",
+                            "transferId": "bad-kind",
+                            "requestId": "request-1",
+                            "purpose":
+                                "visioncraft-feature",
+                            "feature": "ocr",
+                            "name": "page.png",
+                            "kind": "file",
+                            "size": 12,
+                        ]
+                    )
+                )
+            )
+        XCTAssertEqual(
+            controlType(in: invalidKind),
+            "file-error"
+        )
+
+        let empty = await fixture.receiver.receive(
+            .control(
+                controlData(
+                    [
+                        "type": "file-start",
+                        "transferId": "empty-feature",
+                        "requestId": "request-1",
+                        "purpose":
+                            "visioncraft-feature",
+                        "feature": "ocr",
+                        "name": "page.png",
+                        "kind": "image",
+                        "size": 0,
+                    ]
+                )
+            )
+        )
+        XCTAssertEqual(
+            controlType(in: empty),
+            "file-error"
+        )
+
+        let unsupported = await fixture.receiver
+            .receive(
+                .control(
+                    controlData(
+                        [
+                            "type": "file-start",
+                            "transferId": "bad-feature",
+                            "requestId": "request-1",
+                            "purpose":
+                                "visioncraft-feature",
+                            "feature": "unknown",
+                            "name": "page.png",
+                            "kind": "image",
+                            "size": 12,
+                        ]
+                    )
+                )
+            )
+        XCTAssertEqual(
+            controlType(in: unsupported),
+            "file-error"
+        )
+
+        let longID = await fixture.receiver.receive(
+            .control(
+                controlData(
+                    [
+                        "type": "file-start",
+                        "transferId": "long-id",
+                        "requestId": String(
+                            repeating: "a",
+                            count: 81
+                        ),
+                        "purpose":
+                            "visioncraft-feature",
+                        "feature": "ocr",
+                        "name": "page.png",
+                        "kind": "image",
+                        "size": 12,
+                    ]
+                )
+            )
+        )
+        XCTAssertEqual(
+            controlType(in: longID),
+            "file-error"
+        )
+    }
+
+    func testTranslationTextRequestValidation()
+        async
+    {
+        let fixture = makeFixture()
+        defer { fixture.remove() }
+
+        let valid = await fixture.receiver.receive(
+            .control(
+                controlData(
+                    [
+                        "type": "feature-request",
+                        "requestId": "translate-1",
+                        "feature": "translation",
+                        "payload": [
+                            "text": "Hello",
+                        ],
+                    ]
+                )
+            )
+        )
+        XCTAssertEqual(
+            remoteFeatureRequest(in: valid),
+            .translationText(
+                VisionLinkTextTranslationRequest(
+                    requestID: "translate-1",
+                    text: "Hello"
+                )
+            )
+        )
+
+        let empty = await fixture.receiver.receive(
+            .control(
+                controlData(
+                    [
+                        "type": "feature-request",
+                        "requestId": "translate-2",
+                        "feature": "translation",
+                        "payload": [
+                            "text": "   ",
+                        ],
+                    ]
+                )
+            )
+        )
+        XCTAssertEqual(
+            controlType(in: empty),
+            "feature-error"
+        )
+
+        let oversized = await fixture.receiver
+            .receive(
+                .control(
+                    controlData(
+                        [
+                            "type": "feature-request",
+                            "requestId": "translate-3",
+                            "feature": "translation",
+                            "payload": [
+                                "text": String(
+                                    repeating: "a",
+                                    count:
+                                        VisionLinkDataReceiver
+                                        .maximumTranslationTextSize
+                                        + 1
+                                ),
+                            ],
+                        ]
+                    )
+                )
+            )
+        XCTAssertEqual(
+            controlType(in: oversized),
+            "feature-error"
+        )
+        XCTAssertNil(
+            remoteFeatureRequest(in: oversized)
+        )
+    }
+
+    func testFeatureControlEncodesLimits()
+    {
+        let progress = controlObject(
+            in: [
+                .sendControl(
+                    VisionLinkFeatureControl.progress(
+                        requestID: "request-1",
+                        feature: .imageAnalysis,
+                        stage: "analyzing"
+                    )
+                ),
+            ]
+        )
+        XCTAssertEqual(
+            progress?["type"] as? String,
+            "feature-progress"
+        )
+        XCTAssertEqual(
+            progress?["feature"] as? String,
+            "image-analysis"
+        )
+
+        let oversized = controlObject(
+            in: [
+                .sendControl(
+                    VisionLinkFeatureControl.result(
+                        requestID: "request-2",
+                        feature: .ocr,
+                        text: String(
+                            repeating: "a",
+                            count:
+                                VisionLinkFeatureControl
+                                .maximumResultSize + 1
+                        )
+                    )
+                ),
+            ]
+        )
+        XCTAssertEqual(
+            oversized?["type"] as? String,
+            "feature-error"
+        )
+
+        let longMessage = String(
+            repeating: "가",
+            count: 700
+        )
+        let error = controlObject(
+            in: [
+                .sendControl(
+                    VisionLinkFeatureControl.error(
+                        requestID: "request-3",
+                        feature: .translation,
+                        message: longMessage
+                    )
+                ),
+            ]
+        )
+        XCTAssertEqual(
+            (error?["message"] as? String)?.count,
+            500
+        )
+    }
+
     private func start(
         _ fixture: Fixture,
         transferID: String,
@@ -501,6 +830,28 @@ final class VisionLinkDataReceiverTests:
             }
         }
         return nil
+    }
+
+    private func remoteFeatureRequest(
+        in actions: [VisionLinkDataAction]
+    ) -> VisionLinkRemoteFeatureRequest? {
+        for action in actions {
+            if case .event(
+                .remoteFeatureRequested(let request)
+            ) = action {
+                return request
+            }
+        }
+        return nil
+    }
+
+    private func pngPayload() -> Data {
+        Data(
+            base64Encoded:
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"
+                + "CAQAAAC1HAwCAAAAC0lEQVR42mNk"
+                + "YAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+        )!
     }
 
     private func sha256(

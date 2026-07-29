@@ -83,6 +83,17 @@ nonisolated struct VisionLinkEventRecord:
     let summary: String
 }
 
+nonisolated struct VisionLinkRemoteFeatureStatus:
+    Equatable,
+    Sendable
+{
+    let requestID: String
+    let feature: VisionLinkRemoteFeature
+    let stage: String
+    let message: String
+    let isWorking: Bool
+}
+
 @MainActor
 final class VisionLinkManager: ObservableObject {
     @Published private(set) var state:
@@ -107,6 +118,8 @@ final class VisionLinkManager: ObservableObject {
         String?
     @Published private(set) var dataTransferMessage:
         String?
+    @Published private(set) var remoteFeatureStatus:
+        VisionLinkRemoteFeatureStatus?
     @Published private(set) var recentEvents:
         [VisionLinkEventRecord] = []
 
@@ -116,6 +129,8 @@ final class VisionLinkManager: ObservableObject {
     private let webSocketSession: URLSession
     private let deviceName: String
     private let webRTCReceiver: VisionLinkWebRTCReceiver
+    private let remoteFeatureProcessor:
+        VisionLinkRemoteFeatureProcessor
 
     private var connectionTask: Task<Void, Never>?
     private var receiveTask: Task<Void, Never>?
@@ -125,6 +140,11 @@ final class VisionLinkManager: ObservableObject {
     private var currentIceServers: [VisionLinkIceServer] = []
     private var currentRelayPolicy =
         VisionLinkContract.p2pPreferred
+    private var remoteFeatureQueue:
+        [VisionLinkRemoteFeatureRequest] = []
+    private var remoteFeatureTask:
+        Task<Void, Never>?
+    private var remoteFeatureGeneration = 0
 
     init(
         server: any VisionLinkServerServing =
@@ -133,12 +153,20 @@ final class VisionLinkManager: ObservableObject {
             any VisionLinkCredentialStoring =
                 VisionLinkCredentialStore(),
         webSocketSession: URLSession = .shared,
-        deviceName: String? = nil
+        deviceName: String? = nil,
+        remoteFeatureService:
+            any VisionLinkRemoteFeatureServing =
+                VisionLinkLocalRemoteFeatureService
+                    .shared
     ) {
         self.server = server
         self.credentialStore = credentialStore
         self.webSocketSession = webSocketSession
         webRTCReceiver = VisionLinkWebRTCReceiver()
+        remoteFeatureProcessor =
+            VisionLinkRemoteFeatureProcessor(
+                service: remoteFeatureService
+            )
         let requestedName = deviceName
             ?? UIDevice.current.name
         let normalized = requestedName.trimmingCharacters(
@@ -159,6 +187,7 @@ final class VisionLinkManager: ObservableObject {
         connectionTask?.cancel()
         receiveTask?.cancel()
         countdownTask?.cancel()
+        remoteFeatureTask?.cancel()
         webSocket?.cancel(
             with: .goingAway,
             reason: nil
@@ -629,11 +658,204 @@ final class VisionLinkManager: ObservableObject {
     }
 
     private func resetMedia() {
+        invalidateRemoteFeatureWork(
+            reason: "media-reset"
+        )
         webRTCReceiver.close()
         remoteVideoTrack = nil
         isDataChannelReady = false
         isCameraShareActive = false
         incomingTransfer = nil
+    }
+
+    private func enqueueRemoteFeature(
+        _ request: VisionLinkRemoteFeatureRequest
+    ) {
+        remoteFeatureQueue.append(request)
+        appendEvent(
+            "원격 \(request.feature.title) 요청 수신"
+        )
+        startRemoteFeatureQueueIfNeeded()
+    }
+
+    private func startRemoteFeatureQueueIfNeeded() {
+        guard remoteFeatureTask == nil,
+              isDataChannelReady,
+              !remoteFeatureQueue.isEmpty else {
+            return
+        }
+        let generation = remoteFeatureGeneration
+        remoteFeatureTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+            await self.drainRemoteFeatureQueue(
+                generation: generation
+            )
+        }
+    }
+
+    private func drainRemoteFeatureQueue(
+        generation: Int
+    ) async {
+        defer {
+            if generation
+                == remoteFeatureGeneration {
+                remoteFeatureTask = nil
+                startRemoteFeatureQueueIfNeeded()
+            }
+        }
+
+        while !Task.isCancelled,
+              generation == remoteFeatureGeneration,
+              isDataChannelReady,
+              !remoteFeatureQueue.isEmpty {
+            let request = remoteFeatureQueue.removeFirst()
+            do {
+                try await remoteFeatureProcessor.process(
+                    request
+                ) { [weak self] update in
+                    guard let self,
+                          generation
+                            == self
+                                .remoteFeatureGeneration,
+                          self.isDataChannelReady,
+                          !Task.isCancelled else {
+                        return
+                    }
+                    self.handleRemoteFeatureUpdate(
+                        update,
+                        request: request
+                    )
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                guard generation
+                        == remoteFeatureGeneration,
+                      isDataChannelReady else {
+                    return
+                }
+                handleRemoteFeatureUpdate(
+                    .failed(
+                        Self.userMessage(for: error)
+                    ),
+                    request: request
+                )
+            }
+        }
+    }
+
+    private func handleRemoteFeatureUpdate(
+        _ update: VisionLinkRemoteFeatureUpdate,
+        request: VisionLinkRemoteFeatureRequest
+    ) {
+        let requestID = request.requestID
+        let feature = request.feature
+        switch update {
+        case .progress(let stage):
+            _ = webRTCReceiver.sendFeatureProgress(
+                requestID: requestID,
+                feature: feature,
+                stage: stage
+            )
+            remoteFeatureStatus =
+                VisionLinkRemoteFeatureStatus(
+                    requestID: requestID,
+                    feature: feature,
+                    stage: stage,
+                    message:
+                        Self.featureStageMessage(
+                            feature: feature,
+                            stage: stage
+                        ),
+                    isWorking: true
+                )
+            appendEvent(
+                "원격 \(feature.title) · "
+                    + Self.featureStageMessage(
+                        feature: feature,
+                        stage: stage
+                    )
+            )
+
+        case .result(let text):
+            _ = webRTCReceiver.sendFeatureResult(
+                requestID: requestID,
+                feature: feature,
+                text: text
+            )
+            remoteFeatureStatus =
+                VisionLinkRemoteFeatureStatus(
+                    requestID: requestID,
+                    feature: feature,
+                    stage: "complete",
+                    message: "\(feature.title) 완료",
+                    isWorking: false
+                )
+            dataTransferMessage = nil
+            appendEvent(
+                "원격 \(feature.title) 결과 전송 완료"
+            )
+
+        case .failed(let message):
+            _ = webRTCReceiver.sendFeatureError(
+                requestID: requestID,
+                feature: feature,
+                message: message
+            )
+            remoteFeatureStatus =
+                VisionLinkRemoteFeatureStatus(
+                    requestID: requestID,
+                    feature: feature,
+                    stage: "error",
+                    message: message,
+                    isWorking: false
+                )
+            dataTransferMessage = message
+            appendEvent(
+                "원격 \(feature.title) 실패 · "
+                    + message
+            )
+        }
+    }
+
+    private func invalidateRemoteFeatureWork(
+        reason: String
+    ) {
+        remoteFeatureGeneration &+= 1
+        remoteFeatureTask?.cancel()
+        remoteFeatureTask = nil
+        let queuedFiles = remoteFeatureQueue
+            .compactMap(\.temporaryFileURL)
+        remoteFeatureQueue = []
+        queuedFiles.forEach {
+            try? FileManager.default.removeItem(
+                at: $0
+            )
+        }
+        remoteFeatureStatus = nil
+        if !queuedFiles.isEmpty {
+            appendEvent(
+                "원격 기능 작업 취소 · \(reason)"
+            )
+        }
+    }
+
+    private static func featureStageMessage(
+        feature: VisionLinkRemoteFeature,
+        stage: String
+    ) -> String {
+        switch stage {
+        case "recognizing":
+            return "글자 인식 중"
+        case "translating":
+            return "번역 중"
+        case "analyzing":
+            return "이미지 분석 중"
+        default:
+            return "\(feature.title) 처리 중"
+        }
     }
 
     private func sendSignaling(
@@ -819,7 +1041,11 @@ extension VisionLinkManager:
         if dataChannelReady {
             dataTransferMessage = nil
             appendEvent("VisionLink 데이터 채널 연결됨")
+            startRemoteFeatureQueueIfNeeded()
         } else {
+            invalidateRemoteFeatureWork(
+                reason: "data-channel-closed"
+            )
             isCameraShareActive = false
             incomingTransfer = nil
             appendEvent("VisionLink 데이터 채널 연결 끊김")
@@ -862,6 +1088,10 @@ extension VisionLinkManager:
                 "파일 수신 완료 · "
                     + file.fileName
             )
+        case .remoteFeatureRequested(let request):
+            incomingTransfer = nil
+            dataTransferMessage = nil
+            enqueueRemoteFeature(request)
         case .failed(let message):
             incomingTransfer = nil
             dataTransferMessage = message

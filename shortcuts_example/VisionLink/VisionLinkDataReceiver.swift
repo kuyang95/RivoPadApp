@@ -45,6 +45,79 @@ nonisolated struct VisionLinkReceivedFile:
     let mimeType: String
 }
 
+nonisolated enum VisionLinkRemoteFeature:
+    String,
+    Equatable,
+    Sendable
+{
+    case ocr
+    case imageAnalysis = "image-analysis"
+    case translation
+
+    var title: String {
+        switch self {
+        case .ocr:
+            return "OCR"
+        case .imageAnalysis:
+            return "이미지 설명"
+        case .translation:
+            return "번역"
+        }
+    }
+}
+
+nonisolated struct VisionLinkFeatureImageRequest:
+    Equatable,
+    Sendable
+{
+    let requestID: String
+    let feature: VisionLinkRemoteFeature
+    let fileURL: URL
+}
+
+nonisolated struct VisionLinkTextTranslationRequest:
+    Equatable,
+    Sendable
+{
+    let requestID: String
+    let text: String
+}
+
+nonisolated enum VisionLinkRemoteFeatureRequest:
+    Equatable,
+    Sendable
+{
+    case image(VisionLinkFeatureImageRequest)
+    case translationText(
+        VisionLinkTextTranslationRequest
+    )
+
+    var requestID: String {
+        switch self {
+        case .image(let request):
+            return request.requestID
+        case .translationText(let request):
+            return request.requestID
+        }
+    }
+
+    var feature: VisionLinkRemoteFeature {
+        switch self {
+        case .image(let request):
+            return request.feature
+        case .translationText:
+            return .translation
+        }
+    }
+
+    var temporaryFileURL: URL? {
+        guard case .image(let request) = self else {
+            return nil
+        }
+        return request.fileURL
+    }
+}
+
 nonisolated enum VisionLinkDataEvent:
     Equatable,
     Sendable
@@ -54,6 +127,9 @@ nonisolated enum VisionLinkDataEvent:
     case transferStarted(VisionLinkTransferProgress)
     case transferProgress(VisionLinkTransferProgress)
     case fileReceived(VisionLinkReceivedFile)
+    case remoteFeatureRequested(
+        VisionLinkRemoteFeatureRequest
+    )
     case failed(String)
 }
 
@@ -74,11 +150,91 @@ nonisolated enum VisionLinkDataAction:
     case event(VisionLinkDataEvent)
 }
 
+nonisolated enum VisionLinkFeatureControl {
+    static let maximumResultSize =
+        256 * 1_024
+    static let maximumErrorLength = 500
+
+    static func progress(
+        requestID: String,
+        feature: VisionLinkRemoteFeature,
+        stage: String
+    ) -> Data {
+        controlData(
+            [
+                "type": "feature-progress",
+                "requestId": requestID,
+                "feature": feature.rawValue,
+                "stage": stage,
+            ]
+        )
+    }
+
+    static func result(
+        requestID: String,
+        feature: VisionLinkRemoteFeature,
+        text: String
+    ) -> Data {
+        guard text.utf8.count
+                <= maximumResultSize else {
+            return error(
+                requestID: requestID,
+                feature: feature,
+                message:
+                    "기능 결과가 전송 가능한 크기를 초과했습니다."
+            )
+        }
+        return controlData(
+            [
+                "type": "feature-result",
+                "requestId": requestID,
+                "feature": feature.rawValue,
+                "text": text,
+            ]
+        )
+    }
+
+    static func error(
+        requestID: String,
+        feature: VisionLinkRemoteFeature,
+        message: String
+    ) -> Data {
+        controlData(
+            [
+                "type": "feature-error",
+                "requestId": requestID,
+                "feature": feature.rawValue,
+                "message": String(
+                    message.prefix(maximumErrorLength)
+                ),
+            ]
+        )
+    }
+
+    private static func controlData(
+        _ object: [String: Any]
+    ) -> Data {
+        (
+            try? JSONSerialization.data(
+                withJSONObject: object,
+                options: [.sortedKeys]
+            )
+        ) ?? Data()
+    }
+}
+
 actor VisionLinkDataReceiver {
     static let maximumFileSize: Int64 =
         1_073_741_824
+    static let maximumFeatureImageSize: Int64 =
+        25 * 1_024 * 1_024
     static let maximumClipboardSize =
         128 * 1_024
+    static let maximumFeatureRequestSize =
+        40 * 1_024
+    static let maximumTranslationTextSize =
+        32 * 1_024
+    static let maximumRequestIDLength = 80
 
     private static let blockedGeneralExtensions:
         Set<String> = [
@@ -187,7 +343,10 @@ actor VisionLinkDataReceiver {
         case "data-pong":
             return []
         case "feature-request":
-            return unsupportedFeature(message)
+            return receiveFeatureRequest(
+                message,
+                rawSize: data.count
+            )
         case "chat-context-attachment":
             return unsupportedChatAttachment(message)
         case "live-reading-start":
@@ -226,11 +385,10 @@ actor VisionLinkDataReceiver {
         }
 
         let purpose = message["purpose"] as? String
-        if purpose == "visioncraft-feature"
-            || purpose
+        if purpose
                 == "visioncraft-chat-attachment" {
             return transferError(
-                "이 VisionCraft 원격 기능은 아직 지원되지 않습니다.",
+                "원격 AI 대화 첨부는 아직 지원되지 않습니다.",
                 transferID: transferID
             )
         }
@@ -238,17 +396,71 @@ actor VisionLinkDataReceiver {
         let fileName = Self.sanitizeFileName(
             message["name"] as? String
         )
-        let kind = (
+        let declaredKind =
             message["kind"] as? String
-        ) == "image" ? "image" : "file"
-        guard let mimeType = Self.mimeType(
-            for: fileName,
-            kind: kind
-        ) else {
-            return transferError(
-                "지원하지 않는 파일 형식입니다.",
-                transferID: transferID
+        let kind = declaredKind == "image"
+            ? "image"
+            : "file"
+        let isFeatureRequest =
+            purpose == "visioncraft-feature"
+        let feature: VisionLinkRemoteFeature?
+        let requestID: String?
+        let mimeType: String
+
+        if isFeatureRequest {
+            feature = (
+                message["feature"] as? String
+            ).flatMap(
+                VisionLinkRemoteFeature.init(
+                    rawValue:
+                )
             )
+            requestID = Self.validRequestID(
+                message["requestId"]
+            )
+            guard feature != nil,
+                  requestID != nil,
+                  declaredKind == "image" else {
+                return transferError(
+                    "지원하지 않는 VisionCraft 기능 요청입니다.",
+                    transferID: transferID
+                )
+            }
+            guard size > 0,
+                  size <= Self
+                    .maximumFeatureImageSize else {
+                return transferError(
+                    "기능 이미지는 25MB 이하만 사용할 수 있습니다.",
+                    transferID: transferID
+                )
+            }
+            let declaredMimeType = (
+                message["mimeType"] as? String
+            )?
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            mimeType = declaredMimeType?
+                .isEmpty == false
+                ? declaredMimeType!
+                : Self.mimeType(
+                    for: fileName,
+                    kind: "image"
+                ) ?? "image/*"
+        } else {
+            feature = nil
+            requestID = nil
+            guard let resolvedMimeType =
+                    Self.mimeType(
+                        for: fileName,
+                        kind: kind
+                    ) else {
+                return transferError(
+                    "지원하지 않는 파일 형식입니다.",
+                    transferID: transferID
+                )
+            }
+            mimeType = resolvedMimeType
         }
 
         var createdPartialURL: URL?
@@ -285,7 +497,9 @@ actor VisionLinkDataReceiver {
                 expectedSize: size,
                 partialURL: partialURL,
                 mimeType: mimeType,
-                fileHandle: handle
+                fileHandle: handle,
+                feature: feature,
+                requestID: requestID
             )
             lastProgressPercent = -1
         } catch {
@@ -494,10 +708,21 @@ actor VisionLinkDataReceiver {
             )
         }
 
-        let finalURL = uniqueDestinationURL(
-            fileName: transfer.fileName
-        )
+        let finalURL: URL
+        if transfer.feature != nil {
+            finalURL = uniqueFeatureURL(
+                fileName: transfer.fileName
+            )
+        } else {
+            finalURL = uniqueDestinationURL(
+                fileName: transfer.fileName
+            )
+        }
         do {
+            try FileManager.default.createDirectory(
+                at: finalURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
             try FileManager.default.moveItem(
                 at: transfer.partialURL,
                 to: finalURL
@@ -511,15 +736,7 @@ actor VisionLinkDataReceiver {
             )
         }
 
-        let receivedFile = VisionLinkReceivedFile(
-            transferID: transfer.transferID,
-            kind: transfer.kind,
-            fileName: finalURL.lastPathComponent,
-            size: transfer.receivedBytes,
-            url: finalURL,
-            mimeType: transfer.mimeType
-        )
-        return [
+        var actions: [VisionLinkDataAction] = [
             .sendControl(
                 Self.controlData(
                     [
@@ -532,8 +749,36 @@ actor VisionLinkDataReceiver {
                     ]
                 )
             ),
-            .event(.fileReceived(receivedFile)),
         ]
+        if let feature = transfer.feature,
+           let requestID = transfer.requestID {
+            actions.append(
+                .event(
+                    .remoteFeatureRequested(
+                        .image(
+                            VisionLinkFeatureImageRequest(
+                                requestID: requestID,
+                                feature: feature,
+                                fileURL: finalURL
+                            )
+                        )
+                    )
+                )
+            )
+        } else {
+            let receivedFile = VisionLinkReceivedFile(
+                transferID: transfer.transferID,
+                kind: transfer.kind,
+                fileName: finalURL.lastPathComponent,
+                size: transfer.receivedBytes,
+                url: finalURL,
+                mimeType: transfer.mimeType
+            )
+            actions.append(
+                .event(.fileReceived(receivedFile))
+            )
+        }
+        return actions
     }
 
     private func cancelTransfer(
@@ -598,34 +843,105 @@ actor VisionLinkDataReceiver {
         ]
     }
 
-    private func unsupportedFeature(
-        _ message: [String: Any]
+    private func receiveFeatureRequest(
+        _ message: [String: Any],
+        rawSize: Int
     ) -> [VisionLinkDataAction] {
-        guard let requestID = Self.nonemptyString(
+        guard let requestID = Self.validRequestID(
             message["requestId"]
         ) else {
             return []
         }
-        let feature =
+        let rawFeature =
             message["feature"] as? String ?? ""
-        return [
-            .sendControl(
-                Self.controlData(
+        guard rawFeature
+                == VisionLinkRemoteFeature
+                    .translation.rawValue else {
+            let feature =
+                VisionLinkRemoteFeature(
+                    rawValue: rawFeature
+                )
+            let data: Data
+            if let feature {
+                data = VisionLinkFeatureControl.error(
+                    requestID: requestID,
+                    feature: feature,
+                    message:
+                        "지원하지 않는 VisionCraft 기능입니다."
+                )
+            } else {
+                data = Self.controlData(
                     [
                         "type": "feature-error",
                         "requestId": requestID,
-                        "feature": feature,
+                        "feature": rawFeature,
                         "message":
-                            "이 VisionCraft 원격 기능은 "
-                            + "아직 지원되지 않습니다.",
+                            "지원하지 않는 VisionCraft 기능입니다.",
                     ]
                 )
-            ),
+            }
+            return [
+                .sendControl(data),
+                .event(
+                    .failed(
+                        "지원하지 않는 원격 기능 요청입니다: "
+                            + rawFeature
+                    )
+                ),
+            ]
+        }
+
+        guard rawSize <= Self
+                .maximumFeatureRequestSize else {
+            return featureRequestError(
+                requestID: requestID,
+                message: "번역할 텍스트가 너무 깁니다."
+            )
+        }
+        let text = (
+            message["payload"]
+                as? [String: Any]
+        )?["text"] as? String
+        guard let text,
+              !text.trimmingCharacters(
+                in: .whitespacesAndNewlines
+              ).isEmpty,
+              text.utf8.count
+                <= Self.maximumTranslationTextSize else {
+            return featureRequestError(
+                requestID: requestID,
+                message:
+                    "번역할 텍스트가 비어 있거나 "
+                    + "32KB를 초과했습니다."
+            )
+        }
+        return [
             .event(
-                .failed(
-                    "원격 \(feature) 요청은 다음 구현 대상입니다."
+                .remoteFeatureRequested(
+                    .translationText(
+                        VisionLinkTextTranslationRequest(
+                            requestID: requestID,
+                            text: text
+                        )
+                    )
                 )
             ),
+        ]
+    }
+
+    private func featureRequestError(
+        requestID: String,
+        message: String
+    ) -> [VisionLinkDataAction] {
+        [
+            .sendControl(
+                VisionLinkFeatureControl.error(
+                    requestID: requestID,
+                    feature: .translation,
+                    message: message
+                )
+            ),
+            .event(.failed(message)),
         ]
     }
 
@@ -763,6 +1079,28 @@ actor VisionLinkDataReceiver {
         }
     }
 
+    private func uniqueFeatureURL(
+        fileName: String
+    ) -> URL {
+        let directory = partialDirectory
+            .appendingPathComponent(
+                "Features",
+                isDirectory: true
+            )
+        let pathExtension = URL(
+            fileURLWithPath: fileName
+        )
+        .pathExtension
+        var name = UUID().uuidString
+        if !pathExtension.isEmpty {
+            name += ".\(pathExtension)"
+        }
+        return directory.appendingPathComponent(
+            name,
+            isDirectory: false
+        )
+    }
+
     private static func progress(
         for transfer: IncomingTransfer
     ) -> VisionLinkTransferProgress {
@@ -864,6 +1202,17 @@ actor VisionLinkDataReceiver {
         return value
     }
 
+    private static func validRequestID(
+        _ value: Any?
+    ) -> String? {
+        guard let value = nonemptyString(value),
+              value.count
+                <= maximumRequestIDLength else {
+            return nil
+        }
+        return value
+    }
+
     private static func int64(
         _ value: Any?
     ) -> Int64? {
@@ -906,6 +1255,8 @@ private struct IncomingTransfer {
     let partialURL: URL
     let mimeType: String
     let fileHandle: FileHandle
+    let feature: VisionLinkRemoteFeature?
+    let requestID: String?
     var receivedBytes: Int64 = 0
     var hasher = SHA256()
 }
