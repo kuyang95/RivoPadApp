@@ -57,6 +57,10 @@ struct shortcuts_exampleApp: App {
                                     question: question
                                 )
                             )
+                        case .readerLibrary:
+                            ReaderLibraryView()
+                        case .epubReader(let fileURL):
+                            EPUBReaderView(fileURL: fileURL)
                         case .cameraTools:
                             CameraToolsView()
                         case .magnifier:

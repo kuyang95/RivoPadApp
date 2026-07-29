@@ -1,0 +1,476 @@
+import Foundation
+import XCTest
+import zlib
+
+@testable import shortcuts_example
+
+final class EPUBReaderTests: XCTestCase {
+    func testParsesEPUB3MetadataNavigationAndReadingOrder()
+        throws
+    {
+        let data = try EPUBFixture.makeBook()
+        let archive = try EPUBArchive(data: data)
+
+        XCTAssertEqual(
+            try archive.text(at: "mimetype"),
+            "application/epub+zip"
+        )
+
+        let book = try EPUBBookParser.parse(data: data)
+
+        XCTAssertEqual(book.identifier, "rivo-epub-fixture")
+        XCTAssertEqual(book.title, "테스트 책")
+        XCTAssertEqual(book.creator, "Rivo")
+        XCTAssertEqual(book.language, "ko")
+        XCTAssertEqual(book.chapters.count, 2)
+        XCTAssertEqual(book.chapters[0].title, "첫 번째 장")
+        XCTAssertEqual(book.chapters[1].title, "두 번째 장")
+        XCTAssertTrue(
+            book.chapters[0].text.contains(
+                "첫 문장 이어지는 내용"
+            )
+        )
+        XCTAssertFalse(
+            book.chapters[0].text.contains("숨은 메뉴")
+        )
+        XCTAssertFalse(
+            book.chapters[0].text.contains("표시하지 않음")
+        )
+    }
+
+    func testSearchFindsMatchingChapterAndBuildsSnippet()
+        throws
+    {
+        let book = try EPUBBookParser.parse(
+            data: EPUBFixture.makeBook()
+        )
+
+        let results = EPUBSearchEngine.search(
+            "오프라인",
+            in: book.chapters
+        )
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results[0].chapterIndex, 1)
+        XCTAssertEqual(results[0].chapterTitle, "두 번째 장")
+        XCTAssertTrue(results[0].snippet.contains("오프라인"))
+        XCTAssertTrue(
+            EPUBSearchEngine.search(
+                "없는 단어",
+                in: book.chapters
+            ).isEmpty
+        )
+    }
+
+    func testArchiveRejectsPathTraversal() throws {
+        let archiveData = try ZIPFixture.make(
+            entries: [
+                ZIPFixtureEntry(
+                    path: "../escape.txt",
+                    data: Data("unsafe".utf8),
+                    compressionMethod: 0
+                )
+            ]
+        )
+
+        XCTAssertThrowsError(
+            try EPUBArchive(data: archiveData)
+        ) { error in
+            guard let archiveError =
+                    error as? EPUBArchiveError,
+                  case .unsafePath = archiveError else {
+                return XCTFail(
+                    "예상하지 못한 오류: \(error)"
+                )
+            }
+        }
+    }
+
+    func testLibraryImportCopiesBookIntoManagedDirectory()
+        async throws
+    {
+        let testDirectory = FileManager.default
+            .temporaryDirectory
+            .appendingPathComponent(
+                "RivoEPUBLibraryTests-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        let sourceDirectory = testDirectory
+            .appendingPathComponent("Source", isDirectory: true)
+        let booksDirectory = testDirectory
+            .appendingPathComponent("Books", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: sourceDirectory,
+            withIntermediateDirectories: true
+        )
+        defer {
+            try? FileManager.default.removeItem(
+                at: testDirectory
+            )
+        }
+
+        let sourceURL = sourceDirectory
+            .appendingPathComponent("fixture.epub")
+        let expected = try EPUBFixture.makeBook()
+        try expected.write(to: sourceURL)
+        let store = EPUBLibraryStore(
+            booksDirectory: booksDirectory
+        )
+
+        let importedURL = try await store.importBook(
+            from: sourceURL
+        )
+
+        XCTAssertNotEqual(importedURL, sourceURL)
+        XCTAssertEqual(
+            importedURL.lastPathComponent,
+            "fixture.epub"
+        )
+        XCTAssertEqual(
+            try Data(contentsOf: importedURL),
+            expected
+        )
+    }
+}
+
+private nonisolated enum EPUBFixture {
+    static func makeBook() throws -> Data {
+        let container = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <container
+          version="1.0"
+          xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+          <rootfiles>
+            <rootfile
+              full-path="OEBPS/content.opf"
+              media-type="application/oebps-package+xml"/>
+          </rootfiles>
+        </container>
+        """
+        let package = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <package
+          version="3.0"
+          unique-identifier="book-id"
+          xmlns="http://www.idpf.org/2007/opf">
+          <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <dc:identifier id="book-id">rivo-epub-fixture</dc:identifier>
+            <dc:title>테스트 책</dc:title>
+            <dc:creator>Rivo</dc:creator>
+            <dc:language>ko</dc:language>
+          </metadata>
+          <manifest>
+            <item
+              id="nav"
+              href="nav.xhtml"
+              media-type="application/xhtml+xml"
+              properties="nav"/>
+            <item
+              id="chapter-1"
+              href="chapter1.xhtml"
+              media-type="application/xhtml+xml"/>
+            <item
+              id="chapter-2"
+              href="chapter2.xhtml"
+              media-type="application/xhtml+xml"/>
+          </manifest>
+          <spine>
+            <itemref idref="chapter-1"/>
+            <itemref idref="chapter-2"/>
+          </spine>
+        </package>
+        """
+        let navigation = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <html
+          xmlns="http://www.w3.org/1999/xhtml"
+          xmlns:epub="http://www.idpf.org/2007/ops">
+          <head><title>목차</title></head>
+          <body>
+            <nav epub:type="toc">
+              <ol>
+                <li><a href="chapter1.xhtml">첫 번째 장</a></li>
+                <li><a href="chapter2.xhtml">두 번째 장</a></li>
+              </ol>
+            </nav>
+          </body>
+        </html>
+        """
+        let firstChapter = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <html xmlns="http://www.w3.org/1999/xhtml">
+          <head>
+            <title>내부 제목</title>
+            <style>.hidden { display: none; }</style>
+          </head>
+          <body>
+            <nav>숨은 메뉴</nav>
+            <h1>본문의 첫 제목</h1>
+            <p>첫 문장&nbsp;이어지는 내용</p>
+            <script>표시하지 않음</script>
+          </body>
+        </html>
+        """
+        let secondChapter = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <html xmlns="http://www.w3.org/1999/xhtml">
+          <head><title>둘째</title></head>
+          <body>
+            <h1>두 번째 장</h1>
+            <p>오프라인 독서를 위한 두 번째 본문입니다.</p>
+          </body>
+        </html>
+        """
+
+        return try ZIPFixture.make(
+            entries: [
+                ZIPFixtureEntry(
+                    path: "mimetype",
+                    data: Data(
+                        "application/epub+zip".utf8
+                    ),
+                    compressionMethod: 0
+                ),
+                ZIPFixtureEntry(
+                    path: "META-INF/container.xml",
+                    data: Data(container.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path: "OEBPS/content.opf",
+                    data: Data(package.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path: "OEBPS/nav.xhtml",
+                    data: Data(navigation.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path: "OEBPS/chapter1.xhtml",
+                    data: Data(firstChapter.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path: "OEBPS/chapter2.xhtml",
+                    data: Data(secondChapter.utf8),
+                    compressionMethod: 8
+                )
+            ]
+        )
+    }
+}
+
+private nonisolated struct ZIPFixtureEntry {
+    let path: String
+    let data: Data
+    let compressionMethod: UInt16
+}
+
+private nonisolated enum ZIPFixture {
+    private struct CentralEntry {
+        let pathData: Data
+        let compressedSize: UInt32
+        let uncompressedSize: UInt32
+        let compressionMethod: UInt16
+        let checksum: UInt32
+        let localHeaderOffset: UInt32
+    }
+
+    static func make(
+        entries: [ZIPFixtureEntry]
+    ) throws -> Data {
+        var archive = Data()
+        var centralEntries: [CentralEntry] = []
+
+        for entry in entries {
+            let pathData = Data(entry.path.utf8)
+            let compressed: Data
+            switch entry.compressionMethod {
+            case 0:
+                compressed = entry.data
+            case 8:
+                compressed = try rawDeflate(entry.data)
+            default:
+                throw ZIPFixtureError.unsupportedCompression
+            }
+            let checksum = crc(of: entry.data)
+            let localOffset = try uint32(archive.count)
+
+            archive.appendLittleEndian(UInt32(0x0403_4B50))
+            archive.appendLittleEndian(UInt16(20))
+            archive.appendLittleEndian(UInt16(0x0800))
+            archive.appendLittleEndian(entry.compressionMethod)
+            archive.appendLittleEndian(UInt16(0))
+            archive.appendLittleEndian(UInt16(0))
+            archive.appendLittleEndian(checksum)
+            archive.appendLittleEndian(
+                try uint32(compressed.count)
+            )
+            archive.appendLittleEndian(
+                try uint32(entry.data.count)
+            )
+            archive.appendLittleEndian(
+                try uint16(pathData.count)
+            )
+            archive.appendLittleEndian(UInt16(0))
+            archive.append(pathData)
+            archive.append(compressed)
+
+            centralEntries.append(
+                CentralEntry(
+                    pathData: pathData,
+                    compressedSize: try uint32(
+                        compressed.count
+                    ),
+                    uncompressedSize: try uint32(
+                        entry.data.count
+                    ),
+                    compressionMethod:
+                        entry.compressionMethod,
+                    checksum: checksum,
+                    localHeaderOffset: localOffset
+                )
+            )
+        }
+
+        let centralOffset = try uint32(archive.count)
+        for entry in centralEntries {
+            archive.appendLittleEndian(UInt32(0x0201_4B50))
+            archive.appendLittleEndian(UInt16(20))
+            archive.appendLittleEndian(UInt16(20))
+            archive.appendLittleEndian(UInt16(0x0800))
+            archive.appendLittleEndian(entry.compressionMethod)
+            archive.appendLittleEndian(UInt16(0))
+            archive.appendLittleEndian(UInt16(0))
+            archive.appendLittleEndian(entry.checksum)
+            archive.appendLittleEndian(entry.compressedSize)
+            archive.appendLittleEndian(entry.uncompressedSize)
+            archive.appendLittleEndian(
+                try uint16(entry.pathData.count)
+            )
+            archive.appendLittleEndian(UInt16(0))
+            archive.appendLittleEndian(UInt16(0))
+            archive.appendLittleEndian(UInt16(0))
+            archive.appendLittleEndian(UInt16(0))
+            archive.appendLittleEndian(UInt32(0))
+            archive.appendLittleEndian(
+                entry.localHeaderOffset
+            )
+            archive.append(entry.pathData)
+        }
+        let centralSize = try uint32(
+            archive.count - Int(centralOffset)
+        )
+        let entryCount = try uint16(centralEntries.count)
+
+        archive.appendLittleEndian(UInt32(0x0605_4B50))
+        archive.appendLittleEndian(UInt16(0))
+        archive.appendLittleEndian(UInt16(0))
+        archive.appendLittleEndian(entryCount)
+        archive.appendLittleEndian(entryCount)
+        archive.appendLittleEndian(centralSize)
+        archive.appendLittleEndian(centralOffset)
+        archive.appendLittleEndian(UInt16(0))
+        return archive
+    }
+
+    private static func rawDeflate(
+        _ data: Data
+    ) throws -> Data {
+        var stream = z_stream()
+        let initialization = deflateInit2_(
+            &stream,
+            Z_DEFAULT_COMPRESSION,
+            Z_DEFLATED,
+            -MAX_WBITS,
+            8,
+            Z_DEFAULT_STRATEGY,
+            ZLIB_VERSION,
+            Int32(MemoryLayout<z_stream>.size)
+        )
+        guard initialization == Z_OK else {
+            throw ZIPFixtureError.compressionFailed
+        }
+        defer {
+            deflateEnd(&stream)
+        }
+
+        let capacity = max(
+            Int(deflateBound(&stream, uLong(data.count))),
+            1
+        )
+        var output = Data(count: capacity)
+        let status = data.withUnsafeBytes { inputBytes in
+            output.withUnsafeMutableBytes { outputBytes in
+                stream.next_in = UnsafeMutablePointer<Bytef>(
+                    mutating: inputBytes.bindMemory(
+                        to: Bytef.self
+                    ).baseAddress
+                )
+                stream.avail_in = uInt(data.count)
+                stream.next_out = outputBytes.bindMemory(
+                    to: Bytef.self
+                ).baseAddress
+                stream.avail_out = uInt(capacity)
+                return deflate(&stream, Z_FINISH)
+            }
+        }
+        guard status == Z_STREAM_END else {
+            throw ZIPFixtureError.compressionFailed
+        }
+        return Data(output.prefix(Int(stream.total_out)))
+    }
+
+    private static func crc(of data: Data) -> UInt32 {
+        data.withUnsafeBytes { bytes in
+            UInt32(
+                crc32(
+                    0,
+                    bytes.bindMemory(to: Bytef.self).baseAddress,
+                    uInt(data.count)
+                )
+            )
+        }
+    }
+
+    private static func uint16(_ value: Int) throws -> UInt16 {
+        guard let value = UInt16(exactly: value) else {
+            throw ZIPFixtureError.valueTooLarge
+        }
+        return value
+    }
+
+    private static func uint32(_ value: Int) throws -> UInt32 {
+        guard let value = UInt32(exactly: value) else {
+            throw ZIPFixtureError.valueTooLarge
+        }
+        return value
+    }
+}
+
+private nonisolated enum ZIPFixtureError: Error {
+    case compressionFailed
+    case unsupportedCompression
+    case valueTooLarge
+}
+
+private extension Data {
+    nonisolated mutating func appendLittleEndian(
+        _ value: UInt16
+    ) {
+        var littleEndian = value.littleEndian
+        Swift.withUnsafeBytes(of: &littleEndian) {
+            append(contentsOf: $0)
+        }
+    }
+
+    nonisolated mutating func appendLittleEndian(
+        _ value: UInt32
+    ) {
+        var littleEndian = value.littleEndian
+        Swift.withUnsafeBytes(of: &littleEndian) {
+            append(contentsOf: $0)
+        }
+    }
+}

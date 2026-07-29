@@ -29,12 +29,18 @@ final class TTSManager: ObservableObject {
         synthesizer.stopSpeaking(at: .immediate)
     }
     
-    func speak(_ text: String) {
+    func speak(_ text: String, rate: Float? = nil) {
         synthesizer.stopSpeaking(at: .immediate)
         
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = AVSpeechSynthesisVoice(language: "ko-KR")
-        utterance.rate = 0.5
+        utterance.rate = min(
+            max(
+                rate ?? 0.5,
+                AVSpeechUtteranceMinimumSpeechRate
+            ),
+            AVSpeechUtteranceMaximumSpeechRate
+        )
         
         synthesizer.speak(utterance)
     }

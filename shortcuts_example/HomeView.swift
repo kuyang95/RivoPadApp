@@ -29,6 +29,21 @@ struct HomeView: View {
                 )
 
                 Button {
+                    appRouter.route = .readerLibrary
+                } label: {
+                    Text("독서")
+                        .font(.system(size: 56, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: 520)
+                        .frame(height: 120)
+                        .background(Color.green)
+                        .cornerRadius(28)
+                }
+                .accessibilityHint(
+                    "EPUB 책을 열거나 마지막 책을 이어서 읽습니다."
+                )
+
+                Button {
                     appRouter.route = .cameraTools
                 } label: {
                     Text("카메라")
@@ -55,13 +70,18 @@ struct HomeView: View {
                         .cornerRadius(28)
                 }
                 .accessibilityHint(
-                    "이미지, PDF 또는 텍스트 파일을 엽니다."
+                    "이미지, PDF, 텍스트 또는 EPUB 파일을 엽니다."
                 )
             }
         }
         .fileImporter(
             isPresented: $isFileImporterPresented,
-            allowedContentTypes: [.image, .pdf, .plainText],
+            allowedContentTypes: [
+                .image,
+                .pdf,
+                .plainText,
+                UTType(filenameExtension: "epub") ?? .data
+            ],
             allowsMultipleSelection: false
         ) { result in
             handleFileImport(result)
@@ -100,7 +120,14 @@ struct HomeView: View {
                         filenameExtension: sourceURL.pathExtension
                     )
 
-                if contentType?.conforms(to: .image) == true {
+                if sourceURL.pathExtension.lowercased() == "epub" {
+                    let bookURL = try await EPUBLibraryStore.shared
+                        .importBook(from: sourceURL)
+                    EPUBProgressStore.lastBookURL = bookURL
+                    appRouter.route = .epubReader(
+                        fileURL: bookURL
+                    )
+                } else if contentType?.conforms(to: .image) == true {
                     let didAccess = sourceURL
                         .startAccessingSecurityScopedResource()
                     defer {

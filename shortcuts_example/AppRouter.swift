@@ -18,6 +18,8 @@ enum AppRoute: Hashable {
     case localChat(conversationID: UUID?)
     case localDocument(fileURL: URL)
     case documentQuestion(document: String, question: String)
+    case readerLibrary
+    case epubReader(fileURL: URL)
     case cameraTools
     case magnifier
     case liveTextReader
