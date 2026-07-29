@@ -60,7 +60,14 @@ struct shortcuts_exampleApp: App {
                         case .cameraTools:
                             CameraToolsView()
                         case .magnifier:
-                            MagnifierView()
+                            MagnifierView(mode: .magnifier)
+                                .toolbar(
+                                    .hidden,
+                                    for: .navigationBar
+                                )
+                                .ignoresSafeArea()
+                        case .liveTextReader:
+                            MagnifierView(mode: .liveTextReader)
                                 .toolbar(
                                     .hidden,
                                     for: .navigationBar

@@ -20,6 +20,7 @@ enum AppRoute: Hashable {
     case documentQuestion(document: String, question: String)
     case cameraTools
     case magnifier
+    case liveTextReader
     case documentScanning
     case OCRResult(image: UIImage)
 }

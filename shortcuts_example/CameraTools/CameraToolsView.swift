@@ -17,6 +17,19 @@ struct CameraToolsView: View {
                     "실시간 카메라 돋보기를 엽니다."
                 )
 
+                NavigationLink(value: AppRoute.liveTextReader) {
+                    cameraToolCard(
+                        title: "실시간 텍스트 읽기",
+                        description:
+                            "카메라에 보이는 글자를 찾아 자동으로 읽습니다.",
+                        systemImage: "text.viewfinder",
+                        color: .blue
+                    )
+                }
+                .accessibilityHint(
+                    "카메라 실시간 OCR과 자동 음성 읽기를 시작합니다."
+                )
+
                 NavigationLink(value: AppRoute.documentScanning) {
                     cameraToolCard(
                         title: "문서 스캔",

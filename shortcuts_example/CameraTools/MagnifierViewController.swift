@@ -2,6 +2,86 @@ import AVFoundation
 import CoreImage
 import MetalKit
 import UIKit
+import Vision
+
+nonisolated enum MagnifierCameraMode: Sendable {
+    case magnifier
+    case liveTextReader
+}
+
+nonisolated enum LiveTextDeduplicator {
+    static func shouldAnnounce(
+        _ candidate: String,
+        after previous: String
+    ) -> Bool {
+        let candidate = normalize(candidate)
+        let previous = normalize(previous)
+        guard candidate.count >= 2 else {
+            return false
+        }
+        guard !previous.isEmpty else {
+            return true
+        }
+        guard candidate != previous else {
+            return false
+        }
+
+        let lengthDifference = abs(
+            candidate.count - previous.count
+        )
+        let smallChangeLimit = max(
+            8,
+            Int(Double(previous.count) * 0.25)
+        )
+        if lengthDifference <= smallChangeLimit,
+           candidate.contains(previous)
+            || previous.contains(candidate) {
+            return false
+        }
+
+        return diceSimilarity(candidate, previous) < 0.86
+    }
+
+    private static func normalize(_ text: String) -> String {
+        text
+            .lowercased()
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+    }
+
+    private static func diceSimilarity(
+        _ lhs: String,
+        _ rhs: String
+    ) -> Double {
+        let leftPairs = characterPairs(in: lhs)
+        let rightPairs = characterPairs(in: rhs)
+        guard !leftPairs.isEmpty, !rightPairs.isEmpty else {
+            return lhs == rhs ? 1 : 0
+        }
+
+        var remaining = rightPairs
+        var matches = 0
+        for pair in leftPairs {
+            guard let index = remaining.firstIndex(of: pair) else {
+                continue
+            }
+            matches += 1
+            remaining.remove(at: index)
+        }
+        return Double(matches * 2)
+            / Double(leftPairs.count + rightPairs.count)
+    }
+
+    private static func characterPairs(in text: String) -> [String] {
+        let characters = Array(text)
+        guard characters.count >= 2 else {
+            return []
+        }
+        return (0 ..< characters.count - 1).map {
+            String(characters[$0 ... $0 + 1])
+        }
+    }
+}
 
 nonisolated enum MagnifierFilter: Int, CaseIterable, Sendable {
     case normal
@@ -74,6 +154,7 @@ final class MagnifierViewController:
     var onClose: (() -> Void)?
     var onCapture: ((UIImage) -> Void)?
 
+    private let mode: MagnifierCameraMode
     private let session = AVCaptureSession()
     private let videoOutput = AVCaptureVideoDataOutput()
     private let sessionQueue = DispatchQueue(
@@ -85,6 +166,11 @@ final class MagnifierViewController:
         qos: .userInitiated
     )
     private let frameLock = NSLock()
+    private let liveOCRLock = NSLock()
+    private let liveOCRQueue = DispatchQueue(
+        label: "magnifier.live.ocr",
+        qos: .userInitiated
+    )
 
     private var cameraInput: AVCaptureDeviceInput?
     private var rotationCoordinator:
@@ -94,6 +180,11 @@ final class MagnifierViewController:
     private var currentFilter: MagnifierFilter = .normal
     private var pinchStartZoom: CGFloat = 1
     private var isTorchEnabled = false
+    private var isLiveReadingEnabled = true
+    private var isLiveOCRBusy = false
+    private var lastLiveOCRTime: CFTimeInterval = 0
+    private var lastSpokenText = ""
+    private let liveOCRInterval: CFTimeInterval = 1.5
 
     private let metalDevice = MTLCreateSystemDefaultDevice()
     private lazy var commandQueue = metalDevice?.makeCommandQueue()
@@ -130,6 +221,18 @@ final class MagnifierViewController:
     private let switchCameraButton = UIButton(type: .system)
     private let captureButton = UIButton(type: .system)
     private let statusLabel = UILabel()
+    private let liveTextLabel = UILabel()
+    private let tts = TTSManager.shared
+
+    init(mode: MagnifierCameraMode = .magnifier) {
+        self.mode = mode
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -147,6 +250,9 @@ final class MagnifierViewController:
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         setTorch(false)
+        if mode == .liveTextReader {
+            tts.stop()
+        }
         sessionQueue.async { [weak self] in
             self?.session.stopRunning()
         }
@@ -205,6 +311,24 @@ final class MagnifierViewController:
         statusLabel.textAlignment = .center
         statusLabel.numberOfLines = 2
 
+        liveTextLabel.translatesAutoresizingMaskIntoConstraints = false
+        liveTextLabel.text = "텍스트를 찾는 중…"
+        liveTextLabel.textColor = .white
+        liveTextLabel.font = .preferredFont(
+            forTextStyle: .title2
+        )
+        liveTextLabel.adjustsFontForContentSizeCategory = true
+        liveTextLabel.textAlignment = .center
+        liveTextLabel.numberOfLines = 5
+        liveTextLabel.backgroundColor =
+            UIColor.black.withAlphaComponent(0.7)
+        liveTextLabel.layer.cornerRadius = 16
+        liveTextLabel.layer.masksToBounds = true
+        liveTextLabel.isHidden = mode != .liveTextReader
+        liveTextLabel.isAccessibilityElement = true
+        liveTextLabel.accessibilityLabel = "인식된 텍스트"
+        view.addSubview(liveTextLabel)
+
         zoomSlider.minimumValue = 1
         zoomSlider.maximumValue = 10
         zoomSlider.value = 1
@@ -244,8 +368,12 @@ final class MagnifierViewController:
         )
         configureActionButton(
             captureButton,
-            title: "텍스트 읽기",
-            systemImage: "text.viewfinder",
+            title: mode == .magnifier
+                ? "텍스트 읽기"
+                : "읽기 일시정지",
+            systemImage: mode == .magnifier
+                ? "text.viewfinder"
+                : "pause.fill",
             action: #selector(captureTapped)
         )
         captureButton.configuration?.baseBackgroundColor =
@@ -295,6 +423,22 @@ final class MagnifierViewController:
             ),
             zoomLabel.centerYAnchor.constraint(
                 equalTo: closeButton.centerYAnchor
+            ),
+
+            liveTextLabel.leadingAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.leadingAnchor,
+                constant: 32
+            ),
+            liveTextLabel.trailingAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.trailingAnchor,
+                constant: -32
+            ),
+            liveTextLabel.bottomAnchor.constraint(
+                equalTo: controlsBackdrop.topAnchor,
+                constant: -12
+            ),
+            liveTextLabel.heightAnchor.constraint(
+                greaterThanOrEqualToConstant: 72
             ),
 
             controlsBackdrop.leadingAnchor.constraint(
@@ -451,9 +595,13 @@ final class MagnifierViewController:
             self.updateZoomUI(for: device)
             self.updateTorchUI()
             self.statusLabel.text =
-                position == .back
-                ? "후면 카메라"
-                : "전면 카메라"
+                self.mode == .liveTextReader
+                ? "실시간 텍스트를 찾는 중"
+                : (
+                    position == .back
+                    ? "후면 카메라"
+                    : "전면 카메라"
+                )
         }
     }
 
@@ -626,6 +774,10 @@ final class MagnifierViewController:
     }
 
     @objc private func captureTapped() {
+        if mode == .liveTextReader {
+            toggleLiveReading()
+            return
+        }
         guard let image = capturedImage() else {
             statusLabel.text = "카메라 프레임을 기다리는 중입니다."
             return
@@ -670,6 +822,12 @@ final class MagnifierViewController:
         frameLock.lock()
         latestPixelBuffer = pixelBuffer
         frameLock.unlock()
+
+        if shouldRunLiveOCR() {
+            liveOCRQueue.async { [weak self] in
+                self?.recognizeLiveText(in: pixelBuffer)
+            }
+        }
     }
 
     func draw(in view: MTKView) {
@@ -746,6 +904,141 @@ final class MagnifierViewController:
             return nil
         }
         return UIImage(cgImage: cgImage)
+    }
+
+    private func shouldRunLiveOCR() -> Bool {
+        guard mode == .liveTextReader else {
+            return false
+        }
+        let now = CACurrentMediaTime()
+        liveOCRLock.lock()
+        defer {
+            liveOCRLock.unlock()
+        }
+        guard isLiveReadingEnabled,
+              !isLiveOCRBusy,
+              now - lastLiveOCRTime >= liveOCRInterval else {
+            return false
+        }
+        isLiveOCRBusy = true
+        lastLiveOCRTime = now
+        return true
+    }
+
+    private func recognizeLiveText(
+        in pixelBuffer: CVPixelBuffer
+    ) {
+        defer {
+            liveOCRLock.lock()
+            isLiveOCRBusy = false
+            liveOCRLock.unlock()
+        }
+
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .fast
+        request.usesLanguageCorrection = true
+        request.recognitionLanguages = [
+            "ko-KR",
+            "en-US",
+            "ja-JP"
+        ]
+        request.minimumTextHeight = 0.02
+
+        do {
+            try VNImageRequestHandler(
+                cvPixelBuffer: pixelBuffer,
+                orientation: .up,
+                options: [:]
+            ).perform([request])
+
+            let observations = request.results ?? []
+            let sorted = observations.sorted { lhs, rhs in
+                if abs(
+                    lhs.boundingBox.maxY
+                        - rhs.boundingBox.maxY
+                ) > 0.02 {
+                    return lhs.boundingBox.maxY
+                        > rhs.boundingBox.maxY
+                }
+                return lhs.boundingBox.minX
+                    < rhs.boundingBox.minX
+            }
+            let text = sorted.compactMap {
+                $0.topCandidates(1).first?.string
+            }
+            .map {
+                $0.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+            }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+
+            DispatchQueue.main.async { [weak self] in
+                self?.publishLiveText(text)
+            }
+        } catch {
+            publishStatus(
+                "실시간 OCR 오류: \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func publishLiveText(_ text: String) {
+        let trimmed = text.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !trimmed.isEmpty else {
+            liveTextLabel.text = "텍스트를 찾는 중…"
+            return
+        }
+        liveTextLabel.text = trimmed
+        liveTextLabel.accessibilityValue = trimmed
+
+        guard isLiveReadingEnabled,
+              !tts.isSpeaking,
+              LiveTextDeduplicator.shouldAnnounce(
+                  trimmed,
+                  after: lastSpokenText
+              ) else {
+            return
+        }
+        lastSpokenText = trimmed
+        tts.speak(trimmed)
+    }
+
+    private func toggleLiveReading() {
+        liveOCRLock.lock()
+        isLiveReadingEnabled.toggle()
+        let isEnabled = isLiveReadingEnabled
+        if isEnabled {
+            lastLiveOCRTime = 0
+        }
+        liveOCRLock.unlock()
+
+        if isEnabled {
+            lastSpokenText = ""
+            captureButton.configuration?.title = "읽기 일시정지"
+            captureButton.configuration?.image = UIImage(
+                systemName: "pause.fill"
+            )
+            statusLabel.text = "실시간 텍스트를 찾는 중"
+        } else {
+            tts.stop()
+            captureButton.configuration?.title = "읽기 재개"
+            captureButton.configuration?.image = UIImage(
+                systemName: "play.fill"
+            )
+            statusLabel.text = "실시간 읽기 일시정지"
+        }
+        captureButton.accessibilityValue =
+            isEnabled ? "실행 중" : "일시정지"
+        UIAccessibility.post(
+            notification: .announcement,
+            argument: isEnabled
+                ? "실시간 읽기를 재개했습니다."
+                : "실시간 읽기를 일시정지했습니다."
+        )
     }
 
     private func publishStatus(_ message: String) {
