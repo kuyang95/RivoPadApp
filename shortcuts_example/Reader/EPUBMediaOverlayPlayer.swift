@@ -266,6 +266,182 @@ nonisolated enum EPUBReadAloudSequence {
     }
 }
 
+nonisolated struct EPUBReadAloudTextRange:
+    Equatable,
+    Sendable
+{
+    let chapterIndex: Int
+    let segmentIndex: Int
+    let location: Int
+    let length: Int
+}
+
+nonisolated enum EPUBReadAloudNavigationUnit:
+    Int,
+    CaseIterable,
+    Equatable,
+    Sendable
+{
+    case word
+    case sentence
+    case paragraph
+    case page
+    case chapter
+
+    var displayName: String {
+        switch self {
+        case .word:
+            return "단어"
+        case .sentence:
+            return "문장"
+        case .paragraph:
+            return "문단"
+        case .page:
+            return "페이지"
+        case .chapter:
+            return "장"
+        }
+    }
+
+    func next() -> Self {
+        let units = Self.allCases
+        return units[
+            (rawValue + 1) % units.count
+        ]
+    }
+}
+
+nonisolated enum EPUBReadAloudTextNavigator {
+    static func ranges(
+        in text: String,
+        unit: EPUBReadAloudNavigationUnit
+    ) -> [NSRange] {
+        switch unit {
+        case .word:
+            return regularExpressionRanges(
+                pattern: #"\S+"#,
+                in: text
+            )
+        case .sentence:
+            var result: [NSRange] = []
+            text.enumerateSubstrings(
+                in: text.startIndex ..< text.endIndex,
+                options: [
+                    .bySentences,
+                    .substringNotRequired,
+                ]
+            ) { _, range, _, _ in
+                result.append(
+                    NSRange(range, in: text)
+                )
+            }
+            if result.isEmpty,
+               !text.isEmpty {
+                return [
+                    NSRange(
+                        location: 0,
+                        length:
+                            (text as NSString).length
+                    ),
+                ]
+            }
+            return result
+        case .paragraph, .page, .chapter:
+            guard !text.isEmpty else {
+                return []
+            }
+            return [
+                NSRange(
+                    location: 0,
+                    length:
+                        (text as NSString).length
+                ),
+            ]
+        }
+    }
+
+    static func range(
+        atOrAfterUTF16 location: Int,
+        in text: String,
+        unit: EPUBReadAloudNavigationUnit
+    ) -> NSRange? {
+        let ranges = ranges(
+            in: text,
+            unit: unit
+        )
+        return ranges.first {
+            NSMaxRange($0) > location
+        } ?? ranges.last
+    }
+
+    static func speechRange(
+        in text: String,
+        fromUTF16 requestedStart: Int
+    ) -> NSRange? {
+        let string = text as NSString
+        guard string.length > 0 else {
+            return nil
+        }
+        let clampedStart = min(
+            max(requestedStart, 0),
+            string.length
+        )
+        guard clampedStart < string.length else {
+            return nil
+        }
+        let remaining = NSRange(
+            location: clampedStart,
+            length: string.length - clampedStart
+        )
+        let firstContent = string.rangeOfCharacter(
+            from:
+                CharacterSet
+                .whitespacesAndNewlines
+                .inverted,
+            options: [],
+            range: remaining
+        )
+        guard firstContent.location != NSNotFound else {
+            return nil
+        }
+        let start = firstContent.location
+        let sentenceRanges = ranges(
+            in: text,
+            unit: .sentence
+        )
+        let sentenceEnd =
+            sentenceRanges.first {
+                NSMaxRange($0) > start
+            }.map(NSMaxRange)
+            ?? string.length
+        return NSRange(
+            location: start,
+            length:
+                max(sentenceEnd - start, 0)
+        )
+    }
+
+    private static func regularExpressionRanges(
+        pattern: String,
+        in text: String
+    ) -> [NSRange] {
+        guard let expression =
+                try? NSRegularExpression(
+                    pattern: pattern
+                ) else {
+            return []
+        }
+        let fullRange = NSRange(
+            location: 0,
+            length: (text as NSString).length
+        )
+        return expression.matches(
+            in: text,
+            range: fullRange
+        ).map(\.range)
+    }
+}
+
 nonisolated enum EPUBReadAloudPlaybackMode:
     Equatable,
     Sendable
@@ -428,12 +604,17 @@ final class EPUBMediaOverlayPlaybackController:
     @Published private(set) var errorDescription: String?
     @Published private(set) var playbackMode:
         EPUBReadAloudPlaybackMode = .none
+    @Published private(set) var currentTextRange:
+        EPUBReadAloudTextRange?
+    @Published private(set) var navigationUnit:
+        EPUBReadAloudNavigationUnit = .paragraph
 
     private let player = AVPlayer()
     private let speechSynthesizer =
         AVSpeechSynthesizer()
     private let resourceStore:
         EPUBMediaOverlayResourceStore
+    private var book: EPUBBook?
     private var items: [EPUBMediaOverlayItem] = []
     private var steps: [EPUBReadAloudStep] = []
     private var speechLanguage = "ko-KR"
@@ -445,6 +626,8 @@ final class EPUBMediaOverlayPlaybackController:
     private var currentUtteranceID:
         ObjectIdentifier?
     private var spokenStepID: String?
+    private var speechStartUTF16 = 0
+    private var speechEndUTF16 = 0
     private var playbackRate: Float = 1
 
     init(fileURL: URL) {
@@ -484,14 +667,22 @@ final class EPUBMediaOverlayPlaybackController:
         !steps.isEmpty
     }
 
-    var canMovePrevious: Bool {
-        currentItemIndex > 0
-    }
-
-    var canMoveNext: Bool {
+    private var canMoveNext: Bool {
         steps.indices.contains(
             currentItemIndex + 1
         )
+    }
+
+    var canNavigatePrevious: Bool {
+        navigationTarget(
+            delta: -1
+        ) != nil
+    }
+
+    var canNavigateNext: Bool {
+        navigationTarget(
+            delta: 1
+        ) != nil
     }
 
     var positionDescription: String {
@@ -505,6 +696,10 @@ final class EPUBMediaOverlayPlaybackController:
         playbackMode.displayName
     }
 
+    var navigationUnitDescription: String {
+        navigationUnit.displayName
+    }
+
     func configure(
         book: EPUBBook,
         chapterIndex: Int,
@@ -515,6 +710,7 @@ final class EPUBMediaOverlayPlaybackController:
         removeEndObserver()
         stopSpeech()
         player.replaceCurrentItem(with: nil)
+        self.book = book
         items = book.mediaOverlayItems
         steps = EPUBReadAloudSequence.steps(
             for: book
@@ -547,8 +743,14 @@ final class EPUBMediaOverlayPlaybackController:
         ) ?? 0
         loadedItemID = nil
         spokenStepID = nil
+        currentTextRange = nil
         playbackMode = .none
         errorDescription = nil
+    }
+
+    func cycleNavigationUnit() {
+        navigationUnit =
+            navigationUnit.next()
     }
 
     func setRate(_ value: Double) {
@@ -637,14 +839,299 @@ final class EPUBMediaOverlayPlaybackController:
         playbackMode = .none
     }
 
-    func move(by delta: Int) {
-        let target = currentItemIndex + delta
-        guard steps.indices.contains(target) else {
+    func navigate(by delta: Int) {
+        guard delta != 0,
+              let target =
+                navigationTarget(
+                    delta: delta
+                ) else {
             return
         }
-        startStep(
-            index: target,
-            autoplay: true
+        let shouldResume = isPlaying
+        activateStep(
+            index: target.stepIndex,
+            autoplay: shouldResume,
+            speechStartUTF16:
+                target.textRange?.location,
+            selectedTextRange:
+                target.textRange
+        )
+    }
+
+    private func navigationTarget(
+        delta: Int
+    ) -> NavigationTarget? {
+        guard steps.indices.contains(
+                  currentItemIndex
+              ) else {
+            return nil
+        }
+        let direction = delta < 0 ? -1 : 1
+        switch navigationUnit {
+        case .word, .sentence:
+            return inlineNavigationTarget(
+                unit: navigationUnit,
+                direction: direction
+            )
+        case .paragraph:
+            return distinctLocationTarget(
+                direction: direction
+            )
+        case .page:
+            return pageTarget(
+                direction: direction
+            )
+        case .chapter:
+            return chapterTarget(
+                direction: direction
+            )
+        }
+    }
+
+    private func inlineNavigationTarget(
+        unit: EPUBReadAloudNavigationUnit,
+        direction: Int
+    ) -> NavigationTarget? {
+        let step = steps[currentItemIndex]
+        guard step.audioItemIndex == nil else {
+            return distinctLocationTarget(
+                direction: direction
+            )
+        }
+        let ranges =
+            EPUBReadAloudTextNavigator.ranges(
+                in: step.text,
+                unit: unit
+            )
+        guard !ranges.isEmpty else {
+            return distinctLocationTarget(
+                direction: direction
+            )
+        }
+        let rangeLocation: Int
+        if let currentTextRange,
+           currentTextRange.chapterIndex
+            == step.chapterIndex,
+           currentTextRange.segmentIndex
+            == step.segmentIndex {
+            rangeLocation =
+                currentTextRange.location
+        } else {
+            rangeLocation = ranges[0].location
+        }
+        let currentRangeIndex =
+            ranges.lastIndex {
+                $0.location <= rangeLocation
+            } ?? 0
+        let targetRangeIndex =
+            currentRangeIndex + direction
+        if ranges.indices.contains(
+            targetRangeIndex
+        ) {
+            return NavigationTarget(
+                stepIndex: currentItemIndex,
+                textRange:
+                    ranges[targetRangeIndex]
+            )
+        }
+
+        guard let adjacent =
+                distinctLocationTarget(
+                    direction: direction
+                ) else {
+            return nil
+        }
+        let adjacentStep =
+            steps[adjacent.stepIndex]
+        guard adjacentStep.audioItemIndex == nil else {
+            return adjacent
+        }
+        let adjacentRanges =
+            EPUBReadAloudTextNavigator.ranges(
+                in: adjacentStep.text,
+                unit: unit
+            )
+        return NavigationTarget(
+            stepIndex: adjacent.stepIndex,
+            textRange:
+                direction > 0
+                ? adjacentRanges.first
+                : adjacentRanges.last
+        )
+    }
+
+    private func distinctLocationTarget(
+        direction: Int
+    ) -> NavigationTarget? {
+        let current = steps[currentItemIndex]
+        var index =
+            currentItemIndex + direction
+        while steps.indices.contains(index) {
+            let candidate = steps[index]
+            if candidate.chapterIndex
+                    != current.chapterIndex
+                || candidate.segmentIndex
+                    != current.segmentIndex {
+                let firstIndex =
+                    steps.firstIndex {
+                        $0.chapterIndex
+                            == candidate.chapterIndex
+                            && $0.segmentIndex
+                            == candidate.segmentIndex
+                    } ?? index
+                return NavigationTarget(
+                    stepIndex: firstIndex,
+                    textRange: nil
+                )
+            }
+            index += direction
+        }
+        return nil
+    }
+
+    private func pageTarget(
+        direction: Int
+    ) -> NavigationTarget? {
+        guard let book else {
+            return nil
+        }
+        let breakpointIndexes: [Int] =
+            book.pageListItems.compactMap {
+                item -> Int? in
+                    guard let location =
+                            PublicationNavigationResolver
+                            .location(
+                                for: item,
+                                in: book
+                            ) else {
+                        return nil
+                    }
+                    return EPUBReadAloudSequence
+                        .stepIndex(
+                            chapterIndex:
+                                location
+                                .chapterIndex,
+                            segmentIndex:
+                                location
+                                .segmentIndex,
+                            in: steps
+                        )
+            }
+        let breakpoints =
+            Array(Set(breakpointIndexes))
+            .sorted()
+        guard !breakpoints.isEmpty else {
+            return approximatePageTarget(
+                direction: direction
+            )
+        }
+        let currentBreakpoint =
+            breakpoints.lastIndex {
+                $0 <= currentItemIndex
+            } ?? 0
+        let targetIndex =
+            currentBreakpoint + direction
+        guard breakpoints.indices.contains(
+            targetIndex
+        ) else {
+            return nil
+        }
+        return NavigationTarget(
+            stepIndex:
+                breakpoints[targetIndex],
+            textRange: nil
+        )
+    }
+
+    private func approximatePageTarget(
+        direction: Int,
+        charactersPerPage: Int = 500
+    ) -> NavigationTarget? {
+        var paragraphStarts: [Int] = []
+        var lastChapter: Int?
+        var lastSegment: Int?
+        for index in steps.indices {
+            let step = steps[index]
+            if step.chapterIndex != lastChapter
+                || step.segmentIndex != lastSegment {
+                paragraphStarts.append(index)
+                lastChapter = step.chapterIndex
+                lastSegment = step.segmentIndex
+            }
+        }
+        guard let currentParagraph =
+                paragraphStarts.lastIndex(
+                    where: {
+                        $0 <= currentItemIndex
+                    }
+                ) else {
+            return nil
+        }
+        var targetParagraph =
+            currentParagraph
+        var accumulated = 0
+        if direction > 0 {
+            while targetParagraph
+                    < paragraphStarts.count - 1,
+                  accumulated
+                    < charactersPerPage {
+                accumulated +=
+                    (
+                        steps[
+                            paragraphStarts[
+                                targetParagraph
+                            ]
+                        ].text
+                        as NSString
+                    ).length
+                targetParagraph += 1
+            }
+        } else {
+            while targetParagraph > 0,
+                  accumulated
+                    < charactersPerPage {
+                targetParagraph -= 1
+                accumulated +=
+                    (
+                        steps[
+                            paragraphStarts[
+                                targetParagraph
+                            ]
+                        ].text
+                        as NSString
+                    ).length
+            }
+        }
+        guard targetParagraph
+                != currentParagraph else {
+            return nil
+        }
+        return NavigationTarget(
+            stepIndex:
+                paragraphStarts[targetParagraph],
+            textRange: nil
+        )
+    }
+
+    private func chapterTarget(
+        direction: Int
+    ) -> NavigationTarget? {
+        let currentChapter =
+            steps[currentItemIndex].chapterIndex
+        let targetChapter =
+            currentChapter + direction
+        guard let targetIndex =
+                steps.firstIndex(
+                    where: {
+                        $0.chapterIndex
+                            == targetChapter
+                    }
+                ) else {
+            return nil
+        }
+        return NavigationTarget(
+            stepIndex: targetIndex,
+            textRange: nil
         )
     }
 
@@ -672,6 +1159,25 @@ final class EPUBMediaOverlayPlaybackController:
         index: Int,
         autoplay: Bool
     ) {
+        activateStep(
+            index: index,
+            autoplay: autoplay,
+            speechStartUTF16: nil,
+            selectedTextRange: nil
+        )
+    }
+
+    private struct NavigationTarget {
+        let stepIndex: Int
+        let textRange: NSRange?
+    }
+
+    private func activateStep(
+        index: Int,
+        autoplay: Bool,
+        speechStartUTF16: Int?,
+        selectedTextRange: NSRange?
+    ) {
         guard steps.indices.contains(index) else {
             return
         }
@@ -686,6 +1192,13 @@ final class EPUBMediaOverlayPlaybackController:
         currentLocation = location(
             forStepAt: index
         )
+        currentTextRange =
+            selectedTextRange.flatMap {
+                textRange(
+                    forStepAt: index,
+                    range: $0
+                )
+            }
         currentTimeSeconds =
             clipBegin(forStepAt: index) ?? 0
         guard autoplay else {
@@ -699,7 +1212,11 @@ final class EPUBMediaOverlayPlaybackController:
                     audioItemIndex
             )
         } else {
-            startSpeech(stepIndex: index)
+            startSpeech(
+                stepIndex: index,
+                fromUTF16:
+                    speechStartUTF16 ?? 0
+            )
         }
     }
 
@@ -855,7 +1372,8 @@ final class EPUBMediaOverlayPlaybackController:
     }
 
     private func startSpeech(
-        stepIndex: Int
+        stepIndex: Int,
+        fromUTF16 requestedStart: Int = 0
     ) {
         guard steps.indices.contains(
                   stepIndex
@@ -874,8 +1392,26 @@ final class EPUBMediaOverlayPlaybackController:
             )
             return
         }
+        guard let speechRange =
+                EPUBReadAloudTextNavigator
+                .speechRange(
+                    in: text,
+                    fromUTF16:
+                        requestedStart
+                ),
+              let range =
+                Range(
+                    speechRange,
+                    in: text
+                ) else {
+            isPlaying = true
+            finishCurrentStep(
+                expectedStepID: step.id
+            )
+            return
+        }
         let utterance = AVSpeechUtterance(
-            string: text
+            string: String(text[range])
         )
         utterance.voice =
             preferredVoice(
@@ -892,6 +1428,24 @@ final class EPUBMediaOverlayPlaybackController:
         currentUtteranceID =
             ObjectIdentifier(utterance)
         spokenStepID = step.id
+        speechStartUTF16 =
+            speechRange.location
+        speechEndUTF16 =
+            NSMaxRange(speechRange)
+        if let initialRange =
+                EPUBReadAloudTextNavigator
+                .range(
+                    atOrAfterUTF16:
+                        speechRange.location,
+                    in: text,
+                    unit: .word
+                ) {
+            currentTextRange =
+                textRange(
+                    forStepAt: stepIndex,
+                    range: initialRange
+                )
+        }
         currentLocation = location(
             forStepAt: stepIndex
         )
@@ -932,9 +1486,66 @@ final class EPUBMediaOverlayPlaybackController:
             return
         }
         currentUtteranceID = nil
+        if steps.indices.contains(
+               currentItemIndex
+           ),
+           steps[currentItemIndex].id
+            == spokenStepID,
+           speechEndUTF16
+            < (
+                steps[currentItemIndex].text
+                    as NSString
+            ).length {
+            startSpeech(
+                stepIndex: currentItemIndex,
+                fromUTF16: speechEndUTF16
+            )
+            return
+        }
         finishCurrentStep(
             expectedStepID: spokenStepID
         )
+    }
+
+    private func noteSpeechRange(
+        _ range: NSRange,
+        utteranceID: ObjectIdentifier
+    ) {
+        guard currentUtteranceID
+                == utteranceID,
+              steps.indices.contains(
+                  currentItemIndex
+              ) else {
+            return
+        }
+        let textLength =
+            (
+                steps[currentItemIndex].text
+                    as NSString
+            ).length
+        let location = min(
+            max(
+                speechStartUTF16
+                    + range.location,
+                0
+            ),
+            textLength
+        )
+        let length = min(
+            max(range.length, 0),
+            max(textLength - location, 0)
+        )
+        guard length > 0 else {
+            return
+        }
+        currentTextRange =
+            textRange(
+                forStepAt: currentItemIndex,
+                range: NSRange(
+                    location: location,
+                    length: length
+                )
+            )
     }
 
     private func stopSpeech() {
@@ -984,6 +1595,22 @@ final class EPUBMediaOverlayPlaybackController:
         )
     }
 
+    private func textRange(
+        forStepAt index: Int,
+        range: NSRange
+    ) -> EPUBReadAloudTextRange? {
+        guard steps.indices.contains(index) else {
+            return nil
+        }
+        let step = steps[index]
+        return EPUBReadAloudTextRange(
+            chapterIndex: step.chapterIndex,
+            segmentIndex: step.segmentIndex,
+            location: range.location,
+            length: range.length
+        )
+    }
+
     private func clipBegin(
         forStepAt index: Int
     ) -> Double? {
@@ -1019,6 +1646,23 @@ final class EPUBMediaOverlayPlaybackController:
 extension EPUBMediaOverlayPlaybackController:
     AVSpeechSynthesizerDelegate
 {
+    nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        willSpeakRangeOfSpeechString
+            characterRange: NSRange,
+        utterance: AVSpeechUtterance
+    ) {
+        let utteranceID =
+            ObjectIdentifier(utterance)
+        Task { @MainActor [weak self] in
+            self?.noteSpeechRange(
+                characterRange,
+                utteranceID:
+                    utteranceID
+            )
+        }
+    }
+
     nonisolated func speechSynthesizer(
         _ synthesizer: AVSpeechSynthesizer,
         didFinish utterance:

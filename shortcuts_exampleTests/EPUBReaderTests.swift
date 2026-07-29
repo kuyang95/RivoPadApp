@@ -380,6 +380,88 @@ final class EPUBReaderTests: XCTestCase {
         )
     }
 
+    func testReadAloudTextNavigatorUsesUTF16WordRanges()
+    {
+        let text = "😀 첫 단어, 둘째 단어."
+        let ranges =
+            EPUBReadAloudTextNavigator.ranges(
+                in: text,
+                unit: .word
+            )
+        let words = ranges.compactMap {
+            range -> String? in
+            guard let range =
+                    Range(range, in: text) else {
+                return nil
+            }
+            return String(text[range])
+        }
+
+        XCTAssertEqual(
+            words,
+            ["😀", "첫", "단어,", "둘째", "단어."]
+        )
+        XCTAssertEqual(ranges.first?.location, 0)
+        XCTAssertEqual(ranges.first?.length, 2)
+        XCTAssertEqual(
+            EPUBReadAloudNavigationUnit
+                .word.next(),
+            .sentence
+        )
+        XCTAssertEqual(
+            EPUBReadAloudNavigationUnit
+                .chapter.next(),
+            .word
+        )
+    }
+
+    func testReadAloudSpeechChunksAtSentenceBoundaries()
+        throws
+    {
+        let text =
+            "첫 문장입니다. 두 번째 문장입니다! 마지막입니다."
+        let first =
+            try XCTUnwrap(
+                EPUBReadAloudTextNavigator
+                    .speechRange(
+                        in: text,
+                        fromUTF16: 0
+                    )
+            )
+        let second =
+            try XCTUnwrap(
+                EPUBReadAloudTextNavigator
+                    .speechRange(
+                        in: text,
+                        fromUTF16:
+                            NSMaxRange(first)
+                    )
+            )
+        let firstRange =
+            try XCTUnwrap(
+                Range(first, in: text)
+            )
+        let secondRange =
+            try XCTUnwrap(
+                Range(second, in: text)
+            )
+
+        XCTAssertEqual(
+            String(text[firstRange])
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ),
+            "첫 문장입니다."
+        )
+        XCTAssertEqual(
+            String(text[secondRange])
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ),
+            "두 번째 문장입니다!"
+        )
+    }
+
     func testMediaOverlayAudioExtractsToPrivateTemporaryFile()
         async throws
     {

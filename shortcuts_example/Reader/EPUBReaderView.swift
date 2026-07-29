@@ -696,6 +696,10 @@ struct EPUBReaderView: View {
                             length:
                                 highlightLength(
                                     for: index
+                                ),
+                            utf16Range:
+                                readAloudTextRange(
+                                    for: index
                                 )
                         )
                         .font(
@@ -848,15 +852,16 @@ struct EPUBReaderView: View {
 
             if mediaOverlayPlayer.canPlay {
                 Button(
-                    "이전 읽기 위치",
+                    "이전 \(mediaOverlayPlayer.navigationUnitDescription)",
                     systemImage:
                         "backward.end.fill"
                 ) {
-                    mediaOverlayPlayer.move(by: -1)
+                    mediaOverlayPlayer
+                        .navigate(by: -1)
                 }
                 .disabled(
                     !mediaOverlayPlayer
-                        .canMovePrevious
+                        .canNavigatePrevious
                 )
 
                 Button(
@@ -876,14 +881,34 @@ struct EPUBReaderView: View {
                 )
 
                 Button(
-                    "다음 읽기 위치",
+                    "다음 \(mediaOverlayPlayer.navigationUnitDescription)",
                     systemImage:
                         "forward.end.fill"
                 ) {
-                    mediaOverlayPlayer.move(by: 1)
+                    mediaOverlayPlayer
+                        .navigate(by: 1)
                 }
                 .disabled(
-                    !mediaOverlayPlayer.canMoveNext
+                    !mediaOverlayPlayer
+                        .canNavigateNext
+                )
+
+                Button(
+                    mediaOverlayPlayer
+                        .navigationUnitDescription,
+                    systemImage:
+                        "arrow.left.arrow.right"
+                ) {
+                    mediaOverlayPlayer
+                        .cycleNavigationUnit()
+                }
+                .accessibilityLabel(
+                    "탐색 단위 "
+                    + mediaOverlayPlayer
+                        .navigationUnitDescription
+                )
+                .accessibilityHint(
+                    "두 번 탭하면 단어, 문장, 문단, 페이지, 장 순서로 바뀝니다."
                 )
 
                 if mediaOverlayPlayer.isLoading {
@@ -1249,33 +1274,56 @@ struct EPUBReaderView: View {
     private func highlightedText(
         _ text: String,
         start: Int?,
-        length: Int
+        length: Int,
+        utf16Range: NSRange? = nil
     ) -> Text {
-        guard let start,
-              start >= 0,
-              length > 0,
-              let lower = text.index(
-                  text.startIndex,
-                  offsetBy: start,
-                  limitedBy: text.endIndex
-              ),
-              let upper = text.index(
-                  lower,
-                  offsetBy: length,
-                  limitedBy: text.endIndex
-              ) else {
+        let highlightedRange:
+            Range<String.Index>?
+        if let utf16Range {
+            highlightedRange =
+                Range(
+                    utf16Range,
+                    in: text
+                )
+        } else if let start,
+                  start >= 0,
+                  length > 0,
+                  let lower = text.index(
+                      text.startIndex,
+                      offsetBy: start,
+                      limitedBy: text.endIndex
+                  ),
+                  let upper = text.index(
+                      lower,
+                      offsetBy: length,
+                      limitedBy: text.endIndex
+                  ) {
+            highlightedRange =
+                lower ..< upper
+        } else {
+            highlightedRange = nil
+        }
+        guard let highlightedRange else {
             return Text(text)
         }
+        let lower = highlightedRange.lowerBound
+        let upper = highlightedRange.upperBound
         let prefix = Text(
-            String(text[..<lower])
+            String(
+                text[text.startIndex ..< lower]
+            )
         )
         let match = Text(
-            String(text[lower ..< upper])
+            String(
+                text[highlightedRange]
+            )
         )
         .bold()
         .foregroundColor(.orange)
         let suffix = Text(
-            String(text[upper...])
+            String(
+                text[upper ..< text.endIndex]
+            )
         )
         return Text(
             "\(prefix)\(match)\(suffix)"
@@ -1292,6 +1340,24 @@ struct EPUBReaderView: View {
         return location.chapterIndex
             == viewModel.currentChapterIndex
             && location.segmentIndex == segmentIndex
+    }
+
+    private func readAloudTextRange(
+        for segmentIndex: Int
+    ) -> NSRange? {
+        guard let range =
+                mediaOverlayPlayer
+                .currentTextRange,
+              range.chapterIndex
+                == viewModel.currentChapterIndex,
+              range.segmentIndex
+                == segmentIndex else {
+            return nil
+        }
+        return NSRange(
+            location: range.location,
+            length: range.length
+        )
     }
 
     private func moveChapter(by delta: Int) {
