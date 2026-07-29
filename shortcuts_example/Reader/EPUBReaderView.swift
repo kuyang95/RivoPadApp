@@ -9,7 +9,42 @@ nonisolated struct EPUBSearchResult:
     let id: String
     let chapterIndex: Int
     let chapterTitle: String
+    let segmentIndex: Int
     let snippet: String
+    let matchStartInSnippet: Int
+    let matchStartInSegment: Int
+    let matchLength: Int
+}
+
+nonisolated struct EPUBTextSegment:
+    Identifiable,
+    Equatable,
+    Sendable
+{
+    let id: String
+    let text: String
+}
+
+nonisolated enum EPUBTextSegmenter {
+    static func segments(
+        in chapter: EPUBChapter
+    ) -> [EPUBTextSegment] {
+        chapter.text
+            .components(separatedBy: "\n\n")
+            .map {
+                $0.split(whereSeparator: \.isWhitespace)
+                    .joined(separator: " ")
+            }
+            .filter { !$0.isEmpty }
+            .enumerated()
+            .map { index, text in
+                EPUBTextSegment(
+                    id:
+                        "\(chapter.id)-segment-\(index)",
+                    text: text
+                )
+            }
+    }
 }
 
 nonisolated enum EPUBSearchEngine {
@@ -24,37 +59,101 @@ nonisolated enum EPUBSearchEngine {
             return []
         }
 
-        return chapters.enumerated().compactMap {
-            chapterIndex,
-            chapter in
-            guard let range = chapter.text.range(
-                of: query,
-                options: [
-                    .caseInsensitive,
-                    .diacriticInsensitive
-                ]
-            ) else {
-                return nil
+        var results: [EPUBSearchResult] = []
+        for (chapterIndex, chapter)
+            in chapters.enumerated() {
+            let segments =
+                EPUBTextSegmenter.segments(
+                    in: chapter
+                )
+            for (segmentIndex, segment)
+                in segments.enumerated() {
+                appendMatches(
+                    query: query,
+                    chapterIndex: chapterIndex,
+                    chapter: chapter,
+                    segmentIndex: segmentIndex,
+                    segment: segment,
+                    to: &results
+                )
             }
-            let start = chapter.text.index(
-                range.lowerBound,
-                offsetBy: -60,
-                limitedBy: chapter.text.startIndex
-            ) ?? chapter.text.startIndex
-            let end = chapter.text.index(
-                range.upperBound,
-                offsetBy: 100,
-                limitedBy: chapter.text.endIndex
-            ) ?? chapter.text.endIndex
-            let snippet = chapter.text[start ..< end]
-                .split(whereSeparator: \.isWhitespace)
-                .joined(separator: " ")
-            return EPUBSearchResult(
-                id: "\(chapter.id)-\(chapterIndex)",
-                chapterIndex: chapterIndex,
-                chapterTitle: chapter.title,
-                snippet: snippet
+        }
+        return results
+    }
+
+    private static func appendMatches(
+        query: String,
+        chapterIndex: Int,
+        chapter: EPUBChapter,
+        segmentIndex: Int,
+        segment: EPUBTextSegment,
+        to results: inout [EPUBSearchResult]
+    ) {
+        var searchStart = segment.text.startIndex
+        while searchStart < segment.text.endIndex,
+              let range = segment.text.range(
+                  of: query,
+                  options: [
+                      .caseInsensitive,
+                      .diacriticInsensitive,
+                  ],
+                  range:
+                      searchStart
+                      ..< segment.text.endIndex
+              ) {
+            let matchStart = segment.text.distance(
+                from: segment.text.startIndex,
+                to: range.lowerBound
             )
+            let matchLength = segment.text.distance(
+                from: range.lowerBound,
+                to: range.upperBound
+            )
+            let snippetStart = segment.text.index(
+                range.lowerBound,
+                offsetBy: -40,
+                limitedBy: segment.text.startIndex
+            ) ?? segment.text.startIndex
+            let snippetEnd = segment.text.index(
+                range.upperBound,
+                offsetBy: 60,
+                limitedBy: segment.text.endIndex
+            ) ?? segment.text.endIndex
+            let hasPrefix =
+                snippetStart != segment.text.startIndex
+            let hasSuffix =
+                snippetEnd != segment.text.endIndex
+            let prefix = hasPrefix ? "…" : ""
+            let suffix = hasSuffix ? "…" : ""
+            let snippet =
+                prefix
+                + String(
+                    segment.text[
+                        snippetStart ..< snippetEnd
+                    ]
+                )
+                + suffix
+            results.append(
+                EPUBSearchResult(
+                    id:
+                        "\(chapter.id)-"
+                        + "\(segmentIndex)-"
+                        + "\(matchStart)",
+                    chapterIndex: chapterIndex,
+                    chapterTitle: chapter.title,
+                    segmentIndex: segmentIndex,
+                    snippet: snippet,
+                    matchStartInSnippet:
+                        prefix.count
+                        + segment.text.distance(
+                            from: snippetStart,
+                            to: range.lowerBound
+                        ),
+                    matchStartInSegment: matchStart,
+                    matchLength: matchLength
+                )
+            )
+            searchStart = range.upperBound
         }
     }
 }
@@ -65,9 +164,18 @@ final class EPUBReaderViewModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var errorDescription: String?
     @Published private(set) var currentChapterIndex = 0
+    @Published private(set) var currentSegmentIndex = 0
+    @Published private(set) var highlightedSearchResult:
+        EPUBSearchResult?
+    @Published private(set) var navigationRevision = 0
+    @Published private(set) var navigationTargetSegmentIndex =
+        0
 
     private let fileURL: URL
     private var didLoad = false
+    private var progressSaveTask:
+        Task<Void, Never>?
+    private var isApplyingNavigation = false
 
     init(fileURL: URL) {
         self.fileURL = fileURL
@@ -108,13 +216,34 @@ final class EPUBReaderViewModel: ObservableObject {
                 try EPUBBookParser.parse(data: data)
             }.value
             book = parsedBook
-            let savedIndex = EPUBProgressStore.chapterIndex(
+            let savedProgress =
+                EPUBProgressStore.progress(
                 for: parsedBook.identifier
             )
             currentChapterIndex = min(
-                max(savedIndex, 0),
+                max(
+                    savedProgress?.chapterIndex ?? 0,
+                    0
+                ),
                 parsedBook.chapters.count - 1
             )
+            let segmentCount =
+                EPUBTextSegmenter.segments(
+                    in: parsedBook.chapters[
+                        currentChapterIndex
+                    ]
+                ).count
+            currentSegmentIndex = min(
+                max(
+                    savedProgress?.segmentIndex ?? 0,
+                    0
+                ),
+                max(segmentCount - 1, 0)
+            )
+            navigationTargetSegmentIndex =
+                currentSegmentIndex
+            isApplyingNavigation = true
+            navigationRevision &+= 1
             EPUBProgressStore.lastBookURL = fileURL
         } catch {
             errorDescription = error.localizedDescription
@@ -122,20 +251,125 @@ final class EPUBReaderViewModel: ObservableObject {
         isLoading = false
     }
 
-    func selectChapter(_ index: Int) {
+    func selectChapter(
+        _ index: Int,
+        segmentIndex: Int = 0,
+        highlightedResult:
+            EPUBSearchResult? = nil
+    ) {
         guard let book,
               book.chapters.indices.contains(index) else {
             return
         }
+        let segmentCount =
+            EPUBTextSegmenter.segments(
+                in: book.chapters[index]
+            ).count
         currentChapterIndex = index
-        EPUBProgressStore.saveChapterIndex(
-            index,
-            for: book.identifier
+        currentSegmentIndex = min(
+            max(segmentIndex, 0),
+            max(segmentCount - 1, 0)
         )
+        navigationTargetSegmentIndex =
+            currentSegmentIndex
+        isApplyingNavigation = true
+        highlightedSearchResult =
+            highlightedResult
+        navigationRevision &+= 1
+        saveProgress()
     }
 
     func moveChapter(by delta: Int) {
         selectChapter(currentChapterIndex + delta)
+    }
+
+    func selectSearchResult(
+        _ result: EPUBSearchResult
+    ) {
+        selectChapter(
+            result.chapterIndex,
+            segmentIndex: result.segmentIndex,
+            highlightedResult: result
+        )
+    }
+
+    func noteVisibleSegment(_ index: Int) {
+        guard !isApplyingNavigation,
+              let chapter = currentChapter else {
+            return
+        }
+        let segments =
+            EPUBTextSegmenter.segments(
+                in: chapter
+            )
+        guard segments.indices.contains(index),
+              index != currentSegmentIndex else {
+            return
+        }
+        currentSegmentIndex = index
+        progressSaveTask?.cancel()
+        progressSaveTask = Task {
+            try? await Task.sleep(
+                nanoseconds: 600_000_000
+            )
+            guard !Task.isCancelled else {
+                return
+            }
+            saveProgress()
+            progressSaveTask = nil
+        }
+    }
+
+    func finishNavigation(
+        revision: Int,
+        segmentIndex: Int
+    ) {
+        guard revision == navigationRevision else {
+            return
+        }
+        currentSegmentIndex = segmentIndex
+        isApplyingNavigation = false
+        saveProgress()
+    }
+
+    func flushProgress() {
+        progressSaveTask?.cancel()
+        progressSaveTask = nil
+        saveProgress()
+    }
+
+    private func saveProgress() {
+        guard let book else {
+            return
+        }
+        EPUBProgressStore.save(
+            EPUBReaderProgress(
+                chapterIndex:
+                    currentChapterIndex,
+                segmentIndex:
+                    currentSegmentIndex
+            ),
+            for: book.identifier
+        )
+    }
+}
+
+private nonisolated struct
+    EPUBSegmentOffsetPreferenceKey:
+    PreferenceKey
+{
+    static let defaultValue: [Int: CGFloat] = [:]
+
+    static func reduce(
+        value: inout [Int: CGFloat],
+        nextValue: () -> [Int: CGFloat]
+    ) {
+        value.merge(
+            nextValue(),
+            uniquingKeysWith: { _, newValue in
+                newValue
+            }
+        )
     }
 }
 
@@ -271,6 +505,7 @@ struct EPUBReaderView: View {
             tts.stop()
         }
         .onDisappear {
+            viewModel.flushProgress()
             tts.stop()
         }
         .sheet(isPresented: $isContentsPresented) {
@@ -288,38 +523,166 @@ struct EPUBReaderView: View {
     private func chapterView(
         _ chapter: EPUBChapter
     ) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                Text(chapter.title)
-                    .font(
-                        .system(
-                            size: 30 * fontScale,
-                            weight: .bold
+        let segments =
+            EPUBTextSegmenter.segments(
+                in: chapter
+            )
+        return ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(
+                    alignment: .leading,
+                    spacing: 24
+                ) {
+                    Text(chapter.title)
+                        .font(
+                            .system(
+                                size: 30 * fontScale,
+                                weight: .bold
+                            )
                         )
-                    )
-                    .accessibilityAddTraits(.isHeader)
-
-                Text(chapter.text)
-                    .font(
-                        .system(
-                            size: 22 * fontScale
+                        .accessibilityAddTraits(
+                            .isHeader
                         )
-                    )
-                    .lineSpacing(
-                        CGFloat(
-                            8 * max(lineHeight - 1, 0)
+                    ForEach(
+                        Array(segments.enumerated()),
+                        id: \.element.id
+                    ) { index, segment in
+                        highlightedText(
+                            segment.text,
+                            start:
+                                highlightStart(
+                                    for: index
+                                ),
+                            length:
+                                highlightLength(
+                                    for: index
+                                )
                         )
-                    )
-                    .textSelection(.enabled)
-                    .accessibilityLabel(chapter.text)
+                        .font(
+                            .system(
+                                size: 22 * fontScale
+                            )
+                        )
+                        .lineSpacing(
+                            CGFloat(
+                                8
+                                * max(
+                                    lineHeight - 1,
+                                    0
+                                )
+                            )
+                        )
+                        .textSelection(.enabled)
+                        .accessibilityLabel(
+                            segment.text
+                        )
+                        .id(segment.id)
+                        .background {
+                            GeometryReader { geometry in
+                                Color.clear.preference(
+                                    key:
+                                        EPUBSegmentOffsetPreferenceKey
+                                        .self,
+                                    value: [
+                                        index:
+                                            geometry.frame(
+                                                in:
+                                                    .named(
+                                                        "epub-chapter-scroll"
+                                                    )
+                                            ).minY,
+                                    ]
+                                )
+                            }
+                        }
+                    }
+                }
+                .foregroundStyle(theme.foreground)
+                .padding(.horizontal, 32)
+                .padding(.vertical, 28)
+                .frame(
+                    maxWidth: 860,
+                    alignment: .leading
+                )
+                .frame(maxWidth: .infinity)
             }
-            .foregroundStyle(theme.foreground)
-            .padding(.horizontal, 32)
-            .padding(.vertical, 28)
-            .frame(maxWidth: 860, alignment: .leading)
-            .frame(maxWidth: .infinity)
+            .coordinateSpace(
+                name: "epub-chapter-scroll"
+            )
+            .onPreferenceChange(
+                EPUBSegmentOffsetPreferenceKey.self
+            ) { offsets in
+                guard let visible = offsets.min(
+                    by: {
+                        abs($0.value)
+                            < abs($1.value)
+                    }
+                )?.key else {
+                    return
+                }
+                viewModel.noteVisibleSegment(
+                    visible
+                )
+            }
+            .task(
+                id: viewModel.navigationRevision
+            ) {
+                let revision =
+                    viewModel.navigationRevision
+                let targetIndex =
+                    viewModel
+                    .navigationTargetSegmentIndex
+                guard segments.indices.contains(
+                    targetIndex
+                ) else {
+                    return
+                }
+                await Task.yield()
+                proxy.scrollTo(
+                    segments[
+                        targetIndex
+                    ].id,
+                    anchor: .top
+                )
+                try? await Task.sleep(
+                    nanoseconds: 100_000_000
+                )
+                guard !Task.isCancelled else {
+                    return
+                }
+                viewModel.finishNavigation(
+                    revision: revision,
+                    segmentIndex: targetIndex
+                )
+            }
         }
         .id(viewModel.currentChapterIndex)
+    }
+
+    private func highlightStart(
+        for segmentIndex: Int
+    ) -> Int? {
+        guard let result =
+                viewModel.highlightedSearchResult,
+              result.chapterIndex
+                == viewModel.currentChapterIndex,
+              result.segmentIndex == segmentIndex else {
+            return nil
+        }
+        return result.matchStartInSegment
+    }
+
+    private func highlightLength(
+        for segmentIndex: Int
+    ) -> Int {
+        guard let result =
+                viewModel.highlightedSearchResult,
+              result.chapterIndex
+                == viewModel.currentChapterIndex,
+              result.segmentIndex == segmentIndex else {
+            return 0
+        }
+        return result.matchLength
     }
 
     private var playbackBar: some View {
@@ -431,8 +794,8 @@ struct EPUBReaderView: View {
                 } else {
                     List(results) { result in
                         Button {
-                            viewModel.selectChapter(
-                                result.chapterIndex
+                            viewModel.selectSearchResult(
+                                result
                             )
                             isSearchPresented = false
                         } label: {
@@ -442,7 +805,14 @@ struct EPUBReaderView: View {
                             ) {
                                 Text(result.chapterTitle)
                                     .font(.headline)
-                                Text(result.snippet)
+                                highlightedText(
+                                    result.snippet,
+                                    start:
+                                        result
+                                        .matchStartInSnippet,
+                                    length:
+                                        result.matchLength
+                                )
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(3)
@@ -524,5 +894,38 @@ struct EPUBReaderView: View {
                 }
             }
         }
+    }
+
+    private func highlightedText(
+        _ text: String,
+        start: Int?,
+        length: Int
+    ) -> Text {
+        guard let start,
+              start >= 0,
+              length > 0,
+              let lower = text.index(
+                  text.startIndex,
+                  offsetBy: start,
+                  limitedBy: text.endIndex
+              ),
+              let upper = text.index(
+                  lower,
+                  offsetBy: length,
+                  limitedBy: text.endIndex
+              ) else {
+            return Text(text)
+        }
+        return Text(
+            String(text[..<lower])
+        )
+        + Text(
+            String(text[lower ..< upper])
+        )
+        .bold()
+        .foregroundColor(.orange)
+        + Text(
+            String(text[upper...])
+        )
     }
 }

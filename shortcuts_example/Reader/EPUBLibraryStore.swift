@@ -81,6 +81,23 @@ actor EPUBLibraryStore {
     }
 }
 
+nonisolated struct EPUBReaderProgress:
+    Codable,
+    Equatable,
+    Sendable
+{
+    let chapterIndex: Int
+    let segmentIndex: Int
+
+    init(
+        chapterIndex: Int,
+        segmentIndex: Int
+    ) {
+        self.chapterIndex = max(chapterIndex, 0)
+        self.segmentIndex = max(segmentIndex, 0)
+    }
+}
+
 @MainActor
 enum EPUBProgressStore {
     private static let lastBookPathKey = "reader.epub.lastBookPath"
@@ -102,18 +119,51 @@ enum EPUBProgressStore {
         }
     }
 
-    static func chapterIndex(for bookIdentifier: String) -> Int {
-        UserDefaults.standard.integer(
+    static func progress(
+        for bookIdentifier: String,
+        defaults: UserDefaults = .standard
+    ) -> EPUBReaderProgress? {
+        if let data = defaults.data(
+            forKey: progressKey(bookIdentifier)
+        ),
+           let progress = try? JSONDecoder().decode(
+               EPUBReaderProgress.self,
+               from: data
+           ) {
+            return progress
+        }
+        guard defaults.object(
             forKey: chapterKey(bookIdentifier)
+        ) != nil else {
+            return nil
+        }
+        return EPUBReaderProgress(
+            chapterIndex: defaults.integer(
+                forKey: chapterKey(bookIdentifier)
+            ),
+            segmentIndex: 0
         )
     }
 
-    static func saveChapterIndex(
-        _ index: Int,
-        for bookIdentifier: String
+    static func save(
+        _ progress: EPUBReaderProgress,
+        for bookIdentifier: String,
+        defaults: UserDefaults = .standard
     ) {
-        UserDefaults.standard.set(
-            index,
+        let normalized = EPUBReaderProgress(
+            chapterIndex: progress.chapterIndex,
+            segmentIndex: progress.segmentIndex
+        )
+        if let data = try? JSONEncoder().encode(
+            normalized
+        ) {
+            defaults.set(
+                data,
+                forKey: progressKey(bookIdentifier)
+            )
+        }
+        defaults.set(
+            normalized.chapterIndex,
             forKey: chapterKey(bookIdentifier)
         )
     }
@@ -121,5 +171,12 @@ enum EPUBProgressStore {
     private static func chapterKey(_ identifier: String) -> String {
         let encoded = Data(identifier.utf8).base64EncodedString()
         return "reader.epub.chapter.\(encoded)"
+    }
+
+    private static func progressKey(
+        _ identifier: String
+    ) -> String {
+        let encoded = Data(identifier.utf8).base64EncodedString()
+        return "reader.epub.progress.\(encoded)"
     }
 }

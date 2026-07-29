@@ -62,6 +62,96 @@ final class EPUBReaderTests: XCTestCase {
         )
     }
 
+    func testSearchReturnsEveryMatchWithSegmentLocation()
+    {
+        let chapter = EPUBChapter(
+            id: "chapter",
+            title: "반복 장",
+            href: "chapter.xhtml",
+            text:
+                "첫 문단 반복 단어와 반복 단어\n\n"
+                + "둘째 문단의 반복 단어"
+        )
+
+        let results = EPUBSearchEngine.search(
+            "반복",
+            in: [chapter]
+        )
+
+        XCTAssertEqual(results.count, 3)
+        XCTAssertEqual(
+            results.map(\.segmentIndex),
+            [0, 0, 1]
+        )
+        XCTAssertEqual(
+            results.map(\.matchStartInSegment),
+            [5, 12, 7]
+        )
+        for result in results {
+            XCTAssertEqual(
+                String(
+                    result.snippet.dropFirst(
+                        result.matchStartInSnippet
+                    ).prefix(result.matchLength)
+                ),
+                "반복"
+            )
+        }
+    }
+
+    @MainActor
+    func testProgressRoundTripAndLegacyMigration()
+    {
+        let suiteName =
+            "EPUBProgressStoreTests-"
+            + UUID().uuidString
+        let defaults = UserDefaults(
+            suiteName: suiteName
+        )!
+        defer {
+            defaults.removePersistentDomain(
+                forName: suiteName
+            )
+        }
+
+        let progress = EPUBReaderProgress(
+            chapterIndex: 3,
+            segmentIndex: 7
+        )
+        EPUBProgressStore.save(
+            progress,
+            for: "book",
+            defaults: defaults
+        )
+        XCTAssertEqual(
+            EPUBProgressStore.progress(
+                for: "book",
+                defaults: defaults
+            ),
+            progress
+        )
+
+        let legacyIdentifier = "legacy"
+        let encoded = Data(
+            legacyIdentifier.utf8
+        ).base64EncodedString()
+        defaults.set(
+            2,
+            forKey:
+                "reader.epub.chapter.\(encoded)"
+        )
+        XCTAssertEqual(
+            EPUBProgressStore.progress(
+                for: legacyIdentifier,
+                defaults: defaults
+            ),
+            EPUBReaderProgress(
+                chapterIndex: 2,
+                segmentIndex: 0
+            )
+        )
+    }
+
     func testArchiveRejectsPathTraversal() throws {
         let archiveData = try ZIPFixture.make(
             entries: [
