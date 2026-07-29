@@ -4,6 +4,8 @@ import UIKit
 
 struct HomeView: View {
     @EnvironmentObject var appRouter: AppRouter
+    @EnvironmentObject private var rivoRemoteManager:
+        RivoRemoteManager
     @State private var isFileImporterPresented = false
     @State private var fileImportError: String?
     
@@ -14,6 +16,8 @@ struct HomeView: View {
 
             ScrollView {
                 VStack(spacing: 32) {
+                    rivoConnectionStatus
+
                     Button {
                         appRouter.route = .chatHistory
                     } label: {
@@ -45,21 +49,6 @@ struct HomeView: View {
                     )
 
                     Button {
-                        appRouter.route = .rivoRemote
-                    } label: {
-                        Text("리모컨")
-                            .font(.system(size: 56, weight: .bold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: 520)
-                            .frame(height: 120)
-                            .background(Color.orange)
-                            .cornerRadius(28)
-                    }
-                    .accessibilityHint(
-                        "Rivo Three 또는 Mini를 검색하고 연결합니다."
-                    )
-
-                    Button {
                         appRouter.route = .cameraTools
                     } label: {
                         Text("카메라")
@@ -72,6 +61,21 @@ struct HomeView: View {
                     }
                     .accessibilityHint(
                         "카메라 돋보기 또는 문서 스캐너를 선택합니다."
+                    )
+
+                    Button {
+                        appRouter.route = .visionLink
+                    } label: {
+                        Text("VisionLink")
+                            .font(.system(size: 56, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: 520)
+                            .frame(height: 120)
+                            .background(Color.teal)
+                            .cornerRadius(28)
+                    }
+                    .accessibilityHint(
+                        "다른 기기의 VisionLink와 연결합니다."
                     )
 
                     Button {
@@ -121,6 +125,91 @@ struct HomeView: View {
             }
         } message: {
             Text(fileImportError ?? "")
+        }
+    }
+
+    private var rivoConnectionStatus: some View {
+        Button {
+            appRouter.route = .rivoRemote
+        } label: {
+            HStack(spacing: 14) {
+                if isRivoTransitioning {
+                    ProgressView()
+                        .tint(rivoStatusColor)
+                } else {
+                    Image(systemName: "circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(rivoStatusColor)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Rivo 리모컨")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text(rivoHomeStatusTitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 20)
+            .frame(maxWidth: 520)
+            .frame(height: 68)
+            .background(Color.secondary.opacity(0.09))
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            "Rivo 리모컨, \(rivoHomeStatusTitle)"
+        )
+        .accessibilityHint("연결 관리 화면을 엽니다.")
+    }
+
+    private var rivoHomeStatusTitle: String {
+        switch rivoRemoteManager.state {
+        case .inactive:
+            return "연결 안 됨"
+        default:
+            return rivoRemoteManager.state.title
+        }
+    }
+
+    private var rivoStatusColor: Color {
+        switch rivoRemoteManager.state {
+        case .ready:
+            return .green
+        case .permissionDenied,
+             .unsupported,
+             .bluetoothOff,
+             .failed:
+            return .red
+        case .preparing,
+             .scanning,
+             .connecting,
+             .discovering:
+            return .orange
+        case .inactive,
+             .disconnected:
+            return .secondary
+        }
+    }
+
+    private var isRivoTransitioning: Bool {
+        switch rivoRemoteManager.state {
+        case .preparing,
+             .scanning,
+             .connecting,
+             .discovering:
+            return true
+        default:
+            return false
         }
     }
 

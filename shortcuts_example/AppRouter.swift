@@ -21,6 +21,7 @@ enum AppRoute: Hashable {
     case readerLibrary
     case epubReader(fileURL: URL)
     case rivoRemote
+    case visionLink
     case cameraTools
     case magnifier
     case liveTextReader

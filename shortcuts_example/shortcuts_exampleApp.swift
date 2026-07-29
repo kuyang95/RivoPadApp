@@ -15,6 +15,8 @@ struct shortcuts_exampleApp: App {
         RivoRemoteManager()
     @StateObject private var rivoRemoteControlCenter =
         RivoRemoteControlCenter()
+    @StateObject private var visionLinkManager =
+        VisionLinkManager()
 
     @State private var path = NavigationPath()   // ✅ App이 path 관리
     @State private var didHandleDirectScannerLaunch = false
@@ -67,6 +69,8 @@ struct shortcuts_exampleApp: App {
                             EPUBReaderView(fileURL: fileURL)
                         case .rivoRemote:
                             RivoRemoteView()
+                        case .visionLink:
+                            VisionLinkView()
                         case .cameraTools:
                             CameraToolsView()
                         case .magnifier:
@@ -122,6 +126,7 @@ struct shortcuts_exampleApp: App {
             }
             .environmentObject(appRouter)
             .environmentObject(rivoRemoteManager)
+            .environmentObject(visionLinkManager)
             .overlay {
                 if rivoRemoteControlCenter.isMenuPresented {
                     RivoQuickMenuOverlay(
