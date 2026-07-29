@@ -1,3 +1,4 @@
+import QuickLook
 import SwiftUI
 import UIKit
 
@@ -6,6 +7,7 @@ struct VisionLinkView: View {
         VisionLinkManager
     @State private var isUnregisterConfirmationPresented =
         false
+    @State private var previewURL: URL?
 
     var body: some View {
         List {
@@ -19,6 +21,7 @@ struct VisionLinkView: View {
                 pairingSection(code: pairingCode)
             }
 
+            dataTransferSection
             controlsSection
             diagnosticsSection
             currentScopeSection
@@ -27,6 +30,7 @@ struct VisionLinkView: View {
         .task {
             manager.activate()
         }
+        .quickLookPreview($previewURL)
         .confirmationDialog(
             "저장된 VisionLink 연결을 해제할까요?",
             isPresented:
@@ -45,6 +49,165 @@ struct VisionLinkView: View {
                 "상대 기기와 서버에 저장된 연결 정보가 "
                     + "삭제됩니다."
             )
+        }
+    }
+
+    @ViewBuilder
+    private var dataTransferSection: some View {
+        Section("데이터 채널") {
+            Label(
+                manager.isDataChannelReady
+                    ? "파일·텍스트 수신 준비됨"
+                    : "상대 기기의 데이터 채널 대기 중",
+                systemImage:
+                    manager.isDataChannelReady
+                    ? "arrow.down.circle.fill"
+                    : "arrow.down.circle"
+            )
+            .foregroundStyle(
+                manager.isDataChannelReady
+                    ? Color.green
+                    : Color.secondary
+            )
+
+            if manager.isCameraShareActive {
+                Label(
+                    "상대 카메라 공유 중",
+                    systemImage: "camera.fill"
+                )
+                .foregroundStyle(.green)
+            }
+
+            if let progress = manager.incomingTransfer {
+                VStack(
+                    alignment: .leading,
+                    spacing: 8
+                ) {
+                    Text(progress.fileName)
+                        .font(.headline)
+                    ProgressView(
+                        value:
+                            progress.fractionCompleted
+                    )
+                    Text(
+                        byteCount(
+                            progress.receivedBytes
+                        )
+                        + " / "
+                        + byteCount(
+                            progress.totalBytes
+                        )
+                    )
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                }
+                .accessibilityElement(
+                    children: .combine
+                )
+            }
+
+            if let file = manager.lastReceivedFile {
+                VStack(
+                    alignment: .leading,
+                    spacing: 10
+                ) {
+                    Label {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 3
+                        ) {
+                            Text(file.fileName)
+                                .font(.headline)
+                            Text(byteCount(file.size))
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                        }
+                    } icon: {
+                        Image(
+                            systemName:
+                                file.kind == "image"
+                                ? "photo"
+                                : "doc"
+                        )
+                    }
+
+                    HStack {
+                        Button(
+                            "미리보기",
+                            systemImage:
+                                "doc.text.magnifyingglass"
+                        ) {
+                            previewURL = file.url
+                        }
+                        .buttonStyle(.bordered)
+
+                        ShareLink(
+                            item: file.url,
+                            preview: SharePreview(
+                                file.fileName
+                            )
+                        ) {
+                            Label(
+                                "내보내기",
+                                systemImage:
+                                    "square.and.arrow.up"
+                            )
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+            }
+
+            if let text =
+                manager.receivedClipboardText {
+                VStack(
+                    alignment: .leading,
+                    spacing: 10
+                ) {
+                    Text("받은 클립보드 텍스트")
+                        .font(.headline)
+                    Text(text.isEmpty ? "(빈 텍스트)" : text)
+                        .lineLimit(6)
+                        .textSelection(.enabled)
+                        .frame(
+                            maxWidth: .infinity,
+                            alignment: .leading
+                        )
+                    HStack {
+                        Button(
+                            "클립보드에 복사",
+                            systemImage: "doc.on.doc"
+                        ) {
+                            UIPasteboard.general
+                                .string = text
+                        }
+                        .buttonStyle(.borderedProminent)
+
+                        Button("닫기") {
+                            manager
+                                .clearReceivedClipboard()
+                        }
+                    }
+                }
+            }
+
+            if let message =
+                manager.dataTransferMessage {
+                Label(
+                    message,
+                    systemImage:
+                        "exclamationmark.triangle.fill"
+                )
+                .foregroundStyle(.red)
+                .swipeActions {
+                    Button("지우기") {
+                        manager
+                            .clearDataTransferMessage()
+                    }
+                }
+            }
         }
     }
 
@@ -275,11 +438,24 @@ struct VisionLinkView: View {
                 systemImage: "checkmark.circle.fill"
             )
             Label(
-                "데이터 채널과 파일 수신은 다음 단계",
+                "데이터 채널·파일·클립보드 수신",
+                systemImage: "checkmark.circle.fill"
+            )
+            Label(
+                "원격 OCR·AI·번역은 다음 구현 대상",
                 systemImage: "arrow.forward.circle"
             )
             .foregroundStyle(.secondary)
         }
+    }
+
+    private func byteCount(
+        _ value: Int64
+    ) -> String {
+        ByteCountFormatter.string(
+            fromByteCount: value,
+            countStyle: .file
+        )
     }
 
     private var statusIcon: String {

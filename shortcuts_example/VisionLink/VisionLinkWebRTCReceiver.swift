@@ -39,6 +39,16 @@ protocol VisionLinkWebRTCReceiverDelegate: AnyObject {
 
     func webRTCReceiver(
         _ receiver: VisionLinkWebRTCReceiver,
+        dataChannelReady: Bool
+    )
+
+    func webRTCReceiver(
+        _ receiver: VisionLinkWebRTCReceiver,
+        didReceive dataEvent: VisionLinkDataEvent
+    )
+
+    func webRTCReceiver(
+        _ receiver: VisionLinkWebRTCReceiver,
         didFail message: String
     )
 }
@@ -56,6 +66,12 @@ final class VisionLinkWebRTCReceiver: NSObject {
     private var negotiationTask: Task<Void, Never>?
     private var pendingRemoteCandidates: [RTCIceCandidate] = []
     private weak var remoteVideoTrack: RTCVideoTrack?
+    private var dataChannel: RTCDataChannel?
+    private var dataChannelBridge:
+        VisionLinkDataChannelBridge?
+    private var dataReceiver:
+        VisionLinkDataReceiver?
+    private var dataReceiveTask: Task<Void, Never>?
 
     override init() {
         _ = Self.didInitializeSSL
@@ -196,6 +212,7 @@ final class VisionLinkWebRTCReceiver: NSObject {
     func close() {
         negotiationTask?.cancel()
         negotiationTask = nil
+        closeDataChannel()
         remoteVideoTrack = nil
         pendingRemoteCandidates = []
         peerConnection?.close()
@@ -261,6 +278,136 @@ final class VisionLinkWebRTCReceiver: NSObject {
             self,
             didReceive: track
         )
+    }
+
+    private func attachDataChannel(
+        _ channel: RTCDataChannel
+    ) {
+        closeDataChannel()
+
+        let destinationDirectory =
+            FileManager.default.urls(
+                for: .documentDirectory,
+                in: .userDomainMask
+            )
+            .first!
+            .appendingPathComponent(
+                "VisionLink",
+                isDirectory: true
+            )
+        let partialDirectory =
+            FileManager.default.urls(
+                for: .cachesDirectory,
+                in: .userDomainMask
+            )
+            .first!
+            .appendingPathComponent(
+                "VisionLink/Incoming",
+                isDirectory: true
+            )
+        let receiver = VisionLinkDataReceiver(
+            destinationDirectory:
+                destinationDirectory,
+            partialDirectory: partialDirectory
+        )
+
+        var continuation:
+            AsyncStream<VisionLinkDataInput>
+                .Continuation?
+        let stream = AsyncStream<
+            VisionLinkDataInput
+        > { value in
+            continuation = value
+        }
+        guard let continuation else {
+            fail(
+                "VisionLink 데이터 수신기를 만들 수 없습니다."
+            )
+            return
+        }
+        let bridge = VisionLinkDataChannelBridge(
+            continuation: continuation
+        )
+
+        dataChannel = channel
+        dataReceiver = receiver
+        dataChannelBridge = bridge
+        channel.delegate = bridge
+        dataReceiveTask = Task { [weak self] in
+            for await input in stream {
+                guard !Task.isCancelled,
+                      let self else {
+                    return
+                }
+                switch input {
+                case .opened:
+                    self.delegate?.webRTCReceiver(
+                        self,
+                        dataChannelReady: true
+                    )
+                case .closed:
+                    await receiver.close()
+                    self.delegate?.webRTCReceiver(
+                        self,
+                        dataChannelReady: false
+                    )
+                case .control, .binary:
+                    let actions = await receiver
+                        .receive(input)
+                    guard !Task.isCancelled else {
+                        return
+                    }
+                    self.handleDataActions(actions)
+                }
+            }
+        }
+        bridge.publishCurrentState(of: channel)
+    }
+
+    private func closeDataChannel() {
+        let receiver = dataReceiver
+        dataChannel?.delegate = nil
+        dataChannel?.close()
+        dataChannelBridge?.finish()
+        dataReceiveTask?.cancel()
+        dataReceiveTask = nil
+        dataChannelBridge = nil
+        dataReceiver = nil
+        dataChannel = nil
+        if let receiver {
+            Task {
+                await receiver.close()
+            }
+        }
+        delegate?.webRTCReceiver(
+            self,
+            dataChannelReady: false
+        )
+    }
+
+    private func handleDataActions(
+        _ actions: [VisionLinkDataAction]
+    ) {
+        for action in actions {
+            switch action {
+            case .sendControl(let data):
+                guard let dataChannel,
+                      dataChannel.readyState == .open else {
+                    continue
+                }
+                _ = dataChannel.sendData(
+                    RTCDataBuffer(
+                        data: data,
+                        isBinary: false
+                    )
+                )
+            case .event(let event):
+                delegate?.webRTCReceiver(
+                    self,
+                    didReceive: event
+                )
+            }
+        }
     }
 
     private func fail(_ message: String) {
@@ -376,7 +523,11 @@ extension VisionLinkWebRTCReceiver:
     nonisolated func peerConnection(
         _ peerConnection: RTCPeerConnection,
         didOpen dataChannel: RTCDataChannel
-    ) {}
+    ) {
+        Task { @MainActor [weak self] in
+            self?.attachDataChannel(dataChannel)
+        }
+    }
 
     nonisolated func peerConnection(
         _ peerConnection: RTCPeerConnection,
@@ -386,6 +537,65 @@ extension VisionLinkWebRTCReceiver:
         let track = rtpReceiver.track
         Task { @MainActor [weak self] in
             self?.attachVideoTrack(track)
+        }
+    }
+}
+
+nonisolated private final class
+    VisionLinkDataChannelBridge:
+    NSObject,
+    RTCDataChannelDelegate,
+    @unchecked Sendable
+{
+    private let continuation:
+        AsyncStream<VisionLinkDataInput>
+            .Continuation
+
+    init(
+        continuation:
+            AsyncStream<VisionLinkDataInput>
+                .Continuation
+    ) {
+        self.continuation = continuation
+    }
+
+    func publishCurrentState(
+        of dataChannel: RTCDataChannel
+    ) {
+        dataChannelDidChangeState(dataChannel)
+    }
+
+    func finish() {
+        continuation.finish()
+    }
+
+    func dataChannelDidChangeState(
+        _ dataChannel: RTCDataChannel
+    ) {
+        switch dataChannel.readyState {
+        case .open:
+            continuation.yield(.opened)
+        case .closed:
+            continuation.yield(.closed)
+        case .connecting, .closing:
+            break
+        @unknown default:
+            break
+        }
+    }
+
+    func dataChannel(
+        _ dataChannel: RTCDataChannel,
+        didReceiveMessageWith buffer: RTCDataBuffer
+    ) {
+        if buffer.isBinary {
+            continuation.yield(
+                .binary(buffer.data)
+            )
+        } else {
+            continuation.yield(
+                .control(buffer.data)
+            )
         }
     }
 }

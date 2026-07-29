@@ -95,6 +95,18 @@ final class VisionLinkManager: ObservableObject {
     @Published private(set) var hasStoredPair = false
     @Published private(set) var remoteVideoTrack:
         RTCVideoTrack?
+    @Published private(set) var isDataChannelReady =
+        false
+    @Published private(set) var isCameraShareActive =
+        false
+    @Published private(set) var incomingTransfer:
+        VisionLinkTransferProgress?
+    @Published private(set) var lastReceivedFile:
+        VisionLinkReceivedFile?
+    @Published private(set) var receivedClipboardText:
+        String?
+    @Published private(set) var dataTransferMessage:
+        String?
     @Published private(set) var recentEvents:
         [VisionLinkEventRecord] = []
 
@@ -218,6 +230,14 @@ final class VisionLinkManager: ObservableObject {
 
     func clearEventHistory() {
         recentEvents = []
+    }
+
+    func clearReceivedClipboard() {
+        receivedClipboardText = nil
+    }
+
+    func clearDataTransferMessage() {
+        dataTransferMessage = nil
     }
 
     private func launchConnection(
@@ -611,6 +631,9 @@ final class VisionLinkManager: ObservableObject {
     private func resetMedia() {
         webRTCReceiver.close()
         remoteVideoTrack = nil
+        isDataChannelReady = false
+        isCameraShareActive = false
+        incomingTransfer = nil
     }
 
     private func sendSignaling(
@@ -782,6 +805,68 @@ extension VisionLinkManager:
     ) {
         remoteVideoTrack = videoTrack
         appendEvent("원격 비디오 트랙 수신")
+    }
+
+    func webRTCReceiver(
+        _ receiver: VisionLinkWebRTCReceiver,
+        dataChannelReady: Bool
+    ) {
+        guard isDataChannelReady
+                != dataChannelReady else {
+            return
+        }
+        isDataChannelReady = dataChannelReady
+        if dataChannelReady {
+            dataTransferMessage = nil
+            appendEvent("VisionLink 데이터 채널 연결됨")
+        } else {
+            isCameraShareActive = false
+            incomingTransfer = nil
+            appendEvent("VisionLink 데이터 채널 연결 끊김")
+        }
+    }
+
+    func webRTCReceiver(
+        _ receiver: VisionLinkWebRTCReceiver,
+        didReceive dataEvent: VisionLinkDataEvent
+    ) {
+        switch dataEvent {
+        case .cameraShareChanged(let active):
+            isCameraShareActive = active
+            appendEvent(
+                active
+                    ? "상대 카메라 공유 시작"
+                    : "상대 카메라 공유 종료"
+            )
+        case .clipboardReceived(let text):
+            receivedClipboardText = text
+            dataTransferMessage = nil
+            appendEvent(
+                "클립보드 텍스트 수신 · "
+                    + "\(text.count)자"
+            )
+        case .transferStarted(let progress):
+            incomingTransfer = progress
+            dataTransferMessage = nil
+            appendEvent(
+                "파일 수신 시작 · "
+                    + progress.fileName
+            )
+        case .transferProgress(let progress):
+            incomingTransfer = progress
+        case .fileReceived(let file):
+            incomingTransfer = nil
+            lastReceivedFile = file
+            dataTransferMessage = nil
+            appendEvent(
+                "파일 수신 완료 · "
+                    + file.fileName
+            )
+        case .failed(let message):
+            incomingTransfer = nil
+            dataTransferMessage = message
+            appendEvent(message)
+        }
     }
 
     func webRTCReceiver(
