@@ -9,6 +9,23 @@ nonisolated struct EPUBChapter:
     let title: String
     let href: String
     let text: String
+    let fragmentSegmentIndexes: [String: Int]
+
+    init(
+        id: String,
+        title: String,
+        href: String,
+        text: String,
+        fragmentSegmentIndexes:
+            [String: Int] = [:]
+    ) {
+        self.id = id
+        self.title = title
+        self.href = href
+        self.text = text
+        self.fragmentSegmentIndexes =
+            fragmentSegmentIndexes
+    }
 }
 
 nonisolated struct EPUBBook: Equatable, Sendable {
@@ -17,6 +34,26 @@ nonisolated struct EPUBBook: Equatable, Sendable {
     let creator: String?
     let language: String?
     let chapters: [EPUBChapter]
+    let mediaOverlayItems:
+        [EPUBMediaOverlayItem]
+
+    init(
+        identifier: String,
+        title: String,
+        creator: String?,
+        language: String?,
+        chapters: [EPUBChapter],
+        mediaOverlayItems:
+            [EPUBMediaOverlayItem] = []
+    ) {
+        self.identifier = identifier
+        self.title = title
+        self.creator = creator
+        self.language = language
+        self.chapters = chapters
+        self.mediaOverlayItems =
+            mediaOverlayItems
+    }
 }
 
 nonisolated enum EPUBParserError: LocalizedError {
@@ -48,6 +85,7 @@ nonisolated enum EPUBBookParser {
         let href: String
         let mediaType: String
         let properties: Set<String>
+        let mediaOverlayID: String?
     }
 
     static func parse(data: Data) throws -> EPUBBook {
@@ -83,7 +121,9 @@ nonisolated enum EPUBBookParser {
                 id: rawItem.id,
                 href: rawItem.href,
                 mediaType: rawItem.mediaType,
-                properties: rawItem.properties
+                properties: rawItem.properties,
+                mediaOverlayID:
+                    rawItem.mediaOverlayID
             )
         }
         let spine = packageDelegate.spineIDs.compactMap {
@@ -125,7 +165,14 @@ nonisolated enum EPUBBookParser {
                     id: item.id,
                     title: title,
                     href: chapterPath,
-                    text: text
+                    text: text,
+                    fragmentSegmentIndexes:
+                        fragmentSegmentIndexes(
+                            text: text,
+                            fragmentTexts:
+                                extractor
+                                .fragmentTexts
+                        )
                 )
             )
         }
@@ -137,6 +184,23 @@ nonisolated enum EPUBBookParser {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let title = packageDelegate.title?
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        let overlayPaths =
+            try mediaOverlayPaths(
+                spine: spine,
+                manifest: manifest,
+                manifestOrder:
+                    packageDelegate
+                    .manifestItems
+                    .compactMap {
+                        manifest[$0.id]
+                    },
+                packagePath: packagePath
+            )
+        let mediaOverlayItems =
+            EPUBMediaOverlayParser.parse(
+                archive: archive,
+                paths: overlayPaths
+            )
         return EPUBBook(
             identifier: identifier?.isEmpty == false
                 ? identifier!
@@ -144,8 +208,99 @@ nonisolated enum EPUBBookParser {
             title: title?.isEmpty == false ? title! : "제목 없는 EPUB",
             creator: packageDelegate.creator,
             language: packageDelegate.language,
-            chapters: chapters
+            chapters: chapters,
+            mediaOverlayItems:
+                mediaOverlayItems
         )
+    }
+
+    private static func mediaOverlayPaths(
+        spine: [ManifestItem],
+        manifest: [String: ManifestItem],
+        manifestOrder: [ManifestItem],
+        packagePath: String
+    ) throws -> [String] {
+        var paths: [String] = []
+        var seen: Set<String> = []
+        for item in spine {
+            guard let overlayID =
+                    item.mediaOverlayID,
+                  let overlay = manifest[
+                      overlayID
+                  ],
+                  isSMIL(overlay) else {
+                continue
+            }
+            let path = try resolve(
+                href: overlay.href,
+                relativeTo: packagePath
+            )
+            if seen.insert(path).inserted {
+                paths.append(path)
+            }
+        }
+        if !paths.isEmpty {
+            return paths
+        }
+        for overlay in manifestOrder
+        where isSMIL(overlay) {
+            let path = try resolve(
+                href: overlay.href,
+                relativeTo: packagePath
+            )
+            if seen.insert(path).inserted {
+                paths.append(path)
+            }
+        }
+        return paths
+    }
+
+    private static func isSMIL(
+        _ item: ManifestItem
+    ) -> Bool {
+        item.mediaType.lowercased()
+            == "application/smil+xml"
+        || item.mediaType.lowercased()
+            == "application/smil"
+        || item.href.lowercased()
+            .hasSuffix(".smil")
+    }
+
+    private static func fragmentSegmentIndexes(
+        text: String,
+        fragmentTexts: [String: String]
+    ) -> [String: Int] {
+        let segments = text
+            .components(separatedBy: "\n\n")
+            .map {
+                $0.split(whereSeparator: \.isWhitespace)
+                    .joined(separator: " ")
+            }
+            .filter { !$0.isEmpty }
+        var result: [String: Int] = [:]
+        for (fragmentID, rawFragmentText)
+            in fragmentTexts
+        where result[fragmentID] == nil {
+            let fragmentText = rawFragmentText
+                .split(whereSeparator: \.isWhitespace)
+                .joined(separator: " ")
+            guard !fragmentText.isEmpty,
+                  let index = segments.firstIndex(
+                      where: {
+                          $0 == fragmentText
+                          || $0.contains(
+                              fragmentText
+                          )
+                          || fragmentText.contains(
+                              $0
+                          )
+                      }
+                  ) else {
+                continue
+            }
+            result[fragmentID] = index
+        }
+        return result
     }
 
     private static func navigationTitleMap(
@@ -315,6 +470,7 @@ private nonisolated final class EPUBPackageXMLDelegate:
         let href: String
         let mediaType: String
         let properties: Set<String>
+        let mediaOverlayID: String?
     }
 
     var manifestItems: [RawManifestItem] = []
@@ -356,7 +512,11 @@ private nonisolated final class EPUBPackageXMLDelegate:
                     id: id,
                     href: href,
                     mediaType: mediaType,
-                    properties: properties
+                    properties: properties,
+                    mediaOverlayID:
+                        attributeDict[
+                            "media-overlay"
+                        ]
                 )
             )
         case "spine":
@@ -583,6 +743,17 @@ private nonisolated final class EPUBHTMLTextDelegate:
     private var headingDepth = 0
     private var headingBuffer = ""
     private(set) var firstHeading: String?
+    private(set) var fragmentTexts:
+        [String: String] = [:]
+    private var elementDepth = 0
+    private var fragmentCaptures:
+        [FragmentCapture] = []
+
+    private struct FragmentCapture {
+        let id: String
+        let depth: Int
+        var text: String
+    }
 
     var text: String {
         buffer
@@ -603,6 +774,7 @@ private nonisolated final class EPUBHTMLTextDelegate:
         qualifiedName qName: String?,
         attributes attributeDict: [String: String] = [:]
     ) {
+        elementDepth += 1
         let name = elementName.lowercased()
         if skippedDepth > 0 {
             skippedDepth += 1
@@ -611,6 +783,20 @@ private nonisolated final class EPUBHTMLTextDelegate:
         if Self.skippedElements.contains(name) {
             skippedDepth = 1
             return
+        }
+        if let fragmentID =
+                attributeDict["id"]?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ),
+           !fragmentID.isEmpty {
+            fragmentCaptures.append(
+                FragmentCapture(
+                    id: fragmentID,
+                    depth: elementDepth,
+                    text: ""
+                )
+            )
         }
         if Self.blockElements.contains(name) {
             appendLineBreak()
@@ -632,6 +818,9 @@ private nonisolated final class EPUBHTMLTextDelegate:
             return
         }
         buffer += string
+        for index in fragmentCaptures.indices {
+            fragmentCaptures[index].text += string
+        }
         if headingDepth > 0 {
             headingBuffer += string
         }
@@ -646,6 +835,7 @@ private nonisolated final class EPUBHTMLTextDelegate:
         let name = elementName.lowercased()
         if skippedDepth > 0 {
             skippedDepth -= 1
+            elementDepth -= 1
             return
         }
         if headingDepth > 0 {
@@ -662,6 +852,23 @@ private nonisolated final class EPUBHTMLTextDelegate:
         if Self.blockElements.contains(name) {
             appendLineBreak()
         }
+        let completed = fragmentCaptures
+            .filter {
+                $0.depth == elementDepth
+            }
+        fragmentCaptures.removeAll {
+            $0.depth == elementDepth
+        }
+        for capture in completed
+        where fragmentTexts[capture.id] == nil {
+            let text = capture.text
+                .split(whereSeparator: \.isWhitespace)
+                .joined(separator: " ")
+            if !text.isEmpty {
+                fragmentTexts[capture.id] = text
+            }
+        }
+        elementDepth -= 1
     }
 
     private func appendLineBreak() {

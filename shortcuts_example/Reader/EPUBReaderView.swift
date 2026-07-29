@@ -427,6 +427,8 @@ private enum EPUBReaderTheme: String, CaseIterable, Identifiable {
 
 struct EPUBReaderView: View {
     @StateObject private var viewModel: EPUBReaderViewModel
+    @StateObject private var mediaOverlayPlayer:
+        EPUBMediaOverlayPlaybackController
     @State private var isContentsPresented = false
     @State private var isSearchPresented = false
     @State private var isSettingsPresented = false
@@ -448,6 +450,12 @@ struct EPUBReaderView: View {
             wrappedValue: EPUBReaderViewModel(
                 fileURL: fileURL
             )
+        )
+        _mediaOverlayPlayer = StateObject(
+            wrappedValue:
+                EPUBMediaOverlayPlaybackController(
+                    fileURL: fileURL
+                )
         )
     }
 
@@ -499,14 +507,43 @@ struct EPUBReaderView: View {
         }
         .task {
             await viewModel.load()
+            if let book = viewModel.book {
+                mediaOverlayPlayer.configure(
+                    book: book,
+                    chapterIndex:
+                        viewModel.currentChapterIndex,
+                    segmentIndex:
+                        viewModel.currentSegmentIndex
+                )
+                mediaOverlayPlayer.setRate(
+                    speechRate
+                )
+            }
         }
         .onChange(of: viewModel.currentChapterIndex) {
             _, _ in
             tts.stop()
         }
+        .onChange(
+            of: mediaOverlayPlayer.currentLocation
+        ) { _, location in
+            guard let location else {
+                return
+            }
+            tts.stop()
+            viewModel.selectChapter(
+                location.chapterIndex,
+                segmentIndex: location.segmentIndex
+            )
+        }
+        .onChange(of: speechRate) {
+            _, rate in
+            mediaOverlayPlayer.setRate(rate)
+        }
         .onDisappear {
             viewModel.flushProgress()
             tts.stop()
+            mediaOverlayPlayer.stop()
         }
         .sheet(isPresented: $isContentsPresented) {
             contentsSheet
@@ -577,6 +614,20 @@ struct EPUBReaderView: View {
                             segment.text
                         )
                         .id(segment.id)
+                        .background(
+                            isPlayingMediaSegment(
+                                index
+                            )
+                            ? Color.orange.opacity(
+                                0.16
+                            )
+                            : Color.clear
+                        )
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: 8
+                            )
+                        )
                         .background {
                             GeometryReader { geometry in
                                 Color.clear.preference(
@@ -688,23 +739,102 @@ struct EPUBReaderView: View {
     private var playbackBar: some View {
         HStack(spacing: 16) {
             Button("이전 장", systemImage: "chevron.left") {
-                viewModel.moveChapter(by: -1)
+                moveChapter(by: -1)
             }
             .disabled(viewModel.currentChapterIndex <= 0)
 
-            Button("읽기", systemImage: "play.fill") {
-                guard let text = viewModel.currentChapter?.text else {
-                    return
+            if mediaOverlayPlayer.hasAudio {
+                Button(
+                    "이전 오디오",
+                    systemImage:
+                        "backward.end.fill"
+                ) {
+                    mediaOverlayPlayer.move(by: -1)
                 }
-                tts.speak(
-                    text,
-                    rate: Float(speechRate * 0.5)
+                .disabled(
+                    !mediaOverlayPlayer
+                        .canMovePrevious
                 )
-            }
-            .disabled(viewModel.currentChapter == nil)
 
-            Button("정지", systemImage: "stop.fill") {
-                tts.stop()
+                Button(
+                    mediaOverlayPlayer.isPlaying
+                        ? "일시정지"
+                        : "재생",
+                    systemImage:
+                        mediaOverlayPlayer.isPlaying
+                        ? "pause.fill"
+                        : "play.fill"
+                ) {
+                    mediaOverlayPlayer
+                        .togglePlayback()
+                }
+                .disabled(
+                    mediaOverlayPlayer.isLoading
+                )
+
+                Button(
+                    "다음 오디오",
+                    systemImage:
+                        "forward.end.fill"
+                ) {
+                    mediaOverlayPlayer.move(by: 1)
+                }
+                .disabled(
+                    !mediaOverlayPlayer.canMoveNext
+                )
+
+                if mediaOverlayPlayer.isLoading {
+                    ProgressView()
+                } else {
+                    Text(
+                        mediaOverlayPlayer
+                            .positionDescription
+                    )
+                    .font(
+                        .caption.monospacedDigit()
+                    )
+                    .accessibilityLabel(
+                        "오디오 위치 "
+                        + mediaOverlayPlayer
+                            .positionDescription
+                    )
+                }
+                if let error =
+                        mediaOverlayPlayer
+                        .errorDescription {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
+                }
+            } else {
+                Button(
+                    "읽기",
+                    systemImage: "play.fill"
+                ) {
+                    guard let text =
+                            viewModel
+                            .currentChapter?.text else {
+                        return
+                    }
+                    tts.speak(
+                        text,
+                        rate:
+                            Float(
+                                speechRate * 0.5
+                            )
+                    )
+                }
+                .disabled(
+                    viewModel.currentChapter == nil
+                )
+
+                Button(
+                    "정지",
+                    systemImage: "stop.fill"
+                ) {
+                    tts.stop()
+                }
             }
 
             Text(viewModel.chapterPositionDescription)
@@ -715,7 +845,7 @@ struct EPUBReaderView: View {
                 )
 
             Button("다음 장", systemImage: "chevron.right") {
-                viewModel.moveChapter(by: 1)
+                moveChapter(by: 1)
             }
             .disabled(
                 guardLastChapterReached
@@ -745,7 +875,10 @@ struct EPUBReaderView: View {
                     id: \.element.id
                 ) { index, chapter in
                     Button {
-                        viewModel.selectChapter(index)
+                        selectLocation(
+                            chapterIndex: index,
+                            segmentIndex: 0
+                        )
                         isContentsPresented = false
                     } label: {
                         HStack {
@@ -794,8 +927,13 @@ struct EPUBReaderView: View {
                 } else {
                     List(results) { result in
                         Button {
-                            viewModel.selectSearchResult(
-                                result
+                            selectLocation(
+                                chapterIndex:
+                                    result.chapterIndex,
+                                segmentIndex:
+                                    result.segmentIndex,
+                                highlightedResult:
+                                    result
                             )
                             isSearchPresented = false
                         } label: {
@@ -916,16 +1054,58 @@ struct EPUBReaderView: View {
               ) else {
             return Text(text)
         }
-        return Text(
+        let prefix = Text(
             String(text[..<lower])
         )
-        + Text(
+        let match = Text(
             String(text[lower ..< upper])
         )
         .bold()
         .foregroundColor(.orange)
-        + Text(
+        let suffix = Text(
             String(text[upper...])
+        )
+        return Text(
+            "\(prefix)\(match)\(suffix)"
+        )
+    }
+
+    private func isPlayingMediaSegment(
+        _ segmentIndex: Int
+    ) -> Bool {
+        guard let location =
+                mediaOverlayPlayer.currentLocation else {
+            return false
+        }
+        return location.chapterIndex
+            == viewModel.currentChapterIndex
+            && location.segmentIndex == segmentIndex
+    }
+
+    private func moveChapter(by delta: Int) {
+        let target =
+            viewModel.currentChapterIndex + delta
+        selectLocation(
+            chapterIndex: target,
+            segmentIndex: 0
+        )
+    }
+
+    private func selectLocation(
+        chapterIndex: Int,
+        segmentIndex: Int,
+        highlightedResult:
+            EPUBSearchResult? = nil
+    ) {
+        mediaOverlayPlayer.selectLocation(
+            chapterIndex: chapterIndex,
+            segmentIndex: segmentIndex
+        )
+        viewModel.selectChapter(
+            chapterIndex,
+            segmentIndex: segmentIndex,
+            highlightedResult:
+                highlightedResult
         )
     }
 }

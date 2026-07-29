@@ -36,6 +36,46 @@ final class EPUBReaderTests: XCTestCase {
         XCTAssertFalse(
             book.chapters[0].text.contains("표시하지 않음")
         )
+        XCTAssertEqual(
+            book.chapters[1]
+                .fragmentSegmentIndexes["offline"],
+            1
+        )
+        XCTAssertEqual(
+            book.mediaOverlayItems,
+            [
+                EPUBMediaOverlayItem(
+                    id:
+                        "OEBPS/chapter2.smil#"
+                        + "offline-audio",
+                    smilPath:
+                        "OEBPS/chapter2.smil",
+                    textPath:
+                        "OEBPS/chapter2.xhtml",
+                    textFragmentID: "offline",
+                    audioPath:
+                        "OEBPS/audio/chapter2.mp3",
+                    clipBeginSeconds: 1.25,
+                    clipEndSeconds: 3.5,
+                    playOrder: 4
+                ),
+                EPUBMediaOverlayItem(
+                    id:
+                        "OEBPS/chapter2.smil#"
+                        + "offline-audio-2",
+                    smilPath:
+                        "OEBPS/chapter2.smil",
+                    textPath:
+                        "OEBPS/chapter2.xhtml",
+                    textFragmentID: "offline",
+                    audioPath:
+                        "OEBPS/audio/chapter2.mp3",
+                    clipBeginSeconds: 3.5,
+                    clipEndSeconds: nil,
+                    playOrder: 5
+                ),
+            ]
+        )
     }
 
     func testSearchFindsMatchingChapterAndBuildsSnippet()
@@ -152,6 +192,125 @@ final class EPUBReaderTests: XCTestCase {
         )
     }
 
+    func testSMILClockSupportsAndroidClockForms()
+    {
+        XCTAssertEqual(
+            EPUBSMILClock.seconds(
+                from: "npt=01:02:03.5"
+            ),
+            3_723.5
+        )
+        XCTAssertEqual(
+            EPUBSMILClock.seconds(
+                from: "02:03.25"
+            ),
+            123.25
+        )
+        XCTAssertEqual(
+            EPUBSMILClock.seconds(
+                from: "1500ms"
+            ),
+            1.5
+        )
+        XCTAssertEqual(
+            EPUBSMILClock.seconds(
+                from: "1.5min"
+            ),
+            90
+        )
+        XCTAssertNil(
+            EPUBSMILClock.seconds(
+                from: "not-a-clock"
+            )
+        )
+    }
+
+    func testMediaOverlayLocationResolvesTextFragment()
+        throws
+    {
+        let book = try EPUBBookParser.parse(
+            data: EPUBFixture.makeBook()
+        )
+
+        XCTAssertEqual(
+            EPUBMediaOverlayLocationResolver
+                .location(
+                    for: 0,
+                    items: book.mediaOverlayItems,
+                    chapters: book.chapters
+                ),
+            EPUBMediaOverlayLocation(
+                itemIndex: 0,
+                chapterIndex: 1,
+                segmentIndex: 1
+            )
+        )
+        XCTAssertEqual(
+            EPUBMediaOverlayLocationResolver
+                .nearestItemIndex(
+                    chapterIndex: 1,
+                    segmentIndex: 1,
+                    items: book.mediaOverlayItems,
+                    chapters: book.chapters
+                ),
+            0
+        )
+        XCTAssertNil(
+            EPUBMediaOverlayLocationResolver
+                .nearestItemIndex(
+                    chapterIndex: 0,
+                    segmentIndex: 0,
+                    items: book.mediaOverlayItems,
+                    chapters: book.chapters
+                )
+        )
+    }
+
+    func testMediaOverlayAudioExtractsToPrivateTemporaryFile()
+        async throws
+    {
+        let testDirectory = FileManager.default
+            .temporaryDirectory
+            .appendingPathComponent(
+                "RivoEPUBAudioTests-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        try FileManager.default.createDirectory(
+            at: testDirectory,
+            withIntermediateDirectories: true
+        )
+        defer {
+            try? FileManager.default.removeItem(
+                at: testDirectory
+            )
+        }
+        let bookURL = testDirectory
+            .appendingPathComponent("fixture.epub")
+        try EPUBFixture.makeBook().write(to: bookURL)
+        let store = EPUBMediaOverlayResourceStore(
+            bookURL: bookURL,
+            temporaryDirectory: testDirectory
+        )
+
+        let firstURL = try await store.audioURL(
+            for: "OEBPS/audio/chapter2.mp3"
+        )
+        let secondURL = try await store.audioURL(
+            for: "OEBPS/audio/chapter2.mp3"
+        )
+
+        XCTAssertEqual(firstURL, secondURL)
+        XCTAssertEqual(
+            try Data(contentsOf: firstURL),
+            Data([0x49, 0x44, 0x33, 0x04])
+        )
+        XCTAssertTrue(
+            firstURL.path.hasPrefix(
+                testDirectory.path
+            )
+        )
+    }
+
     func testArchiveRejectsPathTraversal() throws {
         let archiveData = try ZIPFixture.make(
             entries: [
@@ -262,7 +421,16 @@ private nonisolated enum EPUBFixture {
             <item
               id="chapter-2"
               href="chapter2.xhtml"
-              media-type="application/xhtml+xml"/>
+              media-type="application/xhtml+xml"
+              media-overlay="overlay-2"/>
+            <item
+              id="overlay-2"
+              href="chapter2.smil"
+              media-type="application/smil+xml"/>
+            <item
+              id="audio-2"
+              href="audio/chapter2.mp3"
+              media-type="audio/mpeg"/>
           </manifest>
           <spine>
             <itemref idref="chapter-1"/>
@@ -307,9 +475,32 @@ private nonisolated enum EPUBFixture {
           <head><title>둘째</title></head>
           <body>
             <h1>두 번째 장</h1>
-            <p>오프라인 독서를 위한 두 번째 본문입니다.</p>
+            <p id="offline">오프라인 독서를 위한 두 번째 본문입니다.</p>
           </body>
         </html>
+        """
+        let mediaOverlay = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <smil
+          xmlns="http://www.w3.org/ns/SMIL"
+          version="3.0">
+          <body>
+            <seq>
+              <par id="offline-par" playOrder="4">
+                <text src="chapter2.xhtml#offline"/>
+                <audio
+                  id="offline-audio"
+                  src="audio/chapter2.mp3"
+                  clipBegin="1.25s"
+                  clipEnd="3.5s"/>
+                <audio
+                  id="offline-audio-2"
+                  src="audio/chapter2.mp3"
+                  clipBegin="3.5s"/>
+              </par>
+            </seq>
+          </body>
+        </smil>
         """
 
         return try ZIPFixture.make(
@@ -345,6 +536,19 @@ private nonisolated enum EPUBFixture {
                     path: "OEBPS/chapter2.xhtml",
                     data: Data(secondChapter.utf8),
                     compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path: "OEBPS/chapter2.smil",
+                    data: Data(mediaOverlay.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path:
+                        "OEBPS/audio/chapter2.mp3",
+                    data: Data([
+                        0x49, 0x44, 0x33, 0x04,
+                    ]),
+                    compressionMethod: 0
                 )
             ]
         )
