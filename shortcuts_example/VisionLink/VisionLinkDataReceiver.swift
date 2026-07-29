@@ -53,6 +53,7 @@ nonisolated enum VisionLinkRemoteFeature:
     case ocr
     case imageAnalysis = "image-analysis"
     case aiChat = "ai-chat"
+    case liveReading = "live-reading"
     case translation
 
     var title: String {
@@ -63,6 +64,8 @@ nonisolated enum VisionLinkRemoteFeature:
             return "이미지 설명"
         case .aiChat:
             return "AI 대화"
+        case .liveReading:
+            return "실시간 읽기"
         case .translation:
             return "번역"
         }
@@ -142,6 +145,8 @@ nonisolated enum VisionLinkDataEvent:
     case remoteChatAttachmentReceived(
         VisionLinkChatFileAttachment
     )
+    case liveReadingStarted(String)
+    case liveReadingStopped(String)
     case failed(String)
 }
 
@@ -258,6 +263,8 @@ actor VisionLinkDataReceiver {
     static let maximumChatPDFSize: Int64 =
         14 * 1_024 * 1_024
     static let maximumChatMessages = 40
+    static let maximumLiveReadingSessionIDLength =
+        80
 
     private static let blockedGeneralExtensions:
         Set<String> = [
@@ -373,9 +380,15 @@ actor VisionLinkDataReceiver {
         case "chat-context-attachment":
             return receiveChatContextAttachment(message)
         case "live-reading-start":
-            return unsupportedLiveReading(message)
+            return receiveLiveReading(
+                message,
+                started: true
+            )
         case "live-reading-stop":
-            return []
+            return receiveLiveReading(
+                message,
+                started: false
+            )
         default:
             return []
         }
@@ -1208,25 +1221,28 @@ actor VisionLinkDataReceiver {
         ]
     }
 
-    private func unsupportedLiveReading(
-        _ message: [String: Any]
+    private func receiveLiveReading(
+        _ message: [String: Any],
+        started: Bool
     ) -> [VisionLinkDataAction] {
-        guard let sessionID = Self.nonemptyString(
-            message["sessionId"]
-        ) else {
+        guard let sessionID =
+                Self.nonemptyString(
+                    message["sessionId"]
+                ),
+              sessionID.count <= Self
+                .maximumLiveReadingSessionIDLength
+        else {
             return []
         }
         return [
-            .sendControl(
-                Self.controlData(
-                    [
-                        "type": "live-reading-error",
-                        "sessionId": sessionID,
-                        "message":
-                            "원격 실시간 읽기는 "
-                            + "아직 지원되지 않습니다.",
-                    ]
-                )
+            .event(
+                started
+                    ? .liveReadingStarted(
+                        sessionID
+                    )
+                    : .liveReadingStopped(
+                        sessionID
+                    )
             ),
         ]
     }

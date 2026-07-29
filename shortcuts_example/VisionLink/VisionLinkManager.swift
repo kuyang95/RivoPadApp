@@ -147,6 +147,8 @@ final class VisionLinkManager: ObservableObject {
         VisionLinkRemoteFeatureProcessor
     private let remoteChatProcessor:
         VisionLinkRemoteChatProcessor
+    private let liveReadingService:
+        any VisionLinkLiveReadingServing
 
     private var connectionTask: Task<Void, Never>?
     private var receiveTask: Task<Void, Never>?
@@ -161,6 +163,15 @@ final class VisionLinkManager: ObservableObject {
     private var remoteFeatureTask:
         Task<Void, Never>?
     private var remoteFeatureGeneration = 0
+    private var liveReadingSessionID: String?
+    private var liveReadingSequence = 0
+    private var liveReadingTextFilter =
+        VisionLinkLiveReadingTextFilter()
+    private var liveReadingOCRTask:
+        Task<Void, Never>?
+    private var liveReadingScheduleTask:
+        Task<Void, Never>?
+    private var liveReadingOperationID: UUID?
 
     init(
         server: any VisionLinkServerServing =
@@ -180,7 +191,10 @@ final class VisionLinkManager: ObservableObject {
                     .shared,
         conversationStore:
             VisionLinkConversationStore =
-                .shared
+                .shared,
+        liveReadingService:
+            (any VisionLinkLiveReadingServing)? =
+                nil
     ) {
         self.server = server
         self.credentialStore = credentialStore
@@ -196,6 +210,10 @@ final class VisionLinkManager: ObservableObject {
                 conversationStore:
                     conversationStore
             )
+        self.liveReadingService =
+            liveReadingService
+            ?? VisionLinkLocalLiveReadingService
+                .shared
         let requestedName = deviceName
             ?? UIDevice.current.name
         let normalized = requestedName.trimmingCharacters(
@@ -217,6 +235,8 @@ final class VisionLinkManager: ObservableObject {
         receiveTask?.cancel()
         countdownTask?.cancel()
         remoteFeatureTask?.cancel()
+        liveReadingOCRTask?.cancel()
+        liveReadingScheduleTask?.cancel()
         webSocket?.cancel(
             with: .goingAway,
             reason: nil
@@ -697,6 +717,224 @@ final class VisionLinkManager: ObservableObject {
         incomingTransfer = nil
     }
 
+    private func startRemoteLiveReading(
+        sessionID: String
+    ) {
+        stopRemoteLiveReading(
+            reason: "new-live-reading-session"
+        )
+        liveReadingSessionID = sessionID
+        liveReadingSequence = 0
+        liveReadingTextFilter.reset()
+        _ = webRTCReceiver
+            .sendLiveReadingStatus(
+                sessionID: sessionID,
+                state: "started"
+            )
+        remoteFeatureStatus =
+            VisionLinkRemoteFeatureStatus(
+                requestID: sessionID,
+                feature: .liveReading,
+                stage: "started",
+                message: "원격 화면 글자 읽는 중",
+                isWorking: true
+            )
+        dataTransferMessage = nil
+        appendEvent("원격 실시간 읽기 시작")
+        webRTCReceiver
+            .requestLiveReadingFrame()
+    }
+
+    private func stopRemoteLiveReading(
+        reason: String,
+        requestedSessionID: String? = nil,
+        sendStoppedStatus: Bool = false
+    ) {
+        if let requestedSessionID,
+           requestedSessionID
+            != liveReadingSessionID {
+            return
+        }
+        let previousSessionID =
+            liveReadingSessionID
+        liveReadingSessionID = nil
+        liveReadingSequence = 0
+        liveReadingTextFilter.reset()
+        liveReadingOperationID = nil
+        liveReadingOCRTask?.cancel()
+        liveReadingOCRTask = nil
+        liveReadingScheduleTask?.cancel()
+        liveReadingScheduleTask = nil
+        webRTCReceiver
+            .cancelLiveReadingFrameRequest()
+
+        guard let previousSessionID else {
+            return
+        }
+        if sendStoppedStatus {
+            _ = webRTCReceiver
+                .sendLiveReadingStatus(
+                    sessionID:
+                        previousSessionID,
+                    state: "stopped"
+                )
+            remoteFeatureStatus =
+                VisionLinkRemoteFeatureStatus(
+                    requestID:
+                        previousSessionID,
+                    feature: .liveReading,
+                    stage: "stopped",
+                    message:
+                        "원격 실시간 읽기 중지",
+                    isWorking: false
+                )
+        } else if remoteFeatureStatus?
+                    .feature == .liveReading {
+            remoteFeatureStatus = nil
+        }
+        appendEvent(
+            "원격 실시간 읽기 중지 · "
+                + reason
+        )
+    }
+
+    private func processLiveReadingFrame(
+        _ image: CGImage
+    ) {
+        guard let sessionID =
+                liveReadingSessionID,
+              liveReadingOCRTask == nil else {
+            return
+        }
+        let generation =
+            remoteFeatureGeneration
+        let operationID = UUID()
+        liveReadingOperationID = operationID
+        remoteFeatureStatus =
+            VisionLinkRemoteFeatureStatus(
+                requestID: sessionID,
+                feature: .liveReading,
+                stage: "recognizing",
+                message: "원격 화면 글자 인식 중",
+                isWorking: true
+            )
+        liveReadingOCRTask = Task {
+            do {
+                let rawText =
+                    try await liveReadingService
+                    .recognize(image)
+                try Task.checkCancellation()
+                guard generation
+                        == remoteFeatureGeneration,
+                      liveReadingSessionID
+                        == sessionID else {
+                    return
+                }
+                if let text =
+                        liveReadingTextFilter
+                        .accept(rawText) {
+                    liveReadingSequence += 1
+                    _ = webRTCReceiver
+                        .sendLiveReadingResult(
+                            sessionID: sessionID,
+                            sequence:
+                                liveReadingSequence,
+                            text: text
+                        )
+                    appendEvent(
+                        "실시간 읽기 결과 전송 · "
+                            + "\(text.count)자"
+                    )
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                guard generation
+                        == remoteFeatureGeneration,
+                      liveReadingSessionID
+                        == sessionID else {
+                    return
+                }
+                sendLiveReadingError(
+                    sessionID: sessionID,
+                    message:
+                        Self.userMessage(
+                            for: error
+                        )
+                )
+            }
+            finishLiveReadingFrame(
+                sessionID: sessionID,
+                generation: generation,
+                operationID: operationID
+            )
+        }
+    }
+
+    private func finishLiveReadingFrame(
+        sessionID: String,
+        generation: Int,
+        operationID: UUID
+    ) {
+        guard liveReadingOperationID
+                == operationID else {
+            return
+        }
+        liveReadingOperationID = nil
+        liveReadingOCRTask = nil
+        guard generation
+                == remoteFeatureGeneration,
+              liveReadingSessionID == sessionID
+        else {
+            return
+        }
+        scheduleNextLiveReadingFrame(
+            sessionID: sessionID,
+            generation: generation
+        )
+    }
+
+    private func scheduleNextLiveReadingFrame(
+        sessionID: String,
+        generation: Int
+    ) {
+        liveReadingScheduleTask?.cancel()
+        liveReadingScheduleTask = Task {
+            try? await Task.sleep(
+                nanoseconds: 1_200_000_000
+            )
+            guard !Task.isCancelled,
+                  generation
+                    == remoteFeatureGeneration,
+                  liveReadingSessionID
+                    == sessionID,
+                  isDataChannelReady,
+                  isCameraShareActive,
+                  remoteVideoTrack != nil else {
+                return
+            }
+            liveReadingScheduleTask = nil
+            webRTCReceiver
+                .requestLiveReadingFrame()
+        }
+    }
+
+    private func sendLiveReadingError(
+        sessionID: String,
+        message: String
+    ) {
+        _ = webRTCReceiver
+            .sendLiveReadingError(
+                sessionID: sessionID,
+                message: message
+            )
+        dataTransferMessage = message
+        appendEvent(
+            "원격 실시간 읽기 오류 · "
+                + message
+        )
+    }
+
     private func enqueueRemoteFeature(
         _ request: VisionLinkRemoteFeatureRequest
     ) {
@@ -1066,6 +1304,7 @@ final class VisionLinkManager: ObservableObject {
     private func invalidateRemoteFeatureWork(
         reason: String
     ) {
+        stopRemoteLiveReading(reason: reason)
         remoteFeatureGeneration &+= 1
         remoteFeatureTask?.cancel()
         remoteFeatureTask = nil
@@ -1302,6 +1541,12 @@ extension VisionLinkManager:
         switch dataEvent {
         case .cameraShareChanged(let active):
             isCameraShareActive = active
+            if !active {
+                stopRemoteLiveReading(
+                    reason:
+                        "camera-share-stopped"
+                )
+            }
             appendEvent(
                 active
                     ? "상대 카메라 공유 시작"
@@ -1349,6 +1594,21 @@ extension VisionLinkManager:
             incomingTransfer = nil
             dataTransferMessage = nil
             enqueueRemoteChat(.file(attachment))
+        case .liveReadingStarted(
+            let sessionID
+        ):
+            startRemoteLiveReading(
+                sessionID: sessionID
+            )
+        case .liveReadingStopped(
+            let sessionID
+        ):
+            stopRemoteLiveReading(
+                reason: "peer-requested",
+                requestedSessionID:
+                    sessionID,
+                sendStoppedStatus: true
+            )
         case .failed(let message):
             incomingTransfer = nil
             dataTransferMessage = message
@@ -1363,5 +1623,34 @@ extension VisionLinkManager:
         remoteVideoTrack = nil
         state = .failed(message)
         appendEvent(message)
+    }
+
+    func webRTCReceiver(
+        _ receiver: VisionLinkWebRTCReceiver,
+        didReceiveLiveReadingFrame image:
+            CGImage
+    ) {
+        processLiveReadingFrame(image)
+    }
+
+    func webRTCReceiver(
+        _ receiver: VisionLinkWebRTCReceiver,
+        didFailLiveReadingFrame message: String
+    ) {
+        guard let sessionID =
+                liveReadingSessionID else {
+            return
+        }
+        sendLiveReadingError(
+            sessionID: sessionID,
+            message: message.isEmpty
+                ? "카메라 화면을 읽지 못했습니다."
+                : message
+        )
+        scheduleNextLiveReadingFrame(
+            sessionID: sessionID,
+            generation:
+                remoteFeatureGeneration
+        )
     }
 }

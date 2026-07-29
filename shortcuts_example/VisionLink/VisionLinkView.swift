@@ -483,10 +483,9 @@ struct VisionLinkView: View {
                 systemImage: "checkmark.circle.fill"
             )
             Label(
-                "원격 AI 대화·실시간 읽기는 다음 구현 대상",
-                systemImage: "arrow.forward.circle"
+                "원격 AI 대화·첨부·실시간 읽기",
+                systemImage: "checkmark.circle.fill"
             )
-            .foregroundStyle(.secondary)
         }
     }
 

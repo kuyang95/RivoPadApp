@@ -42,6 +42,11 @@
 - 이미지 첨부는 M4 로컬 VLM, PDF는 내장 텍스트·Vision OCR 뒤 로컬 LLM 사용
 - `chat-attachment-ready`·`chat-attachment-error` 회신
 - OCR·번역·이미지 분석·AI 대화·첨부를 하나의 직렬 큐에서 처리
+- Android 규격의 `live-reading-start`·`live-reading-stop` 세션 제어
+- WebRTC 원격 영상을 1.2초 간격으로 한 프레임씩 추출해 Vision OCR 처리
+- 최근 5개 결과의 공백 정규화·bigram 0.88 유사도 기반 중복 억제
+- `live-reading-status`·`live-reading-result`·`live-reading-error` 크기 제한 회신
+- 카메라 공유·채널·세션 종료 시 프레임 요청과 OCR 작업 취소
 
 ## 실기기·서버 확인
 
@@ -80,6 +85,13 @@
 - [ ] HWP/XLS/XLSX 첨부에는 현재 미지원 오류가 상대 기기에 표시된다.
 - [ ] AI 대화와 OCR·번역 요청을 연속 전송해도 요청 순서가 보존된다.
 - [ ] 첨부 또는 AI 답변 생성 중 채널을 끊으면 늦은 회신과 임시 파일이 남지 않는다.
+- [ ] Android에서 실시간 읽기를 시작하면 같은 세션 ID로 `started` 상태가 돌아온다.
+- [ ] 고정된 글자는 한 번만 회신되고 공백·줄바꿈 또는 작은 변화는 중복 억제된다.
+- [ ] 다른 글자로 장면을 바꾸면 증가한 sequence와 새 인식문이 돌아온다.
+- [ ] 실시간 읽기를 중지하면 `stopped` 뒤 늦은 결과가 더 오지 않는다.
+- [ ] 카메라 공유 종료나 데이터 채널 연결 해제 시 프레임 요청과 OCR이 취소된다.
+- [ ] 송신기 회전 0·90·180·270도에서 OCR용 이미지 방향과 결과가 올바르다.
+- [ ] 1.2초 간격으로 10분 이상 읽을 때 M4 앱의 발열·메모리·응답성이 안정적이다.
 
 ## 다음 구현 우선순위
 
@@ -115,10 +127,10 @@
 - [x] `ai-chat` 메시지 문맥과 로컬 MLX 답변 회신
 - [x] 클립보드·이미지·TXT·PDF 대화 첨부
 - [ ] HWP/XLS/XLSX 대화 첨부 텍스트 추출
-- 원격 영상 프레임의 실시간 텍스트 읽기
+- [x] 원격 영상 프레임의 1.2초 간격 OCR과 최근 결과 중복 억제
 - [x] `visioncraft-feature`, `visioncraft-chat-attachment`,
   `chat-context-attachment`, `feature-request` 연결
-- [ ] `live-reading-*` 연결
+- [x] `live-reading-start`·`live-reading-stop`·상태·결과·오류 연결
 
 ## 원격 기능 구현 메모
 
@@ -138,6 +150,9 @@
 - Android 수신 규격상 HWP/XLS/XLSX 전송은 허용하지만 현재 iPad 앱에는
   안전한 로컬 파서가 없다. 파일은 영구 저장하지 않고 명시적 미지원 오류를
   회신하며, 공용 문서 파서를 도입할 때 함께 연결한다.
+- Android와 같이 원격 영상 렌더러와 별도의 1회성 프레임 샘플러를 두고
+  OCR 완료 뒤 1.2초 후 다음 프레임을 요청한다. 화면 렌더링 속도와 OCR
+  처리 속도가 서로 영향을 주지 않으며 동시에 여러 OCR을 쌓지 않는다.
 
 ## iPadOS 제약
 

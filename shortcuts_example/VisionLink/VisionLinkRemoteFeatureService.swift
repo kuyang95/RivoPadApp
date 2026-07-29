@@ -63,6 +63,10 @@ struct VisionLinkRemoteFeatureProcessor {
                     throw VisionLinkRemoteFeatureError
                         .unsupportedRequest
 
+                case .liveReading:
+                    throw VisionLinkRemoteFeatureError
+                        .unsupportedRequest
+
                 case .translation:
                     onUpdate(.progress("recognizing"))
                     let recognized = try await service

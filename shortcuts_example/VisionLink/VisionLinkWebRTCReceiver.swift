@@ -1,4 +1,5 @@
 @preconcurrency import StreamWebRTC
+import CoreGraphics
 import Foundation
 
 nonisolated enum VisionLinkMediaConnectionState:
@@ -39,6 +40,17 @@ protocol VisionLinkWebRTCReceiverDelegate: AnyObject {
 
     func webRTCReceiver(
         _ receiver: VisionLinkWebRTCReceiver,
+        didReceiveLiveReadingFrame image:
+            CGImage
+    )
+
+    func webRTCReceiver(
+        _ receiver: VisionLinkWebRTCReceiver,
+        didFailLiveReadingFrame message: String
+    )
+
+    func webRTCReceiver(
+        _ receiver: VisionLinkWebRTCReceiver,
         dataChannelReady: Bool
     )
 
@@ -72,6 +84,27 @@ final class VisionLinkWebRTCReceiver: NSObject {
     private var dataReceiver:
         VisionLinkDataReceiver?
     private var dataReceiveTask: Task<Void, Never>?
+    private lazy var liveReadingFrameSampler =
+        VisionLinkVideoFrameSampler {
+            [weak self] result in
+            guard let self else {
+                return
+            }
+            switch result {
+            case .success(let image):
+                self.delegate?.webRTCReceiver(
+                    self,
+                    didReceiveLiveReadingFrame:
+                        image
+                )
+            case .failure(let error):
+                self.delegate?.webRTCReceiver(
+                    self,
+                    didFailLiveReadingFrame:
+                        error.localizedDescription
+                )
+            }
+        }
 
     override init() {
         _ = Self.didInitializeSSL
@@ -213,6 +246,12 @@ final class VisionLinkWebRTCReceiver: NSObject {
         negotiationTask?.cancel()
         negotiationTask = nil
         closeDataChannel()
+        if let remoteVideoTrack {
+            remoteVideoTrack.remove(
+                liveReadingFrameSampler
+            )
+        }
+        liveReadingFrameSampler.cancelRequest()
         remoteVideoTrack = nil
         pendingRemoteCandidates = []
         peerConnection?.close()
@@ -294,6 +333,55 @@ final class VisionLinkWebRTCReceiver: NSObject {
         )
     }
 
+    @discardableResult
+    func sendLiveReadingStatus(
+        sessionID: String,
+        state: String
+    ) -> Bool {
+        sendControl(
+            VisionLinkLiveReadingControl.status(
+                sessionID: sessionID,
+                state: state
+            )
+        )
+    }
+
+    @discardableResult
+    func sendLiveReadingResult(
+        sessionID: String,
+        sequence: Int,
+        text: String
+    ) -> Bool {
+        sendControl(
+            VisionLinkLiveReadingControl.result(
+                sessionID: sessionID,
+                sequence: sequence,
+                text: text
+            )
+        )
+    }
+
+    @discardableResult
+    func sendLiveReadingError(
+        sessionID: String,
+        message: String
+    ) -> Bool {
+        sendControl(
+            VisionLinkLiveReadingControl.error(
+                sessionID: sessionID,
+                message: message
+            )
+        )
+    }
+
+    func requestLiveReadingFrame() {
+        liveReadingFrameSampler.requestFrame()
+    }
+
+    func cancelLiveReadingFrameRequest() {
+        liveReadingFrameSampler.cancelRequest()
+    }
+
     private func createAndSetAnswer(
         for peerConnection: RTCPeerConnection
     ) async throws {
@@ -348,7 +436,11 @@ final class VisionLinkWebRTCReceiver: NSObject {
               remoteVideoTrack !== track else {
             return
         }
+        remoteVideoTrack?.remove(
+            liveReadingFrameSampler
+        )
         remoteVideoTrack = track
+        track.add(liveReadingFrameSampler)
         delegate?.webRTCReceiver(
             self,
             didReceive: track
