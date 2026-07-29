@@ -59,12 +59,15 @@ final class ChatViewModel: ObservableObject {
     private enum LoadedKind { case text, vision }
 
     var canSend: Bool {
-        didLoadOnce
-            && !isLoadingModel
+        isReadyForInput
             && !isGenerating
             && !input.trimmingCharacters(
                 in: .whitespacesAndNewlines
             ).isEmpty
+    }
+
+    var isReadyForInput: Bool {
+        didLoadOnce && !isLoadingModel
     }
 
     init(

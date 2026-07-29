@@ -11,8 +11,14 @@ enum ChatIntentInput: Equatable {
 struct LLMContentView: View {
     let intent: ChatIntentInput
     @StateObject private var vm: ChatViewModel
+    @ObservedObject private var stt = STTManager.shared
 
     @State private var didStart = false
+    @State private var speechTask: Task<Void, Never>?
+    @State private var voiceErrorDescription: String?
+    @State private var shouldSpeakNextResponse = false
+
+    private let tts = TTSManager.shared
 
     init(intent: ChatIntentInput) {
         self.intent = intent
@@ -74,13 +80,21 @@ struct LLMContentView: View {
                     .defaultScrollAnchor(.bottom)
                 }
 
-                if let error = vm.historyErrorDescription {
+                if let error = voiceErrorDescription
+                    ?? vm.historyErrorDescription {
                     Text(error)
                         .font(.footnote)
                         .foregroundStyle(.red)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 12)
                         .accessibilityLabel("오류: \(error)")
+                } else if stt.isRecording {
+                    Text("듣는 중… 마이크 버튼을 다시 누르면 종료됩니다.")
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .accessibilityLabel("음성을 듣는 중입니다.")
                 } else if !vm.status.isEmpty {
                     Text(vm.status)
                         .font(.footnote)
@@ -91,6 +105,41 @@ struct LLMContentView: View {
                 }
 
                 HStack(alignment: .bottom) {
+                    Button {
+                        if stt.isRecording {
+                            stt.finishRecording()
+                        } else {
+                            startVoiceInput()
+                        }
+                    } label: {
+                        Image(
+                            systemName: stt.isRecording
+                                ? "stop.fill"
+                                : "mic.fill"
+                        )
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(stt.isRecording ? .red : .indigo)
+                    .disabled(
+                        !vm.isReadyForInput
+                            || vm.isGenerating
+                            || (
+                                speechTask != nil
+                                    && !stt.isRecording
+                            )
+                    )
+                    .accessibilityLabel(
+                        stt.isRecording
+                            ? "음성 입력 종료"
+                            : "음성으로 질문"
+                    )
+                    .accessibilityHint(
+                        stt.isRecording
+                            ? "인식을 마치고 질문을 전송합니다."
+                            : "온디바이스 한국어 음성 인식을 시작합니다."
+                    )
+
                     TextField(
                         "메시지를 입력하세요",
                         text: $vm.input,
@@ -102,6 +151,7 @@ struct LLMContentView: View {
                             vm.isLoadingModel
                                 || vm.isInitialQueryRunning
                                 || vm.isGenerating
+                                || stt.isRecording
                         )
                         .submitLabel(.send)
                         .onSubmit {
@@ -155,7 +205,29 @@ struct LLMContentView: View {
             await vm.prepare(for: intent)
         }
         .onDisappear {
+            speechTask?.cancel()
+            speechTask = nil
+            stt.cancelRecording()
+            tts.stop()
             vm.closeConversation()
+        }
+        .onChange(of: vm.isGenerating) { wasGenerating, isGenerating in
+            guard wasGenerating,
+                  !isGenerating,
+                  shouldSpeakNextResponse else {
+                return
+            }
+            shouldSpeakNextResponse = false
+            guard vm.status == "완료",
+                  let response = vm.messages.last(where: {
+                      $0.role == "assistant"
+                          && !$0.text.trimmingCharacters(
+                              in: .whitespacesAndNewlines
+                          ).isEmpty
+                  }) else {
+                return
+            }
+            speak(response.text)
         }
     }
 
@@ -169,12 +241,67 @@ struct LLMContentView: View {
             return "문서 질문"
         }
     }
+
+    private func startVoiceInput() {
+        guard speechTask == nil,
+              vm.isReadyForInput,
+              !vm.isGenerating else {
+            return
+        }
+
+        tts.stop()
+        voiceErrorDescription = nil
+        speechTask = Task {
+            defer {
+                speechTask = nil
+            }
+
+            do {
+                let stream = try await stt.startRecording(
+                    requiresOnDeviceRecognition: true
+                )
+                for await recognizedText in stream {
+                    try Task.checkCancellation()
+                    let question = recognizedText.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                    guard !question.isEmpty else {
+                        voiceErrorDescription =
+                            "음성을 인식하지 못했습니다. 다시 시도해 주세요."
+                        continue
+                    }
+
+                    vm.input = question
+                    shouldSpeakNextResponse = true
+                    vm.sendUserMessage()
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                voiceErrorDescription = error.localizedDescription
+            }
+        }
+    }
+
+    private func speak(_ text: String) {
+        let trimmed = text.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !trimmed.isEmpty else {
+            return
+        }
+        tts.stop()
+        tts.speak(trimmed)
+    }
 }
 
 
 private struct MessageRow: View {
     let m: ChatViewModel.Msg
-    init(_ m: ChatViewModel.Msg) { self.m = m }
+
+    init(_ m: ChatViewModel.Msg) {
+        self.m = m
+    }
 
     var body: some View {
         HStack(alignment: .bottom) {

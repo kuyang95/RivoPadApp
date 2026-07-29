@@ -15,6 +15,7 @@ final class STTManager: ObservableObject {
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
+    private var requestFinishHandler: (() -> Void)?
 
     private let locale = Locale(identifier: "ko-KR")
 
@@ -32,10 +33,24 @@ final class STTManager: ObservableObject {
     // endAudio 후 final이 안 오면 강제 종료 (안전장치)
     private let finalTimeoutAfterEndAudio: TimeInterval = 2.0
 
-    enum STTError: Error {
+    enum STTError: LocalizedError {
         case permissionDenied
         case recognizerUnavailable
         case alreadyRecording
+        case onDeviceRecognitionUnavailable
+
+        var errorDescription: String? {
+            switch self {
+            case .permissionDenied:
+                return "마이크와 음성 인식 권한이 필요합니다."
+            case .recognizerUnavailable:
+                return "한국어 음성 인식을 사용할 수 없습니다."
+            case .alreadyRecording:
+                return "이미 음성을 듣고 있습니다."
+            case .onDeviceRecognitionUnavailable:
+                return "이 기기에서 한국어 온디바이스 음성 인식을 사용할 수 없습니다."
+            }
+        }
     }
 
     // MARK: - Logging
@@ -45,7 +60,9 @@ final class STTManager: ObservableObject {
     }
 
     // MARK: - Public API
-    func startRecording() async throws -> AsyncStream<String> {
+    func startRecording(
+        requiresOnDeviceRecognition: Bool = false
+    ) async throws -> AsyncStream<String> {
         log("▶️ startRecording() called. isRecording=\(isRecording) audioEngine.isRunning=\(audioEngine.isRunning)")
 
         guard !isRecording else { throw STTError.alreadyRecording }
@@ -60,10 +77,11 @@ final class STTManager: ObservableObject {
               recognizer.isAvailable else {
             throw STTError.recognizerUnavailable
         }
+        guard !requiresOnDeviceRecognition
+                || recognizer.supportsOnDeviceRecognition else {
+            throw STTError.onDeviceRecognitionUnavailable
+        }
         self.speechRecognizer = recognizer
-
-        let audioSession = AVAudioSession.sharedInstance()
-//        try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
@@ -87,6 +105,7 @@ final class STTManager: ObservableObject {
                 guard !didFinishStream else { return }
                 didFinishStream = true
                 Task { @MainActor in
+                    self.requestFinishHandler = nil
                     if let text {
                         continuation.yield(text)
                     }
@@ -118,10 +137,20 @@ final class STTManager: ObservableObject {
                         try? await Task.sleep(nanoseconds: UInt64(self.finalTimeoutAfterEndAudio * 1_000_000_000))
                         if !didFinishStream {
                             self.log("⏳ final timeout hit → finishing without final")
-                            finishOnce(nil)
+                            let fallback = lastPartialText
+                                .trimmingCharacters(
+                                    in: .whitespacesAndNewlines
+                                )
+                            finishOnce(
+                                fallback.isEmpty ? nil : fallback
+                            )
                         }
                     }
                 }
+            }
+
+            self.requestFinishHandler = {
+                endAudioAndStopEngineOnce(reason: "manual stop")
             }
 
             // Tap
@@ -210,7 +239,16 @@ final class STTManager: ObservableObject {
         }
     }
 
-    // MARK: - Stop (내부용)
+    func finishRecording() {
+        requestFinishHandler?()
+    }
+
+    func cancelRecording() {
+        requestFinishHandler = nil
+        stopInternalCancel()
+    }
+
+    // MARK: - Stop
 
     /// final 받기 전에는 cancel을 최대한 피해야 함.
     /// 하지만 stream을 완전히 종료할 때는 cancel 포함해서 정리.
@@ -229,6 +267,7 @@ final class STTManager: ObservableObject {
 
         recognitionTask = nil
         recognitionRequest = nil
+        requestFinishHandler = nil
         self.amplitude = 0
 
 //        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
@@ -243,6 +282,7 @@ final class STTManager: ObservableObject {
         recognitionTask?.cancel()
         recognitionTask = nil
         recognitionRequest = nil
+        requestFinishHandler = nil
         isRecording = false
     }
 
@@ -254,7 +294,7 @@ final class STTManager: ObservableObject {
             }
         }
         let mic = await withCheckedContinuation { cont in
-            AVAudioSession.sharedInstance().requestRecordPermission { granted in
+            AVAudioApplication.requestRecordPermission { granted in
                 cont.resume(returning: granted)
             }
         }
