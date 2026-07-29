@@ -264,6 +264,36 @@ final class VisionLinkWebRTCReceiver: NSObject {
         )
     }
 
+    @discardableResult
+    func sendChatAttachmentReady(
+        attachmentID: String,
+        conversationID: String,
+        name: String
+    ) -> Bool {
+        sendControl(
+            VisionLinkChatControl.attachmentReady(
+                attachmentID: attachmentID,
+                conversationID: conversationID,
+                name: name
+            )
+        )
+    }
+
+    @discardableResult
+    func sendChatAttachmentError(
+        attachmentID: String,
+        conversationID: String,
+        message: String
+    ) -> Bool {
+        sendControl(
+            VisionLinkChatControl.attachmentError(
+                attachmentID: attachmentID,
+                conversationID: conversationID,
+                message: message
+            )
+        )
+    }
+
     private func createAndSetAnswer(
         for peerConnection: RTCPeerConnection
     ) async throws {

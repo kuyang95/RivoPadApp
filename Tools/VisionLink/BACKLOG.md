@@ -34,6 +34,14 @@
 - Vision OCR과 M4 로컬 MLX VLM/LLM을 사용하는 네트워크 비의존 처리
 - 기능 요청 직렬 큐와 데이터 채널 교체 시 작업 취소·임시 파일 정리
 - VisionLink 화면의 현재 원격 기능 단계·완료·오류 상태
+- Android 규격의 `ai-chat` 요청 검증과 `thinking`·결과·오류 회신
+- 원격 대화 ID를 로컬 대화 기록 UUID에 영구 연결
+- 첫 요청 전체 문맥과 이후 최신 질문·답변을 로컬 대화 기록에 저장
+- 최대 64KB 클립보드 문맥 첨부와 누적 256KB 안전 제한
+- 최대 25MB 이미지·TXT·PDF 대화 첨부 수신과 교체·임시 파일 정리
+- 이미지 첨부는 M4 로컬 VLM, PDF는 내장 텍스트·Vision OCR 뒤 로컬 LLM 사용
+- `chat-attachment-ready`·`chat-attachment-error` 회신
+- OCR·번역·이미지 분석·AI 대화·첨부를 하나의 직렬 큐에서 처리
 
 ## 실기기·서버 확인
 
@@ -62,6 +70,16 @@
 - [ ] 앱의 로컬 AI 대화가 사용 중이면 상대 기기에 재시도 오류가 표시된다.
 - [ ] 기능 처리 중 데이터 채널을 끊어도 늦은 결과나 임시 이미지가 남지 않는다.
 - [ ] 여러 기능 요청을 연속 전송하면 순서대로 직렬 처리된다.
+- [ ] Android에서 새 AI 대화를 보내면 `thinking` 뒤 M4 로컬 답변이 돌아온다.
+- [ ] 같은 원격 대화 ID의 후속 질문이 앞선 대화 문맥을 이어서 답한다.
+- [ ] 클립보드 문맥을 첨부한 뒤 질문하면 해당 내용을 참고해 답한다.
+- [ ] 이미지 첨부 뒤 질문하면 로컬 VLM이 이미지 내용을 참고해 답한다.
+- [ ] 텍스트가 있는 PDF와 스캔 PDF를 각각 첨부하면 로컬 답변이 돌아온다.
+- [ ] TXT 첨부가 문맥으로 누적되고 다음 질문에서 사용된다.
+- [ ] 새 이미지·PDF 첨부가 기존 첨부를 교체하고 오래된 파일이 남지 않는다.
+- [ ] HWP/XLS/XLSX 첨부에는 현재 미지원 오류가 상대 기기에 표시된다.
+- [ ] AI 대화와 OCR·번역 요청을 연속 전송해도 요청 순서가 보존된다.
+- [ ] 첨부 또는 AI 답변 생성 중 채널을 끊으면 늦은 회신과 임시 파일이 남지 않는다.
 
 ## 다음 구현 우선순위
 
@@ -93,10 +111,14 @@
 - [x] 텍스트 번역 요청과 결과 회신
 - [x] 기능별 진행·결과·오류 회신과 크기 제한
 - [x] 연결 교체 취소, 직렬 처리, 기능 임시 파일 정리
-- 로컬 AI 채팅과 VisionLink 대화 ID 연결
+- [x] 로컬 AI 채팅과 VisionLink 대화 ID 연결
+- [x] `ai-chat` 메시지 문맥과 로컬 MLX 답변 회신
+- [x] 클립보드·이미지·TXT·PDF 대화 첨부
+- [ ] HWP/XLS/XLSX 대화 첨부 텍스트 추출
 - 원격 영상 프레임의 실시간 텍스트 읽기
-- `visioncraft-feature`, `visioncraft-chat-attachment`,
-  `chat-context-attachment`, `feature-request`, `live-reading-*` 연결
+- [x] `visioncraft-feature`, `visioncraft-chat-attachment`,
+  `chat-context-attachment`, `feature-request` 연결
+- [ ] `live-reading-*` 연결
 
 ## 원격 기능 구현 메모
 
@@ -108,6 +130,14 @@
 - 로컬 AI 생성 중 새 원격 분석·번역 요청이 기존 대화를 중단하지 않도록
   현재는 `local AI busy` 오류로 돌려보낸다. OCR 요청은 AI 모델과
   독립적으로 동작한다.
+- Android Gemini 대화는 iPad에서 `Qwen3-8B-Instruct-4bit`와
+  `Qwen3-VL-8B-Instruct-4bit`로 대체했다. 메시지 기록, 공유 문맥,
+  이미지 또는 PDF 추출문을 제한된 프롬프트로 합쳐 네트워크 없이 답한다.
+- iPad MLX VLM은 PDF 파일 자체를 입력받지 않으므로 PDFKit 내장 텍스트를
+  먼저 사용하고, 텍스트가 없는 페이지는 Vision OCR로 추출해 LLM에 넣는다.
+- Android 수신 규격상 HWP/XLS/XLSX 전송은 허용하지만 현재 iPad 앱에는
+  안전한 로컬 파서가 없다. 파일은 영구 저장하지 않고 명시적 미지원 오류를
+  회신하며, 공용 문서 파서를 도입할 때 함께 연결한다.
 
 ## iPadOS 제약
 

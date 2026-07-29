@@ -59,6 +59,10 @@ struct VisionLinkRemoteFeatureProcessor {
                             at: imageRequest.fileURL
                         )
 
+                case .aiChat:
+                    throw VisionLinkRemoteFeatureError
+                        .unsupportedRequest
+
                 case .translation:
                     onUpdate(.progress("recognizing"))
                     let recognized = try await service
@@ -339,6 +343,7 @@ nonisolated enum VisionLinkRemoteFeatureError:
     case localAIBusy
     case emptyResult
     case resultTooLarge
+    case unsupportedRequest
 
     var errorDescription: String? {
         switch self {
@@ -352,6 +357,8 @@ nonisolated enum VisionLinkRemoteFeatureError:
             return "로컬 AI가 결과를 만들지 못했습니다."
         case .resultTooLarge:
             return "기능 결과가 전송 가능한 크기를 초과했습니다."
+        case .unsupportedRequest:
+            return "지원하지 않는 원격 기능 요청입니다."
         }
     }
 }

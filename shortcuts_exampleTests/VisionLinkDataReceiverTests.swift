@@ -674,6 +674,347 @@ final class VisionLinkDataReceiverTests:
         )
     }
 
+    func testAIChatRequestValidation()
+        async
+    {
+        let fixture = makeFixture()
+        defer { fixture.remove() }
+
+        let valid = await fixture.receiver.receive(
+            .control(
+                controlData(
+                    [
+                        "type": "feature-request",
+                        "requestId": "chat-1",
+                        "conversationId":
+                            "conversation-1",
+                        "feature": "ai-chat",
+                        "payload": [
+                            "messages": [
+                                [
+                                    "role": "user",
+                                    "content": "첫 질문",
+                                ],
+                                [
+                                    "role": "assistant",
+                                    "content": "첫 답변",
+                                ],
+                                [
+                                    "role": "user",
+                                    "content": "다음 질문",
+                                ],
+                            ],
+                        ],
+                    ]
+                )
+            )
+        )
+        XCTAssertEqual(
+            remoteChatRequest(in: valid),
+            VisionLinkChatRequest(
+                requestID: "chat-1",
+                conversationID: "conversation-1",
+                messages: [
+                    VisionLinkChatMessage(
+                        role: .user,
+                        content: "첫 질문"
+                    ),
+                    VisionLinkChatMessage(
+                        role: .assistant,
+                        content: "첫 답변"
+                    ),
+                    VisionLinkChatMessage(
+                        role: .user,
+                        content: "다음 질문"
+                    ),
+                ]
+            )
+        )
+
+        let assistantLast = await fixture.receiver
+            .receive(
+                .control(
+                    controlData(
+                        [
+                            "type": "feature-request",
+                            "requestId": "chat-2",
+                            "conversationId":
+                                "conversation-1",
+                            "feature": "ai-chat",
+                            "payload": [
+                                "messages": [
+                                    [
+                                        "role":
+                                            "assistant",
+                                        "content": "잘못된 끝",
+                                    ],
+                                ],
+                            ],
+                        ]
+                    )
+                )
+            )
+        XCTAssertEqual(
+            controlType(in: assistantLast),
+            "feature-error"
+        )
+        XCTAssertEqual(
+            controlObject(
+                in: assistantLast
+            )?["feature"] as? String,
+            "ai-chat"
+        )
+
+        let tooMany = Array(
+            repeating: [
+                "role": "user",
+                "content": "질문",
+            ],
+            count:
+                VisionLinkDataReceiver
+                .maximumChatMessages + 1
+        )
+        let oversizedTurns = await fixture.receiver
+            .receive(
+                .control(
+                    controlData(
+                        [
+                            "type": "feature-request",
+                            "requestId": "chat-3",
+                            "conversationId":
+                                "conversation-1",
+                            "feature": "ai-chat",
+                            "payload": [
+                                "messages": tooMany,
+                            ],
+                        ]
+                    )
+                )
+            )
+        XCTAssertEqual(
+            controlType(in: oversizedTurns),
+            "feature-error"
+        )
+        XCTAssertNil(
+            remoteChatRequest(in: oversizedTurns)
+        )
+    }
+
+    func testChatContextAttachmentValidation()
+        async
+    {
+        let fixture = makeFixture()
+        defer { fixture.remove() }
+
+        let valid = await fixture.receiver.receive(
+            .control(
+                controlData(
+                    [
+                        "type":
+                            "chat-context-attachment",
+                        "attachmentId":
+                            "attachment-1",
+                        "conversationId":
+                            "conversation-1",
+                        "name": "  메모  ",
+                        "text": "참고 문맥",
+                    ]
+                )
+            )
+        )
+        XCTAssertEqual(
+            remoteChatContext(in: valid),
+            VisionLinkChatContextAttachment(
+                attachmentID: "attachment-1",
+                conversationID: "conversation-1",
+                name: "메모",
+                text: "참고 문맥"
+            )
+        )
+
+        let oversized = await fixture.receiver
+            .receive(
+                .control(
+                    controlData(
+                        [
+                            "type":
+                                "chat-context-attachment",
+                            "attachmentId":
+                                "attachment-2",
+                            "conversationId":
+                                "conversation-1",
+                            "text": String(
+                                repeating: "a",
+                                count:
+                                    VisionLinkDataReceiver
+                                    .maximumChatContextSize
+                                    + 1
+                            ),
+                        ]
+                    )
+                )
+            )
+        XCTAssertEqual(
+            controlType(in: oversized),
+            "chat-attachment-error"
+        )
+        XCTAssertNil(
+            remoteChatContext(in: oversized)
+        )
+    }
+
+    func testChatImageAttachmentCompletesToTemporaryEvent()
+        async throws
+    {
+        let fixture = makeFixture()
+        defer { fixture.remove() }
+        let payload = pngPayload()
+        let startActions = await fixture.receiver
+            .receive(
+                .control(
+                    controlData(
+                        [
+                            "type": "file-start",
+                            "transferId":
+                                "attachment-3",
+                            "attachmentId":
+                                "attachment-3",
+                            "conversationId":
+                                "conversation-1",
+                            "purpose":
+                                "visioncraft-chat-attachment",
+                            "attachmentKind":
+                                "image",
+                            "name": "photo.png",
+                            "kind": "image",
+                            "mimeType":
+                                "image/png",
+                            "size": payload.count,
+                        ]
+                    )
+                )
+            )
+        XCTAssertEqual(
+            controlType(in: startActions),
+            "file-accepted"
+        )
+        _ = await fixture.receiver.receive(
+            .binary(payload)
+        )
+        let finishActions = await fixture.receiver
+            .receive(
+                .control(
+                    controlData(
+                        [
+                            "type": "file-end",
+                            "transferId":
+                                "attachment-3",
+                            "size": payload.count,
+                            "sha256":
+                                sha256(payload),
+                        ]
+                    )
+                )
+            )
+        XCTAssertEqual(
+            controlType(in: finishActions),
+            "file-complete"
+        )
+        let attachment = try XCTUnwrap(
+            remoteChatFile(in: finishActions)
+        )
+        XCTAssertEqual(
+            attachment.attachmentID,
+            "attachment-3"
+        )
+        XCTAssertEqual(
+            attachment.conversationID,
+            "conversation-1"
+        )
+        XCTAssertEqual(attachment.kind, .image)
+        XCTAssertEqual(
+            try Data(contentsOf: attachment.fileURL),
+            payload
+        )
+        XCTAssertTrue(
+            attachment.fileURL.path
+                .contains("/Partial/Features/")
+        )
+        XCTAssertNil(
+            receivedFile(in: finishActions)
+        )
+    }
+
+    func testInvalidChatAttachmentMetadataIsRejected()
+        async
+    {
+        let fixture = makeFixture()
+        defer { fixture.remove() }
+
+        let mismatchedID = await fixture.receiver
+            .receive(
+                .control(
+                    controlData(
+                        [
+                            "type": "file-start",
+                            "transferId":
+                                "transfer-1",
+                            "attachmentId":
+                                "attachment-1",
+                            "conversationId":
+                                "conversation-1",
+                            "purpose":
+                                "visioncraft-chat-attachment",
+                            "attachmentKind":
+                                "document",
+                            "name": "document.pdf",
+                            "kind": "file",
+                            "mimeType":
+                                "application/pdf",
+                            "size": 100,
+                        ]
+                    )
+                )
+            )
+        XCTAssertEqual(
+            controlType(in: mismatchedID),
+            "file-error"
+        )
+
+        let oversizedPDF = await fixture.receiver
+            .receive(
+                .control(
+                    controlData(
+                        [
+                            "type": "file-start",
+                            "transferId":
+                                "attachment-2",
+                            "attachmentId":
+                                "attachment-2",
+                            "conversationId":
+                                "conversation-1",
+                            "purpose":
+                                "visioncraft-chat-attachment",
+                            "attachmentKind":
+                                "document",
+                            "name": "document.pdf",
+                            "kind": "file",
+                            "mimeType":
+                                "application/pdf",
+                            "size":
+                                VisionLinkDataReceiver
+                                .maximumChatPDFSize
+                                + 1,
+                        ]
+                    )
+                )
+            )
+        XCTAssertEqual(
+            controlType(in: oversizedPDF),
+            "file-error"
+        )
+    }
+
     func testFeatureControlEncodesLimits()
     {
         let progress = controlObject(
@@ -734,6 +1075,46 @@ final class VisionLinkDataReceiverTests:
         )
         XCTAssertEqual(
             (error?["message"] as? String)?.count,
+            500
+        )
+
+        let ready = controlObject(
+            in: [
+                .sendControl(
+                    VisionLinkChatControl
+                        .attachmentReady(
+                            attachmentID:
+                                "attachment-1",
+                            conversationID:
+                                "conversation-1",
+                            name: "메모"
+                        )
+                ),
+            ]
+        )
+        XCTAssertEqual(
+            ready?["type"] as? String,
+            "chat-attachment-ready"
+        )
+
+        let chatError = controlObject(
+            in: [
+                .sendControl(
+                    VisionLinkChatControl
+                        .attachmentError(
+                            attachmentID:
+                                "attachment-1",
+                            conversationID:
+                                "conversation-1",
+                            message: longMessage
+                        )
+                ),
+            ]
+        )
+        XCTAssertEqual(
+            (
+                chatError?["message"] as? String
+            )?.count,
             500
         )
     }
@@ -840,6 +1221,49 @@ final class VisionLinkDataReceiverTests:
                 .remoteFeatureRequested(let request)
             ) = action {
                 return request
+            }
+        }
+        return nil
+    }
+
+    private func remoteChatRequest(
+        in actions: [VisionLinkDataAction]
+    ) -> VisionLinkChatRequest? {
+        for action in actions {
+            if case .event(
+                .remoteChatRequested(let request)
+            ) = action {
+                return request
+            }
+        }
+        return nil
+    }
+
+    private func remoteChatContext(
+        in actions: [VisionLinkDataAction]
+    ) -> VisionLinkChatContextAttachment? {
+        for action in actions {
+            if case .event(
+                .remoteChatContextReceived(
+                    let attachment
+                )
+            ) = action {
+                return attachment
+            }
+        }
+        return nil
+    }
+
+    private func remoteChatFile(
+        in actions: [VisionLinkDataAction]
+    ) -> VisionLinkChatFileAttachment? {
+        for action in actions {
+            if case .event(
+                .remoteChatAttachmentReceived(
+                    let attachment
+                )
+            ) = action {
+                return attachment
             }
         }
         return nil

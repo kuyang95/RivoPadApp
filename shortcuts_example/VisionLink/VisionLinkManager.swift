@@ -94,6 +94,20 @@ nonisolated struct VisionLinkRemoteFeatureStatus:
     let isWorking: Bool
 }
 
+nonisolated private enum VisionLinkRemoteWorkItem {
+    case feature(VisionLinkRemoteFeatureRequest)
+    case chat(VisionLinkRemoteChatWork)
+
+    var temporaryFileURL: URL? {
+        switch self {
+        case .feature(let request):
+            return request.temporaryFileURL
+        case .chat(let work):
+            return work.temporaryFileURL
+        }
+    }
+}
+
 @MainActor
 final class VisionLinkManager: ObservableObject {
     @Published private(set) var state:
@@ -131,6 +145,8 @@ final class VisionLinkManager: ObservableObject {
     private let webRTCReceiver: VisionLinkWebRTCReceiver
     private let remoteFeatureProcessor:
         VisionLinkRemoteFeatureProcessor
+    private let remoteChatProcessor:
+        VisionLinkRemoteChatProcessor
 
     private var connectionTask: Task<Void, Never>?
     private var receiveTask: Task<Void, Never>?
@@ -140,8 +156,8 @@ final class VisionLinkManager: ObservableObject {
     private var currentIceServers: [VisionLinkIceServer] = []
     private var currentRelayPolicy =
         VisionLinkContract.p2pPreferred
-    private var remoteFeatureQueue:
-        [VisionLinkRemoteFeatureRequest] = []
+    private var remoteWorkQueue:
+        [VisionLinkRemoteWorkItem] = []
     private var remoteFeatureTask:
         Task<Void, Never>?
     private var remoteFeatureGeneration = 0
@@ -157,7 +173,14 @@ final class VisionLinkManager: ObservableObject {
         remoteFeatureService:
             any VisionLinkRemoteFeatureServing =
                 VisionLinkLocalRemoteFeatureService
-                    .shared
+                    .shared,
+        remoteChatService:
+            any VisionLinkRemoteChatServing =
+                VisionLinkLocalRemoteChatService
+                    .shared,
+        conversationStore:
+            VisionLinkConversationStore =
+                .shared
     ) {
         self.server = server
         self.credentialStore = credentialStore
@@ -166,6 +189,12 @@ final class VisionLinkManager: ObservableObject {
         remoteFeatureProcessor =
             VisionLinkRemoteFeatureProcessor(
                 service: remoteFeatureService
+            )
+        remoteChatProcessor =
+            VisionLinkRemoteChatProcessor(
+                service: remoteChatService,
+                conversationStore:
+                    conversationStore
             )
         let requestedName = deviceName
             ?? UIDevice.current.name
@@ -671,17 +700,38 @@ final class VisionLinkManager: ObservableObject {
     private func enqueueRemoteFeature(
         _ request: VisionLinkRemoteFeatureRequest
     ) {
-        remoteFeatureQueue.append(request)
+        remoteWorkQueue.append(.feature(request))
         appendEvent(
             "원격 \(request.feature.title) 요청 수신"
         )
         startRemoteFeatureQueueIfNeeded()
     }
 
+    private func enqueueRemoteChat(
+        _ work: VisionLinkRemoteChatWork
+    ) {
+        remoteWorkQueue.append(.chat(work))
+        switch work {
+        case .request:
+            appendEvent("원격 AI 대화 요청 수신")
+        case .context(let attachment):
+            appendEvent(
+                "AI 대화 문맥 첨부 수신 · "
+                    + attachment.name
+            )
+        case .file(let attachment):
+            appendEvent(
+                "AI 대화 파일 첨부 수신 · "
+                    + attachment.name
+            )
+        }
+        startRemoteFeatureQueueIfNeeded()
+    }
+
     private func startRemoteFeatureQueueIfNeeded() {
         guard remoteFeatureTask == nil,
               isDataChannelReady,
-              !remoteFeatureQueue.isEmpty else {
+              !remoteWorkQueue.isEmpty else {
             return
         }
         let generation = remoteFeatureGeneration
@@ -709,25 +759,55 @@ final class VisionLinkManager: ObservableObject {
         while !Task.isCancelled,
               generation == remoteFeatureGeneration,
               isDataChannelReady,
-              !remoteFeatureQueue.isEmpty {
-            let request = remoteFeatureQueue.removeFirst()
+              !remoteWorkQueue.isEmpty {
+            let work = remoteWorkQueue.removeFirst()
             do {
-                try await remoteFeatureProcessor.process(
-                    request
-                ) { [weak self] update in
-                    guard let self,
-                          generation
-                            == self
-                                .remoteFeatureGeneration,
-                          self.isDataChannelReady,
-                          !Task.isCancelled else {
-                        return
+                switch work {
+                case .feature(let request):
+                    try await remoteFeatureProcessor
+                        .process(
+                            request
+                        ) { [weak self] update in
+                            guard let self,
+                                  generation
+                                    == self
+                                        .remoteFeatureGeneration,
+                                  self
+                                    .isDataChannelReady,
+                                  !Task
+                                    .isCancelled
+                            else {
+                                return
+                            }
+                            self
+                                .handleRemoteFeatureUpdate(
+                                    update,
+                                    request:
+                                        request
+                                )
+                        }
+                case .chat(let chatWork):
+                    try await remoteChatProcessor
+                        .process(
+                            chatWork
+                        ) { [weak self] update in
+                            guard let self,
+                                  generation
+                                    == self
+                                        .remoteFeatureGeneration,
+                                  self
+                                    .isDataChannelReady,
+                                  !Task
+                                    .isCancelled
+                            else {
+                                return
+                            }
+                            self
+                                .handleRemoteChatUpdate(
+                                    update
+                                )
+                        }
                     }
-                    self.handleRemoteFeatureUpdate(
-                        update,
-                        request: request
-                    )
-                }
             } catch is CancellationError {
                 return
             } catch {
@@ -736,14 +816,177 @@ final class VisionLinkManager: ObservableObject {
                       isDataChannelReady else {
                     return
                 }
-                handleRemoteFeatureUpdate(
-                    .failed(
-                        Self.userMessage(for: error)
-                    ),
-                    request: request
-                )
+                switch work {
+                case .feature(let request):
+                    handleRemoteFeatureUpdate(
+                        .failed(
+                            Self.userMessage(for: error)
+                        ),
+                        request: request
+                    )
+                case .chat(let chatWork):
+                    handleUnexpectedRemoteChatError(
+                        error,
+                        work: chatWork
+                    )
+                }
             }
         }
+    }
+
+    private func handleRemoteChatUpdate(
+        _ update: VisionLinkRemoteChatUpdate
+    ) {
+        switch update {
+        case .progress(let request, let stage):
+            _ = webRTCReceiver.sendFeatureProgress(
+                requestID: request.requestID,
+                feature: .aiChat,
+                stage: stage
+            )
+            remoteFeatureStatus =
+                VisionLinkRemoteFeatureStatus(
+                    requestID: request.requestID,
+                    feature: .aiChat,
+                    stage: stage,
+                    message: "답변 생각 중",
+                    isWorking: true
+                )
+            appendEvent("원격 AI 대화 · 답변 생각 중")
+
+        case .result(let request, let text):
+            _ = webRTCReceiver.sendFeatureResult(
+                requestID: request.requestID,
+                feature: .aiChat,
+                text: text
+            )
+            remoteFeatureStatus =
+                VisionLinkRemoteFeatureStatus(
+                    requestID: request.requestID,
+                    feature: .aiChat,
+                    stage: "complete",
+                    message: "AI 대화 완료",
+                    isWorking: false
+                )
+            dataTransferMessage = nil
+            appendEvent("원격 AI 대화 결과 전송 완료")
+
+        case .failed(let request, let message):
+            _ = webRTCReceiver.sendFeatureError(
+                requestID: request.requestID,
+                feature: .aiChat,
+                message: message
+            )
+            showRemoteChatFailure(
+                id: request.requestID,
+                message: message
+            )
+
+        case .attachmentReady(
+            let attachmentID,
+            let conversationID,
+            let name
+        ):
+            _ = webRTCReceiver
+                .sendChatAttachmentReady(
+                    attachmentID: attachmentID,
+                    conversationID:
+                        conversationID,
+                    name: name
+                )
+            remoteFeatureStatus =
+                VisionLinkRemoteFeatureStatus(
+                    requestID: attachmentID,
+                    feature: .aiChat,
+                    stage: "attachment-ready",
+                    message: "\(name) 첨부 완료",
+                    isWorking: false
+                )
+            dataTransferMessage = nil
+            appendEvent(
+                "AI 대화 첨부 준비 완료 · \(name)"
+            )
+
+        case .attachmentFailed(
+            let attachmentID,
+            let conversationID,
+            let message
+        ):
+            _ = webRTCReceiver
+                .sendChatAttachmentError(
+                    attachmentID: attachmentID,
+                    conversationID:
+                        conversationID,
+                    message: message
+                )
+            showRemoteChatFailure(
+                id: attachmentID,
+                message: message
+            )
+        }
+    }
+
+    private func handleUnexpectedRemoteChatError(
+        _ error: Error,
+        work: VisionLinkRemoteChatWork
+    ) {
+        let message = Self.userMessage(for: error)
+        switch work {
+        case .request(let request):
+            _ = webRTCReceiver.sendFeatureError(
+                requestID: request.requestID,
+                feature: .aiChat,
+                message: message
+            )
+            showRemoteChatFailure(
+                id: request.requestID,
+                message: message
+            )
+        case .context(let attachment):
+            _ = webRTCReceiver
+                .sendChatAttachmentError(
+                    attachmentID:
+                        attachment.attachmentID,
+                    conversationID:
+                        attachment.conversationID,
+                    message: message
+                )
+            showRemoteChatFailure(
+                id: attachment.attachmentID,
+                message: message
+            )
+        case .file(let attachment):
+            _ = webRTCReceiver
+                .sendChatAttachmentError(
+                    attachmentID:
+                        attachment.attachmentID,
+                    conversationID:
+                        attachment.conversationID,
+                    message: message
+                )
+            showRemoteChatFailure(
+                id: attachment.attachmentID,
+                message: message
+            )
+        }
+    }
+
+    private func showRemoteChatFailure(
+        id: String,
+        message: String
+    ) {
+        remoteFeatureStatus =
+            VisionLinkRemoteFeatureStatus(
+                requestID: id,
+                feature: .aiChat,
+                stage: "error",
+                message: message,
+                isWorking: false
+            )
+        dataTransferMessage = message
+        appendEvent(
+            "원격 AI 대화 실패 · " + message
+        )
     }
 
     private func handleRemoteFeatureUpdate(
@@ -826,9 +1069,9 @@ final class VisionLinkManager: ObservableObject {
         remoteFeatureGeneration &+= 1
         remoteFeatureTask?.cancel()
         remoteFeatureTask = nil
-        let queuedFiles = remoteFeatureQueue
+        let queuedFiles = remoteWorkQueue
             .compactMap(\.temporaryFileURL)
-        remoteFeatureQueue = []
+        remoteWorkQueue = []
         queuedFiles.forEach {
             try? FileManager.default.removeItem(
                 at: $0
@@ -1092,6 +1335,20 @@ extension VisionLinkManager:
             incomingTransfer = nil
             dataTransferMessage = nil
             enqueueRemoteFeature(request)
+        case .remoteChatRequested(let request):
+            dataTransferMessage = nil
+            enqueueRemoteChat(.request(request))
+        case .remoteChatContextReceived(
+            let attachment
+        ):
+            dataTransferMessage = nil
+            enqueueRemoteChat(.context(attachment))
+        case .remoteChatAttachmentReceived(
+            let attachment
+        ):
+            incomingTransfer = nil
+            dataTransferMessage = nil
+            enqueueRemoteChat(.file(attachment))
         case .failed(let message):
             incomingTransfer = nil
             dataTransferMessage = message

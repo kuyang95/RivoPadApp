@@ -52,6 +52,7 @@ nonisolated enum VisionLinkRemoteFeature:
 {
     case ocr
     case imageAnalysis = "image-analysis"
+    case aiChat = "ai-chat"
     case translation
 
     var title: String {
@@ -60,6 +61,8 @@ nonisolated enum VisionLinkRemoteFeature:
             return "OCR"
         case .imageAnalysis:
             return "이미지 설명"
+        case .aiChat:
+            return "AI 대화"
         case .translation:
             return "번역"
         }
@@ -129,6 +132,15 @@ nonisolated enum VisionLinkDataEvent:
     case fileReceived(VisionLinkReceivedFile)
     case remoteFeatureRequested(
         VisionLinkRemoteFeatureRequest
+    )
+    case remoteChatRequested(
+        VisionLinkChatRequest
+    )
+    case remoteChatContextReceived(
+        VisionLinkChatContextAttachment
+    )
+    case remoteChatAttachmentReceived(
+        VisionLinkChatFileAttachment
     )
     case failed(String)
 }
@@ -235,6 +247,17 @@ actor VisionLinkDataReceiver {
     static let maximumTranslationTextSize =
         32 * 1_024
     static let maximumRequestIDLength = 80
+    static let maximumChatRequestSize =
+        128 * 1_024
+    static let maximumChatMessageSize =
+        16 * 1_024
+    static let maximumChatContextSize =
+        64 * 1_024
+    static let maximumChatAttachmentSize: Int64 =
+        25 * 1_024 * 1_024
+    static let maximumChatPDFSize: Int64 =
+        14 * 1_024 * 1_024
+    static let maximumChatMessages = 40
 
     private static let blockedGeneralExtensions:
         Set<String> = [
@@ -348,7 +371,7 @@ actor VisionLinkDataReceiver {
                 rawSize: data.count
             )
         case "chat-context-attachment":
-            return unsupportedChatAttachment(message)
+            return receiveChatContextAttachment(message)
         case "live-reading-start":
             return unsupportedLiveReading(message)
         case "live-reading-stop":
@@ -385,14 +408,6 @@ actor VisionLinkDataReceiver {
         }
 
         let purpose = message["purpose"] as? String
-        if purpose
-                == "visioncraft-chat-attachment" {
-            return transferError(
-                "원격 AI 대화 첨부는 아직 지원되지 않습니다.",
-                transferID: transferID
-            )
-        }
-
         let fileName = Self.sanitizeFileName(
             message["name"] as? String
         )
@@ -403,8 +418,12 @@ actor VisionLinkDataReceiver {
             : "file"
         let isFeatureRequest =
             purpose == "visioncraft-feature"
+        let isChatAttachment =
+            purpose == "visioncraft-chat-attachment"
         let feature: VisionLinkRemoteFeature?
         let requestID: String?
+        let chatAttachment:
+            IncomingChatAttachment?
         let mimeType: String
 
         if isFeatureRequest {
@@ -418,7 +437,10 @@ actor VisionLinkDataReceiver {
             requestID = Self.validRequestID(
                 message["requestId"]
             )
-            guard feature != nil,
+            guard let feature,
+                  feature == .ocr
+                    || feature == .imageAnalysis
+                    || feature == .translation,
                   requestID != nil,
                   declaredKind == "image" else {
                 return transferError(
@@ -447,9 +469,59 @@ actor VisionLinkDataReceiver {
                     for: fileName,
                     kind: "image"
                 ) ?? "image/*"
+            chatAttachment = nil
+        } else if isChatAttachment {
+            feature = nil
+            requestID = nil
+            let attachmentID = Self.validRequestID(
+                message["attachmentId"]
+            )
+            let conversationID = Self.validRequestID(
+                message["conversationId"]
+            )
+            let attachmentKind = (
+                message["attachmentKind"] as? String
+            ).flatMap(
+                VisionLinkChatAttachmentKind.init(
+                    rawValue:
+                )
+            )
+            let declaredMimeType = (
+                message["mimeType"] as? String
+            )?
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            guard let attachmentID,
+                  attachmentID == transferID,
+                  let conversationID,
+                  let attachmentKind,
+                  let declaredMimeType,
+                  Self.isValidChatAttachment(
+                    fileName: fileName,
+                    transferKind: kind,
+                    attachmentKind:
+                        attachmentKind,
+                    mimeType: declaredMimeType,
+                    size: size
+                  ) else {
+                return transferError(
+                    "지원하지 않거나 잘못된 대화 첨부입니다.",
+                    transferID: transferID
+                )
+            }
+            mimeType = declaredMimeType
+            chatAttachment =
+                IncomingChatAttachment(
+                    attachmentID: attachmentID,
+                    conversationID:
+                        conversationID,
+                    kind: attachmentKind
+                )
         } else {
             feature = nil
             requestID = nil
+            chatAttachment = nil
             guard let resolvedMimeType =
                     Self.mimeType(
                         for: fileName,
@@ -499,7 +571,8 @@ actor VisionLinkDataReceiver {
                 mimeType: mimeType,
                 fileHandle: handle,
                 feature: feature,
-                requestID: requestID
+                requestID: requestID,
+                chatAttachment: chatAttachment
             )
             lastProgressPercent = -1
         } catch {
@@ -709,7 +782,8 @@ actor VisionLinkDataReceiver {
         }
 
         let finalURL: URL
-        if transfer.feature != nil {
+        if transfer.feature != nil
+            || transfer.chatAttachment != nil {
             finalURL = uniqueFeatureURL(
                 fileName: transfer.fileName
             )
@@ -761,6 +835,29 @@ actor VisionLinkDataReceiver {
                                 feature: feature,
                                 fileURL: finalURL
                             )
+                        )
+                    )
+                )
+            )
+        } else if let chatAttachment =
+                    transfer.chatAttachment {
+            actions.append(
+                .event(
+                    .remoteChatAttachmentReceived(
+                        VisionLinkChatFileAttachment(
+                            attachmentID:
+                                chatAttachment
+                                .attachmentID,
+                            conversationID:
+                                chatAttachment
+                                .conversationID,
+                            name:
+                                transfer.fileName,
+                            kind:
+                                chatAttachment.kind,
+                            mimeType:
+                                transfer.mimeType,
+                            fileURL: finalURL
                         )
                     )
                 )
@@ -854,6 +951,15 @@ actor VisionLinkDataReceiver {
         }
         let rawFeature =
             message["feature"] as? String ?? ""
+        if rawFeature
+                == VisionLinkRemoteFeature
+                    .aiChat.rawValue {
+            return receiveChatRequest(
+                message,
+                requestID: requestID,
+                rawSize: rawSize
+            )
+        }
         guard rawFeature
                 == VisionLinkRemoteFeature
                     .translation.rawValue else {
@@ -945,31 +1051,158 @@ actor VisionLinkDataReceiver {
         ]
     }
 
-    private func unsupportedChatAttachment(
+    private func receiveChatRequest(
+        _ message: [String: Any],
+        requestID: String,
+        rawSize: Int
+    ) -> [VisionLinkDataAction] {
+        guard rawSize
+                <= Self.maximumChatRequestSize else {
+            return chatRequestError(
+                requestID: requestID,
+                message:
+                    "대화 요청이 전송 가능한 크기를 초과했습니다."
+            )
+        }
+        guard let conversationID =
+                Self.validRequestID(
+                    message["conversationId"]
+                ),
+              let payload =
+                message["payload"]
+                    as? [String: Any],
+              let rawMessages =
+                payload["messages"] as? [Any],
+              (1...Self.maximumChatMessages)
+                .contains(rawMessages.count) else {
+            return chatRequestError(
+                requestID: requestID,
+                message:
+                    "대화 요청 형식이 올바르지 않습니다."
+            )
+        }
+
+        var messages: [VisionLinkChatMessage] =
+            []
+        messages.reserveCapacity(rawMessages.count)
+        for rawMessage in rawMessages {
+            guard let item =
+                    rawMessage as? [String: Any],
+                  let roleValue =
+                    item["role"] as? String,
+                  let role = VisionLinkChatRole(
+                    rawValue: roleValue
+                  ),
+                  let content =
+                    item["content"] as? String,
+                  !content.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                  ).isEmpty,
+                  content.utf8.count
+                    <= Self.maximumChatMessageSize else {
+                return chatRequestError(
+                    requestID: requestID,
+                    message:
+                        "대화 메시지 형식이 올바르지 않습니다."
+                )
+            }
+            messages.append(
+                VisionLinkChatMessage(
+                    role: role,
+                    content: content
+                )
+            )
+        }
+        guard messages.last?.role == .user else {
+            return chatRequestError(
+                requestID: requestID,
+                message:
+                    "대화 메시지 형식이 올바르지 않습니다."
+            )
+        }
+        return [
+            .event(
+                .remoteChatRequested(
+                    VisionLinkChatRequest(
+                        requestID: requestID,
+                        conversationID:
+                            conversationID,
+                        messages: messages
+                    )
+                )
+            ),
+        ]
+    }
+
+    private func chatRequestError(
+        requestID: String,
+        message: String
+    ) -> [VisionLinkDataAction] {
+        [
+            .sendControl(
+                VisionLinkFeatureControl.error(
+                    requestID: requestID,
+                    feature: .aiChat,
+                    message: message
+                )
+            ),
+            .event(.failed(message)),
+        ]
+    }
+
+    private func receiveChatContextAttachment(
         _ message: [String: Any]
     ) -> [VisionLinkDataAction] {
         guard let attachmentID =
-                Self.nonemptyString(
+                Self.validRequestID(
                     message["attachmentId"]
                 ),
               let conversationID =
-                Self.nonemptyString(
+                Self.validRequestID(
                     message["conversationId"]
                 ) else {
             return []
         }
+        let trimmedName = (
+            message["name"] as? String ?? ""
+        )
+        .trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        let name = trimmedName.isEmpty
+            ? "클립보드"
+            : String(trimmedName.prefix(120))
+        guard let text = message["text"] as? String,
+              !text.trimmingCharacters(
+                in: .whitespacesAndNewlines
+              ).isEmpty,
+              text.utf8.count
+                <= Self.maximumChatContextSize else {
+            return [
+                .sendControl(
+                    VisionLinkChatControl
+                        .attachmentError(
+                            attachmentID:
+                                attachmentID,
+                            conversationID:
+                                conversationID,
+                            message:
+                                "클립보드 첨부가 비어 있거나 "
+                                + "64KB를 초과했습니다."
+                        )
+                ),
+            ]
+        }
         return [
-            .sendControl(
-                Self.controlData(
-                    [
-                        "type": "chat-attachment-error",
-                        "attachmentId": attachmentID,
-                        "conversationId":
+            .event(
+                .remoteChatContextReceived(
+                    VisionLinkChatContextAttachment(
+                        attachmentID: attachmentID,
+                        conversationID:
                             conversationID,
-                        "message":
-                            "원격 AI 대화 첨부는 "
-                            + "아직 지원되지 않습니다.",
-                    ]
+                        name: name,
+                        text: text
+                    )
                 )
             ),
         ]
@@ -1190,6 +1423,47 @@ actor VisionLinkDataReceiver {
             && height.intValue > 0
     }
 
+    private static func isValidChatAttachment(
+        fileName: String,
+        transferKind: String,
+        attachmentKind:
+            VisionLinkChatAttachmentKind,
+        mimeType: String,
+        size: Int64
+    ) -> Bool {
+        guard size > 0,
+              size <= maximumChatAttachmentSize,
+              !mimeType.isEmpty else {
+            return false
+        }
+        if attachmentKind == .image {
+            return transferKind == "image"
+                && mimeType.hasPrefix("image/")
+        }
+        guard transferKind == "file" else {
+            return false
+        }
+        let pathExtension = URL(
+            fileURLWithPath: fileName
+        )
+        .pathExtension
+        .lowercased()
+        guard [
+            "pdf",
+            "txt",
+            "hwp",
+            "xls",
+            "xlsx",
+        ].contains(pathExtension) else {
+            return false
+        }
+        return pathExtension != "pdf"
+            || (
+                mimeType == "application/pdf"
+                    && size <= maximumChatPDFSize
+            )
+    }
+
     private static func nonemptyString(
         _ value: Any?
     ) -> String? {
@@ -1257,8 +1531,16 @@ private struct IncomingTransfer {
     let fileHandle: FileHandle
     let feature: VisionLinkRemoteFeature?
     let requestID: String?
+    let chatAttachment:
+        IncomingChatAttachment?
     var receivedBytes: Int64 = 0
     var hasher = SHA256()
+}
+
+private struct IncomingChatAttachment {
+    let attachmentID: String
+    let conversationID: String
+    let kind: VisionLinkChatAttachmentKind
 }
 
 nonisolated private enum VisionLinkDataReceiverError:
