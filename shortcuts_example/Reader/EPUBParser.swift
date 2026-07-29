@@ -1,5 +1,38 @@
 import Foundation
 
+nonisolated enum AccessiblePublicationFormat:
+    String,
+    Equatable,
+    Sendable
+{
+    case epub
+    case daisy202
+    case daisy3
+
+    var displayName: String {
+        switch self {
+        case .epub:
+            return "EPUB"
+        case .daisy202:
+            return "DAISY 2.02"
+        case .daisy3:
+            return "DAISY 3"
+        }
+    }
+}
+
+nonisolated struct PublicationNavigationItem:
+    Identifiable,
+    Equatable,
+    Sendable
+{
+    let id: String
+    let label: String
+    let href: String?
+    let depth: Int
+    let playOrder: Int?
+}
+
 nonisolated struct EPUBChapter:
     Identifiable,
     Equatable,
@@ -29,6 +62,7 @@ nonisolated struct EPUBChapter:
 }
 
 nonisolated struct EPUBBook: Equatable, Sendable {
+    let format: AccessiblePublicationFormat
     let identifier: String
     let title: String
     let creator: String?
@@ -36,16 +70,27 @@ nonisolated struct EPUBBook: Equatable, Sendable {
     let chapters: [EPUBChapter]
     let mediaOverlayItems:
         [EPUBMediaOverlayItem]
+    let navigationItems:
+        [PublicationNavigationItem]
+    let pageListItems:
+        [PublicationNavigationItem]
 
     init(
+        format:
+            AccessiblePublicationFormat = .epub,
         identifier: String,
         title: String,
         creator: String?,
         language: String?,
         chapters: [EPUBChapter],
         mediaOverlayItems:
-            [EPUBMediaOverlayItem] = []
+            [EPUBMediaOverlayItem] = [],
+        navigationItems:
+            [PublicationNavigationItem] = [],
+        pageListItems:
+            [PublicationNavigationItem] = []
     ) {
+        self.format = format
         self.identifier = identifier
         self.title = title
         self.creator = creator
@@ -53,6 +98,10 @@ nonisolated struct EPUBBook: Equatable, Sendable {
         self.chapters = chapters
         self.mediaOverlayItems =
             mediaOverlayItems
+        self.navigationItems =
+            navigationItems
+        self.pageListItems =
+            pageListItems
     }
 }
 
@@ -266,7 +315,7 @@ nonisolated enum EPUBBookParser {
             .hasSuffix(".smil")
     }
 
-    private static func fragmentSegmentIndexes(
+    static func fragmentSegmentIndexes(
         text: String,
         fragmentTexts: [String: String]
     ) -> [String: Int] {
@@ -377,7 +426,7 @@ nonisolated enum EPUBBookParser {
         }
     }
 
-    private static func parseXHTML(
+    static func parseXHTML(
         _ data: Data,
         delegate: XMLParserDelegate
     ) throws {
@@ -390,7 +439,8 @@ nonisolated enum EPUBBookParser {
     private static func replacingHTMLEntities(
         in data: Data
     ) -> Data {
-        guard var text = String(data: data, encoding: .utf8) else {
+        guard var text =
+                EPUBArchive.decodeText(data) else {
             return data
         }
         let replacements = [
@@ -418,6 +468,12 @@ nonisolated enum EPUBBookParser {
                 with: numericEntity
             )
         }
+        text = text.replacingOccurrences(
+            of:
+                #"(?i)(<\?xml\b[^>]*\bencoding\s*=\s*["'])[^"']+(["'])"#,
+            with: "$1UTF-8$2",
+            options: .regularExpression
+        )
         return Data(text.utf8)
     }
 
@@ -723,7 +779,7 @@ private nonisolated final class EPUBNCXXMLDelegate:
     }
 }
 
-private nonisolated final class EPUBHTMLTextDelegate:
+nonisolated final class EPUBHTMLTextDelegate:
     NSObject,
     XMLParserDelegate
 {
@@ -732,7 +788,9 @@ private nonisolated final class EPUBHTMLTextDelegate:
         "div", "figcaption", "figure", "footer", "h1",
         "h2", "h3", "h4", "h5", "h6", "header", "li",
         "main", "p", "pre", "section", "table", "td", "th",
-        "tr"
+        "tr", "hd", "sent", "pagenum", "doctitle",
+        "docauthor", "byline", "dateline", "note",
+        "prodnote", "sidebar", "annotation", "dt", "dd"
     ]
     private static let skippedElements: Set<String> = [
         "head", "nav", "script", "style", "svg"
@@ -801,7 +859,9 @@ private nonisolated final class EPUBHTMLTextDelegate:
         if Self.blockElements.contains(name) {
             appendLineBreak()
         }
-        if ["h1", "h2", "h3"].contains(name),
+        if [
+            "h1", "h2", "h3", "hd", "doctitle",
+        ].contains(name),
            firstHeading == nil {
             headingDepth = 1
             headingBuffer = ""

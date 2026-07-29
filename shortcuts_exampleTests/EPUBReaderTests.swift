@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 import XCTest
 import zlib
 
@@ -335,6 +336,39 @@ final class EPUBReaderTests: XCTestCase {
         }
     }
 
+    func testArchiveDecodesDeclaredLegacyKoreanText()
+        throws
+    {
+        let encoding = String.Encoding(
+            rawValue:
+                CFStringConvertEncodingToNSStringEncoding(
+                    CFStringEncoding(0x0422)
+                )
+        )
+        let source = """
+        <?xml version="1.0" encoding="windows-949"?>
+        <html><body><p>오래된 한글 DAISY 본문</p></body></html>
+        """
+        let encoded = try XCTUnwrap(
+            source.data(using: encoding)
+        )
+
+        XCTAssertEqual(
+            EPUBArchive.decodeText(encoded),
+            source
+        )
+        let extractor = EPUBHTMLTextDelegate()
+        try EPUBBookParser.parseXHTML(
+            encoded,
+            delegate: extractor
+        )
+        XCTAssertTrue(
+            extractor.text.contains(
+                "오래된 한글 DAISY 본문"
+            )
+        )
+    }
+
     func testLibraryImportCopiesBookIntoManagedDirectory()
         async throws
     {
@@ -379,6 +413,212 @@ final class EPUBReaderTests: XCTestCase {
             try Data(contentsOf: importedURL),
             expected
         )
+    }
+
+    func testParsesDaisy202NCCNavigationAndSMIL()
+        throws
+    {
+        let book = try AccessiblePublicationParser
+            .parse(
+                data:
+                    DaisyFixture.makeDaisy202()
+            )
+
+        XCTAssertEqual(book.format, .daisy202)
+        XCTAssertEqual(
+            book.identifier,
+            "rivo-daisy-202"
+        )
+        XCTAssertEqual(book.title, "DAISY 2 테스트")
+        XCTAssertEqual(book.creator, "Rivo")
+        XCTAssertEqual(book.language, "ko")
+        XCTAssertEqual(
+            book.navigationItems.map(\.label),
+            ["첫 장", "첫 장의 절"]
+        )
+        XCTAssertEqual(
+            book.navigationItems.map(\.depth),
+            [0, 1]
+        )
+        XCTAssertEqual(book.chapters.count, 1)
+        XCTAssertEqual(book.chapters[0].title, "첫 장")
+        XCTAssertTrue(
+            book.chapters[0].text.contains(
+                "DAISY 2 본문"
+            )
+        )
+        XCTAssertNotNil(
+            book.chapters[0]
+                .fragmentSegmentIndexes["s1"]
+        )
+        XCTAssertEqual(
+            PublicationNavigationResolver
+                .location(
+                    for:
+                        book.navigationItems[0],
+                    in: book
+                ),
+            PublicationNavigationLocation(
+                chapterIndex: 0,
+                segmentIndex:
+                    try XCTUnwrap(
+                        book.chapters[0]
+                            .fragmentSegmentIndexes[
+                                "s1"
+                            ]
+                    )
+            )
+        )
+        XCTAssertEqual(
+            book.mediaOverlayItems,
+            [
+                EPUBMediaOverlayItem(
+                    id:
+                        "Book/smil/part1.smil"
+                        + "#par-1",
+                    smilPath:
+                        "Book/smil/part1.smil",
+                    textPath:
+                        "Book/text/chapter.html",
+                    textFragmentID: "s1",
+                    audioPath:
+                        "Book/audio/book.mp3",
+                    clipBeginSeconds: 1.5,
+                    clipEndSeconds: 4,
+                    playOrder: 1
+                ),
+            ]
+        )
+    }
+
+    func testParsesDaisy3PackageNCXAndDTBook()
+        throws
+    {
+        let book = try AccessiblePublicationParser
+            .parse(
+                data: DaisyFixture.makeDaisy3()
+            )
+
+        XCTAssertEqual(book.format, .daisy3)
+        XCTAssertEqual(
+            book.identifier,
+            "rivo-daisy-3"
+        )
+        XCTAssertEqual(book.title, "DAISY 3 테스트")
+        XCTAssertEqual(book.creator, "Rivo")
+        XCTAssertEqual(book.language, "ko")
+        XCTAssertEqual(
+            book.navigationItems.map(\.label),
+            ["첫 장", "하위 절"]
+        )
+        XCTAssertEqual(
+            book.navigationItems.map(\.depth),
+            [0, 1]
+        )
+        XCTAssertEqual(
+            book.pageListItems.map(\.label),
+            ["1"]
+        )
+        XCTAssertEqual(
+            book.pageListItems.first?.href,
+            "DAISY/text/book.xml#page-1"
+        )
+        XCTAssertEqual(book.chapters.count, 1)
+        XCTAssertEqual(book.chapters[0].title, "첫 장")
+        XCTAssertTrue(
+            book.chapters[0].text.contains(
+                "DAISY 3 문장"
+            )
+        )
+        XCTAssertNotNil(
+            book.chapters[0]
+                .fragmentSegmentIndexes["s1"]
+        )
+        XCTAssertNotNil(
+            book.chapters[0]
+                .fragmentSegmentIndexes["page-1"]
+        )
+        XCTAssertEqual(
+            PublicationNavigationResolver
+                .location(
+                    for:
+                        book.navigationItems[1],
+                    in: book
+                ),
+            PublicationNavigationLocation(
+                chapterIndex: 0,
+                segmentIndex:
+                    try XCTUnwrap(
+                        book.chapters[0]
+                            .fragmentSegmentIndexes[
+                                "s2"
+                            ]
+                    )
+            )
+        )
+        XCTAssertEqual(
+            PublicationNavigationResolver
+                .location(
+                    for:
+                        book.pageListItems[0],
+                    in: book
+                ),
+            PublicationNavigationLocation(
+                chapterIndex: 0,
+                segmentIndex:
+                    try XCTUnwrap(
+                        book.chapters[0]
+                            .fragmentSegmentIndexes[
+                                "page-1"
+                            ]
+                    )
+            )
+        )
+        XCTAssertEqual(
+            book.mediaOverlayItems.first,
+            EPUBMediaOverlayItem(
+                id:
+                    "DAISY/audio.smil#par-1",
+                smilPath: "DAISY/audio.smil",
+                textPath:
+                    "DAISY/text/book.xml",
+                textFragmentID: "s1",
+                audioPath:
+                    "DAISY/audio/book.mp3",
+                clipBeginSeconds: 0,
+                clipEndSeconds: 2.25,
+                playOrder: 1
+            )
+        )
+    }
+
+    func testAccessiblePublicationRejectsUnknownZIP()
+        throws
+    {
+        let data = try ZIPFixture.make(
+            entries: [
+                ZIPFixtureEntry(
+                    path: "readme.txt",
+                    data: Data("not a book".utf8),
+                    compressionMethod: 8
+                ),
+            ]
+        )
+
+        XCTAssertThrowsError(
+            try AccessiblePublicationParser
+                .parse(data: data)
+        ) { error in
+            guard let parserError =
+                    error as?
+                    AccessiblePublicationParserError,
+                  case .unsupportedFormat =
+                    parserError else {
+                return XCTFail(
+                    "예상하지 못한 오류: \(error)"
+                )
+            }
+        }
     }
 }
 
@@ -550,6 +790,210 @@ private nonisolated enum EPUBFixture {
                     ]),
                     compressionMethod: 0
                 )
+            ]
+        )
+    }
+}
+
+private nonisolated enum DaisyFixture {
+    static func makeDaisy202() throws -> Data {
+        let ncc = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <html xmlns="http://www.w3.org/1999/xhtml">
+          <head>
+            <title>DAISY 2 테스트</title>
+            <meta name="dc:identifier" content="rivo-daisy-202"/>
+            <meta name="dc:title" content="DAISY 2 테스트"/>
+            <meta name="dc:creator" content="Rivo"/>
+            <meta name="dc:language" content="ko"/>
+          </head>
+          <body>
+            <h1 id="n1">
+              <a href="smil/part1.smil#nav-1">첫 장</a>
+            </h1>
+            <h2 id="n2">
+              <a href="smil/part1.smil#nav-2">첫 장의 절</a>
+            </h2>
+          </body>
+        </html>
+        """
+        let smil = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <smil>
+          <body>
+            <seq>
+              <par id="par-1" playOrder="1">
+                <text src="../text/chapter.html#s1"/>
+                <audio
+                  src="../audio/book.mp3"
+                  clip-begin="1.5s"
+                  clip-end="4s"/>
+              </par>
+            </seq>
+          </body>
+        </smil>
+        """
+        let chapter = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <html xmlns="http://www.w3.org/1999/xhtml">
+          <head><title>첫 장</title></head>
+          <body>
+            <h1>첫 장</h1>
+            <p id="s1">DAISY 2 본문입니다.</p>
+          </body>
+        </html>
+        """
+        return try ZIPFixture.make(
+            entries: [
+                ZIPFixtureEntry(
+                    path: "Book/NCC.HTML",
+                    data: Data(ncc.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path: "Book/smil/part1.smil",
+                    data: Data(smil.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path:
+                        "Book/text/chapter.html",
+                    data: Data(chapter.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path: "Book/audio/book.mp3",
+                    data: Data([
+                        0x49, 0x44, 0x33, 0x04,
+                    ]),
+                    compressionMethod: 0
+                ),
+            ]
+        )
+    }
+
+    static func makeDaisy3() throws -> Data {
+        let package = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <package
+          unique-identifier="book-id"
+          xmlns="http://openebook.org/namespaces/oeb-package/1.0/">
+          <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <dc:identifier id="book-id">rivo-daisy-3</dc:identifier>
+            <dc:title>DAISY 3 테스트</dc:title>
+            <dc:creator>Rivo</dc:creator>
+            <dc:language>ko</dc:language>
+          </metadata>
+          <manifest>
+            <item
+              id="ncx"
+              href="navigation.ncx"
+              media-type="application/x-dtbncx+xml"/>
+            <item
+              id="smil"
+              href="audio.smil"
+              media-type="application/smil+xml"/>
+            <item
+              id="text"
+              href="text/book.xml"
+              media-type="application/x-dtbook+xml"/>
+            <item
+              id="audio"
+              href="audio/book.mp3"
+              media-type="audio/mpeg"/>
+          </manifest>
+          <spine toc="ncx">
+            <itemref idref="smil"/>
+          </spine>
+        </package>
+        """
+        let navigation = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/">
+          <navMap>
+            <navPoint id="nav-1" playOrder="1">
+              <navLabel><text>첫 장</text></navLabel>
+              <content src="text/book.xml#s1"/>
+              <navPoint id="nav-2" playOrder="2">
+                <navLabel><text>하위 절</text></navLabel>
+                <content src="text/book.xml#s2"/>
+              </navPoint>
+            </navPoint>
+          </navMap>
+          <pageList>
+            <pageTarget id="page-1" playOrder="3">
+              <navLabel><text>1</text></navLabel>
+              <content src="text/book.xml#page-1"/>
+            </pageTarget>
+          </pageList>
+        </ncx>
+        """
+        let smil = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <smil xmlns="http://www.w3.org/2001/SMIL20/">
+          <body>
+            <seq>
+              <par id="par-1" playOrder="1">
+                <text src="text/book.xml#s1"/>
+                <audio
+                  src="audio/book.mp3"
+                  clipBegin="0s"
+                  clipEnd="2.25s"/>
+              </par>
+            </seq>
+          </body>
+        </smil>
+        """
+        let book = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <dtbook xmlns="http://www.daisy.org/z3986/2005/dtbook/">
+          <head>
+            <meta name="dc:Title" content="DAISY 3 테스트"/>
+          </head>
+          <book>
+            <frontmatter>
+              <doctitle>DAISY 3 테스트</doctitle>
+            </frontmatter>
+            <bodymatter>
+              <level1>
+                <h1>첫 장</h1>
+                <p><sent id="s1">DAISY 3 문장입니다.</sent></p>
+                <p><sent id="s2">하위 절 본문입니다.</sent></p>
+                <pagenum id="page-1">1</pagenum>
+              </level1>
+            </bodymatter>
+          </book>
+        </dtbook>
+        """
+        return try ZIPFixture.make(
+            entries: [
+                ZIPFixtureEntry(
+                    path: "DAISY/package.opf",
+                    data: Data(package.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path: "DAISY/navigation.ncx",
+                    data: Data(navigation.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path: "DAISY/audio.smil",
+                    data: Data(smil.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path: "DAISY/text/book.xml",
+                    data: Data(book.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path: "DAISY/audio/book.mp3",
+                    data: Data([
+                        0x49, 0x44, 0x33, 0x04,
+                    ]),
+                    compressionMethod: 0
+                ),
             ]
         )
     }

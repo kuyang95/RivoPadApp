@@ -7,8 +7,11 @@ struct ReaderLibraryView: View {
     @State private var lastBookURL: URL?
     @State private var errorDescription: String?
 
-    private var epubType: UTType {
-        UTType(filenameExtension: "epub") ?? .data
+    private var supportedBookTypes: [UTType] {
+        let epub =
+            UTType(filenameExtension: "epub")
+            ?? .data
+        return [epub, .zip]
     }
 
     var body: some View {
@@ -18,14 +21,14 @@ struct ReaderLibraryView: View {
                     isImporterPresented = true
                 } label: {
                     Label(
-                        "EPUB 파일 열기",
+                        "EPUB·DAISY 파일 열기",
                         systemImage: "plus.rectangle.on.folder"
                     )
                     .font(.title2.bold())
                     .padding(.vertical, 12)
                 }
                 .accessibilityHint(
-                    "Files에서 EPUB 책을 가져옵니다."
+                    "Files에서 EPUB 또는 ZIP 형식의 DAISY 책을 가져옵니다."
                 )
             }
 
@@ -53,7 +56,8 @@ struct ReaderLibraryView: View {
         .navigationTitle("독서")
         .fileImporter(
             isPresented: $isImporterPresented,
-            allowedContentTypes: [epubType],
+            allowedContentTypes:
+                supportedBookTypes,
             allowsMultipleSelection: false
         ) { result in
             importBook(result)

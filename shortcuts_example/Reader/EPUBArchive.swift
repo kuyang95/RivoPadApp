@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 import zlib
 
 nonisolated enum EPUBArchiveError: LocalizedError {
@@ -130,20 +131,52 @@ nonisolated struct EPUBArchive: Sendable {
 
     func text(at path: String) throws -> String {
         let entryData = try data(at: path)
-        for encoding in [
-            String.Encoding.utf8,
-            .utf16,
-            .utf16LittleEndian,
-            .utf16BigEndian
-        ] {
+        if let text = Self.decodeText(entryData) {
+            return text
+        }
+        throw LocalDocumentImportError.textDecodingFailed
+    }
+
+    static func decodeText(_ data: Data) -> String? {
+        if let encodingName =
+                declaredEncodingName(in: data),
+           let encoding =
+                textEncoding(named: encodingName),
+           let text = String(
+               data: data,
+               encoding: encoding
+           ) {
+            return text
+        }
+        let startsWithUTF16BOM =
+            data.starts(with: [0xFF, 0xFE])
+            || data.starts(with: [0xFE, 0xFF])
+        let encodings: [String.Encoding] =
+            startsWithUTF16BOM
+            ? [
+                .utf16,
+                .utf16LittleEndian,
+                .utf16BigEndian,
+                .utf8,
+            ]
+            : [
+                .utf8,
+                .shiftJIS,
+                legacyEncoding(0x0422),
+                legacyEncoding(0x0940),
+                legacyEncoding(0x0400),
+                .windowsCP1252,
+                .isoLatin1,
+            ]
+        for encoding in encodings {
             if let text = String(
-                data: entryData,
+                data: data,
                 encoding: encoding
             ) {
                 return text
             }
         }
-        throw LocalDocumentImportError.textDecodingFailed
+        return nil
     }
 
     static func normalizedPath(_ rawPath: String) throws -> String {
@@ -251,9 +284,10 @@ nonisolated struct EPUBArchive: Sendable {
             let nameData = data.subdata(
                 in: nameStart ..< nameEnd
             )
-            guard let rawName = String(
-                data: nameData,
-                encoding: .utf8
+            guard let rawName = decodeFilename(
+                nameData,
+                requiresUTF8:
+                    flags & 0x0800 != 0
             ) else {
                 throw EPUBArchiveError.invalidArchive
             }
@@ -279,6 +313,121 @@ nonisolated struct EPUBArchive: Sendable {
             throw EPUBArchiveError.invalidArchive
         }
         return result
+    }
+
+    private static func decodeFilename(
+        _ data: Data,
+        requiresUTF8: Bool
+    ) -> String? {
+        if requiresUTF8 {
+            return String(
+                data: data,
+                encoding: .utf8
+            )
+        }
+        for encoding in [
+            String.Encoding.utf8,
+            .shiftJIS,
+            legacyEncoding(0x0422),
+            legacyEncoding(0x0400),
+        ] {
+            if let value = String(
+                data: data,
+                encoding: encoding
+            ) {
+                return value
+            }
+        }
+        return nil
+    }
+
+    private static func declaredEncodingName(
+        in data: Data
+    ) -> String? {
+        let prefix = data.prefix(4_096)
+        guard let header = String(
+            data: prefix,
+            encoding: .isoLatin1
+        ) else {
+            return nil
+        }
+        for pattern in [
+            #"\bencoding\s*=\s*["']\s*([^"'\s]+)"#,
+            #"\bcharset\s*=\s*["']?\s*([A-Za-z0-9._-]+)"#,
+        ] {
+            guard let expression =
+                    try? NSRegularExpression(
+                        pattern: pattern,
+                        options: .caseInsensitive
+                    ),
+                  let match = expression.firstMatch(
+                      in: header,
+                      range: NSRange(
+                          header.startIndex
+                              ..< header.endIndex,
+                          in: header
+                      )
+                  ),
+                  match.numberOfRanges > 1,
+                  let range = Range(
+                      match.range(at: 1),
+                      in: header
+                  ) else {
+                continue
+            }
+            return String(header[range])
+        }
+        return nil
+    }
+
+    private static func textEncoding(
+        named rawName: String
+    ) -> String.Encoding? {
+        let name = rawName.lowercased()
+            .replacingOccurrences(
+                of: "_",
+                with: "-"
+            )
+        switch name {
+        case "utf-8", "utf8":
+            return .utf8
+        case "utf-16", "utf16":
+            return .utf16
+        case "utf-16le", "utf16le":
+            return .utf16LittleEndian
+        case "utf-16be", "utf16be":
+            return .utf16BigEndian
+        case "shift-jis", "shiftjis",
+             "sjis", "ms932", "cp932",
+             "windows-31j":
+            return .shiftJIS
+        case "euc-kr", "euckr",
+             "ks-c-5601-1987",
+             "ksc5601":
+            return legacyEncoding(0x0940)
+        case "ms949", "cp949",
+             "windows-949", "uhc":
+            return legacyEncoding(0x0422)
+        case "cp437", "ibm437":
+            return legacyEncoding(0x0400)
+        case "windows-1252", "cp1252":
+            return .windowsCP1252
+        case "iso-8859-1", "latin1":
+            return .isoLatin1
+        default:
+            return nil
+        }
+    }
+
+    private static func legacyEncoding(
+        _ rawValue: UInt32
+    ) -> String.Encoding {
+        String.Encoding(
+            rawValue:
+                CFStringConvertEncodingToNSStringEncoding(
+                    CFStringEncoding(rawValue)
+                )
+        )
     }
 
     private static func findEndRecord(in data: Data) -> Int? {

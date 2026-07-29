@@ -90,14 +90,14 @@
 | EPUB ZIP/OPF/HTML 파싱 | ✅ | 다양한 EPUB 회귀 세트 🧪 |
 | 라이브러리·마지막 책 | 🟡 | 최근 책과 책별 장·문단 위치 복원 완료, 전체 서재 관리 ⏳ |
 | 본문 표시·기본 장 이동 | ✅ | 원본 CSS·리소스 보존 🟡 |
-| 목차·페이지 목록·검색 | 🟡 | EPUB 목차·모든 본문 검색 결과·강조 이동 완료, 인쇄 페이지 목록 ⏳ |
+| 목차·페이지 목록·검색 | 🟡 | DAISY 계층 목차·페이지 목록과 모든 본문 검색·강조 이동 완료, EPUB 인쇄 페이지 목록 ⏳ |
 | 재생/정지·이전/다음·시간 이동 | 🟡 | SMIL 클립 재생·자동 이동 완료, 임의 시간 이동 ⏳ |
-| SMIL 오디오 동기화 | 🟡 | EPUB Media Overlay 파싱·AVPlayer 구간 재생·본문 문단 이동 완료, DAISY 실책 검증 🧪 |
+| SMIL 오디오 동기화 | 🟡 | EPUB·DAISY SMIL 파싱, AVPlayer 구간 재생·본문 문단 이동 완료, DAISY 실책 검증 🧪 |
 | 오디오 없는 구간 TTS | ⏳ | |
 | 문장·단어 하이라이트 | ⏳ | WKWebView JS 연동 필요 |
 | 단어·줄·문단·페이지·장 탐색 | ⏳ | |
 | 테마·글꼴·줄 간격·여백·속도 | ✅ | 밝게/세피아/어둡게, 글자·줄 간격, TTS·오디오 속도 |
-| DAISY 2.02 / DAISY 3 | ⏳ | 파서와 리소스 재작성 필요 |
+| DAISY 2.02 / DAISY 3 | 🟡 | NCC·OPF·NCX·DTBook·SMIL·구형 한글 인코딩 완료, 다양한 실책 검증 🧪 |
 
 세부 목록: `Tools/Reader/BACKLOG.md`
 
@@ -179,7 +179,7 @@ iPad 앱에서는 동일 구현하지 않으며, 제품 범위와 대체 경로�
 2. VisionLink 원격 OCR·이미지 분석·번역 ✅
 3. VisionLink 원격 AI 채팅·실시간 읽기 ✅
 4. EPUB 독서 연속성·목차·검색 ✅
-5. DAISY/SMIL 재생
+5. DAISY/SMIL 재생 🟡
 6. 문서 뷰어 탐색·외형·저장
 7. Rivo 화면별 조작·시간 동기화·상태 복원
 8. Share/Action Extension·위젯·App Intent

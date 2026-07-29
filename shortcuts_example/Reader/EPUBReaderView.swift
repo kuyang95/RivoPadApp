@@ -47,6 +47,116 @@ nonisolated enum EPUBTextSegmenter {
     }
 }
 
+nonisolated struct PublicationNavigationLocation:
+    Equatable,
+    Sendable
+{
+    let chapterIndex: Int
+    let segmentIndex: Int
+}
+
+nonisolated enum PublicationNavigationResolver {
+    static func location(
+        for item: PublicationNavigationItem,
+        in book: EPUBBook
+    ) -> PublicationNavigationLocation? {
+        guard let href = item.href else {
+            return nil
+        }
+        let parts = href.split(
+            separator: "#",
+            maxSplits: 1,
+            omittingEmptySubsequences: false
+        )
+        let path = parts.first.map(String.init)
+            ?? href
+        let fragment = parts.count > 1
+            ? String(parts[1])
+                .removingPercentEncoding
+            : nil
+
+        if let chapterIndex =
+                chapterIndex(
+                    for: path,
+                    in: book.chapters
+                ) {
+            let chapter =
+                book.chapters[chapterIndex]
+            return PublicationNavigationLocation(
+                chapterIndex: chapterIndex,
+                segmentIndex:
+                    fragment.flatMap {
+                        chapter
+                            .fragmentSegmentIndexes[
+                                $0
+                            ]
+                    } ?? 0
+            )
+        }
+
+        let matchingOverlayIndexes =
+            book.mediaOverlayItems.indices
+            .filter {
+                pathsMatch(
+                    book.mediaOverlayItems[$0]
+                        .smilPath,
+                    path
+                )
+            }
+        guard let firstOverlayIndex =
+                matchingOverlayIndexes.first else {
+            return nil
+        }
+        let overlayIndex =
+            matchingOverlayIndexes.first {
+                guard let fragment else {
+                    return false
+                }
+                return book.mediaOverlayItems[$0]
+                    .id.split(
+                        separator: "#",
+                        maxSplits: 1
+                    ).last.map(String.init)
+                    == fragment
+            }
+            ?? firstOverlayIndex
+        guard let location =
+                EPUBMediaOverlayLocationResolver
+                .location(
+                    for: overlayIndex,
+                    items:
+                        book.mediaOverlayItems,
+                    chapters: book.chapters
+                ) else {
+            return nil
+        }
+        return PublicationNavigationLocation(
+            chapterIndex:
+                location.chapterIndex,
+            segmentIndex:
+                location.segmentIndex
+        )
+    }
+
+    private static func chapterIndex(
+        for path: String,
+        in chapters: [EPUBChapter]
+    ) -> Int? {
+        chapters.firstIndex {
+            pathsMatch($0.href, path)
+        }
+    }
+
+    private static func pathsMatch(
+        _ lhs: String,
+        _ rhs: String
+    ) -> Bool {
+        lhs == rhs
+            || lhs.caseInsensitiveCompare(rhs)
+                == .orderedSame
+    }
+}
+
 nonisolated enum EPUBSearchEngine {
     static func search(
         _ query: String,
@@ -213,7 +323,8 @@ final class EPUBReaderViewModel: ObservableObject {
             let parsedBook = try await Task.detached(
                 priority: .userInitiated
             ) {
-                try EPUBBookParser.parse(data: data)
+                try AccessiblePublicationParser
+                    .parse(data: data)
             }.value
             book = parsedBook
             let savedProgress =
@@ -468,7 +579,7 @@ struct EPUBReaderView: View {
             theme.background.ignoresSafeArea()
 
             if viewModel.isLoading {
-                ProgressView("EPUB을 여는 중")
+                ProgressView("책을 여는 중")
                     .tint(theme.foreground)
                     .foregroundStyle(theme.foreground)
             } else if let error = viewModel.errorDescription {
@@ -482,7 +593,7 @@ struct EPUBReaderView: View {
             }
         }
         .navigationTitle(
-            viewModel.book?.title ?? "EPUB 독서"
+            viewModel.book?.title ?? "독서"
         )
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -867,26 +978,88 @@ struct EPUBReaderView: View {
     private var contentsSheet: some View {
         NavigationStack {
             List {
-                ForEach(
-                    Array(
-                        (viewModel.book?.chapters ?? [])
-                            .enumerated()
-                    ),
-                    id: \.element.id
-                ) { index, chapter in
-                    Button {
-                        selectLocation(
-                            chapterIndex: index,
-                            segmentIndex: 0
+                if let book = viewModel.book {
+                    Section {
+                        LabeledContent(
+                            "형식",
+                            value:
+                                book.format
+                                .displayName
                         )
-                        isContentsPresented = false
-                    } label: {
-                        HStack {
-                            Text(chapter.title)
-                            Spacer()
-                            if index
-                                == viewModel.currentChapterIndex {
-                                Image(systemName: "checkmark")
+                        if let creator =
+                                book.creator,
+                           !creator.isEmpty {
+                            LabeledContent(
+                                "저자",
+                                value: creator
+                            )
+                        }
+                    }
+
+                    if !book.navigationItems
+                        .isEmpty {
+                        Section("출판물 목차") {
+                            ForEach(
+                                book.navigationItems
+                            ) { item in
+                                navigationButton(
+                                    item,
+                                    in: book
+                                )
+                            }
+                        }
+                    }
+
+                    if !book.pageListItems
+                        .isEmpty {
+                        Section("페이지") {
+                            ForEach(
+                                book.pageListItems
+                            ) { item in
+                                navigationButton(
+                                    item,
+                                    in: book
+                                )
+                            }
+                        }
+                    }
+
+                    Section(
+                        book.navigationItems
+                            .isEmpty
+                        ? "목차"
+                        : "읽기 순서"
+                    ) {
+                        ForEach(
+                            Array(
+                                book.chapters
+                                    .enumerated()
+                            ),
+                            id: \.element.id
+                        ) { index, chapter in
+                            Button {
+                                selectLocation(
+                                    chapterIndex:
+                                        index,
+                                    segmentIndex: 0
+                                )
+                                isContentsPresented =
+                                    false
+                            } label: {
+                                HStack {
+                                    Text(
+                                        chapter.title
+                                    )
+                                    Spacer()
+                                    if index
+                                        == viewModel
+                                        .currentChapterIndex {
+                                        Image(
+                                            systemName:
+                                                "checkmark"
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -901,6 +1074,63 @@ struct EPUBReaderView: View {
                 }
             }
         }
+    }
+
+    private func navigationButton(
+        _ item: PublicationNavigationItem,
+        in book: EPUBBook
+    ) -> some View {
+        let location =
+            PublicationNavigationResolver
+            .location(for: item, in: book)
+        return Button {
+            guard let location else {
+                return
+            }
+            selectLocation(
+                chapterIndex:
+                    location.chapterIndex,
+                segmentIndex:
+                    location.segmentIndex
+            )
+            isContentsPresented = false
+        } label: {
+            HStack {
+                Text(
+                    item.label.isEmpty
+                        ? "이름 없는 항목"
+                        : item.label
+                )
+                .padding(
+                    .leading,
+                    CGFloat(
+                        min(
+                            max(item.depth, 0),
+                            8
+                        )
+                        * 18
+                    )
+                )
+                Spacer()
+                if let location,
+                   location.chapterIndex
+                    == viewModel
+                    .currentChapterIndex,
+                   location.segmentIndex
+                    == viewModel
+                    .currentSegmentIndex {
+                    Image(
+                        systemName: "checkmark"
+                    )
+                }
+            }
+        }
+        .disabled(location == nil)
+        .accessibilityHint(
+            location == nil
+                ? "이 목차 위치는 현재 본문과 연결되지 않았습니다."
+                : "해당 본문 위치로 이동합니다."
+        )
     }
 
     private var searchSheet: some View {

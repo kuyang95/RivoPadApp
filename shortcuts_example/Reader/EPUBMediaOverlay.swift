@@ -15,6 +15,14 @@ nonisolated struct EPUBMediaOverlayItem:
     let playOrder: Int?
 }
 
+nonisolated struct EPUBMediaOverlayParseResult:
+    Equatable,
+    Sendable
+{
+    let items: [EPUBMediaOverlayItem]
+    let referencedTextPaths: [String]
+}
+
 nonisolated enum EPUBSMILClock {
     static func seconds(
         from rawValue: String?
@@ -106,7 +114,21 @@ nonisolated enum EPUBMediaOverlayParser {
         archive: EPUBArchive,
         paths: [String]
     ) -> [EPUBMediaOverlayItem] {
+        parseResult(
+            archive: archive,
+            paths: paths
+        ).items
+    }
+
+    static func parseResult(
+        archive: EPUBArchive,
+        paths: [String],
+        fallbackTextDocumentPath:
+            String? = nil
+    ) -> EPUBMediaOverlayParseResult {
         var items: [EPUBMediaOverlayItem] = []
+        var referencedTextPaths: [String] = []
+        var seenTextPaths: Set<String> = []
         for path in paths
         where archive.contains(path) {
             guard let data = try? archive.data(
@@ -122,14 +144,43 @@ nonisolated enum EPUBMediaOverlayParser {
                 continue
             }
             for rawItem in delegate.items {
-                guard let text =
-                        try? resolve(
-                            rawItem.textSource,
-                            relativeTo: path
-                        ),
+                let text: ResolvedReference?
+                if let source = rawItem.textSource,
+                   !source.isEmpty {
+                    text = try? resolve(
+                        source,
+                        relativeTo: path
+                    )
+                } else if let fallback =
+                            fallbackTextDocumentPath,
+                          archive.contains(fallback) {
+                    text = ResolvedReference(
+                        path: fallback,
+                        fragment:
+                            syntheticFragmentID(
+                                smilPath: path,
+                                itemID: rawItem.id
+                            )
+                    )
+                } else {
+                    text = nil
+                }
+                guard let text else {
+                    continue
+                }
+                if archive.contains(text.path),
+                   seenTextPaths
+                    .insert(text.path).inserted {
+                    referencedTextPaths.append(
+                        text.path
+                    )
+                }
+                guard let audioSource =
+                        rawItem.audioSource,
+                      !audioSource.isEmpty,
                       let audio =
                         try? resolve(
-                            rawItem.audioSource,
+                            audioSource,
                             relativeTo: path
                         ),
                       archive.contains(
@@ -165,7 +216,25 @@ nonisolated enum EPUBMediaOverlayParser {
                 )
             }
         }
-        return items
+        return EPUBMediaOverlayParseResult(
+            items: items,
+            referencedTextPaths:
+                referencedTextPaths
+        )
+    }
+
+    private static func syntheticFragmentID(
+        smilPath: String,
+        itemID: String
+    ) -> String {
+        let seed = smilPath.map {
+            $0.isLetter
+                || $0.isNumber
+                || "_.:-".contains($0)
+                ? $0
+                : "_"
+        }
+        return "__smil__\(String(seed))__\(itemID)"
     }
 
     private static func resolve(
@@ -218,8 +287,8 @@ private nonisolated final class SMILXMLDelegate:
 {
     struct RawItem {
         let id: String
-        let textSource: String
-        let audioSource: String
+        let textSource: String?
+        let audioSource: String?
         let clipBegin: String?
         let clipEnd: String?
         let playOrder: Int?
@@ -329,9 +398,22 @@ private nonisolated final class SMILXMLDelegate:
         qualifiedName qName: String?
     ) {
         guard elementName.lowercased() == "par",
-              let parallel = parallels.popLast(),
-              let textSource =
-                parallel.textSource else {
+              let parallel = parallels.popLast() else {
+            return
+        }
+        if parallel.audios.isEmpty {
+            items.append(
+                RawItem(
+                    id: parallel.id,
+                    textSource:
+                        parallel.textSource,
+                    audioSource: nil,
+                    clipBegin: nil,
+                    clipEnd: nil,
+                    playOrder:
+                        parallel.playOrder
+                )
+            )
             return
         }
         for (index, audio)
@@ -345,7 +427,8 @@ private nonisolated final class SMILXMLDelegate:
                             ? parallel.id
                             : "\(parallel.id)-audio-\(index)"
                         ),
-                    textSource: textSource,
+                    textSource:
+                        parallel.textSource,
                     audioSource: audio.source,
                     clipBegin:
                         audio.clipBegin,
