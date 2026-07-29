@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+@preconcurrency import StreamWebRTC
 import UIKit
 
 nonisolated enum VisionLinkConnectionState:
@@ -12,6 +13,9 @@ nonisolated enum VisionLinkConnectionState:
     case waitingForCompanion
     case companionConnected(String)
     case mediaOfferReceived
+    case mediaConnecting
+    case mediaConnected
+    case videoReceiving
     case disconnected
     case codeExpired
     case failed(String)
@@ -30,6 +34,12 @@ nonisolated enum VisionLinkConnectionState:
             return "\(name) 신호 연결됨"
         case .mediaOfferReceived:
             return "영상 연결 제안 수신"
+        case .mediaConnecting:
+            return "영상 연결 중"
+        case .mediaConnected:
+            return "영상 연결됨 · 첫 화면 대기 중"
+        case .videoReceiving:
+            return "원격 영상 수신 중"
         case .disconnected:
             return "연결 끊김"
         case .codeExpired:
@@ -52,7 +62,10 @@ nonisolated enum VisionLinkConnectionState:
         switch self {
         case .waitingForCompanion,
              .companionConnected,
-             .mediaOfferReceived:
+             .mediaOfferReceived,
+             .mediaConnecting,
+             .mediaConnected,
+             .videoReceiving:
             return true
         default:
             return false
@@ -80,6 +93,8 @@ final class VisionLinkManager: ObservableObject {
     @Published private(set) var roomID: String?
     @Published private(set) var peerName: String?
     @Published private(set) var hasStoredPair = false
+    @Published private(set) var remoteVideoTrack:
+        RTCVideoTrack?
     @Published private(set) var recentEvents:
         [VisionLinkEventRecord] = []
 
@@ -88,12 +103,16 @@ final class VisionLinkManager: ObservableObject {
         any VisionLinkCredentialStoring
     private let webSocketSession: URLSession
     private let deviceName: String
+    private let webRTCReceiver: VisionLinkWebRTCReceiver
 
     private var connectionTask: Task<Void, Never>?
     private var receiveTask: Task<Void, Never>?
     private var countdownTask: Task<Void, Never>?
     private var webSocket: URLSessionWebSocketTask?
     private var socketGeneration = 0
+    private var currentIceServers: [VisionLinkIceServer] = []
+    private var currentRelayPolicy =
+        VisionLinkContract.p2pPreferred
 
     init(
         server: any VisionLinkServerServing =
@@ -107,6 +126,7 @@ final class VisionLinkManager: ObservableObject {
         self.server = server
         self.credentialStore = credentialStore
         self.webSocketSession = webSocketSession
+        webRTCReceiver = VisionLinkWebRTCReceiver()
         let requestedName = deviceName
             ?? UIDevice.current.name
         let normalized = requestedName.trimmingCharacters(
@@ -120,6 +140,7 @@ final class VisionLinkManager: ObservableObject {
         hasStoredPair = (
             try? credentialStore.read()
         ) != nil
+        webRTCReceiver.delegate = self
     }
 
     deinit {
@@ -270,6 +291,8 @@ final class VisionLinkManager: ObservableObject {
         roomID = response.roomID
         pairingCode = response.pairingCode
         pairingURI = response.pairingURI
+        currentIceServers = response.iceServers
+        currentRelayPolicy = response.relayPolicy
         startCountdown(
             pairID: response.pairID,
             expirationDate: expirationDate(
@@ -310,6 +333,8 @@ final class VisionLinkManager: ObservableObject {
                 pairingURI = nil
                 remainingSeconds = nil
                 peerName = response.peerName
+                currentIceServers = response.iceServers
+                currentRelayPolicy = response.relayPolicy
                 try openWebSocket(
                     response.receiver.websocketURL
                 )
@@ -430,11 +455,17 @@ final class VisionLinkManager: ObservableObject {
         case .peerWaiting:
             state = .waitingForCompanion
 
-        case .offer:
+        case .offer(let offer):
             confirmPairing()
             state = .mediaOfferReceived
+            webRTCReceiver.handleOffer(
+                offer,
+                iceServers: currentIceServers,
+                relayPolicy: currentRelayPolicy
+            )
 
         case .peerLeft, .hangup:
+            resetMedia()
             state = .disconnected
 
         case .pairDeleted(let pairID, _):
@@ -453,11 +484,23 @@ final class VisionLinkManager: ObservableObject {
                     + (message ?? "")
             )
 
-        case .answer,
-             .iceCandidate,
-             .unknown:
+        case .iceCandidate(let candidate):
+            webRTCReceiver.addRemoteIceCandidate(
+                candidate
+            )
+
+        case .answer, .unknown:
             break
         }
+    }
+
+    func markFirstVideoFrameRendered() {
+        guard remoteVideoTrack != nil,
+              state != .videoReceiving else {
+            return
+        }
+        state = .videoReceiving
+        appendEvent("원격 영상 첫 화면 표시")
     }
 
     private func confirmPairing() {
@@ -557,11 +600,49 @@ final class VisionLinkManager: ObservableObject {
         socketGeneration &+= 1
         receiveTask?.cancel()
         receiveTask = nil
+        resetMedia()
         webSocket?.cancel(
             with: .goingAway,
             reason: reason.data(using: .utf8)
         )
         webSocket = nil
+    }
+
+    private func resetMedia() {
+        webRTCReceiver.close()
+        remoteVideoTrack = nil
+    }
+
+    private func sendSignaling(
+        _ message: String,
+        successEvent: String
+    ) {
+        guard let socket = webSocket else {
+            state = .failed(
+                "VisionLink 신호 연결이 없어 응답을 보낼 수 없습니다."
+            )
+            return
+        }
+        let generation = socketGeneration
+        Task { [weak self, socket] in
+            do {
+                try await socket.send(.string(message))
+                guard let self,
+                      generation == self.socketGeneration else {
+                    return
+                }
+                self.appendEvent(successEvent)
+            } catch {
+                guard let self,
+                      generation == self.socketGeneration else {
+                    return
+                }
+                self.state = .failed(
+                    "VisionLink 신호 전송 실패: "
+                        + Self.userMessage(for: error)
+                )
+            }
+        }
     }
 
     private func stopCountdown() {
@@ -616,5 +697,99 @@ final class VisionLinkManager: ObservableObject {
             return description
         }
         return error.localizedDescription
+    }
+}
+
+extension VisionLinkManager:
+    VisionLinkWebRTCReceiverDelegate
+{
+    func webRTCReceiver(
+        _ receiver: VisionLinkWebRTCReceiver,
+        didCreateAnswer sdp: String
+    ) {
+        do {
+            sendSignaling(
+                try VisionLinkJSON.answerMessage(sdp: sdp),
+                successEvent: "영상 연결 응답 전송"
+            )
+        } catch {
+            state = .failed(
+                Self.userMessage(for: error)
+            )
+        }
+    }
+
+    func webRTCReceiver(
+        _ receiver: VisionLinkWebRTCReceiver,
+        didGenerate candidate: VisionLinkIceCandidate
+    ) {
+        do {
+            sendSignaling(
+                try VisionLinkJSON.iceCandidateMessage(
+                    candidate
+                ),
+                successEvent: "로컬 네트워크 후보 전송"
+            )
+        } catch {
+            state = .failed(
+                Self.userMessage(for: error)
+            )
+        }
+    }
+
+    func webRTCReceiverDidFinishGathering(
+        _ receiver: VisionLinkWebRTCReceiver
+    ) {
+        do {
+            sendSignaling(
+                try VisionLinkJSON.iceCandidateMessage(nil),
+                successEvent: "로컬 네트워크 후보 수집 완료"
+            )
+        } catch {
+            state = .failed(
+                Self.userMessage(for: error)
+            )
+        }
+    }
+
+    func webRTCReceiver(
+        _ receiver: VisionLinkWebRTCReceiver,
+        didChange mediaState: VisionLinkMediaConnectionState
+    ) {
+        switch mediaState {
+        case .connecting:
+            state = .mediaConnecting
+        case .connected:
+            if state != .videoReceiving {
+                state = .mediaConnected
+            }
+            appendEvent("WebRTC 미디어 연결됨")
+        case .disconnected:
+            state = .disconnected
+            appendEvent("WebRTC 미디어 연결 끊김")
+        case .failed:
+            remoteVideoTrack = nil
+            state = .failed(
+                "VisionLink 영상 연결에 실패했습니다."
+            )
+            appendEvent("WebRTC 미디어 연결 실패")
+        }
+    }
+
+    func webRTCReceiver(
+        _ receiver: VisionLinkWebRTCReceiver,
+        didReceive videoTrack: RTCVideoTrack
+    ) {
+        remoteVideoTrack = videoTrack
+        appendEvent("원격 비디오 트랙 수신")
+    }
+
+    func webRTCReceiver(
+        _ receiver: VisionLinkWebRTCReceiver,
+        didFail message: String
+    ) {
+        remoteVideoTrack = nil
+        state = .failed(message)
+        appendEvent(message)
     }
 }

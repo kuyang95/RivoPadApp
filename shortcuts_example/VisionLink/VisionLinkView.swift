@@ -11,6 +11,10 @@ struct VisionLinkView: View {
         List {
             statusSection
 
+            if manager.remoteVideoTrack != nil {
+                videoSection
+            }
+
             if let pairingCode = manager.pairingCode {
                 pairingSection(code: pairingCode)
             }
@@ -41,6 +45,26 @@ struct VisionLinkView: View {
                 "상대 기기와 서버에 저장된 연결 정보가 "
                     + "삭제됩니다."
             )
+        }
+    }
+
+    private var videoSection: some View {
+        Section("원격 화면") {
+            VisionLinkVideoView(
+                track: manager.remoteVideoTrack
+            ) {
+                manager.markFirstVideoFrameRendered()
+            }
+            .aspectRatio(16 / 10, contentMode: .fit)
+            .frame(maxWidth: .infinity)
+            .background(Color.black)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 12,
+                    style: .continuous
+                )
+            )
+            .accessibilityLabel("VisionLink 원격 카메라 영상")
         }
     }
 
@@ -159,7 +183,10 @@ struct VisionLinkView: View {
 
             case .waitingForCompanion,
                  .companionConnected,
-                 .mediaOfferReceived:
+                 .mediaOfferReceived,
+                 .mediaConnecting,
+                 .mediaConnected,
+                 .videoReceiving:
                 Button(
                     "신호 연결 끊기",
                     systemImage: "network.slash"
@@ -244,7 +271,11 @@ struct VisionLinkView: View {
                 systemImage: "checkmark.circle.fill"
             )
             Label(
-                "WebRTC 영상·파일 수신은 다음 단계",
+                "WebRTC 원격 영상 수신과 Metal 표시",
+                systemImage: "checkmark.circle.fill"
+            )
+            Label(
+                "데이터 채널과 파일 수신은 다음 단계",
                 systemImage: "arrow.forward.circle"
             )
             .foregroundStyle(.secondary)
@@ -255,7 +286,13 @@ struct VisionLinkView: View {
         switch manager.state {
         case .waitingForCompanion:
             return "antenna.radiowaves.left.and.right"
-        case .companionConnected, .mediaOfferReceived:
+        case .companionConnected,
+             .mediaOfferReceived,
+             .mediaConnecting:
+            return "arrow.triangle.2.circlepath"
+        case .mediaConnected:
+            return "video.badge.clock"
+        case .videoReceiving:
             return "checkmark.circle.fill"
         case .failed, .codeExpired:
             return "exclamationmark.triangle.fill"
@@ -268,9 +305,12 @@ struct VisionLinkView: View {
 
     private var statusColor: Color {
         switch manager.state {
-        case .companionConnected, .mediaOfferReceived:
+        case .mediaConnected, .videoReceiving:
             return .green
         case .waitingForCompanion,
+             .companionConnected,
+             .mediaOfferReceived,
+             .mediaConnecting,
              .creatingSession,
              .reconnecting:
             return .orange

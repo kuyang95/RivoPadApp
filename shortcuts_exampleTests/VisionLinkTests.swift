@@ -306,9 +306,86 @@ final class VisionLinkSignalingTests: XCTestCase {
         )
     }
 
+    func testEncodesAnswerMessage() throws {
+        let text = try VisionLinkJSON.answerMessage(
+            sdp: "v=0\r\na=recvonly"
+        )
+        let json = try jsonObject(text)
+        let description = try XCTUnwrap(
+            json["description"] as? [String: Any]
+        )
+
+        XCTAssertEqual(json["type"] as? String, "answer")
+        XCTAssertEqual(
+            description["type"] as? String,
+            "answer"
+        )
+        XCTAssertEqual(
+            description["sdp"] as? String,
+            "v=0\r\na=recvonly"
+        )
+    }
+
+    func testEncodesLocalIceCandidate() throws {
+        let text = try VisionLinkJSON.iceCandidateMessage(
+            VisionLinkIceCandidate(
+                messageID: nil,
+                candidate: "candidate:1",
+                sdpMid: "video",
+                sdpMLineIndex: 2
+            )
+        )
+        let json = try jsonObject(text)
+        let candidate = try XCTUnwrap(
+            json["candidate"] as? [String: Any]
+        )
+
+        XCTAssertEqual(
+            json["type"] as? String,
+            "ice-candidate"
+        )
+        XCTAssertEqual(
+            candidate["candidate"] as? String,
+            "candidate:1"
+        )
+        XCTAssertEqual(
+            candidate["sdpMid"] as? String,
+            "video"
+        )
+        XCTAssertEqual(
+            candidate["sdpMLineIndex"] as? Int,
+            2
+        )
+    }
+
+    func testEncodesEndOfIceCandidates() throws {
+        let text = try VisionLinkJSON
+            .iceCandidateMessage(nil)
+        let json = try jsonObject(text)
+
+        XCTAssertEqual(
+            json["type"] as? String,
+            "ice-candidate"
+        )
+        XCTAssertTrue(json["candidate"] is NSNull)
+    }
+
     private func parse(
         _ text: String
     ) throws -> VisionLinkSignalingEvent {
         try VisionLinkJSON.parseSignalingMessage(text)
+    }
+
+    private func jsonObject(
+        _ text: String
+    ) throws -> [String: Any] {
+        let data = try XCTUnwrap(
+            text.data(using: .utf8)
+        )
+        return try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: data
+            ) as? [String: Any]
+        )
     }
 }

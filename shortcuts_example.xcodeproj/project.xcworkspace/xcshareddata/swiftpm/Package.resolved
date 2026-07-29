@@ -1,5 +1,5 @@
 {
-  "originHash" : "18e7e41b79b9e7f346217f1a4cfa27942abc39e4a60ae54f779d6a0aee15468d",
+  "originHash" : "708adb829d63de0d121c0c7b9df32052da9c8d232db43f74ecc9b01328b3c11f",
   "pins" : [
     {
       "identity" : "mlx-swift",
@@ -26,6 +26,15 @@
       "state" : {
         "revision" : "b7fb7f7dea8a2469e6335d95a61b8f36d0dc83b2",
         "version" : "1.24.2"
+      }
+    },
+    {
+      "identity" : "stream-video-swift-webrtc",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/GetStream/stream-video-swift-webrtc.git",
+      "state" : {
+        "revision" : "37680e0def99dd12c95a5945c2ad31e32ff25c97",
+        "version" : "145.12.0"
       }
     },
     {

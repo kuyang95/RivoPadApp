@@ -431,6 +431,48 @@ nonisolated enum VisionLinkJSON {
         }
     }
 
+    static func answerMessage(
+        sdp: String
+    ) throws -> String {
+        try encode([
+            "type": "answer",
+            "description": [
+                "type": "answer",
+                "sdp": sdp
+            ]
+        ])
+    }
+
+    static func iceCandidateMessage(
+        _ candidate: VisionLinkIceCandidate?
+    ) throws -> String {
+        var json: [String: Any] = [
+            "type": "ice-candidate"
+        ]
+        if let candidate,
+           let rawCandidate = candidate.candidate {
+            let sdpMid: Any = candidate.sdpMid ?? NSNull()
+            json["candidate"] = [
+                "candidate": rawCandidate,
+                "sdpMid": sdpMid,
+                "sdpMLineIndex":
+                    candidate.sdpMLineIndex ?? 0
+            ]
+        } else {
+            json["candidate"] = NSNull()
+        }
+        return try encode(json)
+    }
+
+    static func hangupMessage(
+        reason: String = "user-requested"
+    ) throws -> String {
+        try encode([
+            "type": "hangup",
+            "reason": reason
+        ])
+    }
+
     private static func description(
         from json: [String: Any]
     ) throws -> VisionLinkSessionDescription {
@@ -502,6 +544,22 @@ nonisolated enum VisionLinkJSON {
             return value.stringValue
         }
         return nil
+    }
+
+    private static func encode(
+        _ json: [String: Any]
+    ) throws -> String {
+        let data = try JSONSerialization.data(
+            withJSONObject: json,
+            options: [.sortedKeys]
+        )
+        guard let value = String(
+            data: data,
+            encoding: .utf8
+        ) else {
+            throw VisionLinkProtocolError.invalidMessage
+        }
+        return value
     }
 }
 

@@ -12,10 +12,15 @@
 - connected, peer joined/left/waiting, pair created/deleted 해석
 - offer, answer, ICE candidate, hangup, error 메시지 해석
 - 최근 신호 이벤트 진단 화면
+- GetStream WebRTC XCFramework `145.12.0` 고정
+- 서버 STUN/TURN 설정과 relay forbidden 필터 적용
+- offer 적용, answer 생성·전송, 양방향 ICE candidate 처리
+- Unified Plan 원격 비디오 트랙 수신
+- Metal 기반 원격 영상 표시와 첫 화면 상태 감지
 
 ## 실기기·서버 확인
 
-- [ ] iPad에서 VisionLink 화면을 열면 4자리 코드가 생성된다.
+- [x] iPad에서 VisionLink 화면을 열면 4자리 코드가 생성된다.
 - [ ] 코드와 만료 시간이 Android VisionCraft와 같은 서버 응답과 맞는다.
 - [ ] 상대 VisionLink 앱에 코드를 입력하면 기기 이름이 표시된다.
 - [ ] peer joined와 pair created 이벤트가 진단 목록에 기록된다.
@@ -27,13 +32,13 @@
 
 ## 다음 구현 우선순위
 
-### P0 — WebRTC 영상 수신
+### P0 — WebRTC 영상 수신 안정화
 
-- Google WebRTC iOS 바이너리 또는 검증된 Swift Package 선정
-- 서버 응답의 STUN/TURN 목록과 relay policy 적용
-- offer 수신, answer 생성·전송, 로컬 ICE candidate 전송
-- 원격 ICE candidate 큐잉과 remote description 이후 적용
-- 원격 비디오 트랙을 Metal 기반 화면에 표시
+- [x] 검증 가능한 WebRTC XCFramework 선정·버전 고정
+- [x] 서버 응답의 STUN/TURN 목록과 relay policy 적용
+- [x] offer 수신, answer 생성·전송, 로컬 ICE candidate 전송
+- [x] 원격 ICE candidate 큐잉과 remote description 이후 적용
+- [x] 원격 비디오 트랙을 Metal 기반 화면에 표시
 - 첫 프레임·프레임 정지·연결 타임아웃 상태
 - 앱 활성 상태에서 연결 끊김 뒤 신호·미디어 재연결
 
@@ -58,5 +63,5 @@
 
 - 앱이 열린 동안의 수신과 짧은 상태 복원은 가능하지만 Android의
   foreground service처럼 화면을 끈 뒤 영구 수신할 수는 없다.
-- WebRTC 영상 수신에는 별도 네이티브 바이너리가 필요하며 현재 단계는
-  서버 페어링과 신호 연결까지만 포함한다.
+- WebRTC 영상 수신은 앱이 활성 상태일 때 동작한다. 장시간 백그라운드
+  수신은 iPadOS 정책상 별도 세션 설계가 필요하다.
