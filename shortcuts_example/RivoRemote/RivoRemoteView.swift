@@ -160,7 +160,7 @@ struct RivoRemoteView: View {
     private var controlsSection: some View {
         Section("앱 내부 빠른 메뉴") {
             Label(
-                "L1: 빠른 메뉴 열기와 닫기",
+                "L1: 메뉴 열기/닫기 · 두 번: 안내 열기",
                 systemImage: "rectangle.rightthird.inset.filled"
             )
             Label(

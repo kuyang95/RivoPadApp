@@ -112,6 +112,15 @@ final class RivoRemoteControlCenter: ObservableObject {
             let action,
             _
         ):
+            if button == .l1,
+               action == .doubleTapped {
+                isMenuPresented = true
+                feedback = selectedItemAnnouncement
+                return RivoRemoteDecision(
+                    command: nil,
+                    consumed: true
+                )
+            }
             guard action == .pressed else {
                 return RivoRemoteDecision(
                     command: nil,

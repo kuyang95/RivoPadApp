@@ -138,6 +138,8 @@ final class RivoRemoteManager:
         [RivoDiscoveredDevice] = []
     @Published private(set) var recentEvents:
         [RivoRemoteEvent] = []
+    @Published private(set) var latestInputBatch:
+        [RivoRemoteInput] = []
     @Published private(set) var eventSequence = 0
     @Published private(set) var invalidPacketCount = 0
     @Published private(set) var connectedDeviceType:
@@ -290,11 +292,13 @@ final class RivoRemoteManager:
         notifyCharacteristic = nil
         timeSyncState = .idle
         recentEvents = []
+        latestInputBatch = []
         state = .inactive
     }
 
     func clearEventHistory() {
         recentEvents = []
+        latestInputBatch = []
         invalidPacketCount = 0
     }
 
@@ -785,6 +789,7 @@ final class RivoRemoteManager:
             return
         }
 
+        var parsedInputs: [RivoRemoteInput] = []
         for packet in assembler.append(value) {
             guard let input = RivoRemotePacketParser.parse(
                 packet
@@ -802,11 +807,15 @@ final class RivoRemoteManager:
                 ),
                 at: 0
             )
+            parsedInputs.append(input)
             if recentEvents.count > 30 {
                 recentEvents.removeLast(
                     recentEvents.count - 30
                 )
             }
+        }
+        if !parsedInputs.isEmpty {
+            latestInputBatch = parsedInputs
             eventSequence &+= 1
         }
     }

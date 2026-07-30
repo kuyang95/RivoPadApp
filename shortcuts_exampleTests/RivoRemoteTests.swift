@@ -254,6 +254,177 @@ final class RivoRemoteProtocolTests: XCTestCase {
     }
 }
 
+final class RivoButtonGestureRecognizerTests:
+    XCTestCase
+{
+    func testOrdinaryTapMatchesAndroidPressAndReleaseDelays() {
+        var recognizer =
+            RivoButtonGestureRecognizer()
+
+        XCTAssertTrue(
+            recognizer.receive(
+                button(.five, action: .pressed),
+                at: 10
+            ).isEmpty
+        )
+        XCTAssertTrue(
+            recognizer.advance(to: 10.009)
+                .isEmpty
+        )
+        XCTAssertEqual(
+            recognizer.advance(to: 10.010),
+            [button(.five, action: .pressed)]
+        )
+        XCTAssertTrue(
+            recognizer.receive(
+                button(.five, action: .released),
+                at: 10.100
+            ).isEmpty
+        )
+        XCTAssertEqual(
+            recognizer.advance(to: 10.150),
+            [button(.five, action: .released)]
+        )
+    }
+
+    func testLongPressIncludesPressAndUsesDedicatedEndEvent() {
+        var recognizer =
+            RivoButtonGestureRecognizer()
+
+        _ = recognizer.receive(
+            button(.five, action: .pressed),
+            at: 20
+        )
+
+        XCTAssertEqual(
+            recognizer.advance(to: 20.500),
+            [
+                button(.five, action: .pressed),
+                button(.five, action: .longPressed)
+            ]
+        )
+        XCTAssertEqual(
+            recognizer.receive(
+                button(.five, action: .released),
+                at: 20.750
+            ),
+            [
+                button(
+                    .five,
+                    action: .longPressEnded
+                )
+            ]
+        )
+        XCTAssertNil(recognizer.nextDeadline)
+    }
+
+    func testDoubleTapSuppressesModeButtonSingleTap() {
+        var recognizer =
+            RivoButtonGestureRecognizer()
+
+        XCTAssertTrue(
+            recognizer.receive(
+                button(.l1, action: .pressed),
+                at: 30
+            ).isEmpty
+        )
+        XCTAssertTrue(
+            recognizer.receive(
+                button(.l1, action: .released),
+                at: 30.100
+            ).isEmpty
+        )
+        XCTAssertEqual(
+            recognizer.receive(
+                button(.l1, action: .pressed),
+                at: 30.250
+            ),
+            [button(.l1, action: .doubleTapped)]
+        )
+        XCTAssertEqual(
+            recognizer.receive(
+                button(.l1, action: .released),
+                at: 30.300
+            ),
+            [button(.l1, action: .doubleTapEnded)]
+        )
+        XCTAssertNil(recognizer.nextDeadline)
+    }
+
+    func testModeButtonSingleTapIsConfirmedAfterInterval() {
+        var recognizer =
+            RivoButtonGestureRecognizer()
+
+        _ = recognizer.receive(
+            button(.l1, action: .pressed),
+            at: 40
+        )
+        _ = recognizer.receive(
+            button(.l1, action: .released),
+            at: 40.100
+        )
+
+        XCTAssertTrue(
+            recognizer.advance(to: 40.399)
+                .isEmpty
+        )
+        XCTAssertEqual(
+            recognizer.advance(to: 40.400),
+            [
+                button(.l1, action: .pressed),
+                button(.l1, action: .released)
+            ]
+        )
+    }
+
+    func testMissingReleaseAutoEndsHoldAfterThreeSeconds() {
+        var recognizer =
+            RivoButtonGestureRecognizer()
+
+        _ = recognizer.receive(
+            button(.eight, action: .pressed),
+            at: 50
+        )
+
+        XCTAssertEqual(
+            recognizer.advance(to: 53),
+            [
+                button(.eight, action: .pressed),
+                button(.eight, action: .longPressed),
+                button(
+                    .eight,
+                    action: .longPressEnded
+                )
+            ]
+        )
+        XCTAssertNil(recognizer.nextDeadline)
+    }
+
+    func testSequenceBypassesButtonTiming() {
+        var recognizer =
+            RivoButtonGestureRecognizer()
+
+        XCTAssertEqual(
+            recognizer.receive(
+                .sequence("a/"),
+                at: 60
+            ),
+            [.sequence("a/")]
+        )
+    }
+
+    private func button(
+        _ button: RivoButton,
+        action: RivoButtonAction
+    ) -> RivoRemoteInput {
+        .button(
+            button: button,
+            action: action,
+            rawKey: 0
+        )
+    }
+}
+
 @MainActor
 final class RivoRemoteControlCenterTests: XCTestCase {
     func testQuickMenuNavigationSelectsReader() {
@@ -301,6 +472,24 @@ final class RivoRemoteControlCenterTests: XCTestCase {
             controlCenter.receive(.sequence("a/")),
             .startVoiceAction
         )
+    }
+
+    func testL1DoubleTapAlwaysPresentsQuickMenuGuide() {
+        let controlCenter = RivoRemoteControlCenter()
+
+        XCTAssertNil(
+            controlCenter.receive(
+                button(.l1, action: .doubleTapped)
+            )
+        )
+        XCTAssertTrue(controlCenter.isMenuPresented)
+
+        XCTAssertNil(
+            controlCenter.receive(
+                button(.l1, action: .doubleTapped)
+            )
+        )
+        XCTAssertTrue(controlCenter.isMenuPresented)
     }
 
     func testClosedMenuLeavesScreenButtonsForActiveFeature() {

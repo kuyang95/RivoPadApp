@@ -259,6 +259,10 @@ nonisolated enum RivoButtonAction:
 {
     case pressed
     case released
+    case longPressed
+    case longPressEnded
+    case doubleTapped
+    case doubleTapEnded
 
     var title: String {
         switch self {
@@ -266,6 +270,14 @@ nonisolated enum RivoButtonAction:
             return "누름"
         case .released:
             return "뗌"
+        case .longPressed:
+            return "길게 누름"
+        case .longPressEnded:
+            return "길게 누름 끝"
+        case .doubleTapped:
+            return "두 번 누름"
+        case .doubleTapEnded:
+            return "두 번 누름 끝"
         }
     }
 }

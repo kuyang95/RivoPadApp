@@ -13,6 +13,8 @@ struct shortcuts_exampleApp: App {
     @StateObject private var appRouter = AppRouter()
     @StateObject private var rivoRemoteManager =
         RivoRemoteManager()
+    @StateObject private var rivoButtonGestureInterpreter =
+        RivoButtonGestureInterpreter()
     @StateObject private var rivoRemoteControlCenter =
         RivoRemoteControlCenter()
     @StateObject private var rivoScreenRemoteControlCenter =
@@ -321,26 +323,29 @@ struct shortcuts_exampleApp: App {
                 path.append(route)
                 appRouter.route = nil
             }
-            .onChange(
-                of: rivoRemoteManager.eventSequence
-            ) { _, _ in
-                guard let input =
-                        rivoRemoteManager.lastInput else {
+            .onReceive(
+                rivoRemoteManager.$latestInputBatch
+            ) { inputs in
+                guard !inputs.isEmpty else {
                     return
                 }
-                guard !rivoScreenRemoteControlCenter
-                    .receivePriorityInput(input) else {
-                    return
+                rivoButtonGestureInterpreter
+                    .receive(inputs)
+            }
+            .onReceive(
+                rivoButtonGestureInterpreter.$latestBatch
+            ) { inputs in
+                for input in inputs {
+                    routeRivoRemoteInput(input)
                 }
-                let decision =
-                    rivoRemoteControlCenter
-                        .receiveDecision(input)
-                if let command = decision.command {
-                    performRivoRemoteCommand(command)
-                }
-                if !decision.consumed {
-                    rivoScreenRemoteControlCenter
-                        .receive(input)
+            }
+            .onChange(of: rivoRemoteManager.state) {
+                oldState,
+                newState in
+                if oldState.isReady,
+                   !newState.isReady {
+                    rivoButtonGestureInterpreter
+                        .releaseAll()
                 }
             }
             
@@ -405,6 +410,25 @@ struct shortcuts_exampleApp: App {
             }
             path = NavigationPath()
             path.append(route)
+        }
+    }
+
+    private func routeRivoRemoteInput(
+        _ input: RivoRemoteInput
+    ) {
+        guard !rivoScreenRemoteControlCenter
+            .receivePriorityInput(input) else {
+            return
+        }
+        let decision =
+            rivoRemoteControlCenter
+                .receiveDecision(input)
+        if let command = decision.command {
+            performRivoRemoteCommand(command)
+        }
+        if !decision.consumed {
+            rivoScreenRemoteControlCenter
+                .receive(input)
         }
     }
 
