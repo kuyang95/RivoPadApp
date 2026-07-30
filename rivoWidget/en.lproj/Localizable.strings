@@ -16,3 +16,16 @@
 "연결 실패" = "Connection Failed";
 "Rivo 상태와 바로가기" = "Rivo Status and Shortcuts";
 "마지막 Rivo 연결 상태를 보고 VisionCraft 기능을 빠르게 엽니다." = "View the latest Rivo connection status and quickly open VisionCraft features.";
+"열 기능" = "Feature to Open";
+"새 AI 대화" = "New AI Chat";
+"AI 대화 기록" = "AI Chat History";
+"문서 스캔" = "Document Scanner";
+"실시간 글자 읽기" = "Live Text Reader";
+"카메라 돋보기" = "Camera Magnifier";
+"음성 명령" = "Voice Command";
+"문서 열기" = "Open Documents";
+"카메라 도구" = "Camera Tools";
+"VisionCraft에서 열기" = "Open in VisionCraft";
+"VisionCraft 빠른 실행" = "VisionCraft Quick Launch";
+"홈 화면에서 자주 쓰는 기능 하나를 바로 엽니다." = "Open one frequently used feature directly from the Home Screen.";
+"새 AI 대화, 대화 기록, 스캔, 실시간 읽기, 돋보기, 음성 명령, 문서와 독서를 바로 엽니다." = "Quickly open a new AI chat, chat history, scanner, live reader, magnifier, voice command, documents, or reading.";

@@ -594,6 +594,12 @@ struct shortcuts_exampleApp: App {
             route = .settings
         case .ai:
             route = .chatHistory
+        case .aiNew:
+            route = .localChat(
+                conversationID: nil
+            )
+        case .aiHistory:
+            route = .chatHistory
         case .reader:
             route = .readerLibrary
         case .camera:
@@ -602,6 +608,8 @@ struct shortcuts_exampleApp: App {
             route = .magnifier
         case .liveText:
             route = .liveTextReader
+        case .voiceAction:
+            route = .voiceAction
         case .scanner:
             route = .documentScanning
         case .files:

@@ -1,5 +1,6 @@
 import SwiftUI
 import WidgetKit
+import AppIntents
 
 private func widgetLocalized(
     _ key: String
@@ -395,9 +396,360 @@ struct RivoStatusWidget: Widget {
     }
 }
 
+enum VisionCraftWidgetShortcut:
+    String,
+    CaseIterable,
+    AppEnum
+{
+    case newAIChat
+    case chatHistory
+    case documentScanner
+    case liveTextReader
+    case magnifier
+    case voiceAction
+    case documents
+    case reader
+    case camera
+
+    static var typeDisplayRepresentation:
+        TypeDisplayRepresentation {
+        "열 기능"
+    }
+
+    static var caseDisplayRepresentations:
+        [VisionCraftWidgetShortcut:
+            DisplayRepresentation] {
+        [
+            .newAIChat:
+                "새 AI 대화",
+            .chatHistory:
+                "AI 대화 기록",
+            .documentScanner:
+                "문서 스캔",
+            .liveTextReader:
+                "실시간 글자 읽기",
+            .magnifier:
+                "카메라 돋보기",
+            .voiceAction:
+                "음성 명령",
+            .documents:
+                "문서 열기",
+            .reader:
+                "독서",
+            .camera:
+                "카메라 도구",
+        ]
+    }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .newAIChat:
+            return "새 AI 대화"
+        case .chatHistory:
+            return "AI 대화 기록"
+        case .documentScanner:
+            return "문서 스캔"
+        case .liveTextReader:
+            return "실시간 글자 읽기"
+        case .magnifier:
+            return "카메라 돋보기"
+        case .voiceAction:
+            return "음성 명령"
+        case .documents:
+            return "문서 열기"
+        case .reader:
+            return "독서"
+        case .camera:
+            return "카메라 도구"
+        }
+    }
+
+    var accessibilityTitle: String {
+        switch self {
+        case .newAIChat:
+            return widgetLocalized(
+                "새 AI 대화"
+            )
+        case .chatHistory:
+            return widgetLocalized(
+                "AI 대화 기록"
+            )
+        case .documentScanner:
+            return widgetLocalized(
+                "문서 스캔"
+            )
+        case .liveTextReader:
+            return widgetLocalized(
+                "실시간 글자 읽기"
+            )
+        case .magnifier:
+            return widgetLocalized(
+                "카메라 돋보기"
+            )
+        case .voiceAction:
+            return widgetLocalized(
+                "음성 명령"
+            )
+        case .documents:
+            return widgetLocalized(
+                "문서 열기"
+            )
+        case .reader:
+            return widgetLocalized(
+                "독서"
+            )
+        case .camera:
+            return widgetLocalized(
+                "카메라 도구"
+            )
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .newAIChat:
+            return "plus.bubble.fill"
+        case .chatHistory:
+            return "clock.arrow.circlepath"
+        case .documentScanner:
+            return "doc.viewfinder"
+        case .liveTextReader:
+            return "text.viewfinder"
+        case .magnifier:
+            return "plus.magnifyingglass"
+        case .voiceAction:
+            return "waveform"
+        case .documents:
+            return "folder"
+        case .reader:
+            return "book"
+        case .camera:
+            return "camera"
+        }
+    }
+
+    var deepLinkPath: String {
+        switch self {
+        case .newAIChat:
+            return "ai-new"
+        case .chatHistory:
+            return "ai-history"
+        case .documentScanner:
+            return "scanner"
+        case .liveTextReader:
+            return "live-text"
+        case .magnifier:
+            return "magnifier"
+        case .voiceAction:
+            return "voice-action"
+        case .documents:
+            return "files"
+        case .reader:
+            return "reader"
+        case .camera:
+            return "camera"
+        }
+    }
+
+    var deepLinkURL: URL {
+        URL(
+            string:
+                "rivopad://open/"
+                + deepLinkPath
+        )!
+    }
+}
+
+struct VisionCraftShortcutConfiguration:
+    WidgetConfigurationIntent
+{
+    static var title:
+        LocalizedStringResource =
+        "VisionCraft 빠른 실행"
+    static var description =
+        IntentDescription(
+            "홈 화면에서 자주 쓰는 기능 하나를 바로 엽니다."
+        )
+
+    @Parameter(
+        title: "열 기능",
+        default: .newAIChat
+    )
+    var shortcut:
+        VisionCraftWidgetShortcut
+}
+
+private struct
+    VisionCraftShortcutEntry:
+        TimelineEntry
+{
+    let date: Date
+    let shortcut:
+        VisionCraftWidgetShortcut
+}
+
+private struct
+    VisionCraftShortcutProvider:
+        AppIntentTimelineProvider
+{
+    func placeholder(
+        in context: Context
+    ) -> VisionCraftShortcutEntry {
+        VisionCraftShortcutEntry(
+            date: Date(),
+            shortcut: .newAIChat
+        )
+    }
+
+    func snapshot(
+        for configuration:
+            VisionCraftShortcutConfiguration,
+        in context: Context
+    ) async
+        -> VisionCraftShortcutEntry
+    {
+        entry(for: configuration)
+    }
+
+    func timeline(
+        for configuration:
+            VisionCraftShortcutConfiguration,
+        in context: Context
+    ) async
+        -> Timeline<
+            VisionCraftShortcutEntry
+        >
+    {
+        Timeline(
+            entries: [
+                entry(for: configuration)
+            ],
+            policy: .never
+        )
+    }
+
+    private func entry(
+        for configuration:
+            VisionCraftShortcutConfiguration
+    ) -> VisionCraftShortcutEntry {
+        VisionCraftShortcutEntry(
+            date: Date(),
+            shortcut:
+                configuration.shortcut
+        )
+    }
+}
+
+private struct
+    VisionCraftShortcutWidgetView:
+        View
+{
+    let entry:
+        VisionCraftShortcutEntry
+
+    var body: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            Image(
+                systemName:
+                    entry.shortcut
+                    .systemImage
+            )
+            .font(
+                .system(
+                    size: 34,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                Color.accentColor
+            )
+            .accessibilityHidden(true)
+
+            Spacer(minLength: 0)
+
+            Text(entry.shortcut.title)
+                .font(.headline)
+                .lineLimit(2)
+
+            Text("VisionCraft에서 열기")
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+        }
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity,
+            alignment: .topLeading
+        )
+        .containerBackground(
+            for: .widget
+        ) {
+            Color(
+                uiColor:
+                    .secondarySystemBackground
+            )
+        }
+        .widgetURL(
+            entry.shortcut.deepLinkURL
+        )
+        .accessibilityElement(
+            children: .combine
+        )
+        .accessibilityLabel(
+            entry.shortcut
+                .accessibilityTitle
+        )
+        .accessibilityHint(
+            widgetLocalizedFormat(
+                "VisionCraft %@ 화면을 엽니다.",
+                entry.shortcut
+                    .accessibilityTitle
+            )
+        )
+    }
+}
+
+struct VisionCraftShortcutWidget:
+    Widget
+{
+    let kind =
+        "VisionCraftShortcutWidget"
+
+    var body:
+        some WidgetConfiguration
+    {
+        AppIntentConfiguration(
+            kind: kind,
+            intent:
+                VisionCraftShortcutConfiguration
+                .self,
+            provider:
+                VisionCraftShortcutProvider()
+        ) { entry in
+            VisionCraftShortcutWidgetView(
+                entry: entry
+            )
+        }
+        .configurationDisplayName(
+            "VisionCraft 빠른 실행"
+        )
+        .description(
+            "새 AI 대화, 대화 기록, 스캔, 실시간 읽기, 돋보기, 음성 명령, 문서와 독서를 바로 엽니다."
+        )
+        .supportedFamilies([
+            .systemSmall
+        ])
+    }
+}
+
 @main
 struct RivoWidgetBundle: WidgetBundle {
     var body: some Widget {
         RivoStatusWidget()
+        VisionCraftShortcutWidget()
     }
 }

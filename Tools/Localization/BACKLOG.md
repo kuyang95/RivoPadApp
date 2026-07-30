@@ -15,6 +15,7 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 - 도움말 센터의 탐색·검색·앱 정보·로컬 처리·Android 차이 안내
 - Share Extension과 선택 텍스트 Action의 표시 이름, 상태와 오류 안내
 - Rivo 위젯의 표시 이름, 연결 상태, 바로가기와 VoiceOver 안내
+- 구성 가능한 VisionCraft 빠른 실행 위젯의 아홉 기능 이름·설명·힌트
 - 카메라·마이크·동작·음성 인식·Bluetooth 권한 설명
 - 영어·일본어 핵심 번들과 동적 format 인수의 자동 테스트
 - 로컬 번역 화면의 대상 언어·입력·진행·결과·오류·VoiceOver 문구

@@ -47,4 +47,31 @@ final class AppDeepLinkRouterTests: XCTestCase {
             )
         }
     }
+
+    func testRecognizesDedicatedQuickLaunchDestinations()
+        throws
+    {
+        let expected:
+            [String: AppDeepLinkDestination] = [
+                "ai-new": .aiNew,
+                "ai-history": .aiHistory,
+                "voice-action": .voiceAction
+            ]
+
+        for (path, destination) in expected {
+            let url = try XCTUnwrap(
+                URL(
+                    string:
+                        "rivopad://open/"
+                        + path
+                )
+            )
+            XCTAssertEqual(
+                AppDeepLinkRouter.destination(
+                    for: url
+                ),
+                destination
+            )
+        }
+    }
 }
