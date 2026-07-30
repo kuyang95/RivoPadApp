@@ -55,6 +55,8 @@ struct shortcuts_exampleApp: App {
                         switch event {
                         case .settings:
                             AppSettingsView()
+                        case .help:
+                            HelpCenterView()
                         case .chatHistory:
                             ChatHistoryView()
                         case .localChat(let conversationID):

@@ -29,6 +29,7 @@ struct AppSettingsView: View {
             documentSection
             readerSection
             connectionSection
+            supportSection
             systemSection
             resetSection
         }
@@ -275,6 +276,15 @@ struct AppSettingsView: View {
             NavigationLink(
                 "VisionLink",
                 value: AppRoute.visionLink
+            )
+        }
+    }
+
+    private var supportSection: some View {
+        Section("지원") {
+            NavigationLink(
+                "사용 설명서 및 변경 내역",
+                value: AppRoute.help
             )
         }
     }
