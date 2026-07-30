@@ -416,8 +416,15 @@ struct shortcuts_exampleApp: App {
     private func routeRivoRemoteInput(
         _ input: RivoRemoteInput
     ) {
-        guard !rivoScreenRemoteControlCenter
-            .receivePriorityInput(input) else {
+        if RivoScreenInputPriorityPolicy
+            .shouldOfferToScreenFirst(
+                input,
+                isMenuPresented:
+                    rivoRemoteControlCenter
+                    .isMenuPresented
+            ),
+        rivoScreenRemoteControlCenter
+            .receivePriorityInput(input) {
             return
         }
         let decision =

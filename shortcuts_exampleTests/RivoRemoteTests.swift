@@ -865,6 +865,160 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         )
     }
 
+    func testLocalDocumentRemoteColorActionsWrapAndInvert() {
+        let first =
+            LocalDocumentAppearance.defaultValue
+        let lastIndex =
+            LocalDocumentColorTheme.all.count - 1
+        let last =
+            LocalDocumentAppearance(
+                fontLevel: 5,
+                lineHeightLevel: 5,
+                colorIndex: lastIndex,
+                showsLineSeparators: false
+            )
+
+        XCTAssertEqual(
+            RivoLocalDocumentRemoteAction
+                .previousColor
+                .updatedAppearance(from: first)?
+                .colorIndex,
+            lastIndex
+        )
+        XCTAssertEqual(
+            RivoLocalDocumentRemoteAction
+                .nextColor
+                .updatedAppearance(from: last)?
+                .colorIndex,
+            0
+        )
+        XCTAssertEqual(
+            RivoLocalDocumentRemoteAction
+                .invertColor
+                .updatedAppearance(from: first)?
+                .colorIndex,
+            1
+        )
+        XCTAssertEqual(
+            RivoLocalDocumentRemoteAction
+                .originalColor
+                .updatedAppearance(from: last)?
+                .colorIndex,
+            0
+        )
+    }
+
+    func testLocalDocumentDisplayModeRoutesColorKeys() {
+        let screenControl =
+            RivoScreenRemoteControlCenter()
+        screenControl.activate(.localDocumentReader)
+
+        XCTAssertTrue(
+            screenControl.receive(
+                button(.l2, action: .pressed)
+            )
+        )
+        XCTAssertEqual(
+            screenControl.localDocumentMode,
+            .display
+        )
+        XCTAssertEqual(
+            screenControl.latestEvent?.action,
+            .localDocumentReader(
+                .enterDisplayMode(showGuide: false)
+            )
+        )
+
+        XCTAssertTrue(
+            screenControl.receive(
+                button(.four, action: .pressed)
+            )
+        )
+        XCTAssertEqual(
+            screenControl.latestEvent?.action,
+            .localDocumentReader(.previousColor)
+        )
+        XCTAssertTrue(
+            screenControl.receive(
+                button(.r2, action: .pressed)
+            )
+        )
+        XCTAssertEqual(
+            screenControl.latestEvent?.action,
+            .localDocumentReader(.invertColor)
+        )
+
+        XCTAssertTrue(
+            screenControl.receive(
+                button(.l3, action: .doubleTapped)
+            )
+        )
+        XCTAssertEqual(
+            screenControl.localDocumentMode,
+            .text
+        )
+        XCTAssertEqual(
+            screenControl.latestEvent?.action,
+            .localDocumentReader(
+                .enterTextMode(showGuide: true)
+            )
+        )
+        XCTAssertTrue(
+            screenControl.receive(
+                button(.four, action: .pressed)
+            )
+        )
+        XCTAssertEqual(
+            screenControl.latestEvent?.action,
+            .localDocumentReader(.decreaseFont)
+        )
+    }
+
+    func testLocalDocumentConsumesR3BeforeGlobalStop() {
+        let screenControl =
+            RivoScreenRemoteControlCenter()
+        screenControl.activate(.localDocumentReader)
+
+        XCTAssertTrue(
+            screenControl.receivePriorityInput(
+                button(.r3, action: .pressed)
+            )
+        )
+        XCTAssertEqual(
+            screenControl.latestEvent?.action,
+            .localDocumentReader(.toggleReading)
+        )
+        XCTAssertFalse(
+            screenControl.receivePriorityInput(
+                button(.r3, action: .released)
+            )
+        )
+    }
+
+    func testQuickMenuKeepsButtonsFromScreenPriority() {
+        XCTAssertFalse(
+            RivoScreenInputPriorityPolicy
+                .shouldOfferToScreenFirst(
+                    button(.r3, action: .pressed),
+                    isMenuPresented: true
+                )
+        )
+        XCTAssertTrue(
+            RivoScreenInputPriorityPolicy
+                .shouldOfferToScreenFirst(
+                    button(.r3, action: .pressed),
+                    isMenuPresented: false
+                )
+        )
+        XCTAssertTrue(
+            RivoScreenInputPriorityPolicy
+                .shouldOfferToScreenFirst(
+                    .sequence("a/"),
+                    isMenuPresented: true
+                )
+        )
+    }
+
     private func button(
         _ button: RivoButton,
         action: RivoButtonAction

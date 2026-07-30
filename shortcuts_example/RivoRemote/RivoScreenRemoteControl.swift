@@ -50,6 +50,8 @@ nonisolated enum RivoLocalDocumentRemoteAction:
     Equatable,
     Sendable
 {
+    case enterTextMode(showGuide: Bool)
+    case enterDisplayMode(showGuide: Bool)
     case beginning
     case previousLine
     case previousPage
@@ -62,6 +64,11 @@ nonisolated enum RivoLocalDocumentRemoteAction:
     case decreaseLineHeight
     case defaultLineHeight
     case increaseLineHeight
+    case previousColor
+    case originalColor
+    case nextColor
+    case invertColor
+    case toggleReading
 
     func updatedAppearance(
         from appearance:
@@ -86,11 +93,82 @@ nonisolated enum RivoLocalDocumentRemoteAction:
                 .lineHeightLevel
         case .increaseLineHeight:
             updated.lineHeightLevel += 1
+        case .previousColor:
+            let count =
+                LocalDocumentColorTheme.all.count
+            guard count > 0 else {
+                return updated
+            }
+            let current =
+                updated.normalized(
+                    colorCount: count
+                ).colorIndex
+            updated.colorIndex =
+                (
+                    current
+                        - 1
+                        + count
+                ) % count
+        case .originalColor:
+            updated.colorIndex = 0
+        case .nextColor:
+            let count =
+                LocalDocumentColorTheme.all.count
+            guard count > 0 else {
+                return updated
+            }
+            let current =
+                updated.normalized(
+                    colorCount: count
+                ).colorIndex
+            updated.colorIndex =
+                (current + 1)
+                % count
+        case .invertColor:
+            updated.colorIndex =
+                Self.invertedColorIndex(
+                    from: updated.colorIndex
+                )
         default:
             return nil
         }
         return updated.normalized()
     }
+
+    private static func invertedColorIndex(
+        from colorIndex: Int
+    ) -> Int {
+        let themes = LocalDocumentColorTheme.all
+        guard !themes.isEmpty else {
+            return 0
+        }
+        let currentIndex = min(
+            max(colorIndex, 0),
+            themes.count - 1
+        )
+        let current = themes[currentIndex]
+        if let invertedIndex = themes.firstIndex(
+            where: {
+                $0.backgroundHex
+                    == current.foregroundHex
+                    && $0.foregroundHex
+                        == current.backgroundHex
+            }
+        ) {
+            return invertedIndex
+        }
+        return currentIndex == 0
+            ? min(1, themes.count - 1)
+            : 0
+    }
+}
+
+nonisolated enum RivoLocalDocumentRemoteMode:
+    Equatable,
+    Sendable
+{
+    case text
+    case display
 }
 
 nonisolated enum RivoLocalAIChatRemoteAction:
@@ -138,10 +216,24 @@ nonisolated struct RivoScreenRemoteEvent:
     let action: RivoScreenRemoteAction
 }
 
+nonisolated enum RivoScreenInputPriorityPolicy {
+    static func shouldOfferToScreenFirst(
+        _ input: RivoRemoteInput,
+        isMenuPresented: Bool
+    ) -> Bool {
+        if case .sequence = input {
+            return true
+        }
+        return !isMenuPresented
+    }
+}
+
 nonisolated enum RivoScreenRemoteMapper {
     static func action(
         for input: RivoRemoteInput,
-        on screen: RivoRemoteScreen
+        on screen: RivoRemoteScreen,
+        localDocumentMode:
+            RivoLocalDocumentRemoteMode = .text
     ) -> RivoScreenRemoteAction? {
         if case .localAIChat = screen,
            case .sequence(let payload) = input,
@@ -158,8 +250,20 @@ nonisolated enum RivoScreenRemoteMapper {
             let button,
             let buttonAction,
             _
-        ) = input,
-        buttonAction == .pressed else {
+        ) = input else {
+            return nil
+        }
+
+        if case .localDocumentReader = screen,
+           let action = localDocumentModeAction(
+               for: button,
+               buttonAction: buttonAction,
+               mode: localDocumentMode
+           ) {
+            return .localDocumentReader(action)
+        }
+
+        guard buttonAction == .pressed else {
             return nil
         }
 
@@ -198,12 +302,7 @@ nonisolated enum RivoScreenRemoteMapper {
                 return nil
             }
         case .localDocumentReader:
-            return localDocumentAction(
-                for: button
-            ).map(
-                RivoScreenRemoteAction
-                    .localDocumentReader
-            )
+            return nil
         case .localAIChat:
             return nil
         case .voiceAction:
@@ -266,6 +365,65 @@ nonisolated enum RivoScreenRemoteMapper {
             return nil
         }
     }
+
+    private static func localDocumentModeAction(
+        for button: RivoButton,
+        buttonAction: RivoButtonAction,
+        mode: RivoLocalDocumentRemoteMode
+    ) -> RivoLocalDocumentRemoteAction? {
+        if button == .l2 {
+            switch buttonAction {
+            case .pressed:
+                return .enterDisplayMode(
+                    showGuide: false
+                )
+            case .doubleTapped:
+                return .enterDisplayMode(
+                    showGuide: true
+                )
+            default:
+                return nil
+            }
+        }
+        if button == .l3 {
+            switch buttonAction {
+            case .pressed:
+                return .enterTextMode(
+                    showGuide: false
+                )
+            case .doubleTapped:
+                return .enterTextMode(
+                    showGuide: true
+                )
+            default:
+                return nil
+            }
+        }
+        guard buttonAction == .pressed else {
+            return nil
+        }
+        if button == .r3 {
+            return .toggleReading
+        }
+
+        switch mode {
+        case .text:
+            return localDocumentAction(for: button)
+        case .display:
+            switch button {
+            case .four:
+                return .previousColor
+            case .five:
+                return .originalColor
+            case .six:
+                return .nextColor
+            case .r2:
+                return .invertColor
+            default:
+                return nil
+            }
+        }
+    }
 }
 
 @MainActor
@@ -276,12 +434,17 @@ final class RivoScreenRemoteControlCenter:
         RivoRemoteScreen?
     @Published private(set) var latestEvent:
         RivoScreenRemoteEvent?
+    @Published private(set) var localDocumentMode:
+        RivoLocalDocumentRemoteMode = .text
 
     private var nextEventID: UInt64 = 0
 
     func activate(_ screen: RivoRemoteScreen) {
         activeScreen = screen
         latestEvent = nil
+        if screen == .localDocumentReader {
+            localDocumentMode = .text
+        }
     }
 
     func deactivate(_ screen: RivoRemoteScreen) {
@@ -298,9 +461,23 @@ final class RivoScreenRemoteControlCenter:
               let action =
                 RivoScreenRemoteMapper.action(
                     for: input,
-                    on: activeScreen
+                    on: activeScreen,
+                    localDocumentMode:
+                        localDocumentMode
                 ) else {
             return false
+        }
+        if case .localDocumentReader(
+            let documentAction
+        ) = action {
+            switch documentAction {
+            case .enterTextMode:
+                localDocumentMode = .text
+            case .enterDisplayMode:
+                localDocumentMode = .display
+            default:
+                break
+            }
         }
         nextEventID &+= 1
         latestEvent = RivoScreenRemoteEvent(
@@ -315,7 +492,15 @@ final class RivoScreenRemoteControlCenter:
     func receivePriorityInput(
         _ input: RivoRemoteInput
     ) -> Bool {
-        guard case .sequence = input else {
+        if case .sequence = input {
+            return receive(input)
+        }
+        guard activeScreen == .localDocumentReader,
+              case .button(
+                button: .r3,
+                action: .pressed,
+                rawKey: _
+              ) = input else {
             return false
         }
         return receive(input)

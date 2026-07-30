@@ -259,7 +259,7 @@ struct RivoRemoteView: View {
                 systemImage: "list.number"
             )
             Label(
-                "별표: 메뉴 닫기 · R3: 음성 읽기 정지",
+                "별표: 메뉴 닫기 · R3: 문서 읽기/전역 정지",
                 systemImage: "speaker.slash"
             )
             Label(
@@ -293,6 +293,14 @@ struct RivoRemoteView: View {
             Label(
                 "TXT/PDF: 4/5/6 글자 · 별표/0/샵 줄 간격",
                 systemImage: "textformat.size"
+            )
+            Label(
+                "TXT/PDF: L2 색상 · 4/5/6 이전/원본/다음",
+                systemImage: "paintpalette"
+            )
+            Label(
+                "TXT/PDF 색상: R2 반전 · L3 문서 조작",
+                systemImage: "circle.lefthalf.filled"
             )
         }
     }

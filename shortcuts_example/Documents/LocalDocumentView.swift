@@ -895,6 +895,17 @@ struct LocalDocumentView: View {
                 announceRemoteFeedback(
                     "줄 간격 \(updated.lineHeightLevel)"
                 )
+            case .previousColor,
+                 .originalColor,
+                 .nextColor,
+                 .invertColor:
+                let theme =
+                    LocalDocumentColorTheme.all[
+                        updated.colorIndex
+                    ]
+                announceRemoteFeedback(
+                    "색상 \(theme.name)"
+                )
             default:
                 break
             }
@@ -902,6 +913,18 @@ struct LocalDocumentView: View {
         }
 
         switch action {
+        case .enterTextMode(let showGuide):
+            announceRemoteFeedback(
+                showGuide
+                    ? "문서 조작 모드. 1 처음, 2 이전 줄, 3 이전 페이지, 4 5 6 글자 크기, 7 끝, 8 다음 줄, 9 다음 페이지, 별표 0 샵 줄 간격"
+                    : "문서 조작 모드"
+            )
+        case .enterDisplayMode(let showGuide):
+            announceRemoteFeedback(
+                showGuide
+                    ? "색상 조작 모드. 4 이전 색상, 5 원본 색상, 6 다음 색상, R2 반전, L3 문서 조작"
+                    : "색상 조작 모드"
+            )
         case .beginning:
             moveToDocumentBoundary(isEnd: false)
             announceRemoteFeedback("문서 처음")
@@ -928,9 +951,37 @@ struct LocalDocumentView: View {
             announceRemoteFeedback(
                 "다음 페이지, \(currentLineIndex + 1)번째 줄"
             )
+        case .toggleReading:
+            toggleDocumentReadingFromRemote()
         default:
             break
         }
+    }
+
+    private func toggleDocumentReadingFromRemote() {
+        if tts.isSpeaking {
+            tts.stop()
+            announceRemoteFeedback(
+                "문서 읽기를 중지했습니다."
+            )
+            return
+        }
+        let text =
+            LocalDocumentTextSegmenter.text(
+                fromLine: currentLineIndex,
+                in: viewModel.text
+            )
+        guard !text.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ).isEmpty else {
+            announceRemoteFeedback(
+                "읽을 문서 텍스트가 없습니다."
+            )
+            return
+        }
+        feedback =
+            "\(currentLineIndex + 1)번째 줄부터 읽기를 시작했습니다."
+        tts.speak(text)
     }
 
     private func announceRemoteFeedback(
