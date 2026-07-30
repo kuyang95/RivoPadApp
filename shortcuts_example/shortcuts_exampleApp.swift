@@ -74,11 +74,14 @@ struct shortcuts_exampleApp: App {
                                     .deactivate(.localAIChat)
                             }
                         case .translation(
-                            let initialText
+                            let initialText,
+                            let automaticallyStarts
                         ):
                             TranslationView(
                                 initialText:
-                                    initialText
+                                    initialText,
+                                automaticallyStarts:
+                                    automaticallyStarts
                             )
                         case .webQuestion(
                             let initialURL,
@@ -287,6 +290,53 @@ struct shortcuts_exampleApp: App {
                                     for: .navigationBar
                                 )
                                 .ignoresSafeArea()
+                        case .imageDescriptionCamera:
+                            MagnifierView(
+                                mode:
+                                    .imageDescription
+                            )
+                            .onAppear {
+                                rivoScreenRemoteControlCenter
+                                    .activate(
+                                        .magnifier
+                                    )
+                            }
+                            .onDisappear {
+                                rivoScreenRemoteControlCenter
+                                    .deactivate(
+                                        .magnifier
+                                    )
+                            }
+                            .toolbar(
+                                .hidden,
+                                for: .navigationBar
+                            )
+                            .ignoresSafeArea()
+                        case .capturedImageAnalysis(
+                            let image,
+                            let question
+                        ):
+                            LLMContentView(
+                                intent:
+                                    .capturedImageAnalysis(
+                                        image:
+                                            image,
+                                        question:
+                                            question
+                                    )
+                            )
+                            .onAppear {
+                                rivoScreenRemoteControlCenter
+                                    .activate(
+                                        .localAIChat
+                                    )
+                            }
+                            .onDisappear {
+                                rivoScreenRemoteControlCenter
+                                    .deactivate(
+                                        .localAIChat
+                                    )
+                            }
                         case .documentScanning:
                             DocumentScanRootView()
                                 .onAppear {
@@ -389,12 +439,20 @@ struct shortcuts_exampleApp: App {
                         controlCenter: rivoRemoteControlCenter,
                         onCommand: performRivoRemoteCommand
                     )
+                } else if rivoRemoteControlCenter
+                            .isCommandModeActive {
+                    RivoCommandModeOverlay(
+                        controlCenter:
+                            rivoRemoteControlCenter
+                    )
                 }
             }
             .animation(
                 .easeInOut(duration: 0.2),
                 value:
                     rivoRemoteControlCenter.isMenuPresented
+                        || rivoRemoteControlCenter
+                            .isCommandModeActive
             )
             .task {
                 openScannerFromLaunchArgumentsIfNeeded()
@@ -704,10 +762,31 @@ struct shortcuts_exampleApp: App {
                 route = .localChat(conversationID: nil)
             case .reader:
                 route = .readerLibrary
+            case .translation:
+                let clipboardText =
+                    UIPasteboard
+                    .general.string?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    )
+                route = .translation(
+                    initialText:
+                        clipboardText?
+                        .isEmpty == false
+                        ? clipboardText
+                        : nil,
+                    automaticallyStarts:
+                        clipboardText?
+                        .isEmpty == false
+                )
             case .magnifier:
                 route = .magnifier
             case .liveTextReader:
                 route = .liveTextReader
+            case .imageDescription:
+                route =
+                    .imageDescriptionCamera
             case .scanner:
                 route = .documentScanning
             case .remoteSettings:

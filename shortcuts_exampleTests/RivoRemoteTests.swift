@@ -863,7 +863,7 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         )
         XCTAssertTrue(
             controlCenter.feedback.contains(
-                "카메라 돋보기"
+                "9 이미지 설명"
             )
         )
 
@@ -876,6 +876,155 @@ final class RivoRemoteControlCenterTests: XCTestCase {
             controlCenter.feedback.contains(
                 "TXT 또는 PDF"
             )
+        )
+    }
+
+    func testR1CommandModeRoutesAndroidPrimaryActions() {
+        let mappings: [
+            (
+                RivoButton,
+                RivoQuickDestination
+            )
+        ] = [
+            (.two, .translation),
+            (.three, .liveTextReader),
+            (.four, .magnifier),
+            (.nine, .imageDescription),
+        ]
+
+        for (
+            buttonValue,
+            destination
+        ) in mappings {
+            let controlCenter =
+                RivoRemoteControlCenter()
+
+            let enterDecision =
+                controlCenter
+                .receiveDecision(
+                    button(
+                        .r1,
+                        action: .pressed
+                    )
+                )
+
+            XCTAssertTrue(
+                enterDecision.consumed
+            )
+            XCTAssertTrue(
+                controlCenter
+                    .isCommandModeActive
+            )
+            XCTAssertEqual(
+                controlCenter.receive(
+                    button(
+                        buttonValue,
+                        action: .pressed
+                    )
+                ),
+                .navigate(destination)
+            )
+            XCTAssertFalse(
+                controlCenter
+                    .isCommandModeActive
+            )
+        }
+    }
+
+    func testR1CommandCameraKeyOpensMagnifierFallback() {
+        let controlCenter =
+            RivoRemoteControlCenter()
+
+        _ = controlCenter.receive(
+            button(
+                .r1,
+                action: .doubleTapped
+            )
+        )
+
+        XCTAssertTrue(
+            controlCenter
+                .isCommandModeActive
+        )
+        XCTAssertTrue(
+            controlCenter.feedback.contains(
+                "클립보드 번역"
+            )
+        )
+        XCTAssertEqual(
+            controlCenter.receive(
+                button(
+                    .sharp,
+                    action: .pressed
+                )
+            ),
+            .navigate(.magnifier)
+        )
+        XCTAssertTrue(
+            controlCenter.feedback.contains(
+                "같은 키"
+            )
+        )
+    }
+
+    func testQuickMenuAndVoiceSequenceExitCommandMode() {
+        let controlCenter =
+            RivoRemoteControlCenter()
+
+        _ = controlCenter.receive(
+            button(
+                .r1,
+                action: .pressed
+            )
+        )
+        _ = controlCenter.receive(
+            button(
+                .l1,
+                action: .pressed
+            )
+        )
+        XCTAssertFalse(
+            controlCenter
+                .isCommandModeActive
+        )
+        XCTAssertTrue(
+            controlCenter
+                .isMenuPresented
+        )
+
+        controlCenter.dismissMenu()
+        _ = controlCenter.receive(
+            button(
+                .r1,
+                action: .pressed
+            )
+        )
+        XCTAssertEqual(
+            controlCenter.receive(
+                .sequence("a/")
+            ),
+            .startVoiceAction
+        )
+        XCTAssertFalse(
+            controlCenter
+                .isCommandModeActive
+        )
+
+        _ = controlCenter.receive(
+            button(
+                .r1,
+                action: .pressed
+            )
+        )
+        controlCenter
+            .dismissCommandMode()
+        XCTAssertFalse(
+            controlCenter
+                .isCommandModeActive
+        )
+        XCTAssertEqual(
+            controlCenter.feedback,
+            "명령 모드 닫힘"
         )
     }
 

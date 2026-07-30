@@ -30,6 +30,23 @@ struct CameraToolsView: View {
                     "카메라 실시간 OCR과 자동 음성 읽기를 시작합니다."
                 )
 
+                NavigationLink(
+                    value:
+                        AppRoute
+                        .imageDescriptionCamera
+                ) {
+                    cameraToolCard(
+                        title: "이미지 설명",
+                        description:
+                            "사진을 촬영하고 M4 로컬 AI가 보이는 장면을 설명합니다.",
+                        systemImage: "sparkles",
+                        color: .purple
+                    )
+                }
+                .accessibilityHint(
+                    "카메라로 촬영한 이미지를 기기 안에서 분석합니다."
+                )
+
                 NavigationLink(value: AppRoute.documentScanning) {
                     cameraToolCard(
                         title: "문서 스캔",

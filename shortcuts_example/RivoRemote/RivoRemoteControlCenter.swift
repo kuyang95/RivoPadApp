@@ -8,8 +8,10 @@ nonisolated enum RivoQuickDestination:
 {
     case aiChat
     case reader
+    case translation
     case magnifier
     case liveTextReader
+    case imageDescription
     case scanner
     case remoteSettings
 }
@@ -46,6 +48,8 @@ nonisolated struct RivoQuickMenuItem:
 @MainActor
 final class RivoRemoteControlCenter: ObservableObject {
     @Published private(set) var isMenuPresented = false
+    @Published private(set) var
+        isCommandModeActive = false
     @Published private(set) var selectedIndex = 0
     @Published private(set) var feedback = ""
 
@@ -102,6 +106,7 @@ final class RivoRemoteControlCenter: ObservableObject {
             }
             feedback = "음성 명령 듣기"
             isMenuPresented = false
+            isCommandModeActive = false
             return RivoRemoteDecision(
                 command: .startVoiceAction,
                 consumed: true
@@ -114,8 +119,19 @@ final class RivoRemoteControlCenter: ObservableObject {
         ):
             if button == .l1,
                action == .doubleTapped {
+                isCommandModeActive = false
                 isMenuPresented = true
                 feedback = selectedItemAnnouncement
+                return RivoRemoteDecision(
+                    command: nil,
+                    consumed: true
+                )
+            }
+            if button == .r1,
+               action == .doubleTapped {
+                enterCommandMode(
+                    showGuide: true
+                )
                 return RivoRemoteDecision(
                     command: nil,
                     consumed: true
@@ -153,7 +169,17 @@ final class RivoRemoteControlCenter: ObservableObject {
                     consumed: true
                 )
             }
+            if button == .r1 {
+                enterCommandMode(
+                    showGuide: false
+                )
+                return RivoRemoteDecision(
+                    command: nil,
+                    consumed: true
+                )
+            }
             if button == .l1 {
+                isCommandModeActive = false
                 isMenuPresented.toggle()
                 feedback = isMenuPresented
                     ? selectedItemAnnouncement
@@ -161,6 +187,11 @@ final class RivoRemoteControlCenter: ObservableObject {
                 return RivoRemoteDecision(
                     command: nil,
                     consumed: true
+                )
+            }
+            if isCommandModeActive {
+                return commandModeDecision(
+                    for: button
                 )
             }
             guard isMenuPresented else {
@@ -222,6 +253,11 @@ final class RivoRemoteControlCenter: ObservableObject {
         feedback = "빠른 메뉴 닫힘"
     }
 
+    func dismissCommandMode() {
+        isCommandModeActive = false
+        feedback = "명령 모드 닫힘"
+    }
+
     private var selectedItemAnnouncement: String {
         guard items.indices.contains(selectedIndex) else {
             return "빠른 메뉴"
@@ -257,7 +293,7 @@ final class RivoRemoteControlCenter: ObservableObject {
     ) -> String? {
         switch button {
         case .r1:
-            return "카메라 조작 안내. 빠른 메뉴에서 카메라 돋보기를 열면 R1 카메라 모드를 사용할 수 있습니다."
+            return "명령 모드 안내. R1 뒤 2 번역, 3 실시간 텍스트 읽기, 4 카메라 돋보기, 9 이미지 설명입니다."
         case .l2:
             return "화면 색상 안내. 카메라 돋보기나 로컬 문서에서 L2 화면 색상 모드를 사용할 수 있습니다."
         case .l3:
@@ -277,8 +313,77 @@ final class RivoRemoteControlCenter: ObservableObject {
         }
         let item = items[selectedIndex]
         isMenuPresented = false
+        isCommandModeActive = false
         feedback = "\(item.title) 열기"
         return .navigate(item.destination)
+    }
+
+    private func enterCommandMode(
+        showGuide: Bool
+    ) {
+        isMenuPresented = false
+        isCommandModeActive = true
+        feedback = showGuide
+            ? "명령 모드. 2 클립보드 번역, 3 실시간 텍스트 읽기, 4 카메라 돋보기, 9 이미지 설명. 카메라를 연 뒤 5 전환, 6 토치, 7 촬영, 별표 0 샵 확대를 사용합니다."
+            : "명령 모드. 2 번역, 3 텍스트 읽기, 4 카메라, 9 이미지 설명"
+        announceFeedback()
+    }
+
+    private func commandModeDecision(
+        for button: RivoButton
+    ) -> RivoRemoteDecision {
+        let destination:
+            RivoQuickDestination?
+        let message: String
+
+        switch button {
+        case .two:
+            destination = .translation
+            message =
+                "클립보드 번역 열기"
+        case .three:
+            destination =
+                .liveTextReader
+            message =
+                "실시간 텍스트 읽기 열기"
+        case .four:
+            destination = .magnifier
+            message =
+                "카메라 돋보기 열기"
+        case .nine:
+            destination =
+                .imageDescription
+            message =
+                "이미지 설명 카메라 열기"
+        case .five,
+             .six,
+             .seven,
+             .star,
+             .zero,
+             .sharp:
+            destination = .magnifier
+            message =
+                "카메라 돋보기를 엽니다. R1을 누른 뒤 같은 키를 다시 사용해 주세요."
+        default:
+            destination = nil
+            message =
+                "명령 모드에서 지원하지 않는 \(button.title) 버튼"
+        }
+
+        feedback = message
+        announceFeedback()
+        guard let destination else {
+            return RivoRemoteDecision(
+                command: nil,
+                consumed: true
+            )
+        }
+        isCommandModeActive = false
+        return RivoRemoteDecision(
+            command:
+                .navigate(destination),
+            consumed: true
+        )
     }
 }
 
@@ -353,6 +458,137 @@ struct RivoQuickMenuOverlay: View {
                 Text(
                     "L1 메뉴 · 2/4 이전 · 6/8 다음 · "
                         + "5 선택 · 0 홈 · 별표 닫기"
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+            .foregroundStyle(.white)
+            .padding(24)
+            .frame(width: 420)
+            .background(.black.opacity(0.94))
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 28,
+                    style: .continuous
+                )
+            )
+            .shadow(radius: 24)
+            .padding(24)
+        }
+        .transition(
+            .move(edge: .trailing)
+                .combined(with: .opacity)
+        )
+    }
+}
+
+struct RivoCommandModeOverlay: View {
+    @ObservedObject var controlCenter:
+        RivoRemoteControlCenter
+
+    private let commands: [
+        (
+            key: String,
+            title: String
+        )
+    ] = [
+        ("1", "—"),
+        ("2", "번역"),
+        ("3", "OCR"),
+        ("4", "카메라"),
+        ("5", "전·후면"),
+        ("6", "토치"),
+        ("7", "촬영"),
+        ("8", "—"),
+        ("9", "이미지 설명"),
+        ("별표", "줌 축소"),
+        ("0", "줌 초기화"),
+        ("샵", "줌 확대"),
+    ]
+
+    private let columns = Array(
+        repeating:
+            GridItem(
+                .flexible(),
+                spacing: 10
+            ),
+        count: 3
+    )
+
+    var body: some View {
+        HStack {
+            Spacer(minLength: 48)
+
+            VStack(
+                alignment: .leading,
+                spacing: 16
+            ) {
+                HStack {
+                    Text("Rivo 명령 모드")
+                        .font(.title.bold())
+                    Spacer()
+                    Button(
+                        "닫기",
+                        systemImage: "xmark"
+                    ) {
+                        controlCenter
+                            .dismissCommandMode()
+                    }
+                    .labelStyle(.iconOnly)
+                    .font(.title2)
+                }
+
+                LazyVGrid(
+                    columns: columns,
+                    spacing: 10
+                ) {
+                    ForEach(
+                        Array(
+                            commands.enumerated()
+                        ),
+                        id: \.offset
+                    ) { _, command in
+                        VStack(spacing: 5) {
+                            Text(command.key)
+                                .font(
+                                    .title2
+                                    .monospaced()
+                                    .bold()
+                                )
+                            Text(command.title)
+                                .font(.subheadline)
+                                .lineLimit(1)
+                                .minimumScaleFactor(
+                                    0.75
+                                )
+                        }
+                        .frame(
+                            maxWidth: .infinity,
+                            minHeight: 68
+                        )
+                        .background(
+                            Color.white
+                                .opacity(0.12)
+                        )
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: 14,
+                                style:
+                                    .continuous
+                            )
+                        )
+                        .accessibilityElement(
+                            children: .combine
+                        )
+                        .accessibilityLabel(
+                            "\(command.key), \(command.title)"
+                        )
+                    }
+                }
+
+                Text(
+                    "2·3·4·9는 바로 실행합니다. "
+                        + "카메라 키는 돋보기에서 R1 뒤 사용합니다."
                 )
                 .font(.footnote)
                 .foregroundStyle(.secondary)

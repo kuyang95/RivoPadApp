@@ -8,6 +8,10 @@ enum ChatIntentInput: Equatable {
     case textChat(conversationID: UUID?)
     case voiceQuestion(question: String)
     case imageAnalysis(imageURL: URL, question: String)
+    case capturedImageAnalysis(
+        image: UIImage,
+        question: String
+    )
     case documentQA(document: String, question: String)
     case webPageQA(
         content: WebPageContent,
@@ -55,6 +59,7 @@ struct LLMContentView: View {
             storedConversationID = UUID()
             persistsHistory = true
         case .imageAnalysis,
+             .capturedImageAnalysis,
              .documentQA,
              .webPageQA,
              .webSearchQA:
@@ -73,6 +78,10 @@ struct LLMContentView: View {
                 if case .voiceQuestion = intent {
                     return true
                 }
+                if case .capturedImageAnalysis =
+                    intent {
+                    return true
+                }
                 if case .webSearchQA(
                     _,
                     _,
@@ -89,6 +98,13 @@ struct LLMContentView: View {
             RVLogger.d("🔥 View에서 전달받은 imageURL: \(imageURL)")
             RVLogger.d("🔥 imageURL path: \(imageURL.path)")
             RVLogger.d("🔥 question: \(question)")
+        case .capturedImageAnalysis(
+            _,
+            let question
+        ):
+            RVLogger.d(
+                "🔥 카메라 이미지 설명 질문: \(question)"
+            )
         case .textChat,
              .voiceQuestion,
              .documentQA,
@@ -607,7 +623,8 @@ struct LLMContentView: View {
         switch intent {
         case .textChat, .voiceQuestion:
             return "로컬 AI"
-        case .imageAnalysis:
+        case .imageAnalysis,
+             .capturedImageAnalysis:
             return "이미지 질문"
         case .documentQA:
             return "문서 질문"

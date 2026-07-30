@@ -7,6 +7,7 @@ import Vision
 nonisolated enum MagnifierCameraMode: Sendable {
     case magnifier
     case liveTextReader
+    case imageDescription
 }
 
 nonisolated struct LiveTextOCRQuality:
@@ -1141,12 +1142,8 @@ final class MagnifierViewController:
             "현재 필터와 확대가 적용된 프레임을 사진 보관함이나 Files에 저장합니다."
         configureActionButton(
             captureButton,
-            title: mode == .magnifier
-                ? "텍스트 읽기"
-                : "읽기 일시정지",
-            systemImage: mode == .magnifier
-                ? "text.viewfinder"
-                : "pause.fill",
+            title: captureButtonTitle,
+            systemImage: captureButtonSystemImage,
             action: #selector(captureTapped)
         )
         captureButton.configuration?.baseBackgroundColor =
@@ -1493,10 +1490,18 @@ final class MagnifierViewController:
 
         switch action {
         case .enterCameraMode(let showGuide):
-            let seventhKeyAction =
-                mode == .magnifier
-                ? "7 사진 저장"
-                : "7 읽기 일시정지 또는 재개"
+            let seventhKeyAction: String
+            switch mode {
+            case .magnifier:
+                seventhKeyAction =
+                    "7 사진 저장"
+            case .liveTextReader:
+                seventhKeyAction =
+                    "7 읽기 일시정지 또는 재개"
+            case .imageDescription:
+                seventhKeyAction =
+                    "7 이미지 설명"
+            }
             announceRemoteStatus(
                 showGuide
                     ? "카메라 조작 모드. 4 닫기, 5 카메라 전환, 6 토치, \(seventhKeyAction), R2 초점, 별표 0 샵 확대"
@@ -1762,6 +1767,28 @@ final class MagnifierViewController:
         UIImpactFeedbackGenerator(style: .medium)
             .impactOccurred()
         onCapture?(image)
+    }
+
+    private var captureButtonTitle: String {
+        switch mode {
+        case .magnifier:
+            return "텍스트 읽기"
+        case .liveTextReader:
+            return "읽기 일시정지"
+        case .imageDescription:
+            return "이미지 설명"
+        }
+    }
+
+    private var captureButtonSystemImage: String {
+        switch mode {
+        case .magnifier:
+            return "text.viewfinder"
+        case .liveTextReader:
+            return "pause.fill"
+        case .imageDescription:
+            return "sparkles"
+        }
     }
 
     @objc private func photoSaveTapped() {

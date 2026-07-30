@@ -4,12 +4,20 @@ import UIKit
 struct TranslationView: View {
     @StateObject private var viewModel:
         TranslationViewModel
+    @State private var
+        didAutomaticallyStart = false
+    @State private var
+        shouldSpeakAutomaticResult = false
 
     private let tts = TTSManager.shared
+    private let automaticallyStarts: Bool
 
     init(
-        initialText: String? = nil
+        initialText: String? = nil,
+        automaticallyStarts: Bool = false
     ) {
+        self.automaticallyStarts =
+            automaticallyStarts
         _viewModel = StateObject(
             wrappedValue:
                 TranslationViewModel(
@@ -175,6 +183,40 @@ struct TranslationView: View {
                         "오류: \(error)"
                     )
             }
+        }
+        .task {
+            guard automaticallyStarts,
+                  !didAutomaticallyStart,
+                  viewModel.canTranslate else {
+                return
+            }
+            didAutomaticallyStart = true
+            shouldSpeakAutomaticResult =
+                true
+            tts.stop()
+            SoundEffectManager.shared.play(
+                .startingLLM
+            )
+            viewModel.startTranslation()
+        }
+        .onChange(
+            of: viewModel.isTranslating
+        ) {
+            wasTranslating,
+            isTranslating in
+            guard wasTranslating,
+                  !isTranslating,
+                  shouldSpeakAutomaticResult
+            else {
+                return
+            }
+            shouldSpeakAutomaticResult =
+                false
+            guard viewModel.canUseResult
+            else {
+                return
+            }
+            tts.speak(viewModel.result)
         }
         .onDisappear {
             viewModel.cancel()

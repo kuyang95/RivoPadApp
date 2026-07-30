@@ -212,6 +212,7 @@ final class ChatViewModel: ObservableObject {
             input = question
             sendUserMessage()
         case .imageAnalysis,
+             .capturedImageAnalysis,
              .documentQA,
              .webPageQA,
              .webSearchQA:
@@ -229,7 +230,8 @@ final class ChatViewModel: ObservableObject {
             isLoadingModel = true
 
             switch intent {
-            case .imageAnalysis:
+            case .imageAnalysis,
+                 .capturedImageAnalysis:
                 try await llm.activateModel(.qwen3_vl_8b_4bit)
                 loadedKind = .vision
             case .textChat,
@@ -298,6 +300,15 @@ final class ChatViewModel: ObservableObject {
                 status = "이미지 로드 실패: \(error.localizedDescription)"
             }
 
+        case .capturedImageAnalysis(
+            let image,
+            let question
+        ):
+            prepareImageAnalysis(
+                image: image,
+                question: question
+            )
+
         case .documentQA(let document, let question):
             messages.append(.init(role: "user", text: question, image: nil))
             startDocumentQA(document: document, question: question)
@@ -334,6 +345,33 @@ final class ChatViewModel: ObservableObject {
                 question: question
             )
         }
+    }
+
+    private func prepareImageAnalysis(
+        image: UIImage,
+        question: String
+    ) {
+        let images = toCIImages([image])
+        guard !images.isEmpty else {
+            status = "이미지 변환 실패"
+            return
+        }
+        messages.append(
+            .init(
+                role: "user",
+                image: image
+            )
+        )
+        messages.append(
+            .init(
+                role: "user",
+                text: question
+            )
+        )
+        pinnedCIImages = images
+        startImageAnalysis(
+            question: question
+        )
     }
 
     private func restoreConversation() async {

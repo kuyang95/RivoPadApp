@@ -24,7 +24,10 @@ enum AppRoute: Hashable {
     case help
     case chatHistory
     case localChat(conversationID: UUID?)
-    case translation(initialText: String?)
+    case translation(
+        initialText: String?,
+        automaticallyStarts: Bool = false
+    )
     case webQuestion(
         initialURL: String?,
         autoLoad: Bool
@@ -55,6 +58,11 @@ enum AppRoute: Hashable {
     case cameraTools
     case magnifier
     case liveTextReader
+    case imageDescriptionCamera
+    case capturedImageAnalysis(
+        image: UIImage,
+        question: String
+    )
     case documentScanning
     case OCRResult(image: UIImage)
 }
