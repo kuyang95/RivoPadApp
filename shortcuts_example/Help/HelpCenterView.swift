@@ -144,9 +144,15 @@ struct HelpCenterView: View {
     ) -> some View {
         Label {
             VStack(alignment: .leading) {
-                Text(title)
+                Text(
+                    LocalizedStringKey(title)
+                )
                     .font(.headline)
-                Text(subtitle)
+                Text(
+                    LocalizedStringKey(
+                        subtitle
+                    )
+                )
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

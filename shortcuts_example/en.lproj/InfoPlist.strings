@@ -1,0 +1,6 @@
+"CFBundleDisplayName" = "VisionCraft";
+"NSBluetoothAlwaysUsageDescription" = "Bluetooth is required to connect a Rivo remote.";
+"NSCameraUsageDescription" = "Camera access is required for document scanning, magnification, and live text reading.";
+"NSMicrophoneUsageDescription" = "Microphone access is required for voice input.";
+"NSMotionUsageDescription" = "Motion access is required to detect device shake during automatic document capture.";
+"NSSpeechRecognitionUsageDescription" = "Speech recognition is required to convert voice input to text.";

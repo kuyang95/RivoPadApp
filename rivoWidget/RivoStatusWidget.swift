@@ -1,6 +1,26 @@
 import SwiftUI
 import WidgetKit
 
+private func widgetLocalized(
+    _ key: String
+) -> String {
+    NSLocalizedString(
+        key,
+        comment: ""
+    )
+}
+
+private func widgetLocalizedFormat(
+    _ key: String,
+    _ arguments: CVarArg...
+) -> String {
+    String(
+        format: widgetLocalized(key),
+        locale: Locale.current,
+        arguments: arguments
+    )
+}
+
 private enum WidgetConnectionKind:
     String,
     Codable
@@ -184,8 +204,10 @@ private struct RivoStatusWidgetView: View {
                 }
             }
             .accessibilityLabel(
-                "Rivo 리모컨 최근 상태, "
-                + statusTitle
+                widgetLocalizedFormat(
+                    "Rivo 리모컨 최근 상태, %@",
+                    statusTitle
+                )
             )
             .accessibilityHint(
                 "VisionCraft의 Rivo 연결 화면을 엽니다."
@@ -251,7 +273,9 @@ private struct RivoStatusWidgetView: View {
             VStack(spacing: 3) {
                 Image(systemName: symbol)
                     .font(.body)
-                Text(title)
+                Text(
+                    LocalizedStringKey(title)
+                )
                     .font(.caption2)
                     .fontWeight(.semibold)
                     .lineLimit(1)
@@ -269,15 +293,49 @@ private struct RivoStatusWidgetView: View {
                 )
             )
         }
-        .accessibilityLabel(title)
+        .accessibilityLabel(
+            Text(
+                LocalizedStringKey(title)
+            )
+        )
         .accessibilityHint(
-            "VisionCraft \(title) 화면을 엽니다."
+            widgetLocalizedFormat(
+                "VisionCraft %@ 화면을 엽니다.",
+                widgetLocalized(title)
+            )
         )
     }
 
     private var statusTitle: String {
-        entry.snapshot?.title
-            ?? "최근 상태 없음"
+        guard let snapshot =
+                entry.snapshot else {
+            return widgetLocalized(
+                "최근 상태 없음"
+            )
+        }
+        switch snapshot.kind {
+        case .connected:
+            guard let deviceName =
+                    snapshot.deviceName else {
+                return widgetLocalized(
+                    "연결됨"
+                )
+            }
+            return widgetLocalizedFormat(
+                "%@ 연결됨",
+                deviceName
+            )
+        case .connecting:
+            return widgetLocalized("연결 중")
+        case .notConnected:
+            return widgetLocalized("연결 안 됨")
+        case .unavailable:
+            return widgetLocalized(
+                "사용할 수 없음"
+            )
+        case .failed:
+            return widgetLocalized("연결 실패")
+        }
     }
 
     private var statusSymbolName: String {

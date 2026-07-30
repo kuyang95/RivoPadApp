@@ -100,7 +100,9 @@ struct AppSettingsView: View {
                 systemImage: "speaker.wave.2"
             ) {
                 TTSManager.shared.speak(
-                    "VisionCraft 음성 속도 예시입니다."
+                    AppLocalization.string(
+                        "VisionCraft 음성 속도 예시입니다."
+                    )
                 )
             }
         } header: {
@@ -178,7 +180,11 @@ struct AppSettingsView: View {
                     ),
                     id: \.offset
                 ) { index, theme in
-                    Text(theme.name)
+                    Text(
+                        LocalizedStringKey(
+                            theme.name
+                        )
+                    )
                         .tag(index)
                 }
             }
@@ -242,13 +248,15 @@ struct AppSettingsView: View {
             LabeledContent(
                 "재생 속도",
                 value:
-                    readerSpeechRate
-                    .formatted(
-                        .number.precision(
-                            .fractionLength(2)
+                    AppLocalization.format(
+                        "재생 속도 배수 형식",
+                        readerSpeechRate
+                            .formatted(
+                                .number.precision(
+                                    .fractionLength(2)
+                                )
+                            )
                         )
-                    )
-                    + "배"
             )
             Slider(
                 value: $readerSpeechRate,
@@ -307,7 +315,10 @@ struct AppSettingsView: View {
 
             LabeledContent(
                 "앱 언어",
-                value: "iPad 시스템 설정 사용"
+                value:
+                    AppLocalization.string(
+                        "iPad 시스템 설정 사용"
+                    )
             )
         } header: {
             Text("iPadOS")

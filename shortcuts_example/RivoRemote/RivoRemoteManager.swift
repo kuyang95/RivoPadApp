@@ -16,13 +16,13 @@ nonisolated enum RivoConnectionDiagnosticLevel:
     var title: String {
         switch self {
         case .info:
-            return "정보"
+            return AppLocalization.string("정보")
         case .success:
-            return "완료"
+            return AppLocalization.string("완료")
         case .warning:
-            return "주의"
+            return AppLocalization.string("주의")
         case .failure:
-            return "실패"
+            return AppLocalization.string("실패")
         }
     }
 }
@@ -50,25 +50,29 @@ nonisolated enum RivoConnectionDiagnosticStage:
         case .bluetooth:
             return "Bluetooth"
         case .scanning:
-            return "검색"
+            return AppLocalization.string("검색")
         case .connecting:
-            return "연결"
+            return AppLocalization.string("연결")
         case .services:
-            return "서비스"
+            return AppLocalization.string("서비스")
         case .characteristics:
-            return "특성"
+            return AppLocalization.string("특성")
         case .notifications:
-            return "알림"
+            return AppLocalization.string("알림")
         case .ready:
-            return "준비"
+            return AppLocalization.string("준비")
         case .disconnected:
-            return "연결 해제"
+            return AppLocalization.string(
+                "연결 해제"
+            )
         case .reconnecting:
-            return "재연결"
+            return AppLocalization.string("재연결")
         case .packets:
-            return "패킷"
+            return AppLocalization.string("패킷")
         case .timeSync:
-            return "시간 동기화"
+            return AppLocalization.string(
+                "시간 동기화"
+            )
         }
     }
 }
@@ -102,25 +106,48 @@ nonisolated enum RivoBluetoothState: Equatable, Sendable {
     var title: String {
         switch self {
         case .inactive:
-            return "리모컨 검색 전"
+            return AppLocalization.string(
+                "리모컨 검색 전"
+            )
         case .preparing:
-            return "Bluetooth 준비 중"
+            return AppLocalization.string(
+                "Bluetooth 준비 중"
+            )
         case .scanning:
-            return "Rivo 리모컨 검색 중"
+            return AppLocalization.string(
+                "Rivo 리모컨 검색 중"
+            )
         case .connecting(let name):
-            return "\(name) 연결 중"
+            return AppLocalization.format(
+                "%@ 연결 중",
+                name
+            )
         case .discovering(let name):
-            return "\(name) 서비스 확인 중"
+            return AppLocalization.format(
+                "%@ 서비스 확인 중",
+                name
+            )
         case .ready(let name):
-            return "\(name) 연결됨"
+            return AppLocalization.format(
+                "%@ 연결됨",
+                name
+            )
         case .bluetoothOff:
-            return "Bluetooth가 꺼져 있습니다"
+            return AppLocalization.string(
+                "Bluetooth가 꺼져 있습니다"
+            )
         case .permissionDenied:
-            return "Bluetooth 권한이 필요합니다"
+            return AppLocalization.string(
+                "Bluetooth 권한이 필요합니다"
+            )
         case .unsupported:
-            return "Bluetooth LE를 지원하지 않습니다"
+            return AppLocalization.string(
+                "Bluetooth LE를 지원하지 않습니다"
+            )
         case .disconnected:
-            return "리모컨 연결 끊김"
+            return AppLocalization.string(
+                "리모컨 연결 끊김"
+            )
         case .failed(let message):
             return message
         }
@@ -146,11 +173,17 @@ nonisolated enum RivoTimeSyncState:
     var title: String {
         switch self {
         case .idle:
-            return "연결 후 자동으로 맞춥니다."
+            return AppLocalization.string(
+                "연결 후 자동으로 맞춥니다."
+            )
         case .sending:
-            return "현재 시간을 보내는 중"
+            return AppLocalization.string(
+                "현재 시간을 보내는 중"
+            )
         case .sent:
-            return "현재 시간을 전송했습니다."
+            return AppLocalization.string(
+                "현재 시간을 전송했습니다."
+            )
         case .failed(let message):
             return message
         }
@@ -166,7 +199,11 @@ nonisolated struct RivoReconnectAttempt:
 
     var title: String {
         let seconds = Int(delay.rounded())
-        return "\(seconds)초 뒤 자동으로 다시 연결합니다. \(number)번째 재시도"
+        return AppLocalization.format(
+            "%lld초 뒤 자동으로 다시 연결합니다. %lld번째 재시도",
+            seconds,
+            number
+        )
     }
 }
 
@@ -228,13 +265,15 @@ nonisolated struct RivoDiscoveredDevice:
     var signalDescription: String {
         switch signalStrength {
         case -55 ... 0:
-            return "매우 강함"
+            return AppLocalization.string(
+                "매우 강함"
+            )
         case -70 ..< -55:
-            return "강함"
+            return AppLocalization.string("강함")
         case -85 ..< -70:
-            return "보통"
+            return AppLocalization.string("보통")
         default:
-            return "약함"
+            return AppLocalization.string("약함")
         }
     }
 }

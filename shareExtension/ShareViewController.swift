@@ -1,6 +1,15 @@
 import UIKit
 import UniformTypeIdentifiers
 
+private func shareLocalized(
+    _ key: String
+) -> String {
+    NSLocalizedString(
+        key,
+        comment: ""
+    )
+}
+
 private enum ShareInboxKind: String, Codable {
     case text
     case image
@@ -26,7 +35,9 @@ final class ShareViewController: UIViewController {
 
     private let statusLabel: UILabel = {
         let label = UILabel()
-        label.text = "공유 항목을 준비하는 중입니다."
+        label.text = shareLocalized(
+            "공유 항목을 준비하는 중입니다."
+        )
         label.font = .preferredFont(
             forTextStyle: .headline
         )
@@ -40,7 +51,10 @@ final class ShareViewController: UIViewController {
     private lazy var openButton: UIButton = {
         var configuration =
             UIButton.Configuration.filled()
-        configuration.title = "VisionCraft 열기"
+        configuration.title =
+            shareLocalized(
+                "VisionCraft 열기"
+            )
         configuration.cornerStyle = .capsule
         let button = UIButton(
             configuration: configuration
@@ -106,7 +120,9 @@ final class ShareViewController: UIViewController {
         ) else {
             finish(
                 with:
-                    "사진, PDF 또는 텍스트만 공유할 수 있습니다."
+                    shareLocalized(
+                        "사진, PDF 또는 텍스트만 공유할 수 있습니다."
+                    )
             )
             return
         }
@@ -173,7 +189,9 @@ final class ShareViewController: UIViewController {
             if let error {
                 self.finish(
                     with:
-                        "텍스트를 읽지 못했습니다: "
+                        shareLocalized(
+                            "텍스트를 읽지 못했습니다: "
+                        )
                         + error.localizedDescription
                 )
                 return
@@ -194,7 +212,10 @@ final class ShareViewController: UIViewController {
                       in: .whitespacesAndNewlines
                   ).isEmpty else {
                 self.finish(
-                    with: "공유된 텍스트가 비어 있습니다."
+                    with:
+                        shareLocalized(
+                            "공유된 텍스트가 비어 있습니다."
+                        )
                 )
                 return
             }
@@ -204,7 +225,9 @@ final class ShareViewController: UIViewController {
             } catch {
                 self.finish(
                     with:
-                        "공유 항목을 저장하지 못했습니다: "
+                        shareLocalized(
+                            "공유 항목을 저장하지 못했습니다: "
+                        )
                         + error.localizedDescription
                 )
             }
@@ -225,14 +248,19 @@ final class ShareViewController: UIViewController {
             if let error {
                 self.finish(
                     with:
-                        "공유 파일을 읽지 못했습니다: "
+                        shareLocalized(
+                            "공유 파일을 읽지 못했습니다: "
+                        )
                         + error.localizedDescription
                 )
                 return
             }
             guard let sourceURL else {
                 self.finish(
-                    with: "공유 파일을 찾지 못했습니다."
+                    with:
+                        shareLocalized(
+                            "공유 파일을 찾지 못했습니다."
+                        )
                 )
                 return
             }
@@ -246,7 +274,9 @@ final class ShareViewController: UIViewController {
             } catch {
                 self.finish(
                     with:
-                        "공유 파일을 저장하지 못했습니다: "
+                        shareLocalized(
+                            "공유 파일을 저장하지 못했습니다: "
+                        )
                         + error.localizedDescription
                 )
             }
@@ -415,12 +445,16 @@ final class ShareViewController: UIViewController {
     private func finishSuccessfully() {
         DispatchQueue.main.async {
             self.statusLabel.text =
-                "VisionCraft 수신함에 저장했습니다."
+                shareLocalized(
+                    "VisionCraft 수신함에 저장했습니다."
+                )
             self.openButton.isHidden = false
             UIAccessibility.post(
                 notification: .announcement,
                 argument:
-                    "공유 항목을 저장했습니다. VisionCraft 열기 버튼을 누르세요."
+                    shareLocalized(
+                        "공유 항목을 저장했습니다. VisionCraft 열기 버튼을 누르세요."
+                    )
             )
         }
     }
@@ -455,7 +489,9 @@ final class ShareViewController: UIViewController {
             } else {
                 self.finish(
                     with:
-                        "VisionCraft를 직접 열면 공유 항목이 자동으로 표시됩니다."
+                        shareLocalized(
+                            "VisionCraft를 직접 열면 공유 항목이 자동으로 표시됩니다."
+                        )
                 )
             }
         }

@@ -563,10 +563,12 @@
 				};
 			};
 			buildConfigurationList = 9E901E922F2C4D010028581D /* Build configuration list for PBXProject "shortcuts_example" */;
-			developmentRegion = en;
+			developmentRegion = ko;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				ko,
 				en,
+				ja,
 				Base,
 			);
 			mainGroup = 9E901E8E2F2C4D010028581D;
@@ -1134,6 +1136,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "shortcuts-example-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = VisionCraft;
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Rivo 리모컨 연결을 위해 Bluetooth가 필요합니다.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "for document scan";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "음성 입력을 위해 필요합니다.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "문서 자동 촬영 중 기기 흔들림을 감지하기 위해 필요합니다.";
@@ -1198,6 +1201,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "shortcuts-example-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = VisionCraft;
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Rivo 리모컨 연결을 위해 Bluetooth가 필요합니다.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "for document scan";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "음성 입력을 위해 필요합니다.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "문서 자동 촬영 중 기기 흔들림을 감지하기 위해 필요합니다.";

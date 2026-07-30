@@ -21,13 +21,21 @@ nonisolated enum AppSpeechRate:
     var title: String {
         switch self {
         case .slow:
-            return "느리게"
+            return AppLocalization.string(
+                "느리게"
+            )
         case .normal:
-            return "보통"
+            return AppLocalization.string(
+                "보통"
+            )
         case .fast:
-            return "빠르게"
+            return AppLocalization.string(
+                "빠르게"
+            )
         case .veryFast:
-            return "매우 빠르게"
+            return AppLocalization.string(
+                "매우 빠르게"
+            )
         }
     }
 
@@ -63,9 +71,13 @@ nonisolated enum AppFontChoice:
     var title: String {
         switch self {
         case .system:
-            return "iPad 시스템 글꼴"
+            return AppLocalization.string(
+                "iPad 시스템 글꼴"
+            )
         case .nanumSquareRound:
-            return "나눔스퀘어라운드"
+            return AppLocalization.string(
+                "나눔스퀘어라운드"
+            )
         }
     }
 }

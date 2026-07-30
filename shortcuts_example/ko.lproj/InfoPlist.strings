@@ -1,0 +1,6 @@
+"CFBundleDisplayName" = "VisionCraft";
+"NSBluetoothAlwaysUsageDescription" = "Rivo 리모컨 연결을 위해 Bluetooth가 필요합니다.";
+"NSCameraUsageDescription" = "문서 스캔, 돋보기, 실시간 글자 읽기를 위해 카메라가 필요합니다.";
+"NSMicrophoneUsageDescription" = "음성 입력을 위해 마이크가 필요합니다.";
+"NSMotionUsageDescription" = "문서 자동 촬영 중 기기 흔들림을 감지하기 위해 동작 센서가 필요합니다.";
+"NSSpeechRecognitionUsageDescription" = "음성 입력을 글자로 변환하기 위해 음성 인식이 필요합니다.";

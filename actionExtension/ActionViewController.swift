@@ -1,6 +1,15 @@
 import UIKit
 import UniformTypeIdentifiers
 
+private func actionLocalized(
+    _ key: String
+) -> String {
+    NSLocalizedString(
+        key,
+        comment: ""
+    )
+}
+
 private enum ActionInboxKind: String, Codable {
     case text
 }
@@ -20,7 +29,9 @@ private enum ActionExtensionError: LocalizedError {
     case emptyText
 
     var errorDescription: String? {
-        "선택한 텍스트가 비어 있습니다."
+        actionLocalized(
+            "선택한 텍스트가 비어 있습니다."
+        )
     }
 }
 
@@ -32,7 +43,9 @@ final class ActionViewController: UIViewController {
 
     private let statusLabel: UILabel = {
         let label = UILabel()
-        label.text = "선택한 텍스트를 준비하는 중입니다."
+        label.text = actionLocalized(
+            "선택한 텍스트를 준비하는 중입니다."
+        )
         label.font = .preferredFont(
             forTextStyle: .headline
         )
@@ -46,7 +59,10 @@ final class ActionViewController: UIViewController {
     private lazy var openButton: UIButton = {
         var configuration =
             UIButton.Configuration.filled()
-        configuration.title = "VisionCraft에 질문"
+        configuration.title =
+            actionLocalized(
+                "VisionCraft에 질문"
+            )
         configuration.cornerStyle = .capsule
         let button = UIButton(
             configuration: configuration
@@ -65,7 +81,10 @@ final class ActionViewController: UIViewController {
     private lazy var laterButton: UIButton = {
         var configuration =
             UIButton.Configuration.plain()
-        configuration.title = "나중에 열기"
+        configuration.title =
+            actionLocalized(
+                "나중에 열기"
+            )
         let button = UIButton(
             configuration: configuration
         )
@@ -138,7 +157,9 @@ final class ActionViewController: UIViewController {
             .first else {
             finish(
                 with:
-                    "선택한 텍스트를 이 동작에 전달하지 못했습니다."
+                    actionLocalized(
+                        "선택한 텍스트를 이 동작에 전달하지 못했습니다."
+                    )
             )
             return
         }
@@ -153,7 +174,9 @@ final class ActionViewController: UIViewController {
             if let error {
                 self.finish(
                     with:
-                        "선택한 텍스트를 읽지 못했습니다: "
+                        actionLocalized(
+                            "선택한 텍스트를 읽지 못했습니다: "
+                        )
                         + error.localizedDescription
                 )
                 return
@@ -172,7 +195,9 @@ final class ActionViewController: UIViewController {
             guard let text else {
                 self.finish(
                     with:
-                        "선택한 텍스트 형식을 읽을 수 없습니다."
+                        actionLocalized(
+                            "선택한 텍스트 형식을 읽을 수 없습니다."
+                        )
                 )
                 return
             }
@@ -182,7 +207,9 @@ final class ActionViewController: UIViewController {
             } catch {
                 self.finish(
                     with:
-                        "선택한 텍스트를 저장하지 못했습니다: "
+                        actionLocalized(
+                            "선택한 텍스트를 저장하지 못했습니다: "
+                        )
                         + error.localizedDescription
                 )
             }
@@ -278,13 +305,17 @@ final class ActionViewController: UIViewController {
     private func finishSuccessfully() {
         DispatchQueue.main.async {
             self.statusLabel.text =
-                "선택한 텍스트를 로컬 수신함에 저장했습니다."
+                actionLocalized(
+                    "선택한 텍스트를 로컬 수신함에 저장했습니다."
+                )
             self.openButton.isHidden = false
             self.laterButton.isHidden = false
             UIAccessibility.post(
                 notification: .announcement,
                 argument:
-                    "선택한 텍스트를 저장했습니다. VisionCraft에 질문 버튼을 누르거나 나중에 열 수 있습니다."
+                    actionLocalized(
+                        "선택한 텍스트를 저장했습니다. VisionCraft에 질문 버튼을 누르거나 나중에 열 수 있습니다."
+                    )
             )
         }
     }
@@ -317,7 +348,9 @@ final class ActionViewController: UIViewController {
             } else {
                 self.finish(
                     with:
-                        "VisionCraft를 직접 열면 선택한 텍스트가 자동으로 표시됩니다."
+                        actionLocalized(
+                            "VisionCraft를 직접 열면 선택한 텍스트가 자동으로 표시됩니다."
+                        )
                 )
                 self.laterButton.isHidden = false
             }

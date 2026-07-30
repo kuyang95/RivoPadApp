@@ -10,6 +10,7 @@
 @text Share Extension, 선택 텍스트 Action, Rivo 상태 위젯과 App Shortcut 10개를 추가했습니다.
 @text 효과음·음성·TTS 속도·스캐너·문서·독서·앱 글꼴 통합 설정을 추가했습니다.
 @text iPad 전용 사용 설명서와 Android 기능의 iPadOS 제약·대체 경로를 추가했습니다.
+@text 한국어·영어·일본어 앱 언어 기반과 홈·설정·도움말·공유·위젯 번역을 추가했습니다.
 
 @version 0.9
 @date 2026년 7월 29일

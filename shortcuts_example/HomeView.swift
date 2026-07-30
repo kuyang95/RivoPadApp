@@ -206,7 +206,9 @@ struct HomeView: View {
     private var rivoHomeStatusTitle: String {
         switch rivoRemoteManager.state {
         case .inactive:
-            return "연결 안 됨"
+            return AppLocalization.string(
+                "연결 안 됨"
+            )
         default:
             return rivoRemoteManager.state.title
         }
