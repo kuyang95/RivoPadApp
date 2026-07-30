@@ -9,78 +9,633 @@ nonisolated enum MagnifierCameraMode: Sendable {
     case liveTextReader
 }
 
-nonisolated enum LiveTextDeduplicator {
+nonisolated struct LiveTextOCRQuality:
+    Equatable,
+    Sendable
+{
+    let elementCount: Int
+    let medianGlyphHeight: Int
+    let below16Percentage: Int
+
+    init(
+        elementCount: Int = 0,
+        medianGlyphHeight: Int = 0,
+        below16Percentage: Int = 0
+    ) {
+        self.elementCount = max(0, elementCount)
+        self.medianGlyphHeight = max(
+            0,
+            medianGlyphHeight
+        )
+        self.below16Percentage = min(
+            max(0, below16Percentage),
+            100
+        )
+    }
+
+    var isLowForSpeech: Bool {
+        elementCount >= 8
+            && (
+                medianGlyphHeight < 18
+                    || below16Percentage >= 25
+            )
+    }
+}
+
+nonisolated enum LiveTextAnnouncementDisposition:
+    Equatable,
+    Sendable
+{
+    case noText
+    case lowQuality
+    case checking
+    case suppressed
+    case announce
+}
+
+nonisolated struct LiveTextAnnouncementDecision:
+    Equatable,
+    Sendable
+{
+    let disposition:
+        LiveTextAnnouncementDisposition
+    let text: String
+    let reason: String
+    let similarity: Double?
+}
+
+nonisolated struct LiveTextDeduplicator: Sendable {
+    private var candidateText: String?
+    private var candidateStableCount = 0
+    private var lastSpokenText = ""
+    private var lastSpokenAt: TimeInterval = 0
+    private var sceneAnchorText = ""
+    private var sceneAnchorAt: TimeInterval = 0
+    private var consecutiveNoTextFrames = 0
+
+    mutating func evaluate(
+        _ rawText: String,
+        quality: LiveTextOCRQuality,
+        now: TimeInterval,
+        isSpeaking: Bool
+    ) -> LiveTextAnnouncementDecision {
+        let normalized = Self.normalize(rawText)
+        guard normalized.count >= Self.minimumTextLength else {
+            noteNoTextFrame()
+            return LiveTextAnnouncementDecision(
+                disposition: .noText,
+                text: "",
+                reason: "text_too_short",
+                similarity: nil
+            )
+        }
+        consecutiveNoTextFrames = 0
+
+        guard !quality.isLowForSpeech else {
+            return LiveTextAnnouncementDecision(
+                disposition: .lowQuality,
+                text: normalized,
+                reason: "low_ocr_quality",
+                similarity: nil
+            )
+        }
+
+        let previousCandidate = candidateText
+        let candidateSimilarity = previousCandidate.map {
+            Self.sceneSimilarity($0, normalized)
+        }
+        if let previousCandidate,
+           let candidateSimilarity,
+           candidateSimilarity.value
+                >= Self.candidateMatchThreshold {
+            candidateStableCount += 1
+            if normalized.count
+                > previousCandidate.count {
+                candidateText = normalized
+            }
+        } else {
+            candidateText = normalized
+            candidateStableCount = 1
+        }
+
+        let stableText =
+            candidateText ?? normalized
+        guard candidateStableCount
+            >= Self.requiredStableCount else {
+            return LiveTextAnnouncementDecision(
+                disposition: .checking,
+                text: stableText,
+                reason: "candidate_not_stable",
+                similarity: candidateSimilarity?.value
+            )
+        }
+
+        if lastSpokenText.isEmpty,
+           candidateStableCount
+            < Self.initialStableCount,
+           !Self.isRichTextScene(
+               stableText,
+               quality: quality
+           ) {
+            return LiveTextAnnouncementDecision(
+                disposition: .checking,
+                text: stableText,
+                reason: "initial_text_not_stable",
+                similarity: candidateSimilarity?.value
+            )
+        }
+
+        let decision = speechDecision(
+            stableText,
+            quality: quality,
+            now: now,
+            isSpeaking: isSpeaking
+        )
+        guard decision.disposition == .announce else {
+            return decision
+        }
+
+        lastSpokenText = stableText
+        lastSpokenAt = now
+        let spokenText = String(
+            stableText.prefix(Self.maximumSpokenCharacters)
+        )
+        updateSceneAnchor(
+            spokenText,
+            quality: quality,
+            now: now
+        )
+        return LiveTextAnnouncementDecision(
+            disposition: .announce,
+            text: spokenText,
+            reason: decision.reason,
+            similarity: decision.similarity
+        )
+    }
+
+    mutating func reset() {
+        candidateText = nil
+        candidateStableCount = 0
+        lastSpokenText = ""
+        lastSpokenAt = 0
+        sceneAnchorText = ""
+        sceneAnchorAt = 0
+        consecutiveNoTextFrames = 0
+    }
+
     static func shouldAnnounce(
         _ candidate: String,
         after previous: String
     ) -> Bool {
         let candidate = normalize(candidate)
         let previous = normalize(previous)
-        guard candidate.count >= 2 else {
+        guard candidate.count >= minimumTextLength else {
             return false
         }
         guard !previous.isEmpty else {
             return true
         }
-        guard candidate != previous else {
-            return false
+        return sceneSimilarity(
+            previous,
+            candidate
+        ).value < spokenDuplicateThreshold
+    }
+
+    static func quality(
+        lineTexts: [String],
+        linePixelHeights: [Double]
+    ) -> LiveTextOCRQuality {
+        var glyphHeights: [Int] = []
+        for (index, text) in lineTexts.enumerated() {
+            let tokenCount = max(
+                1,
+                comparisonTokens(text).count
+            )
+            let height = index < linePixelHeights.count
+                ? max(
+                    0,
+                    Int(linePixelHeights[index].rounded())
+                )
+                : 0
+            glyphHeights.append(
+                contentsOf: repeatElement(
+                    height,
+                    count: tokenCount
+                )
+            )
+        }
+        guard !glyphHeights.isEmpty else {
+            return LiveTextOCRQuality()
+        }
+        glyphHeights.sort()
+        return LiveTextOCRQuality(
+            elementCount: glyphHeights.count,
+            medianGlyphHeight:
+                glyphHeights[glyphHeights.count / 2],
+            below16Percentage:
+                glyphHeights.filter { $0 < 16 }.count
+                * 100
+                / glyphHeights.count
+        )
+    }
+
+    private mutating func speechDecision(
+        _ text: String,
+        quality: LiveTextOCRQuality,
+        now: TimeInterval,
+        isSpeaking: Bool
+    ) -> LiveTextAnnouncementDecision {
+        if !sceneAnchorText.isEmpty {
+            let elapsed = max(
+                0,
+                now - sceneAnchorAt
+            )
+            if elapsed < Self.sceneAnchorSuppression,
+               isSameSceneAsAnchor(
+                   text,
+                   quality: quality
+               ) {
+                let similarity = Self.sceneSimilarity(
+                    sceneAnchorText,
+                    text
+                ).value
+                return suppressed(
+                    text,
+                    reason: "same_scene_anchor",
+                    similarity: similarity
+                )
+            }
         }
 
-        let lengthDifference = abs(
-            candidate.count - previous.count
-        )
-        let smallChangeLimit = max(
-            8,
-            Int(Double(previous.count) * 0.25)
-        )
-        if lengthDifference <= smallChangeLimit,
-           candidate.contains(previous)
-            || previous.contains(candidate) {
-            return false
+        guard !lastSpokenText.isEmpty else {
+            return LiveTextAnnouncementDecision(
+                disposition: .announce,
+                text: text,
+                reason: "first_text",
+                similarity: nil
+            )
         }
 
-        return diceSimilarity(candidate, previous) < 0.86
+        let elapsed = max(
+            0,
+            now - lastSpokenAt
+        )
+        let match = Self.sceneSimilarity(
+            lastSpokenText,
+            text
+        )
+        if match.value
+            >= Self.spokenDuplicateThreshold {
+            return suppressed(
+                text,
+                reason: "duplicate_threshold",
+                similarity: match.value
+            )
+        }
+        if isSpeaking,
+           match.value
+            >= Self.speakingSceneMatchThreshold {
+            return suppressed(
+                text,
+                reason: "same_scene_while_speaking",
+                similarity: match.value
+            )
+        }
+        if elapsed < Self.sceneRepeatSuppression,
+           match.value
+            >= Self.sceneRepeatMatchThreshold {
+            return suppressed(
+                text,
+                reason: "same_scene_cooldown",
+                similarity: match.value
+            )
+        }
+        if elapsed < Self.minimumSpeakInterval,
+           match.value
+            >= Self.recentTextMatchThreshold {
+            return suppressed(
+                text,
+                reason: "recent_similar_text",
+                similarity: match.value
+            )
+        }
+        return LiveTextAnnouncementDecision(
+            disposition: .announce,
+            text: text,
+            reason: "new_text",
+            similarity: match.value
+        )
+    }
+
+    private func suppressed(
+        _ text: String,
+        reason: String,
+        similarity: Double
+    ) -> LiveTextAnnouncementDecision {
+        LiveTextAnnouncementDecision(
+            disposition: .suppressed,
+            text: text,
+            reason: reason,
+            similarity: similarity
+        )
+    }
+
+    private func isSameSceneAsAnchor(
+        _ text: String,
+        quality: LiveTextOCRQuality
+    ) -> Bool {
+        let score = Self.sceneSimilarity(
+            sceneAnchorText,
+            text
+        )
+        if score.value
+            >= Self.sceneAnchorMatchThreshold {
+            return true
+        }
+        if score.containment
+            >= Self.sceneAnchorContainmentThreshold {
+            return true
+        }
+
+        let isShortPartial =
+            text.count < Self.partialSceneMaximumCharacters
+            || quality.elementCount
+                < Self.partialSceneMaximumElements
+        let isShorterThanAnchor =
+            Double(text.count)
+            < Double(sceneAnchorText.count)
+                * Self.partialAnchorLengthRatio
+        return isShortPartial
+            && isShorterThanAnchor
+            && score.containment
+                >= Self.partialSceneContainmentThreshold
+    }
+
+    private mutating func updateSceneAnchor(
+        _ text: String,
+        quality: LiveTextOCRQuality,
+        now: TimeInterval
+    ) {
+        guard Self.isRichTextScene(
+            text,
+            quality: quality
+        ) else {
+            return
+        }
+        if sceneAnchorText.isEmpty
+            || Double(text.count)
+                >= Double(sceneAnchorText.count)
+                * Self.anchorReplaceMinimumLengthRatio {
+            sceneAnchorText = text
+            sceneAnchorAt = now
+        }
+    }
+
+    private mutating func noteNoTextFrame() {
+        consecutiveNoTextFrames += 1
+        guard consecutiveNoTextFrames
+            >= Self.noTextResetFrames else {
+            return
+        }
+        candidateText = nil
+        candidateStableCount = 0
+        sceneAnchorText = ""
+        sceneAnchorAt = 0
+        consecutiveNoTextFrames = 0
+    }
+
+    private static func isRichTextScene(
+        _ text: String,
+        quality: LiveTextOCRQuality
+    ) -> Bool {
+        text.count >= richTextMinimumCharacters
+            || quality.elementCount
+                >= richTextMinimumElements
     }
 
     private static func normalize(_ text: String) -> String {
         text
-            .lowercased()
             .split(whereSeparator: \.isWhitespace)
             .joined(separator: " ")
     }
 
-    private static func diceSimilarity(
-        _ lhs: String,
-        _ rhs: String
+    private static func sceneSimilarity(
+        _ first: String,
+        _ second: String
+    ) -> SimilarityScore {
+        let ordered = orderedSimilarity(
+            first,
+            second
+        )
+        let tokens = tokenSimilarity(
+            first,
+            second
+        )
+        return SimilarityScore(
+            value: max(ordered, tokens.dice),
+            ordered: ordered,
+            tokens: tokens.dice,
+            containment: tokens.containment
+        )
+    }
+
+    private static func orderedSimilarity(
+        _ first: String,
+        _ second: String
     ) -> Double {
-        let leftPairs = characterPairs(in: lhs)
-        let rightPairs = characterPairs(in: rhs)
-        guard !leftPairs.isEmpty, !rightPairs.isEmpty else {
-            return lhs == rhs ? 1 : 0
+        let left = Array(
+            first.prefix(similarityMaximumCharacters)
+        )
+        let right = Array(
+            second.prefix(similarityMaximumCharacters)
+        )
+        guard !left.isEmpty, !right.isEmpty else {
+            return 0
+        }
+        let distance = levenshteinDistance(
+            left,
+            right
+        )
+        return 1
+            - Double(distance)
+            / Double(max(left.count, right.count))
+    }
+
+    private static func tokenSimilarity(
+        _ first: String,
+        _ second: String
+    ) -> TokenScore {
+        let firstTokens = comparisonTokens(first)
+        let secondTokens = comparisonTokens(second)
+        guard !firstTokens.isEmpty,
+              !secondTokens.isEmpty else {
+            return TokenScore()
         }
 
-        var remaining = rightPairs
-        var matches = 0
-        for pair in leftPairs {
-            guard let index = remaining.firstIndex(of: pair) else {
+        var remaining: [String: Int] = [:]
+        for token in firstTokens {
+            remaining[token, default: 0] += 1
+        }
+        var intersection = 0
+        for token in secondTokens {
+            guard let count = remaining[token],
+                  count > 0 else {
                 continue
             }
-            matches += 1
-            remaining.remove(at: index)
+            intersection += 1
+            if count == 1 {
+                remaining.removeValue(forKey: token)
+            } else {
+                remaining[token] = count - 1
+            }
         }
-        return Double(matches * 2)
-            / Double(leftPairs.count + rightPairs.count)
+        return TokenScore(
+            dice: Double(intersection * 2)
+                / Double(
+                    firstTokens.count
+                        + secondTokens.count
+                ),
+            containment: Double(intersection)
+                / Double(
+                    min(
+                        firstTokens.count,
+                        secondTokens.count
+                    )
+                )
+        )
     }
 
-    private static func characterPairs(in text: String) -> [String] {
-        let characters = Array(text)
-        guard characters.count >= 2 else {
-            return []
+    private static func comparisonTokens(
+        _ text: String
+    ) -> [String] {
+        var tokens: [String] = []
+        var current = ""
+        for character in text {
+            if character.isLetter
+                || character.isNumber
+                || "@._-".contains(character) {
+                current.append(character)
+            } else if !current.isEmpty {
+                tokens.append(
+                    normalizeComparisonToken(current)
+                )
+                current = ""
+            }
         }
-        return (0 ..< characters.count - 1).map {
-            String(characters[$0 ... $0 + 1])
+        if !current.isEmpty {
+            tokens.append(
+                normalizeComparisonToken(current)
+            )
+        }
+        return tokens.filter { !$0.isEmpty }
+    }
+
+    private static func normalizeComparisonToken(
+        _ token: String
+    ) -> String {
+        var characters = Array(token.lowercased())
+        let original = characters
+        for index in characters.indices
+        where characters[index] == "o" {
+            let previousIsDigit =
+                index > original.startIndex
+                && original[
+                    original.index(before: index)
+                ].isNumber
+            let nextIndex =
+                original.index(after: index)
+            let nextIsDigit =
+                nextIndex < original.endIndex
+                && original[nextIndex].isNumber
+            if previousIsDigit || nextIsDigit {
+                characters[index] = "0"
+            }
+        }
+        return String(characters)
+    }
+
+    private static func levenshteinDistance(
+        _ first: [Character],
+        _ second: [Character]
+    ) -> Int {
+        if first == second {
+            return 0
+        }
+        if first.isEmpty {
+            return second.count
+        }
+        if second.isEmpty {
+            return first.count
+        }
+
+        var previous = Array(0 ... second.count)
+        var current = Array(
+            repeating: 0,
+            count: second.count + 1
+        )
+        for firstIndex in first.indices {
+            current[0] = firstIndex + 1
+            for secondIndex in second.indices {
+                let substitutionCost =
+                    first[firstIndex]
+                        == second[secondIndex]
+                    ? 0
+                    : 1
+                current[secondIndex + 1] = min(
+                    current[secondIndex] + 1,
+                    previous[secondIndex + 1] + 1,
+                    previous[secondIndex]
+                        + substitutionCost
+                )
+            }
+            swap(&previous, &current)
+        }
+        return previous[second.count]
+    }
+
+    private struct SimilarityScore: Sendable {
+        let value: Double
+        let ordered: Double
+        let tokens: Double
+        let containment: Double
+    }
+
+    private struct TokenScore: Sendable {
+        let dice: Double
+        let containment: Double
+
+        init(
+            dice: Double = 0,
+            containment: Double = 0
+        ) {
+            self.dice = dice
+            self.containment = containment
         }
     }
+
+    private static let minimumTextLength = 2
+    private static let initialStableCount = 2
+    private static let requiredStableCount = 1
+    private static let candidateMatchThreshold = 0.78
+    private static let spokenDuplicateThreshold = 0.82
+    private static let recentTextMatchThreshold = 0.58
+    private static let minimumSpeakInterval: TimeInterval = 3
+    private static let sceneRepeatSuppression: TimeInterval = 12
+    private static let sceneRepeatMatchThreshold = 0.70
+    private static let speakingSceneMatchThreshold = 0.58
+    private static let sceneAnchorSuppression: TimeInterval = 30
+    private static let sceneAnchorMatchThreshold = 0.70
+    private static let sceneAnchorContainmentThreshold = 0.46
+    private static let partialSceneContainmentThreshold = 0.22
+    private static let partialSceneMaximumCharacters = 90
+    private static let partialSceneMaximumElements = 8
+    private static let partialAnchorLengthRatio = 0.88
+    private static let anchorReplaceMinimumLengthRatio = 0.92
+    private static let richTextMinimumCharacters = 90
+    private static let richTextMinimumElements = 16
+    private static let noTextResetFrames = 3
+    private static let maximumSpokenCharacters = 500
+    private static let similarityMaximumCharacters = 240
 }
 
 nonisolated enum MagnifierFilter: Int, CaseIterable, Sendable {
@@ -387,8 +942,9 @@ final class MagnifierViewController:
     private var isLiveReadingEnabled = true
     private var isLiveOCRBusy = false
     private var lastLiveOCRTime: CFTimeInterval = 0
-    private var lastSpokenText = ""
-    private let liveOCRInterval: CFTimeInterval = 1.5
+    private var liveTextDeduplicator =
+        LiveTextDeduplicator()
+    private let liveOCRInterval: CFTimeInterval = 1
     private var lastRemoteEventID: UInt64 = 0
 
     private let metalDevice = MTLCreateSystemDefaultDevice()
@@ -1550,19 +2106,45 @@ final class MagnifierViewController:
                 return lhs.boundingBox.minX
                     < rhs.boundingBox.minX
             }
-            let text = sorted.compactMap {
-                $0.topCandidates(1).first?.string
-            }
-            .map {
-                $0.trimmingCharacters(
-                    in: .whitespacesAndNewlines
+            let framePixelHeight = Double(
+                CVPixelBufferGetHeight(pixelBuffer)
+            )
+            let recognizedLines = sorted.compactMap {
+                observation
+                    -> (text: String, height: Double)? in
+                guard let candidate = observation
+                    .topCandidates(1)
+                    .first else {
+                    return nil
+                }
+                let text = candidate.string
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                guard !text.isEmpty else {
+                    return nil
+                }
+                return (
+                    text,
+                    Double(
+                        observation.boundingBox.height
+                    ) * framePixelHeight
                 )
             }
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n")
+            let text = recognizedLines
+                .map(\.text)
+                .joined(separator: "\n")
+            let quality = LiveTextDeduplicator.quality(
+                lineTexts: recognizedLines.map(\.text),
+                linePixelHeights:
+                    recognizedLines.map(\.height)
+            )
 
             DispatchQueue.main.async { [weak self] in
-                self?.publishLiveText(text)
+                self?.publishLiveText(
+                    text,
+                    quality: quality
+                )
             }
         } catch {
             publishStatus(
@@ -1571,27 +2153,48 @@ final class MagnifierViewController:
         }
     }
 
-    private func publishLiveText(_ text: String) {
+    private func publishLiveText(
+        _ text: String,
+        quality: LiveTextOCRQuality
+    ) {
         let trimmed = text.trimmingCharacters(
             in: .whitespacesAndNewlines
         )
-        guard !trimmed.isEmpty else {
+        let decision = liveTextDeduplicator.evaluate(
+            trimmed,
+            quality: quality,
+            now: CACurrentMediaTime(),
+            isSpeaking: tts.isSpeaking
+        )
+
+        guard decision.disposition != .noText else {
             liveTextLabel.text = "텍스트를 찾는 중…"
+            liveTextLabel.accessibilityValue = nil
+            statusLabel.text = "실시간 텍스트를 찾는 중"
             return
         }
         liveTextLabel.text = trimmed
         liveTextLabel.accessibilityValue = trimmed
 
-        guard isLiveReadingEnabled,
-              !tts.isSpeaking,
-              LiveTextDeduplicator.shouldAnnounce(
-                  trimmed,
-                  after: lastSpokenText
-              ) else {
+        switch decision.disposition {
+        case .lowQuality:
+            statusLabel.text =
+                "글자가 작아 더 가까이 비춰 주세요"
+        case .checking:
+            statusLabel.text =
+                "인식 결과를 확인하는 중"
+        case .suppressed:
+            statusLabel.text =
+                "실시간 텍스트를 찾는 중"
+        case .announce:
+            guard isLiveReadingEnabled else {
+                return
+            }
+            statusLabel.text = "인식한 텍스트 읽는 중"
+            tts.speak(decision.text)
+        case .noText:
             return
         }
-        lastSpokenText = trimmed
-        tts.speak(trimmed)
     }
 
     private func toggleLiveReading() {
@@ -1604,7 +2207,7 @@ final class MagnifierViewController:
         liveOCRLock.unlock()
 
         if isEnabled {
-            lastSpokenText = ""
+            liveTextDeduplicator.reset()
             captureButton.configuration?.title = "읽기 일시정지"
             captureButton.configuration?.image = UIImage(
                 systemName: "pause.fill"
