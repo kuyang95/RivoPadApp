@@ -10,11 +10,17 @@ nonisolated enum AccessiblePublicationParserError:
     var errorDescription: String? {
         switch self {
         case .unsupportedFormat:
-            return "지원하는 EPUB 또는 DAISY 책이 아닙니다."
+            return AppLocalization.string(
+                "지원하는 EPUB 또는 DAISY 책이 아닙니다."
+            )
         case .rootDocumentMissing:
-            return "DAISY 책의 NCC 또는 OPF 파일을 찾을 수 없습니다."
+            return AppLocalization.string(
+                "DAISY 책의 NCC 또는 OPF 파일을 찾을 수 없습니다."
+            )
         case .readableContentMissing:
-            return "DAISY 책에서 읽을 본문을 찾지 못했습니다."
+            return AppLocalization.string(
+                "DAISY 책에서 읽을 본문을 찾지 못했습니다."
+            )
         }
     }
 }

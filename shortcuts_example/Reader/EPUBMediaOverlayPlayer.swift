@@ -10,7 +10,9 @@ nonisolated enum EPUBMediaOverlayPlaybackError:
     var errorDescription: String? {
         switch self {
         case .audioMissing:
-            return "책 안의 오디오 파일을 찾을 수 없습니다."
+            return AppLocalization.string(
+                "책 안의 오디오 파일을 찾을 수 없습니다."
+            )
         }
     }
 }
@@ -291,15 +293,25 @@ nonisolated enum EPUBReadAloudNavigationUnit:
     var displayName: String {
         switch self {
         case .word:
-            return "단어"
+            return AppLocalization.string(
+                "단어"
+            )
         case .sentence:
-            return "문장"
+            return AppLocalization.string(
+                "문장"
+            )
         case .paragraph:
-            return "문단"
+            return AppLocalization.string(
+                "문단"
+            )
         case .page:
-            return "페이지"
+            return AppLocalization.string(
+                "페이지"
+            )
         case .chapter:
-            return "장"
+            return AppLocalization.string(
+                "장"
+            )
         }
     }
 
@@ -463,9 +475,13 @@ nonisolated enum EPUBReadAloudPlaybackMode:
         case .none:
             return ""
         case .audio:
-            return "오디오"
+            return AppLocalization.string(
+                "오디오"
+            )
         case .textToSpeech:
-            return "로컬 음성"
+            return AppLocalization.string(
+                "로컬 음성"
+            )
         }
     }
 }

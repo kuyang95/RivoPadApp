@@ -33,13 +33,16 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 - 스캐너 자동 촬영·UVDoc 곡면 보정 설정과 fallback 설명
 - 로컬 진단·개인정보, M4 자원 상태, MetricKit 개수와 JSON 내보내기
 - 홈과 소형 위젯의 오늘 M4 로컬 AI 완료·실패·취소·처리량·무제한 문구
+- EPUB·DAISY 서재·목차·검색·보기·혼합 재생 화면, 동적 탐색 단위·
+  재생 방식과 ZIP/EPUB/DAISY 오류의 앱 내부 언어 즉시 반영
+- Xcode `.stringsdata`에서 화면별 키를 수집해 영어·일본어 누락과 두
+  번들의 키·printf 지정자 차이를 검사하는 `audit_localizations.swift`
 
 ## 다음 번역 묶음
 
 - AI 대화 본문·이미지 질문·음성 입력의 나머지 화면
 - 카메라 도구 선택, 돋보기, 실시간 OCR과 자체 문서 스캐너
 - PDF/TXT 문서 뷰어와 내보내기
-- EPUB/DAISY 라이브러리·목차·검색·재생 화면
 - VisionLink 연결·수신·원격 기능과 Rivo 연결 관리·진단 화면
 - App Intent의 title, description, parameter와 Siri phrase
 - 기능별 나머지 로컬 진단 로그, 파일명과 오류 문구
@@ -47,10 +50,10 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 
 ## 자동 점검
 
-- [ ] 번역 대상 Swift 파일의 한국어 문자열을 추출해 미등록 key 수를
-      계속 줄인다.
-- [ ] 영어와 일본어 `.strings`가 같은 key 집합과 format 지정자를
-      유지하는지 검사하는 스크립트를 추가한다.
+- [x] Xcode가 추출한 화면별 키와 번들을 비교해 미등록 key 수를
+      계속 줄이는 검사 도구를 추가한다.
+- [x] 영어와 일본어 `.strings`가 같은 key 집합과 printf 지정자를
+      유지하는지 검사한다.
 - [ ] 영어·일본어로 시뮬레이터를 각각 실행해 주요 화면 스크린샷을 남긴다.
 - [ ] 긴 영어 문구와 일본어에서 큰 글자·가로/세로 레이아웃을 확인한다.
 

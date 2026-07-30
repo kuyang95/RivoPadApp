@@ -115,15 +115,25 @@ nonisolated enum EPUBParserError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .containerMissing:
-            return "EPUB container.xml을 찾을 수 없습니다."
+            return AppLocalization.string(
+                "EPUB container.xml을 찾을 수 없습니다."
+            )
         case .packagePathMissing:
-            return "EPUB 패키지 경로를 찾을 수 없습니다."
+            return AppLocalization.string(
+                "EPUB 패키지 경로를 찾을 수 없습니다."
+            )
         case .packageInvalid:
-            return "EPUB OPF 패키지를 해석할 수 없습니다."
+            return AppLocalization.string(
+                "EPUB OPF 패키지를 해석할 수 없습니다."
+            )
         case .readingOrderMissing:
-            return "EPUB 읽기 순서가 없습니다."
+            return AppLocalization.string(
+                "EPUB 읽기 순서가 없습니다."
+            )
         case .chapterTextMissing:
-            return "EPUB에서 읽을 수 있는 본문을 찾지 못했습니다."
+            return AppLocalization.string(
+                "EPUB에서 읽을 수 있는 본문을 찾지 못했습니다."
+            )
         }
     }
 }

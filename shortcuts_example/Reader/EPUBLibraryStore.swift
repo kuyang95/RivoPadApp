@@ -22,8 +22,8 @@ nonisolated struct EPUBLibraryBook:
     var formatDescription: String {
         fileURL.pathExtension.lowercased() == "epub"
             ? "EPUB"
-            : String(
-                localized: "DAISY ZIP"
+            : AppLocalization.string(
+                "DAISY ZIP"
             )
     }
 }
@@ -47,16 +47,15 @@ nonisolated enum EPUBLibraryError:
     var errorDescription: String? {
         switch self {
         case .unsupportedFormat:
-            return String(
-                localized:
-                    "EPUB 또는 DAISY ZIP 파일만 가져올 수 있습니다."
+            return AppLocalization.string(
+                "EPUB 또는 DAISY ZIP 파일만 가져올 수 있습니다."
             )
         case .libraryCapacityReached(
             let maximumBooks
         ):
-            return String(
-                localized:
-                    "서재에는 책을 최대 \(maximumBooks)권까지 보관할 수 있습니다."
+            return AppLocalization.format(
+                "서재에는 책을 최대 %lld권까지 보관할 수 있습니다.",
+                maximumBooks
             )
         }
     }

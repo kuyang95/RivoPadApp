@@ -501,11 +501,17 @@ private enum EPUBReaderTheme: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .light:
-            return "밝게"
+            return AppLocalization.string(
+                "밝게"
+            )
         case .sepia:
-            return "세피아"
+            return AppLocalization.string(
+                "세피아"
+            )
         case .dark:
-            return "어둡게"
+            return AppLocalization.string(
+                "어둡게"
+            )
         }
     }
 

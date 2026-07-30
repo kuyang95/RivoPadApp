@@ -376,6 +376,82 @@ final class AppLocalizationTests:
         )
     }
 
+    func testReaderDynamicStringsFollowInAppLanguage()
+    {
+        let defaults = UserDefaults.standard
+        let previous =
+            defaults.string(
+                forKey:
+                    AppLanguage
+                    .preferenceKey
+            )
+        defer {
+            if let previous {
+                defaults.set(
+                    previous,
+                    forKey:
+                        AppLanguage
+                        .preferenceKey
+                )
+            } else {
+                defaults.removeObject(
+                    forKey:
+                        AppLanguage
+                        .preferenceKey
+                )
+            }
+        }
+
+        defaults.set(
+            AppLanguage.english.rawValue,
+            forKey:
+                AppLanguage.preferenceKey
+        )
+        XCTAssertEqual(
+            EPUBReadAloudNavigationUnit
+                .paragraph.displayName,
+            "Paragraph"
+        )
+        XCTAssertEqual(
+            EPUBReadAloudPlaybackMode
+                .textToSpeech.displayName,
+            "On-Device Speech"
+        )
+        XCTAssertEqual(
+            EPUBArchiveError
+                .missingEntry(
+                    "OPS/book.xhtml"
+                )
+                .localizedDescription,
+            "A file inside the EPUB could not be found: OPS/book.xhtml"
+        )
+
+        defaults.set(
+            AppLanguage.japanese.rawValue,
+            forKey:
+                AppLanguage.preferenceKey
+        )
+        XCTAssertEqual(
+            EPUBReadAloudNavigationUnit
+                .chapter.displayName,
+            "章"
+        )
+        XCTAssertEqual(
+            AccessiblePublicationParserError
+                .rootDocumentMissing
+                .localizedDescription,
+            "DAISY図書のNCCまたはOPFファイルが見つかりません。"
+        )
+        XCTAssertEqual(
+            EPUBLibraryError
+                .libraryCapacityReached(
+                    maximumBooks: 50
+                )
+                .localizedDescription,
+            "ライブラリには最大50冊まで保存できます。"
+        )
+    }
+
     private func localizedBundle(
         language: String
     ) throws -> Bundle {

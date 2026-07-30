@@ -101,9 +101,9 @@ struct ReaderLibraryView: View {
                         Text("내 서재")
                         Spacer()
                         Text(
-                            String(
-                                localized:
-                                    "책 \(books.count)권"
+                            AppLocalization.format(
+                                "책 %lld권",
+                                books.count
                             )
                         )
                         .textCase(nil)
@@ -153,9 +153,9 @@ struct ReaderLibraryView: View {
             presenting: bookToDelete
         ) { book in
             Button(
-                String(
-                    localized:
-                        "\"\(book.title)\" 삭제"
+                AppLocalization.format(
+                    "\"%@\" 삭제",
+                    book.title
                 ),
                 role: .destructive
             ) {
@@ -166,9 +166,9 @@ struct ReaderLibraryView: View {
             }
         } message: { book in
             Text(
-                String(
-                    localized:
-                        "\"\(book.title)\" 책을 이 iPad의 서재에서 삭제할까요? 원본 파일은 삭제되지 않습니다."
+                AppLocalization.format(
+                    "\"%@\" 책을 이 iPad의 서재에서 삭제할까요? 원본 파일은 삭제되지 않습니다.",
+                    book.title
                 )
             )
         }
@@ -284,9 +284,8 @@ struct ReaderLibraryView: View {
                 if importResult
                     .reusedExistingBook {
                     statusDescription =
-                        String(
-                            localized:
-                                "같은 내용의 책이 이미 있어 기존 책을 열었습니다."
+                        AppLocalization.string(
+                            "같은 내용의 책이 이미 있어 기존 책을 열었습니다."
                         )
                 } else {
                     statusDescription = nil
@@ -346,9 +345,8 @@ struct ReaderLibraryView: View {
                 }
                 bookToDelete = nil
                 statusDescription =
-                    String(
-                        localized:
-                            "서재에서 책을 삭제했습니다. 원본 파일은 그대로입니다."
+                    AppLocalization.string(
+                        "서재에서 책을 삭제했습니다. 원본 파일은 그대로입니다."
                     )
             } catch {
                 errorDescription =

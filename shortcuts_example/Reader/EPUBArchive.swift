@@ -16,23 +16,43 @@ nonisolated enum EPUBArchiveError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidArchive:
-            return "올바른 EPUB ZIP 파일이 아닙니다."
+            return AppLocalization.string(
+                "올바른 EPUB ZIP 파일이 아닙니다."
+            )
         case .zip64Unsupported:
-            return "ZIP64 형식의 EPUB은 아직 지원하지 않습니다."
+            return AppLocalization.string(
+                "ZIP64 형식의 EPUB은 아직 지원하지 않습니다."
+            )
         case .encryptedEntry:
-            return "암호화된 EPUB은 열 수 없습니다."
+            return AppLocalization.string(
+                "암호화된 EPUB은 열 수 없습니다."
+            )
         case .unsupportedCompression(let method):
-            return "지원하지 않는 ZIP 압축 방식입니다: \(method)"
+            return AppLocalization.format(
+                "지원하지 않는 ZIP 압축 방식입니다: %lld",
+                Int64(method)
+            )
         case .unsafePath:
-            return "EPUB 안에 안전하지 않은 파일 경로가 있습니다."
+            return AppLocalization.string(
+                "EPUB 안에 안전하지 않은 파일 경로가 있습니다."
+            )
         case .entryTooLarge:
-            return "EPUB 내부 파일이 너무 큽니다."
+            return AppLocalization.string(
+                "EPUB 내부 파일이 너무 큽니다."
+            )
         case .decompressionFailed:
-            return "EPUB 압축을 해제하지 못했습니다."
+            return AppLocalization.string(
+                "EPUB 압축을 해제하지 못했습니다."
+            )
         case .checksumMismatch:
-            return "EPUB 내부 파일이 손상되었습니다."
+            return AppLocalization.string(
+                "EPUB 내부 파일이 손상되었습니다."
+            )
         case .missingEntry(let path):
-            return "EPUB 내부 파일을 찾을 수 없습니다: \(path)"
+            return AppLocalization.format(
+                "EPUB 내부 파일을 찾을 수 없습니다: %@",
+                path
+            )
         }
     }
 }
