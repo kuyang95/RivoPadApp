@@ -35,6 +35,7 @@ final class ChatViewModel: ObservableObject {
     @Published var isInitialQueryRunning: Bool = false
     @Published var isGenerating: Bool = false
     @Published var historyErrorDescription: String?
+    @Published var contextNoticeDescription: String?
 
     let llm: LLMService
     private var genTask: Task<Void, Never>?
@@ -46,6 +47,8 @@ final class ChatViewModel: ObservableObject {
     private let storedConversationID: UUID
     private var conversationCreatedAt: Date
     private var conversationUpdatedAt: Date
+    private var conversationTitle: String?
+    private let replayCharacterLimit: Int
     private var needsContextReplay = false
     private var didPrepare = false
 
@@ -81,7 +84,8 @@ final class ChatViewModel: ObservableObject {
         llm: LLMService,
         historyStore: ChatHistoryStore = .shared,
         storedConversationID: UUID = UUID(),
-        persistsHistory: Bool = false
+        persistsHistory: Bool = false,
+        replayCharacterLimit: Int? = nil
     ) {
         self.llm = llm
         self.historyStore = historyStore
@@ -90,6 +94,15 @@ final class ChatViewModel: ObservableObject {
         self.conversationID = LLMConversationID(
             storedConversationID
         )
+        self.replayCharacterLimit =
+            replayCharacterLimit
+            ?? ChatContextWindowPolicy
+                .replayCharacterLimit(
+                    for:
+                        DeviceCapabilityProfiler
+                        .snapshot()
+                        .memoryTier
+                )
         let now = Date()
         self.conversationCreatedAt = now
         self.conversationUpdatedAt = now
@@ -298,6 +311,7 @@ final class ChatViewModel: ObservableObject {
 
             conversationCreatedAt = stored.createdAt
             conversationUpdatedAt = stored.updatedAt
+            conversationTitle = stored.title
             messages = stored.messages.map {
                 Msg(
                     id: $0.id,
@@ -309,8 +323,10 @@ final class ChatViewModel: ObservableObject {
             needsContextReplay = !messages.isEmpty
         } catch {
             historyErrorDescription =
-                "대화 기록을 불러오지 못했습니다: "
-                + error.localizedDescription
+                AppLocalization.format(
+                    "대화 기록을 불러오지 못했습니다: %@",
+                    error.localizedDescription
+                )
         }
     }
 
@@ -380,11 +396,26 @@ final class ChatViewModel: ObservableObject {
 
         let modelPrompt: String
         if persistsHistory, needsContextReplay {
-            modelPrompt = ChatTranscriptBuilder.replayPrompt(
+            let replay =
+                ChatTranscriptBuilder.replay(
                 messages: storedMessages(),
-                newPrompt: prompt
-            )
+                newPrompt: prompt,
+                maximumCharacters:
+                    replayCharacterLimit
+                )
+            modelPrompt = replay.prompt
             needsContextReplay = false
+            if replay.isTruncated {
+                contextNoticeDescription =
+                    AppLocalization.format(
+                        "M4 문맥 한도에 맞춰 오래된 메시지 %lld개를 제외하고 최근 기록으로 이어갑니다. 저장된 기록은 그대로 유지됩니다.",
+                        replay
+                            .omittedMessageCount
+                    )
+            } else {
+                contextNoticeDescription =
+                    nil
+            }
         } else {
             modelPrompt = prompt
         }
@@ -612,11 +643,18 @@ final class ChatViewModel: ObservableObject {
         let titleSource = storedMessages.first(where: {
             $0.role == .user
         })?.text ?? ""
+        let resolvedTitle =
+            ChatConversationTitlePolicy
+            .resolvedTitle(
+                existingTitle:
+                    conversationTitle,
+                firstUserMessage:
+                    titleSource
+            )
+        conversationTitle = resolvedTitle
         let conversation = StoredChatConversation(
             id: storedConversationID,
-            title: StoredChatConversation.title(
-                from: titleSource
-            ),
+            title: resolvedTitle,
             createdAt: conversationCreatedAt,
             updatedAt: conversationUpdatedAt,
             messages: storedMessages
@@ -626,8 +664,10 @@ final class ChatViewModel: ObservableObject {
             try await historyStore.upsert(conversation)
         } catch {
             historyErrorDescription =
-                "대화 기록을 저장하지 못했습니다: "
-                + error.localizedDescription
+                AppLocalization.format(
+                    "대화 기록을 저장하지 못했습니다: %@",
+                    error.localizedDescription
+                )
         }
     }
 

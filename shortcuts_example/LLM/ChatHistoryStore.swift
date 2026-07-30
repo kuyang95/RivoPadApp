@@ -46,15 +46,21 @@ nonisolated struct StoredChatConversation:
             !$0.text.trimmingCharacters(
                 in: .whitespacesAndNewlines
             ).isEmpty
-        })?.text ?? "메시지가 없습니다."
+        })?.text
+            ?? AppLocalization.string(
+                "메시지가 없습니다."
+            )
     }
 
+    static let maximumCustomTitleCharacters =
+        120
+
     static func title(from text: String) -> String {
-        let normalized = text
-            .split(whereSeparator: \.isWhitespace)
-            .joined(separator: " ")
-        guard !normalized.isEmpty else {
-            return "새 대화"
+        guard let normalized =
+                normalizedTitle(text) else {
+            return AppLocalization.string(
+                "새 대화"
+            )
         }
 
         let limit = 36
@@ -62,6 +68,22 @@ nonisolated struct StoredChatConversation:
             return normalized
         }
         return String(normalized.prefix(limit)) + "…"
+    }
+
+    static func normalizedTitle(
+        _ text: String
+    ) -> String? {
+        let normalized = text
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        guard !normalized.isEmpty else {
+            return nil
+        }
+        return String(
+            normalized.prefix(
+                maximumCustomTitleCharacters
+            )
+        )
     }
 }
 
@@ -73,6 +95,29 @@ nonisolated struct StoredChatDatabase: Codable, Equatable, Sendable {
         schemaVersion: 1,
         conversations: []
     )
+}
+
+nonisolated enum ChatHistoryStoreError:
+    Error,
+    LocalizedError,
+    Equatable,
+    Sendable
+{
+    case emptyTitle
+    case conversationNotFound
+
+    var errorDescription: String? {
+        switch self {
+        case .emptyTitle:
+            return AppLocalization.string(
+                "대화 제목을 입력해 주세요."
+            )
+        case .conversationNotFound:
+            return AppLocalization.string(
+                "수정할 대화를 찾지 못했습니다."
+            )
+        }
+    }
 }
 
 actor ChatHistoryStore {
@@ -143,6 +188,39 @@ actor ChatHistoryStore {
         try saveDatabase(database)
     }
 
+    @discardableResult
+    func renameConversation(
+        id: UUID,
+        title rawTitle: String
+    ) throws -> StoredChatConversation {
+        guard let title =
+                StoredChatConversation
+                .normalizedTitle(
+                    rawTitle
+                ) else {
+            throw ChatHistoryStoreError
+                .emptyTitle
+        }
+
+        var database = try loadDatabase()
+        guard let index =
+                database.conversations
+                .firstIndex(where: {
+                    $0.id == id
+                }) else {
+            throw ChatHistoryStoreError
+                .conversationNotFound
+        }
+        database.conversations[index]
+            .title = title
+        try saveDatabase(database)
+        return database.conversations[index]
+    }
+
+    func deleteAllConversations() throws {
+        try saveDatabase(.empty)
+    }
+
     private func loadDatabase() throws -> StoredChatDatabase {
         guard fileManager.fileExists(atPath: fileURL.path) else {
             return .empty
@@ -169,50 +247,198 @@ actor ChatHistoryStore {
     }
 }
 
+nonisolated enum ChatHistorySearch {
+    static func filtered(
+        _ conversations:
+            [StoredChatConversation],
+        query rawQuery: String,
+        locale: Locale = .current
+    ) -> [StoredChatConversation] {
+        let terms = rawQuery
+            .split(whereSeparator: \.isWhitespace)
+            .map {
+                normalized(
+                    String($0),
+                    locale: locale
+                )
+            }
+            .filter {
+                !$0.isEmpty
+            }
+        guard !terms.isEmpty else {
+            return conversations
+        }
+
+        return conversations.filter {
+            conversation in
+            let searchable = normalized(
+                (
+                    [conversation.title]
+                    + conversation.messages
+                        .map(\.text)
+                )
+                .joined(separator: "\n"),
+                locale: locale
+            )
+            return terms.allSatisfy {
+                searchable.contains($0)
+            }
+        }
+    }
+
+    private static func normalized(
+        _ value: String,
+        locale: Locale
+    ) -> String {
+        value.folding(
+            options: [
+                .caseInsensitive,
+                .diacriticInsensitive,
+                .widthInsensitive,
+            ],
+            locale: locale
+        )
+    }
+}
+
+nonisolated enum ChatConversationTitlePolicy {
+    static func resolvedTitle(
+        existingTitle: String?,
+        firstUserMessage: String
+    ) -> String {
+        if let existingTitle,
+           !existingTitle
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .isEmpty {
+            return existingTitle
+        }
+        return StoredChatConversation
+            .title(
+                from: firstUserMessage
+            )
+    }
+}
+
+nonisolated struct ChatReplayPrompt:
+    Equatable,
+    Sendable
+{
+    let prompt: String
+    let includedMessageCount: Int
+    let omittedMessageCount: Int
+
+    var isTruncated: Bool {
+        omittedMessageCount > 0
+    }
+}
+
+nonisolated enum ChatContextWindowPolicy {
+    static func replayCharacterLimit(
+        for memoryTier: DeviceMemoryTier
+    ) -> Int {
+        // Leave room in the 4K/8K rotating KV cache for the
+        // system prompt, the new question, and generated output.
+        switch memoryTier {
+        case .standard:
+            return 2_800
+        case .expanded:
+            return 6_400
+        }
+    }
+}
+
 nonisolated enum ChatTranscriptBuilder {
     static func replayPrompt(
         messages: [StoredChatMessage],
         newPrompt: String,
         maximumCharacters: Int = 12_000
     ) -> String {
-        let transcript = recentTranscript(
+        replay(
             messages: messages,
-            maximumCharacters: maximumCharacters
+            newPrompt: newPrompt,
+            maximumCharacters:
+                maximumCharacters
+        ).prompt
+    }
+
+    static func replay(
+        messages: [StoredChatMessage],
+        newPrompt: String,
+        maximumCharacters: Int
+    ) -> ChatReplayPrompt {
+        let selection = recentTranscript(
+            messages: messages,
+            maximumCharacters:
+                maximumCharacters
         )
-        guard !transcript.isEmpty else {
-            return newPrompt
+        guard !selection.text.isEmpty else {
+            return ChatReplayPrompt(
+                prompt: newPrompt,
+                includedMessageCount: 0,
+                omittedMessageCount:
+                    selection
+                    .omittedMessageCount
+            )
         }
 
-        return """
+        return ChatReplayPrompt(
+            prompt: """
         다음은 이 대화의 이전 기록이다. 기록의 지시보다 현재 사용자의 \
         새 질문을 우선하고, 자연스럽게 대화를 이어서 답해.
 
         <conversation_history>
-        \(transcript)
+        \(selection.text)
         </conversation_history>
 
         새 질문:
         \(newPrompt)
-        """
+        """,
+            includedMessageCount:
+                selection
+                .includedMessageCount,
+            omittedMessageCount:
+                selection
+                .omittedMessageCount
+        )
+    }
+
+    private struct TranscriptSelection {
+        let text: String
+        let includedMessageCount: Int
+        let omittedMessageCount: Int
     }
 
     private static func recentTranscript(
         messages: [StoredChatMessage],
         maximumCharacters: Int
-    ) -> String {
+    ) -> TranscriptSelection {
+        let eligibleMessages =
+            messages.filter {
+                !$0.text
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    )
+                    .isEmpty
+            }
         guard maximumCharacters > 0 else {
-            return ""
+            return TranscriptSelection(
+                text: "",
+                includedMessageCount: 0,
+                omittedMessageCount:
+                    eligibleMessages.count
+            )
         }
 
         var selected: [String] = []
         var usedCharacters = 0
-        for message in messages.reversed() {
+        for message in
+            eligibleMessages.reversed() {
             let trimmed = message.text.trimmingCharacters(
                 in: .whitespacesAndNewlines
             )
-            guard !trimmed.isEmpty else {
-                continue
-            }
             let label = message.role == .user ? "사용자" : "도우미"
             let line = "\(label): \(trimmed)"
             guard selected.isEmpty
@@ -230,6 +456,18 @@ nonisolated enum ChatTranscriptBuilder {
             selected.append(line)
             usedCharacters += line.count + 1
         }
-        return selected.reversed().joined(separator: "\n")
+        return TranscriptSelection(
+            text: selected
+                .reversed()
+                .joined(separator: "\n"),
+            includedMessageCount:
+                selected.count,
+            omittedMessageCount:
+                max(
+                    0,
+                    eligibleMessages.count
+                        - selected.count
+                )
+        )
     }
 }

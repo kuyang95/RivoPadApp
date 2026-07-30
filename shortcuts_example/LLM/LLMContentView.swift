@@ -151,6 +151,23 @@ struct LLMContentView: View {
                         .accessibilityLabel("AI 상태: \(vm.status)")
                 }
 
+                if let contextNotice =
+                        vm
+                        .contextNoticeDescription {
+                    Label(
+                        contextNotice,
+                        systemImage:
+                            "text.badge.checkmark"
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+                    .padding(.horizontal, 12)
+                }
+
                 HStack(alignment: .bottom) {
                     Button {
                         if stt.isRecording {
