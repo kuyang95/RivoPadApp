@@ -553,6 +553,10 @@ struct EPUBReaderView: View {
     @State private var isSearchPresented = false
     @State private var isSettingsPresented = false
     @State private var searchQuery = ""
+    @State private var isSeekingPlayback = false
+    @State private var playbackSeekSeconds = 0.0
+    @State private var resumesAfterPlaybackSeek =
+        false
 
     @AppStorage("reader.epub.theme")
     private var themeID = EPUBReaderTheme.light.rawValue
@@ -858,135 +862,261 @@ struct EPUBReaderView: View {
     }
 
     private var playbackBar: some View {
-        HStack(spacing: 16) {
-            Button("이전 장", systemImage: "chevron.left") {
-                moveChapter(by: -1)
-            }
-            .disabled(viewModel.currentChapterIndex <= 0)
-
+        VStack(spacing: 8) {
             if mediaOverlayPlayer.canPlay {
-                Button(
-                    "이전 \(mediaOverlayPlayer.navigationUnitDescription)",
-                    systemImage:
-                        "backward.end.fill"
-                ) {
-                    mediaOverlayPlayer
-                        .navigate(by: -1)
-                }
-                .disabled(
-                    !mediaOverlayPlayer
-                        .canNavigatePrevious
-                )
-
-                Button(
-                    mediaOverlayPlayer.isPlaying
-                        ? "일시정지"
-                        : "재생",
-                    systemImage:
-                        mediaOverlayPlayer.isPlaying
-                        ? "pause.fill"
-                        : "play.fill"
-                ) {
-                    mediaOverlayPlayer
-                        .togglePlayback()
-                }
-                .disabled(
-                    mediaOverlayPlayer.isLoading
-                )
-
-                Button(
-                    "다음 \(mediaOverlayPlayer.navigationUnitDescription)",
-                    systemImage:
-                        "forward.end.fill"
-                ) {
-                    mediaOverlayPlayer
-                        .navigate(by: 1)
-                }
-                .disabled(
-                    !mediaOverlayPlayer
-                        .canNavigateNext
-                )
-
-                Button(
-                    mediaOverlayPlayer
-                        .navigationUnitDescription,
-                    systemImage:
-                        "arrow.left.arrow.right"
-                ) {
-                    mediaOverlayPlayer
-                        .cycleNavigationUnit()
-                }
-                .accessibilityLabel(
-                    "탐색 단위 "
-                    + mediaOverlayPlayer
-                        .navigationUnitDescription
-                )
-                .accessibilityHint(
-                    "두 번 탭하면 단어, 문장, 문단, 페이지, 장 순서로 바뀝니다."
-                )
-
-                if mediaOverlayPlayer.isLoading {
-                    ProgressView()
-                } else {
-                    VStack(spacing: 2) {
-                        if !mediaOverlayPlayer
-                            .playbackModeDescription
-                            .isEmpty {
-                            Text(
-                                mediaOverlayPlayer
-                                    .playbackModeDescription
-                            )
-                            .font(.caption2)
-                        }
-                        Text(
+                VStack(spacing: 0) {
+                    Slider(
+                        value: Binding(
+                            get: {
+                                isSeekingPlayback
+                                    ? playbackSeekSeconds
+                                    : mediaOverlayPlayer
+                                        .timelinePositionSeconds
+                            },
+                            set: {
+                                playbackSeekSeconds =
+                                    $0
+                            }
+                        ),
+                        in: 0 ... max(
                             mediaOverlayPlayer
-                                .positionDescription
-                        )
-                        .font(
-                            .caption
-                            .monospacedDigit()
-                        )
-                    }
-                    .accessibilityElement(
-                        children: .combine
+                                .totalTimelineSeconds,
+                            0.5
+                        ),
+                        onEditingChanged: {
+                            isEditing in
+                            handlePlaybackSeekEditing(
+                                isEditing
+                            )
+                        }
+                    )
+                    .disabled(
+                        mediaOverlayPlayer
+                            .totalTimelineSeconds
+                            <= 0
+                        || mediaOverlayPlayer
+                            .isLoading
                     )
                     .accessibilityLabel(
-                        "읽기 방식 "
-                        + mediaOverlayPlayer
-                            .playbackModeDescription
-                        + ", 위치 "
-                        + mediaOverlayPlayer
-                            .positionDescription
+                        "책 재생 위치"
                     )
+                    .accessibilityValue(
+                        playbackTimelineDescription
+                    )
+                    .accessibilityHint(
+                        "조절을 마치면 선택한 위치로 이동합니다."
+                    )
+
+                    HStack {
+                        Text(
+                            playbackTimelineDescription
+                        )
+                        Spacer()
+                        Text(
+                            "\(playbackTimelinePercent)%"
+                        )
+                    }
+                    .font(
+                        .caption
+                        .monospacedDigit()
+                    )
+                    .foregroundStyle(.secondary)
                 }
-                if let error =
+            }
+
+            HStack(spacing: 16) {
+                Button("이전 장", systemImage: "chevron.left") {
+                    moveChapter(by: -1)
+                }
+                .disabled(viewModel.currentChapterIndex <= 0)
+
+                if mediaOverlayPlayer.canPlay {
+                    Button(
+                        "이전 \(mediaOverlayPlayer.navigationUnitDescription)",
+                        systemImage:
+                            "backward.end.fill"
+                    ) {
                         mediaOverlayPlayer
-                        .errorDescription {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .lineLimit(2)
+                            .navigate(by: -1)
+                    }
+                    .disabled(
+                        !mediaOverlayPlayer
+                            .canNavigatePrevious
+                    )
+
+                    Button(
+                        mediaOverlayPlayer.isPlaying
+                            ? "일시정지"
+                            : "재생",
+                        systemImage:
+                            mediaOverlayPlayer.isPlaying
+                            ? "pause.fill"
+                            : "play.fill"
+                    ) {
+                        mediaOverlayPlayer
+                            .togglePlayback()
+                    }
+                    .disabled(
+                        mediaOverlayPlayer.isLoading
+                    )
+
+                    Button(
+                        "다음 \(mediaOverlayPlayer.navigationUnitDescription)",
+                        systemImage:
+                            "forward.end.fill"
+                    ) {
+                        mediaOverlayPlayer
+                            .navigate(by: 1)
+                    }
+                    .disabled(
+                        !mediaOverlayPlayer
+                            .canNavigateNext
+                    )
+
+                    Button(
+                        mediaOverlayPlayer
+                            .navigationUnitDescription,
+                        systemImage:
+                            "arrow.left.arrow.right"
+                    ) {
+                        mediaOverlayPlayer
+                            .cycleNavigationUnit()
+                    }
+                    .accessibilityLabel(
+                        "탐색 단위 "
+                        + mediaOverlayPlayer
+                            .navigationUnitDescription
+                    )
+                    .accessibilityHint(
+                        "두 번 탭하면 단어, 문장, 문단, 페이지, 장 순서로 바뀝니다."
+                    )
+
+                    if mediaOverlayPlayer.isLoading {
+                        ProgressView()
+                    } else {
+                        VStack(spacing: 2) {
+                            if !mediaOverlayPlayer
+                                .playbackModeDescription
+                                .isEmpty {
+                                Text(
+                                    mediaOverlayPlayer
+                                        .playbackModeDescription
+                                )
+                                .font(.caption2)
+                            }
+                            Text(
+                                mediaOverlayPlayer
+                                    .positionDescription
+                            )
+                            .font(
+                                .caption
+                                .monospacedDigit()
+                            )
+                        }
+                        .accessibilityElement(
+                            children: .combine
+                        )
+                        .accessibilityLabel(
+                            "읽기 방식 "
+                            + mediaOverlayPlayer
+                                .playbackModeDescription
+                            + ", 위치 "
+                            + mediaOverlayPlayer
+                                .positionDescription
+                        )
+                    }
+                    if let error =
+                            mediaOverlayPlayer
+                            .errorDescription {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .lineLimit(2)
+                    }
                 }
-            }
 
-            Text(viewModel.chapterPositionDescription)
-                .font(.headline.monospacedDigit())
-                .frame(minWidth: 70)
-                .accessibilityLabel(
-                    "장 위치 \(viewModel.chapterPositionDescription)"
+                Text(viewModel.chapterPositionDescription)
+                    .font(.headline.monospacedDigit())
+                    .frame(minWidth: 70)
+                    .accessibilityLabel(
+                        "장 위치 \(viewModel.chapterPositionDescription)"
+                    )
+
+                Button("다음 장", systemImage: "chevron.right") {
+                    moveChapter(by: 1)
+                }
+                .disabled(
+                    guardLastChapterReached
                 )
-
-            Button("다음 장", systemImage: "chevron.right") {
-                moveChapter(by: 1)
             }
-            .disabled(
-                guardLastChapterReached
-            )
         }
         .buttonStyle(.bordered)
         .padding()
         .frame(maxWidth: .infinity)
         .background(.bar)
+    }
+
+    private var playbackTimelineDescription:
+        String
+    {
+        if isSeekingPlayback {
+            return mediaOverlayPlayer
+                .timelineDescription(
+                    at: playbackSeekSeconds
+                )
+        }
+        return mediaOverlayPlayer
+            .timelinePositionDescription
+    }
+
+    private var playbackTimelinePercent: Int {
+        let total =
+            mediaOverlayPlayer
+                .totalTimelineSeconds
+        guard total > 0 else {
+            return 0
+        }
+        let position =
+            isSeekingPlayback
+            ? playbackSeekSeconds
+            : mediaOverlayPlayer
+                .timelinePositionSeconds
+        return Int(
+            (
+                min(
+                    max(position / total, 0),
+                    1
+                )
+                * 100
+            ).rounded()
+        )
+    }
+
+    private func handlePlaybackSeekEditing(
+        _ isEditing: Bool
+    ) {
+        if isEditing {
+            isSeekingPlayback = true
+            playbackSeekSeconds =
+                mediaOverlayPlayer
+                    .timelinePositionSeconds
+            resumesAfterPlaybackSeek =
+                mediaOverlayPlayer.isPlaying
+            mediaOverlayPlayer.pause()
+            return
+        }
+        guard isSeekingPlayback else {
+            return
+        }
+        let target = playbackSeekSeconds
+        let shouldResume =
+            resumesAfterPlaybackSeek
+        isSeekingPlayback = false
+        resumesAfterPlaybackSeek = false
+        mediaOverlayPlayer.seek(
+            toTimelineSeconds: target,
+            autoplay: shouldResume
+        )
     }
 
     private var guardLastChapterReached: Bool {

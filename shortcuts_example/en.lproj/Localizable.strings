@@ -438,3 +438,5 @@
 "서재에서 책을 삭제했습니다. 원본 파일은 그대로입니다." = "The book was removed from the library. The original file is unchanged.";
 "EPUB 또는 DAISY ZIP 파일만 가져올 수 있습니다." = "Only EPUB or DAISY ZIP files can be imported.";
 "서재에는 책을 최대 %lld권까지 보관할 수 있습니다." = "The library can store up to %lld books.";
+"책 재생 위치" = "Book Playback Position";
+"조절을 마치면 선택한 위치로 이동합니다." = "Move to the selected position when you finish adjusting.";

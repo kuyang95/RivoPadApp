@@ -607,6 +607,10 @@ final class EPUBMediaOverlayPlaybackController:
     @Published private(set) var currentLocation:
         EPUBMediaOverlayLocation?
     @Published private(set) var currentTimeSeconds = 0.0
+    @Published private(set) var timelinePositionSeconds =
+        0.0
+    @Published private(set) var totalTimelineSeconds =
+        0.0
     @Published private(set) var isPlaying = false
     @Published private(set) var isLoading = false
     @Published private(set) var errorDescription: String?
@@ -625,6 +629,11 @@ final class EPUBMediaOverlayPlaybackController:
     private var book: EPUBBook?
     private var items: [EPUBMediaOverlayItem] = []
     private var steps: [EPUBReadAloudStep] = []
+    private var timeline = EPUBReadAloudTimeline(
+        steps: [],
+        items: [],
+        speechRate: 1
+    )
     private var speechLanguage = "ko-KR"
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
@@ -637,6 +646,10 @@ final class EPUBMediaOverlayPlaybackController:
     private var speechStartUTF16 = 0
     private var speechEndUTF16 = 0
     private var playbackRate: Float = 1
+    private var pendingAudioStartSeconds:
+        Double?
+    private var pendingSpeechStartUTF16:
+        Int?
 
     init(fileURL: URL) {
         resourceStore =
@@ -704,6 +717,36 @@ final class EPUBMediaOverlayPlaybackController:
         playbackMode.displayName
     }
 
+    var timelinePositionDescription: String {
+        "\(Self.durationDescription(timelinePositionSeconds)) / "
+            + Self.durationDescription(
+                totalTimelineSeconds
+            )
+    }
+
+    func timelineDescription(
+        at seconds: Double
+    ) -> String {
+        "\(Self.durationDescription(seconds)) / "
+            + Self.durationDescription(
+                totalTimelineSeconds
+            )
+    }
+
+    var timelineProgress: Double {
+        guard totalTimelineSeconds > 0 else {
+            return 0
+        }
+        return min(
+            max(
+                timelinePositionSeconds
+                    / totalTimelineSeconds,
+                0
+            ),
+            1
+        )
+    }
+
     var navigationUnitDescription: String {
         navigationUnit.displayName
     }
@@ -723,6 +766,7 @@ final class EPUBMediaOverlayPlaybackController:
         steps = EPUBReadAloudSequence.steps(
             for: book
         )
+        rebuildTimeline()
         let languageSample =
             (
                 [book.title]
@@ -752,8 +796,11 @@ final class EPUBMediaOverlayPlaybackController:
         loadedItemID = nil
         spokenStepID = nil
         currentTextRange = nil
+        pendingAudioStartSeconds = nil
+        pendingSpeechStartUTF16 = nil
         playbackMode = .none
         errorDescription = nil
+        updateTimelinePosition()
     }
 
     func cycleNavigationUnit() {
@@ -772,6 +819,8 @@ final class EPUBMediaOverlayPlaybackController:
         playbackRate = Float(
             min(max(value, 0.5), 2)
         )
+        rebuildTimeline()
+        updateTimelinePosition()
         if isPlaying,
            playbackMode == .audio {
             player.rate = playbackRate
@@ -814,9 +863,20 @@ final class EPUBMediaOverlayPlaybackController:
                 atRate: playbackRate
             )
         } else {
-            startStep(
+            activateStep(
                 index: currentItemIndex,
-                autoplay: true
+                autoplay: true,
+                speechStartUTF16:
+                    pendingSpeechStartUTF16,
+                selectedTextRange:
+                    currentTextRange.map {
+                        NSRange(
+                            location: $0.location,
+                            length: $0.length
+                        )
+                    },
+                audioStartSeconds:
+                    pendingAudioStartSeconds
             )
         }
     }
@@ -851,7 +911,48 @@ final class EPUBMediaOverlayPlaybackController:
         } else {
             currentTimeSeconds = 0
         }
+        pendingAudioStartSeconds =
+            clipBegin(
+                forStepAt: currentItemIndex
+            )
+        pendingSpeechStartUTF16 = 0
+        currentTextRange = nil
         playbackMode = .none
+        updateTimelinePosition()
+    }
+
+    func seek(
+        toTimelineSeconds requestedSeconds: Double,
+        autoplay: Bool
+    ) {
+        guard let target = timeline.target(
+            at: requestedSeconds
+        ),
+        steps.indices.contains(
+            target.stepIndex
+        ) else {
+            return
+        }
+        let step = steps[target.stepIndex]
+        let selectedRange =
+            EPUBReadAloudTextNavigator.range(
+                atOrAfterUTF16:
+                    target.textUTF16Offset,
+                in: step.text,
+                unit: .word
+            )
+        activateStep(
+            index: target.stepIndex,
+            autoplay: autoplay,
+            speechStartUTF16:
+                target.textUTF16Offset,
+            selectedTextRange:
+                selectedRange,
+            audioStartSeconds:
+                target.audioTimeSeconds
+        )
+        timelinePositionSeconds =
+            target.timelineSeconds
     }
 
     func navigate(by delta: Int) {
@@ -1191,7 +1292,8 @@ final class EPUBMediaOverlayPlaybackController:
         index: Int,
         autoplay: Bool,
         speechStartUTF16: Int?,
-        selectedTextRange: NSRange?
+        selectedTextRange: NSRange?,
+        audioStartSeconds: Double? = nil
     ) {
         guard steps.indices.contains(index) else {
             return
@@ -1214,8 +1316,34 @@ final class EPUBMediaOverlayPlaybackController:
                     range: $0
                 )
             }
+        let requestedAudioStart =
+            audioStartSeconds
+            ?? clipBegin(forStepAt: index)
         currentTimeSeconds =
-            clipBegin(forStepAt: index) ?? 0
+            requestedAudioStart ?? 0
+        pendingAudioStartSeconds =
+            requestedAudioStart
+        pendingSpeechStartUTF16 =
+            speechStartUTF16
+        if let audioItemIndex =
+                steps[index].audioItemIndex,
+           items.indices.contains(
+               audioItemIndex
+           ),
+           loadedItemID
+            == items[audioItemIndex].id,
+           let requestedAudioStart {
+            player.seek(
+                to: CMTime(
+                    seconds:
+                        requestedAudioStart,
+                    preferredTimescale: 600
+                ),
+                toleranceBefore: .zero,
+                toleranceAfter: .zero
+            )
+        }
+        updateTimelinePosition()
         guard autoplay else {
             return
         }
@@ -1224,7 +1352,9 @@ final class EPUBMediaOverlayPlaybackController:
             scheduleAudioLoad(
                 stepIndex: index,
                 audioItemIndex:
-                    audioItemIndex
+                    audioItemIndex,
+                startTimeSeconds:
+                    requestedAudioStart
             )
         } else {
             startSpeech(
@@ -1237,7 +1367,8 @@ final class EPUBMediaOverlayPlaybackController:
 
     private func scheduleAudioLoad(
         stepIndex: Int,
-        audioItemIndex: Int
+        audioItemIndex: Int,
+        startTimeSeconds: Double?
     ) {
         guard steps.indices.contains(
                   stepIndex
@@ -1268,7 +1399,9 @@ final class EPUBMediaOverlayPlaybackController:
                     url: url,
                     stepIndex: stepIndex,
                     audioItemIndex:
-                        audioItemIndex
+                        audioItemIndex,
+                    startTimeSeconds:
+                        startTimeSeconds
                 )
             } catch {
                 guard !Task.isCancelled,
@@ -1281,7 +1414,11 @@ final class EPUBMediaOverlayPlaybackController:
                 self.errorDescription =
                     "오디오를 열 수 없어 로컬 음성으로 읽습니다."
                 self.startSpeech(
-                    stepIndex: stepIndex
+                    stepIndex: stepIndex,
+                    fromUTF16:
+                        self
+                            .pendingSpeechStartUTF16
+                        ?? 0
                 )
             }
         }
@@ -1290,7 +1427,8 @@ final class EPUBMediaOverlayPlaybackController:
     private func finishAudioLoad(
         url: URL,
         stepIndex: Int,
-        audioItemIndex: Int
+        audioItemIndex: Int,
+        startTimeSeconds: Double?
     ) {
         guard steps.indices.contains(
                   stepIndex
@@ -1332,14 +1470,28 @@ final class EPUBMediaOverlayPlaybackController:
                     )
                 }
             }
+        let requestedStart = min(
+            max(
+                startTimeSeconds
+                    ?? overlay
+                        .clipBeginSeconds,
+                overlay.clipBeginSeconds
+            ),
+            overlay.clipEndSeconds
+                ?? Double.greatestFiniteMagnitude
+        )
         player.seek(
             to: CMTime(
-                seconds: overlay.clipBeginSeconds,
+                seconds: requestedStart,
                 preferredTimescale: 600
             ),
             toleranceBefore: .zero,
             toleranceAfter: .zero
         )
+        currentTimeSeconds = requestedStart
+        pendingAudioStartSeconds =
+            requestedStart
+        updateTimelinePosition()
         isLoading = false
         loadTask = nil
         AppAudioManager.shared.configure()
@@ -1358,6 +1510,7 @@ final class EPUBMediaOverlayPlaybackController:
             time.seconds,
             0
         )
+        updateTimelinePosition()
         guard isPlaying,
               playbackMode == .audio,
               !isLoading,
@@ -1447,6 +1600,8 @@ final class EPUBMediaOverlayPlaybackController:
             speechRange.location
         speechEndUTF16 =
             NSMaxRange(speechRange)
+        pendingSpeechStartUTF16 =
+            speechRange.location
         if let initialRange =
                 EPUBReadAloudTextNavigator
                 .range(
@@ -1461,11 +1616,12 @@ final class EPUBMediaOverlayPlaybackController:
                     range: initialRange
                 )
         }
+        playbackMode = .textToSpeech
+        updateTimelinePosition()
         currentLocation = location(
             forStepAt: stepIndex
         )
         AppAudioManager.shared.configure()
-        playbackMode = .textToSpeech
         isPlaying = true
         speechSynthesizer.speak(utterance)
     }
@@ -1561,6 +1717,9 @@ final class EPUBMediaOverlayPlaybackController:
                     length: length
                 )
             )
+        pendingSpeechStartUTF16 =
+            location
+        updateTimelinePosition()
     }
 
     private func stopSpeech() {
@@ -1639,6 +1798,80 @@ final class EPUBMediaOverlayPlaybackController:
         }
         return items[audioItemIndex]
             .clipBeginSeconds
+    }
+
+    private func rebuildTimeline() {
+        timeline = EPUBReadAloudTimeline(
+            steps: steps,
+            items: items,
+            speechRate:
+                Double(playbackRate)
+        )
+        totalTimelineSeconds =
+            timeline.totalDurationSeconds
+    }
+
+    private func updateTimelinePosition() {
+        let textOffset: Int?
+        if let currentTextRange,
+           steps.indices.contains(
+               currentItemIndex
+           ),
+           currentTextRange.chapterIndex
+            == steps[currentItemIndex]
+                .chapterIndex,
+           currentTextRange.segmentIndex
+            == steps[currentItemIndex]
+                .segmentIndex {
+            textOffset =
+                currentTextRange.location
+        } else {
+            textOffset =
+                pendingSpeechStartUTF16
+        }
+        timelinePositionSeconds =
+            timeline.position(
+                stepIndex: currentItemIndex,
+                audioTimeSeconds:
+                    steps.indices.contains(
+                        currentItemIndex
+                    )
+                    && steps[currentItemIndex]
+                        .audioItemIndex != nil
+                    && playbackMode
+                        != .textToSpeech
+                    ? currentTimeSeconds
+                    : nil,
+                textUTF16Offset:
+                    textOffset
+            )
+    }
+
+    private static func durationDescription(
+        _ seconds: Double
+    ) -> String {
+        let totalSeconds = max(
+            Int(seconds.rounded(.down)),
+            0
+        )
+        let hours = totalSeconds / 3_600
+        let minutes =
+            (totalSeconds % 3_600) / 60
+        let remainingSeconds =
+            totalSeconds % 60
+        if hours > 0 {
+            return String(
+                format: "%d:%02d:%02d",
+                hours,
+                minutes,
+                remainingSeconds
+            )
+        }
+        return String(
+            format: "%d:%02d",
+            minutes,
+            remainingSeconds
+        )
     }
 
     private func cancelLoad() {

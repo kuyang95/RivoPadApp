@@ -142,6 +142,13 @@ final class AppLocalizationTests:
             ),
             "ライブラリから削除"
         )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "책 재생 위치",
+                bundle: english
+            ),
+            "Book Playback Position"
+        )
     }
 
     func testDynamicFormatTranslationsPreserveArguments()

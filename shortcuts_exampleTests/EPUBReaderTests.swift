@@ -353,6 +353,131 @@ final class EPUBReaderTests: XCTestCase {
         )
     }
 
+    func testReadAloudTimelineMapsMixedTTSAndAudioSeek()
+        throws
+    {
+        let steps = [
+            EPUBReadAloudStep(
+                id: "tts",
+                chapterIndex: 0,
+                segmentIndex: 0,
+                text: "12345",
+                audioItemIndex: nil
+            ),
+            EPUBReadAloudStep(
+                id: "audio",
+                chapterIndex: 0,
+                segmentIndex: 1,
+                text: "audio",
+                audioItemIndex: 0
+            ),
+        ]
+        let items = [
+            EPUBMediaOverlayItem(
+                id: "clip",
+                smilPath: "book.smil",
+                textPath: "chapter.xhtml",
+                textFragmentID: "p2",
+                audioPath: "audio.mp3",
+                clipBeginSeconds: 10,
+                clipEndSeconds: 14,
+                playOrder: 1
+            ),
+        ]
+        let timeline = EPUBReadAloudTimeline(
+            steps: steps,
+            items: items,
+            speechRate: 1
+        )
+
+        XCTAssertEqual(
+            timeline.totalDurationSeconds,
+            5,
+            accuracy: 0.001
+        )
+        let textTarget = timeline.target(
+            at: 0.5
+        )
+        XCTAssertEqual(
+            textTarget?.stepIndex,
+            0
+        )
+        XCTAssertEqual(
+            textTarget?.textUTF16Offset,
+            2
+        )
+
+        let audioTarget = timeline.target(
+            at: 3
+        )
+        XCTAssertEqual(
+            audioTarget?.stepIndex,
+            1
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(
+                audioTarget?
+                    .progressWithinStep
+            ),
+            0.5,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(
+                audioTarget?
+                    .audioTimeSeconds
+            ),
+            12,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            timeline.position(
+                stepIndex: 1,
+                audioTimeSeconds: 11,
+                textUTF16Offset: nil
+            ),
+            2,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            timeline.position(
+                stepIndex: 0,
+                audioTimeSeconds: nil,
+                textUTF16Offset: 2
+            ),
+            0.4,
+            accuracy: 0.001
+        )
+
+        let endTarget = timeline.target(
+            at: 99
+        )
+        XCTAssertEqual(
+            endTarget?.stepIndex,
+            1
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(
+                endTarget?
+                    .audioTimeSeconds
+            ),
+            14,
+            accuracy: 0.001
+        )
+        let fastTimeline =
+            EPUBReadAloudTimeline(
+                steps: steps,
+                items: items,
+                speechRate: 2
+            )
+        XCTAssertEqual(
+            fastTimeline
+                .totalDurationSeconds,
+            4.5,
+            accuracy: 0.001
+        )
+    }
+
     func testReadAloudLanguageUsesMetadataAndScript()
     {
         XCTAssertEqual(
