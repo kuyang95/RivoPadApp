@@ -137,6 +137,8 @@ struct LocalDocumentView: View {
     }
 
     @EnvironmentObject private var appRouter: AppRouter
+    @EnvironmentObject private var remoteControl:
+        RivoScreenRemoteControlCenter
     @StateObject private var viewModel: LocalDocumentViewModel
 
     private let appearanceStore:
@@ -285,6 +287,11 @@ struct LocalDocumentView: View {
         .onChange(of: appearance) {
             _, value in
             appearanceStore.save(value)
+        }
+        .onChange(
+            of: remoteControl.latestEvent
+        ) { _, event in
+            handleRemoteEvent(event)
         }
         .sheet(
             isPresented:
@@ -831,14 +838,23 @@ struct LocalDocumentView: View {
     private func moveText(
         by direction: Int
     ) {
+        moveText(
+            by: direction,
+            unit: navigationUnit
+        )
+    }
+
+    private func moveText(
+        by direction: Int,
+        unit: LocalDocumentNavigationUnit
+    ) {
         guard let target =
                 LocalDocumentTextNavigator
                 .targetLine(
                     from:
                         currentLineIndex,
                     direction: direction,
-                    unit:
-                        navigationUnit,
+                    unit: unit,
                     lineCount:
                         documentLines.count,
                     linesPerPage:
@@ -847,6 +863,84 @@ struct LocalDocumentView: View {
             return
         }
         moveToLine(target)
+    }
+
+    private func handleRemoteEvent(
+        _ event: RivoScreenRemoteEvent?
+    ) {
+        guard let event,
+              case .localDocumentReader(
+                let action
+              ) = event.action else {
+            return
+        }
+
+        displayMode = .text
+        isEditing = false
+        if let updated =
+                action.updatedAppearance(
+                    from: appearance
+                ) {
+            appearance = updated
+            switch action {
+            case .decreaseFont,
+                 .defaultFont,
+                 .increaseFont:
+                announceRemoteFeedback(
+                    "글자 크기 \(updated.fontLevel)"
+                )
+            case .decreaseLineHeight,
+                 .defaultLineHeight,
+                 .increaseLineHeight:
+                announceRemoteFeedback(
+                    "줄 간격 \(updated.lineHeightLevel)"
+                )
+            default:
+                break
+            }
+            return
+        }
+
+        switch action {
+        case .beginning:
+            moveToDocumentBoundary(isEnd: false)
+            announceRemoteFeedback("문서 처음")
+        case .previousLine:
+            moveText(by: -1, unit: .line)
+            announceRemoteFeedback(
+                "이전 줄, \(currentLineIndex + 1)번째 줄"
+            )
+        case .previousPage:
+            moveText(by: -1, unit: .page)
+            announceRemoteFeedback(
+                "이전 페이지, \(currentLineIndex + 1)번째 줄"
+            )
+        case .end:
+            moveToDocumentBoundary(isEnd: true)
+            announceRemoteFeedback("문서 끝")
+        case .nextLine:
+            moveText(by: 1, unit: .line)
+            announceRemoteFeedback(
+                "다음 줄, \(currentLineIndex + 1)번째 줄"
+            )
+        case .nextPage:
+            moveText(by: 1, unit: .page)
+            announceRemoteFeedback(
+                "다음 페이지, \(currentLineIndex + 1)번째 줄"
+            )
+        default:
+            break
+        }
+    }
+
+    private func announceRemoteFeedback(
+        _ message: String
+    ) {
+        feedback = message
+        UIAccessibility.post(
+            notification: .announcement,
+            argument: message
+        )
     }
 
     private func moveToDocumentBoundary(

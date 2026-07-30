@@ -199,6 +199,14 @@ struct RivoRemoteView: View {
                 "독서: 2 이전 단위 · 8 다음 단위",
                 systemImage: "arrow.left.arrow.right"
             )
+            Label(
+                "TXT/PDF: 1 처음 · 2/8 줄 · 3/9 페이지 · 7 끝",
+                systemImage: "doc.text"
+            )
+            Label(
+                "TXT/PDF: 4/5/6 글자 · 별표/0/샵 줄 간격",
+                systemImage: "textformat.size"
+            )
         }
     }
 

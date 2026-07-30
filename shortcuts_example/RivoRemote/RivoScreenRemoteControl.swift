@@ -9,6 +9,7 @@ nonisolated enum RivoRemoteScreen:
     case liveTextReader
     case documentScanner
     case publicationReader
+    case localDocumentReader
 }
 
 nonisolated enum RivoMagnifierRemoteAction:
@@ -43,6 +44,53 @@ nonisolated enum RivoPublicationReaderRemoteAction:
     case nextNavigationUnit
 }
 
+nonisolated enum RivoLocalDocumentRemoteAction:
+    Equatable,
+    Sendable
+{
+    case beginning
+    case previousLine
+    case previousPage
+    case decreaseFont
+    case defaultFont
+    case increaseFont
+    case end
+    case nextLine
+    case nextPage
+    case decreaseLineHeight
+    case defaultLineHeight
+    case increaseLineHeight
+
+    func updatedAppearance(
+        from appearance:
+            LocalDocumentAppearance
+    ) -> LocalDocumentAppearance? {
+        var updated = appearance
+        switch self {
+        case .decreaseFont:
+            updated.fontLevel -= 1
+        case .defaultFont:
+            updated.fontLevel =
+                LocalDocumentAppearance
+                .defaultValue.fontLevel
+        case .increaseFont:
+            updated.fontLevel += 1
+        case .decreaseLineHeight:
+            updated.lineHeightLevel -= 1
+        case .defaultLineHeight:
+            updated.lineHeightLevel =
+                LocalDocumentAppearance
+                .defaultValue
+                .lineHeightLevel
+        case .increaseLineHeight:
+            updated.lineHeightLevel += 1
+        default:
+            return nil
+        }
+        return updated.normalized()
+    }
+}
+
 nonisolated enum RivoScreenRemoteAction:
     Equatable,
     Sendable
@@ -53,6 +101,9 @@ nonisolated enum RivoScreenRemoteAction:
     )
     case publicationReader(
         RivoPublicationReaderRemoteAction
+    )
+    case localDocumentReader(
+        RivoLocalDocumentRemoteAction
     )
 }
 
@@ -113,6 +164,13 @@ nonisolated enum RivoScreenRemoteMapper {
             default:
                 return nil
             }
+        case .localDocumentReader:
+            return localDocumentAction(
+                for: button
+            ).map(
+                RivoScreenRemoteAction
+                    .localDocumentReader
+            )
         }
     }
 
@@ -134,6 +192,39 @@ nonisolated enum RivoScreenRemoteMapper {
             return .resetZoom
         case .sharp:
             return .increaseZoom
+        default:
+            return nil
+        }
+    }
+
+    private static func localDocumentAction(
+        for button: RivoButton
+    ) -> RivoLocalDocumentRemoteAction? {
+        switch button {
+        case .one:
+            return .beginning
+        case .two:
+            return .previousLine
+        case .three:
+            return .previousPage
+        case .four:
+            return .decreaseFont
+        case .five:
+            return .defaultFont
+        case .six:
+            return .increaseFont
+        case .seven:
+            return .end
+        case .eight:
+            return .nextLine
+        case .nine:
+            return .nextPage
+        case .star:
+            return .decreaseLineHeight
+        case .zero:
+            return .defaultLineHeight
+        case .sharp:
+            return .increaseLineHeight
         default:
             return nil
         }

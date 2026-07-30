@@ -409,6 +409,93 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         XCTAssertNotEqual(first?.id, second?.id)
     }
 
+    func testLocalDocumentMapperMatchesAndroidTextViewMatrix() {
+        let mappings: [
+            (
+                RivoButton,
+                RivoLocalDocumentRemoteAction
+            )
+        ] = [
+            (.one, .beginning),
+            (.two, .previousLine),
+            (.three, .previousPage),
+            (.four, .decreaseFont),
+            (.five, .defaultFont),
+            (.six, .increaseFont),
+            (.seven, .end),
+            (.eight, .nextLine),
+            (.nine, .nextPage),
+            (.star, .decreaseLineHeight),
+            (.zero, .defaultLineHeight),
+            (.sharp, .increaseLineHeight),
+        ]
+
+        for (button, expectedAction) in mappings {
+            XCTAssertEqual(
+                RivoScreenRemoteMapper.action(
+                    for: self.button(
+                        button,
+                        action: .pressed
+                    ),
+                    on: .localDocumentReader
+                ),
+                .localDocumentReader(
+                    expectedAction
+                )
+            )
+        }
+    }
+
+    func testLocalDocumentRemoteAppearanceClampsAndResets() {
+        let minimum =
+            LocalDocumentAppearance(
+                fontLevel: 1,
+                lineHeightLevel: 1,
+                colorIndex: 0,
+                showsLineSeparators: false
+            )
+        let maximum =
+            LocalDocumentAppearance(
+                fontLevel: 10,
+                lineHeightLevel: 10,
+                colorIndex: 0,
+                showsLineSeparators: false
+            )
+
+        XCTAssertEqual(
+            RivoLocalDocumentRemoteAction
+                .decreaseFont
+                .updatedAppearance(
+                    from: minimum
+                )?.fontLevel,
+            1
+        )
+        XCTAssertEqual(
+            RivoLocalDocumentRemoteAction
+                .increaseLineHeight
+                .updatedAppearance(
+                    from: maximum
+                )?.lineHeightLevel,
+            10
+        )
+        XCTAssertEqual(
+            RivoLocalDocumentRemoteAction
+                .defaultFont
+                .updatedAppearance(
+                    from: maximum
+                )?.fontLevel,
+            LocalDocumentAppearance
+                .defaultValue.fontLevel
+        )
+        XCTAssertNil(
+            RivoLocalDocumentRemoteAction
+                .nextLine
+                .updatedAppearance(
+                    from: minimum
+                )
+        )
+    }
+
     private func button(
         _ button: RivoButton,
         action: RivoButtonAction
