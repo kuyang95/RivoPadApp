@@ -561,6 +561,16 @@ struct AppSettingsView: View {
                 }
             }
 
+            NavigationLink {
+                LocalDiagnosticsView()
+            } label: {
+                Label(
+                    "진단 및 개인정보",
+                    systemImage:
+                        "stethoscope"
+                )
+            }
+
             Button(
                 "VisionCraft 권한 설정 열기",
                 systemImage: "gear"

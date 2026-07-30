@@ -31,6 +31,7 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 - 공유 텍스트의 음성 질문·AI 채팅 기본 진입 설정과 문맥 준비 상태
 - OCR 오타 자동 교정 설정·진행 상태·PDF 페이지 진행 문구
 - 스캐너 자동 촬영·UVDoc 곡면 보정 설정과 fallback 설명
+- 로컬 진단·개인정보, M4 자원 상태, MetricKit 개수와 JSON 내보내기
 
 ## 다음 번역 묶음
 
@@ -40,7 +41,7 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 - EPUB/DAISY 라이브러리·목차·검색·재생 화면
 - VisionLink 연결·수신·원격 기능과 Rivo 연결 관리·진단 화면
 - App Intent의 title, description, parameter와 Siri phrase
-- 알림, 로컬 진단 로그, 파일명과 오류 문구
+- 기능별 나머지 로컬 진단 로그, 파일명과 오류 문구
 - 영어·일본어 사용 설명서 및 변경 내역 본문
 
 ## 자동 점검
