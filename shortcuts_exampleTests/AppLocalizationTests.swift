@@ -37,6 +37,20 @@ final class AppLocalizationTests:
             ),
             "Rivo Remote"
         )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "로컬 번역",
+                bundle: english
+            ),
+            "On-Device Translation"
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "번역 결과",
+                bundle: japanese
+            ),
+            "翻訳結果"
+        )
     }
 
     func testDynamicFormatTranslationsPreserveArguments()

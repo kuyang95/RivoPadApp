@@ -47,8 +47,14 @@ final class LocalVoiceActionTests: XCTestCase {
                 "안녕하세요를 영어로 번역해 줘"
             ),
             .translate(
-                "안녕하세요를 영어로 번역해 줘"
+                "안녕하세요"
             )
+        )
+        XCTAssertEqual(
+            LocalVoiceActionClassifier.classify(
+                "translate: Good morning"
+            ),
+            .translate("Good morning")
         )
         XCTAssertEqual(
             LocalVoiceActionClassifier.classify(

@@ -73,6 +73,13 @@ struct shortcuts_exampleApp: App {
                                 rivoScreenRemoteControlCenter
                                     .deactivate(.localAIChat)
                             }
+                        case .translation(
+                            let initialText
+                        ):
+                            TranslationView(
+                                initialText:
+                                    initialText
+                            )
                         case .voiceQuestion(let question):
                             LLMContentView(
                                 intent: .voiceQuestion(

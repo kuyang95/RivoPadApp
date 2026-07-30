@@ -44,6 +44,25 @@ struct ChatHistoryView: View {
         }
         .navigationTitle("AI 대화")
         .toolbar {
+            ToolbarItem(
+                placement: .topBarTrailing
+            ) {
+                NavigationLink(
+                    value:
+                        AppRoute.translation(
+                            initialText: nil
+                        )
+                ) {
+                    Label(
+                        "번역",
+                        systemImage:
+                            "character.book.closed"
+                    )
+                }
+                .accessibilityHint(
+                    "M4 로컬 AI 번역 화면을 엽니다."
+                )
+            }
             ToolbarItem(placement: .primaryAction) {
                 NavigationLink(
                     value: AppRoute.localChat(

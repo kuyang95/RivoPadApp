@@ -208,10 +208,16 @@ struct LocalVoiceActionView: View {
                 "열 PDF 또는 텍스트 문서를 선택해 주세요."
             )
             onFileImport()
-        case .translate(let question):
+        case .translate(let source):
             route(
-                .voiceQuestion(question: question),
-                announcement: "로컬 AI가 번역 요청을 처리합니다."
+                .translation(
+                    initialText:
+                        source.isEmpty
+                            ? nil
+                            : source
+                ),
+                announcement:
+                    "로컬 번역 화면을 엽니다."
             )
         case .introduce:
             status =

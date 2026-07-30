@@ -182,7 +182,11 @@ nonisolated enum LocalVoiceActionClassifier {
                 "translate",
             ]
         ) {
-            return .translate(original)
+            return .translate(
+                translationSource(
+                    from: original
+                )
+            )
         }
         if containsAny(
             normalized,
@@ -207,5 +211,36 @@ nonisolated enum LocalVoiceActionClassifier {
         candidates.contains {
             value.contains($0)
         }
+    }
+
+    private static func translationSource(
+        from original: String
+    ) -> String {
+        var source = original
+            .replacingOccurrences(
+                of:
+                    "(?i)^\\s*(?:번역|translate)\\s*[:：-]?\\s*",
+                with: "",
+                options:
+                    .regularExpression
+            )
+            .replacingOccurrences(
+                of:
+                    "(?i)\\s*(?:을|를)?\\s*(?:영어|한국어|일본어|english|korean|japanese)?\\s*(?:로|으로|to)?\\s*(?:번역(?:해\\s*줘|해줘|해|해주세요|해\\s*주세요)?|translate(?:\\s+this)?(?:\\s+please)?)\\s*[.!?]*$",
+                with: "",
+                options:
+                    .regularExpression
+            )
+            .trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+        if source.hasSuffix("을")
+            || source.hasSuffix("를") {
+            source.removeLast()
+        }
+        return source.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
     }
 }
