@@ -35,6 +35,52 @@ final class RivoRemoteProtocolTests: XCTestCase {
         )
     }
 
+    func testDeviceSelectionKeepsSavedFallbackButHonorsManualScan() {
+        let saved = UUID()
+        let pending = UUID()
+
+        XCTAssertEqual(
+            RivoDeviceSelectionPolicy
+                .reconnectIdentifier(
+                    pending: pending,
+                    saved: saved
+                ),
+            pending
+        )
+        XCTAssertEqual(
+            RivoDeviceSelectionPolicy
+                .reconnectIdentifier(
+                    pending: nil,
+                    saved: saved
+                ),
+            saved
+        )
+        XCTAssertTrue(
+            RivoDeviceSelectionPolicy
+                .shouldAutomaticallyConnect(
+                    discovered: saved,
+                    saved: saved,
+                    requiresManualSelection: false
+                )
+        )
+        XCTAssertFalse(
+            RivoDeviceSelectionPolicy
+                .shouldAutomaticallyConnect(
+                    discovered: saved,
+                    saved: saved,
+                    requiresManualSelection: true
+                )
+        )
+        XCTAssertFalse(
+            RivoDeviceSelectionPolicy
+                .shouldAutomaticallyConnect(
+                    discovered: pending,
+                    saved: saved,
+                    requiresManualSelection: false
+                )
+        )
+    }
+
     func testTimePacketMatchesAndroidSignedChecksumRange() {
         let packet = RivoTimeSyncPacketEncoder.packet(
             for: RivoClockValue(

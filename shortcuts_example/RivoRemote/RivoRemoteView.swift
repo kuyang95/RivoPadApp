@@ -82,6 +82,15 @@ struct RivoRemoteView: View {
                 ) {
                     manager.retryConnectionNow()
                 }
+
+                if manager.canReturnToSavedDevice {
+                    Button(
+                        "저장된 리모컨으로 돌아가기",
+                        systemImage: "arrow.uturn.backward.circle"
+                    ) {
+                        manager.reconnectSavedDevice()
+                    }
+                }
             }
 
             stateActions
@@ -106,6 +115,13 @@ struct RivoRemoteView: View {
                 systemImage: "personalhotspot.slash"
             ) {
                 manager.disconnect()
+            }
+
+            Button(
+                "다른 리모컨 연결",
+                systemImage: "arrow.triangle.swap"
+            ) {
+                manager.searchForAnotherDevice()
             }
 
             Button(
