@@ -7,6 +7,10 @@ enum ChatIntentInput: Equatable {
     case voiceQuestion(question: String)
     case imageAnalysis(imageURL: URL, question: String)
     case documentQA(document: String, question: String)
+    case webPageQA(
+        content: WebPageContent,
+        question: String
+    )
 }
 
 struct LLMContentView: View {
@@ -35,7 +39,9 @@ struct LLMContentView: View {
         case .voiceQuestion:
             storedConversationID = UUID()
             persistsHistory = true
-        case .imageAnalysis, .documentQA:
+        case .imageAnalysis,
+             .documentQA,
+             .webPageQA:
             storedConversationID = UUID()
             persistsHistory = false
         }
@@ -60,7 +66,10 @@ struct LLMContentView: View {
             RVLogger.d("🔥 View에서 전달받은 imageURL: \(imageURL)")
             RVLogger.d("🔥 imageURL path: \(imageURL.path)")
             RVLogger.d("🔥 question: \(question)")
-        case .textChat, .voiceQuestion, .documentQA:
+        case .textChat,
+             .voiceQuestion,
+             .documentQA,
+             .webPageQA:
             break
         }
     }
@@ -68,6 +77,10 @@ struct LLMContentView: View {
     var body: some View {
         ZStack {
             VStack(spacing: 8) {
+                if let source = webSource {
+                    webSourceBanner(source)
+                }
+
                 if vm.messages.isEmpty, !vm.isLoadingModel {
                     ContentUnavailableView(
                         "새로운 대화",
@@ -258,7 +271,74 @@ struct LLMContentView: View {
             return "이미지 질문"
         case .documentQA:
             return "문서 질문"
+        case .webPageQA:
+            return "웹페이지 질문"
         }
+    }
+
+    private var webSource:
+        WebPageContent?
+    {
+        guard case .webPageQA(
+            let content,
+            _
+        ) = intent else {
+            return nil
+        }
+        return content
+    }
+
+    private func webSourceBanner(
+        _ content: WebPageContent
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(
+                systemName:
+                    "link.circle.fill"
+            )
+            .foregroundStyle(.indigo)
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(content.title)
+                    .font(.subheadline.bold())
+                    .lineLimit(1)
+                Text(
+                    content.sourceURL
+                        .absoluteString
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+
+            Spacer()
+
+            Link(
+                destination:
+                    content.sourceURL
+            ) {
+                Image(
+                    systemName: "safari"
+                )
+            }
+            .accessibilityLabel(
+                "Safari에서 원문 열기"
+            )
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            Color.secondary.opacity(0.08)
+        )
+        .accessibilityElement(
+            children: .combine
+        )
+        .accessibilityLabel(
+            "출처: \(content.title), \(content.sourceURL.absoluteString)"
+        )
     }
 
     @discardableResult

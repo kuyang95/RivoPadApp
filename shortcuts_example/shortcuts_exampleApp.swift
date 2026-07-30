@@ -80,6 +80,41 @@ struct shortcuts_exampleApp: App {
                                 initialText:
                                     initialText
                             )
+                        case .webQuestion(
+                            let initialURL,
+                            let autoLoad
+                        ):
+                            WebQuestionView(
+                                initialURL:
+                                    initialURL,
+                                autoLoad:
+                                    autoLoad
+                            )
+                        case .webPageQuestion(
+                            let content,
+                            let question
+                        ):
+                            LLMContentView(
+                                intent:
+                                    .webPageQA(
+                                        content:
+                                            content,
+                                        question:
+                                            question
+                                    )
+                            )
+                            .onAppear {
+                                rivoScreenRemoteControlCenter
+                                    .activate(
+                                        .localAIChat
+                                    )
+                            }
+                            .onDisappear {
+                                rivoScreenRemoteControlCenter
+                                    .deactivate(
+                                        .localAIChat
+                                    )
+                            }
                         case .voiceQuestion(let question):
                             LLMContentView(
                                 intent: .voiceQuestion(
@@ -527,6 +562,17 @@ struct shortcuts_exampleApp: App {
             !text.isEmpty else {
                 throw SharedInboxStoreError
                     .emptyText
+            }
+            if let url =
+                    WebURLInputParser
+                    .firstWebURL(
+                        in: text
+                    ) {
+                return .webQuestion(
+                    initialURL:
+                        url.absoluteString,
+                    autoLoad: true
+                )
             }
             let bounded = String(
                 text.prefix(24_000)

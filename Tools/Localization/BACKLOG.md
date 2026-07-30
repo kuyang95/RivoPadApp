@@ -18,6 +18,7 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 - 카메라·마이크·동작·음성 인식·Bluetooth 권한 설명
 - 영어·일본어 핵심 번들과 동적 format 인수의 자동 테스트
 - 로컬 번역 화면의 대상 언어·입력·진행·결과·오류·VoiceOver 문구
+- 웹페이지 주소·추출·출처·질문·네트워크·WebKit fallback 오류 문구
 
 ## 다음 번역 묶음
 

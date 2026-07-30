@@ -25,6 +25,14 @@ enum AppRoute: Hashable {
     case chatHistory
     case localChat(conversationID: UUID?)
     case translation(initialText: String?)
+    case webQuestion(
+        initialURL: String?,
+        autoLoad: Bool
+    )
+    case webPageQuestion(
+        content: WebPageContent,
+        question: String
+    )
     case voiceQuestion(question: String)
     case voiceAction
     case localDocument(fileURL: URL)

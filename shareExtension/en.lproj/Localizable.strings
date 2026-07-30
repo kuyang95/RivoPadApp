@@ -1,6 +1,6 @@
 "공유 항목을 준비하는 중입니다." = "Preparing the shared item.";
 "VisionCraft 열기" = "Open VisionCraft";
-"사진, PDF 또는 텍스트만 공유할 수 있습니다." = "You can share only photos, PDFs, or text.";
+"사진, PDF, 텍스트 또는 URL만 공유할 수 있습니다." = "You can share only photos, PDFs, text, or URLs.";
 "텍스트를 읽지 못했습니다: " = "Couldn’t read the text: ";
 "공유된 텍스트가 비어 있습니다." = "The shared text is empty.";
 "공유 항목을 저장하지 못했습니다: " = "Couldn’t save the shared item: ";

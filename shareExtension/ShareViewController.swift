@@ -121,7 +121,7 @@ final class ShareViewController: UIViewController {
             finish(
                 with:
                     shareLocalized(
-                        "사진, PDF 또는 텍스트만 공유할 수 있습니다."
+                        "사진, PDF, 텍스트 또는 URL만 공유할 수 있습니다."
                     )
             )
             return

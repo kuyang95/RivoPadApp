@@ -182,13 +182,11 @@ final class VisionLinkManager: ObservableObject {
         webSocketSession: URLSession = .shared,
         deviceName: String? = nil,
         remoteFeatureService:
-            any VisionLinkRemoteFeatureServing =
-                VisionLinkLocalRemoteFeatureService
-                    .shared,
+            (any VisionLinkRemoteFeatureServing)? =
+                nil,
         remoteChatService:
-            any VisionLinkRemoteChatServing =
-                VisionLinkLocalRemoteChatService
-                    .shared,
+            (any VisionLinkRemoteChatServing)? =
+                nil,
         conversationStore:
             VisionLinkConversationStore =
                 .shared,
@@ -202,11 +200,17 @@ final class VisionLinkManager: ObservableObject {
         webRTCReceiver = VisionLinkWebRTCReceiver()
         remoteFeatureProcessor =
             VisionLinkRemoteFeatureProcessor(
-                service: remoteFeatureService
+                service:
+                    remoteFeatureService
+                    ?? VisionLinkLocalRemoteFeatureService
+                    .shared
             )
         remoteChatProcessor =
             VisionLinkRemoteChatProcessor(
-                service: remoteChatService,
+                service:
+                    remoteChatService
+                    ?? VisionLinkLocalRemoteChatService
+                    .shared,
                 conversationStore:
                     conversationStore
             )

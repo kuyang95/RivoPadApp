@@ -51,6 +51,20 @@ final class AppLocalizationTests:
             ),
             "翻訳結果"
         )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "웹페이지 질문",
+                bundle: english
+            ),
+            "Ask About a Webpage"
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "본문 읽기",
+                bundle: japanese
+            ),
+            "本文を読む"
+        )
     }
 
     func testDynamicFormatTranslationsPreserveArguments()
@@ -77,11 +91,33 @@ final class AppLocalizationTests:
             ),
             "Rivo Three"
         )
+        let englishWebStatus = String(
+            format: AppLocalization.string(
+                "웹 서버가 오류 상태 %lld를 반환했습니다.",
+                bundle: english
+            ),
+            404
+        )
+        let japaneseBodyCount = String(
+            format: AppLocalization.string(
+                "본문 %lld자",
+                bundle: japanese
+            ),
+            1200
+        )
 
         XCTAssertEqual(englishRate, "1.25×")
         XCTAssertEqual(
             japaneseDevice,
             "Rivo Threeに接続済み"
+        )
+        XCTAssertEqual(
+            englishWebStatus,
+            "The web server returned error status 404."
+        )
+        XCTAssertEqual(
+            japaneseBodyCount,
+            "本文1200文字"
         )
     }
 

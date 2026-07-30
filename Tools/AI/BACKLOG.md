@@ -18,17 +18,14 @@ URL 본문과 최신 검색처럼 네트워크가 본질적으로 필요한 입�
 - 번역 원문 16,000자 제한, `<think>` 제거, 스트리밍 결과와 중지
 - 명시적 클립보드 붙여넣기, 결과 복사·선택·읽기
 - 앱 언어를 기본 번역 대상으로 사용하고 음성 번역 명령을 화면에 연결
+- 직접 입력·붙여넣기·다른 앱 공유 URL을 하나의 웹페이지 질문 화면으로 연결
+- HTTP(S) 검증, HTTP redirect와 내장 JS/meta redirect 2회, 10/15초 제한
+- 응답 2MB 상한, charset 해석, script/style/navigation 제거와 HTML entity 복원
+- 정적 본문이 200자보다 짧을 때만 15초 비공개 WebKit 렌더링 fallback
+- 제목·최종 URL·24,000자 본문을 보존하고 원문 Safari 열기 제공
+- 웹 본문 경계 문자열을 무력화하고 신뢰하지 않는 외부 자료로 M4 로컬 AI에 전달
 
 ## 다음 구현
-
-### AI-001: URL 본문 추출과 질문
-
-- HTTP(S) URL 검증, redirect·응답 크기·시간 제한
-- HTML의 script/style/navigation 제거와 제목·본문 추출
-- JavaScript 렌더링 페이지의 제한적 WebKit fallback
-- 공유한 URL과 직접 붙여넣은 URL을 같은 흐름으로 처리
-- 추출 본문을 M4 로컬 AI에 전달하고 원본 URL·제목을 보존
-- prompt injection을 줄이도록 웹 본문을 신뢰하지 않는 데이터로 구분
 
 ### AI-002: 출처가 있는 선택적 웹 검색
 
@@ -56,3 +53,15 @@ URL 본문과 최신 검색처럼 네트워크가 본질적으로 필요한 입�
 - [ ] 붙여넣기·복사 때 iPadOS 개인정보 배너와 VoiceOver 안내가
       자연스러운지 확인한다.
 - [ ] Dynamic Type와 가로·세로 화면에서 원문·결과 편집 영역을 확인한다.
+- [ ] Safari 공유 URL, 제목과 URL이 함께 공유된 항목, 직접 붙여넣기와
+      scheme 없는 도메인이 같은 웹 질문 화면으로 열리는지 확인한다.
+- [ ] 일반 HTML, HTTP redirect, meta/JavaScript redirect와 본문 200자 미만
+      동적 페이지에서 제목·최종 URL·본문이 맞는지 확인한다.
+- [ ] 2MB 초과 응답, 24,000자 본문, 오프라인, 인증·봇 차단 페이지와
+      읽기 중 중지 오류 안내를 확인한다.
+- [ ] HTTPS가 아닌 주소는 iPadOS ATS 정책에 따라 차단될 수 있으며,
+      이때 HTTPS 사용 안내가 표시되는지 확인한다.
+- [ ] WebKit fallback이 비공개 데이터 저장소를 사용하고 화면 이탈 뒤
+      로딩·JavaScript 실행이 남지 않는지 확인한다.
+- [ ] 웹 본문의 명령문과 경계 문자열을 AI가 실행하지 않고, 답변 화면에서
+      제목·출처 URL과 Safari 원문 열기가 유지되는지 확인한다.
