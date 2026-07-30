@@ -1387,7 +1387,8 @@ actor ChatAttachmentStore {
     private func recognizeText(
         from image: UIImage
     ) async throws -> String {
-        try await withCheckedThrowingContinuation {
+        let original =
+            try await withCheckedThrowingContinuation {
             continuation in
             Task { @MainActor in
                 DocumentTextExtractor()
@@ -1400,6 +1401,19 @@ actor ChatAttachmentStore {
                     }
             }
         }
+        let isCorrectionEnabled =
+            await MainActor.run {
+                AppSettingsStore.shared
+                    .ocrAutoCorrectionEnabled
+            }
+        return await LocalOCRCorrectionService
+            .shared
+            .correct(
+                image: image,
+                originalText: original,
+                isEnabled:
+                    isCorrectionEnabled
+            )
     }
 
     private func readSecurityScopedData(

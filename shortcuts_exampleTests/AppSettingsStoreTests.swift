@@ -50,6 +50,9 @@ final class AppSettingsStoreTests:
             store
                 .documentScanColorEnhancementEnabled
         )
+        XCTAssertTrue(
+            store.ocrAutoCorrectionEnabled
+        )
         XCTAssertEqual(
             store.fontChoice,
             .nanumSquareRound
@@ -71,6 +74,8 @@ final class AppSettingsStoreTests:
         store
             .documentScanColorEnhancementEnabled =
             false
+        store.ocrAutoCorrectionEnabled =
+            false
         store.fontChoice = .system
         store.sharedTextEntryMode = .chat
 
@@ -90,6 +95,10 @@ final class AppSettingsStoreTests:
         XCTAssertFalse(
             restored
                 .documentScanColorEnhancementEnabled
+        )
+        XCTAssertFalse(
+            restored
+                .ocrAutoCorrectionEnabled
         )
         XCTAssertEqual(
             restored.fontChoice,
@@ -145,6 +154,8 @@ final class AppSettingsStoreTests:
         store
             .documentScanColorEnhancementEnabled =
             false
+        store.ocrAutoCorrectionEnabled =
+            false
         store.fontChoice = .system
         store.sharedTextEntryMode = .chat
 
@@ -163,6 +174,9 @@ final class AppSettingsStoreTests:
         XCTAssertTrue(
             store
                 .documentScanColorEnhancementEnabled
+        )
+        XCTAssertTrue(
+            store.ocrAutoCorrectionEnabled
         )
         XCTAssertEqual(
             store.fontChoice,

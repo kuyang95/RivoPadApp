@@ -30,6 +30,7 @@
 @text Excel 97-2003 OLE/BIFF8 XLS와 압축 HWP 5.x의 로컬 텍스트 추출, 암호화·손상·압축 폭탄 방어와 원본 보존을 추가했습니다.
 @text VisionLink 원격 AI 대화에서도 XLSX·Excel 97-2003 XLS·HWP 5.x를 로컬 추출해 첨부 문맥으로 사용할 수 있게 했습니다.
 @text 사용자가 승인한 Files 폴더를 기억해 PDF·TXT·XLSX·XLS·HWP를 검색하고 구조화 문서를 일반 문서 뷰어에서 읽도록 추가했습니다.
+@text 정지 이미지와 Vision OCR 원문을 M4 Qwen3-VL로 함께 대조하는 OCR 오타 자동 교정, 설정 토글과 숫자·URL·줄바꿈·길이 변조 방어를 추가했습니다.
 
 @version 0.9
 @date 2026년 7월 29일

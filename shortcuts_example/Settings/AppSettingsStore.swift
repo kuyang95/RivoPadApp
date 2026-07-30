@@ -164,6 +164,8 @@ final class AppSettingsStore:
             "settings.speechRate.v1"
         static let scanColorEnhancement =
             "settings.scanColorEnhancement.v1"
+        static let ocrAutoCorrection =
+            "settings.ocrAutoCorrection.v1"
         static let fontChoice =
             "settings.fontChoice.v1"
         static let sharedTextEntryMode =
@@ -208,6 +210,18 @@ final class AppSettingsStore:
                 documentScanColorEnhancementEnabled,
                 forKey:
                     Key.scanColorEnhancement
+            )
+        }
+    }
+
+    @Published var ocrAutoCorrectionEnabled:
+        Bool
+    {
+        didSet {
+            save(
+                ocrAutoCorrectionEnabled,
+                forKey:
+                    Key.ocrAutoCorrection
             )
         }
     }
@@ -264,6 +278,13 @@ final class AppSettingsStore:
                 defaults: defaults,
                 fallback: true
             )
+        ocrAutoCorrectionEnabled =
+            Self.bool(
+                forKey:
+                    Key.ocrAutoCorrection,
+                defaults: defaults,
+                fallback: true
+            )
         fontChoice = defaults
             .string(
                 forKey: Key.fontChoice
@@ -287,6 +308,7 @@ final class AppSettingsStore:
         speechRate = .normal
         documentScanColorEnhancementEnabled =
             true
+        ocrAutoCorrectionEnabled = true
         fontChoice = .nanumSquareRound
         sharedTextEntryMode = .voice
     }

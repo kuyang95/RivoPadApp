@@ -7,6 +7,8 @@ Android `TextEditorViewerScreen`과 iPad의 `LocalDocumentView`를 대조해,
 ## 구현 완료
 
 - PDFKit 원본 보기와 PDF 내장 텍스트/OCR 추출
+- 텍스트 레이어가 없는 PDF 페이지를 Vision OCR한 뒤 설정에 따라 페이지
+  이미지와 원문을 M4 Qwen3-VL로 대조 교정하고 실패 시 원문 유지
 - TXT UTF-8/UTF-16 가져오기와 읽기/편집 모드 전환
 - 전체 텍스트 복사와 iPad 네이티브 부분 선택
 - 현재 보이는 논리 줄부터 로컬 TTS 읽기와 즉시 정지
@@ -58,6 +60,9 @@ Android `TextEditorViewerScreen`과 iPad의 `LocalDocumentView`를 대조해,
       논리 줄만 좌우 스크롤되며 회전 뒤 줄 위치와 앱 재실행 뒤 설정이 유지된다.
 - [ ] 한국어·영어·일본어와 문장 부호가 없는 목록 문서에서 문장 강조,
       이전·다시·다음, 연속 재생 완료와 중지 뒤 오래된 콜백 무시가 맞다.
+- [ ] 텍스트 레이어가 없는 1·20페이지 PDF를 OCR 교정 켬·끔으로 열어
+      페이지 순서·줄바꿈·숫자·URL이 보존되고 진행 상태와 총 시간이
+      이해 가능한지 확인한다.
 
 ## 다음 구현
 

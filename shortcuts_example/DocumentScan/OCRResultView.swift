@@ -32,7 +32,8 @@ struct OCRResultView: View {
 
             if vm.isExtracting {
                 ThinkingOverlayView(
-                    title: "텍스트 추출중",
+                    title:
+                        vm.extractionStatus,
                     activeDotIndex: vm.activeDotIndex
                 )
                 .transition(.opacity)

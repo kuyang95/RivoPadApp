@@ -117,9 +117,15 @@ final class LocalDocumentViewModel: ObservableObject {
                 of: CGSize(width: 1_800, height: 2_400),
                 for: .mediaBox
             )
-            if let recognizedText = try? await recognizeText(
-                from: pageImage
-            ) {
+            if let recognizedText =
+                try? await
+                recognizeAndCorrectText(
+                    from: pageImage,
+                    pageNumber:
+                        pageIndex + 1,
+                    pageCount:
+                        document.pageCount
+                ) {
                 let trimmed = recognizedText.trimmingCharacters(
                     in: .whitespacesAndNewlines
                 )
@@ -144,6 +150,36 @@ final class LocalDocumentViewModel: ObservableObject {
                 continuation.resume(with: result)
             }
         }
+    }
+
+    private func recognizeAndCorrectText(
+        from image: UIImage,
+        pageNumber: Int,
+        pageCount: Int
+    ) async throws -> String {
+        let original = try await
+            recognizeText(from: image)
+        let isEnabled =
+            AppSettingsStore.shared
+            .ocrAutoCorrectionEnabled
+        if isEnabled,
+           !original.trimmingCharacters(
+               in: .whitespacesAndNewlines
+           ).isEmpty {
+            status =
+                AppLocalization.format(
+                    "PDF %lld/%lld페이지 OCR 오타 교정 중",
+                    pageNumber,
+                    pageCount
+                )
+        }
+        return await LocalOCRCorrectionService
+            .shared
+            .correct(
+                image: image,
+                originalText: original,
+                isEnabled: isEnabled
+            )
     }
 }
 

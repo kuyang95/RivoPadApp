@@ -24,6 +24,10 @@ final class OCRResultViewModel: ObservableObject {
     @Published var extractedText: String = ""
     @Published var lineBoxes: [TextBox2] = []
     @Published var isExtracting: Bool = false
+    @Published var extractionStatus:
+        String = AppLocalization.string(
+            "텍스트 추출중"
+        )
 
     // MARK: - LLM State
     @Published var isRecording = false
@@ -93,6 +97,10 @@ final class OCRResultViewModel: ObservableObject {
         guard !isExtracting else { return }
 
         isExtracting = true
+        extractionStatus =
+            AppLocalization.string(
+                "텍스트 추출중"
+            )
         startThinkingAnimation()
 
         guard let cg = image.cgImage else {
@@ -114,9 +122,33 @@ final class OCRResultViewModel: ObservableObject {
 
             boxes = self.sortReadingOrder(boxes)
 
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    return
+                }
                 self.lineBoxes = boxes
-                self.extractedText = boxes.map(\.text).joined(separator: "\n")
+                let original = boxes
+                    .map(\.text)
+                    .joined(separator: "\n")
+                if AppSettingsStore.shared
+                    .ocrAutoCorrectionEnabled,
+                   !original.isEmpty {
+                    self.extractionStatus =
+                        AppLocalization.string(
+                            "OCR 오타 교정중"
+                        )
+                }
+                self.extractedText =
+                    await LocalOCRCorrectionService
+                    .shared
+                    .correct(
+                        image: image,
+                        originalText: original,
+                        isEnabled:
+                            AppSettingsStore
+                            .shared
+                            .ocrAutoCorrectionEnabled
+                    )
                 self.stopThinkingAnimation()
                 self.isExtracting = false
             }

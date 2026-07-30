@@ -28,4 +28,25 @@ actor OCRService {
             .compactMap { $0.topCandidates(1).first?.string }
             .joined(separator: "\n") ?? "(텍스트 없음)"
     }
+
+    func recognizeAndCorrect(
+        from image: UIImage,
+        isCorrectionEnabled: Bool
+    ) async throws -> String {
+        let original = try await recognize(
+            from: image
+        )
+        guard original != "(텍스트 없음)"
+        else {
+            return original
+        }
+        return await LocalOCRCorrectionService
+            .shared
+            .correct(
+                image: image,
+                originalText: original,
+                isEnabled:
+                    isCorrectionEnabled
+            )
+    }
 }

@@ -34,7 +34,18 @@ struct OCRIntent: AppIntent {
             return .result(value: "", dialog: "이미지 변환에 실패했습니다")
         }
 
-        let text = try await OCRService.shared.recognize(from: uiImage)
+        let correctionEnabled =
+            await MainActor.run {
+                AppSettingsStore.shared
+                    .ocrAutoCorrectionEnabled
+            }
+        let text = try await OCRService
+            .shared
+            .recognizeAndCorrect(
+                from: uiImage,
+                isCorrectionEnabled:
+                    correctionEnabled
+            )
 
         // ✅ 앱 화면에서 읽어갈 수 있게 저장
         OCRSharedStore.save(text: text)

@@ -184,11 +184,21 @@ struct AppSettingsView: View {
             .accessibilityHint(
                 "촬영한 문서의 배경과 글자 대비를 Android VisionCraft 방식으로 강화합니다."
             )
+
+            Toggle(
+                "OCR 오타 자동 교정",
+                isOn:
+                    $settings
+                    .ocrAutoCorrectionEnabled
+            )
+            .accessibilityHint(
+                "정적인 사진과 스캔 문서의 Vision OCR 결과를 이미지와 대조해 M4 로컬 AI로 교정합니다."
+            )
         } header: {
             Text("문서 스캐너")
         } footer: {
             Text(
-                "모서리 검출과 원근·곡면 보정은 항상 적용하고, 이 항목은 마지막 색상 강화 단계만 제어합니다."
+                "모서리·원근·곡면 보정은 항상 적용됩니다. OCR 교정은 Qwen3-VL을 이 iPad에서 실행하므로 처음에는 모델 준비 시간이 필요하며, 실패하면 Vision OCR 원문을 유지합니다."
             )
         }
     }

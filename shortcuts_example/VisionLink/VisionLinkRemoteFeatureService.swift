@@ -153,9 +153,16 @@ final class VisionLinkLocalRemoteFeatureService:
             maximumEdge: 2_048
         )
         try Task.checkCancellation()
-        return try await ocrService.recognize(
-            from: UIImage(cgImage: cgImage)
-        )
+        return try await ocrService
+            .recognizeAndCorrect(
+                from:
+                    UIImage(
+                        cgImage: cgImage
+                    ),
+                isCorrectionEnabled:
+                    AppSettingsStore.shared
+                    .ocrAutoCorrectionEnabled
+            )
     }
 
     func describeImage(
