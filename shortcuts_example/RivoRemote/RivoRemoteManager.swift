@@ -50,6 +50,29 @@ nonisolated enum RivoBluetoothState: Equatable, Sendable {
     }
 }
 
+nonisolated enum RivoTimeSyncState:
+    Equatable,
+    Sendable
+{
+    case idle
+    case sending
+    case sent(Date)
+    case failed(String)
+
+    var title: String {
+        switch self {
+        case .idle:
+            return "연결 후 자동으로 맞춥니다."
+        case .sending:
+            return "현재 시간을 보내는 중"
+        case .sent:
+            return "현재 시간을 전송했습니다."
+        case .failed(let message):
+            return message
+        }
+    }
+}
+
 nonisolated struct RivoDiscoveredDevice:
     Identifiable,
     Equatable,
@@ -119,6 +142,8 @@ final class RivoRemoteManager:
     @Published private(set) var invalidPacketCount = 0
     @Published private(set) var connectedDeviceType:
         RivoDeviceType?
+    @Published private(set) var timeSyncState:
+        RivoTimeSyncState = .idle
 
     private let defaults: UserDefaults
     private var centralManager: CBCentralManager?
@@ -132,6 +157,10 @@ final class RivoRemoteManager:
     private var shouldReconnect = false
     private var connectionTimeoutTask: Task<Void, Never>?
     private var reconnectTask: Task<Void, Never>?
+    private var periodicTimeSyncTask:
+        Task<Void, Never>?
+    private var automaticTimeSyncPeripheralIdentifier:
+        UUID?
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -146,6 +175,7 @@ final class RivoRemoteManager:
     deinit {
         connectionTimeoutTask?.cancel()
         reconnectTask?.cancel()
+        periodicTimeSyncTask?.cancel()
     }
 
     var connectedDeviceName: String? {
@@ -232,6 +262,10 @@ final class RivoRemoteManager:
         shouldReconnect = false
         connectionTimeoutTask?.cancel()
         reconnectTask?.cancel()
+        periodicTimeSyncTask?.cancel()
+        automaticTimeSyncPeripheralIdentifier =
+            nil
+        timeSyncState = .idle
         guard let activePeripheral else {
             state = .disconnected
             return
@@ -254,6 +288,7 @@ final class RivoRemoteManager:
         activePeripheral = nil
         writeCharacteristic = nil
         notifyCharacteristic = nil
+        timeSyncState = .idle
         recentEvents = []
         state = .inactive
     }
@@ -261,6 +296,46 @@ final class RivoRemoteManager:
     func clearEventHistory() {
         recentEvents = []
         invalidPacketCount = 0
+    }
+
+    func syncTime() {
+        guard state.isReady,
+              let peripheral = activePeripheral,
+              let characteristic =
+                writeCharacteristic else {
+            timeSyncState = .failed(
+                "Rivo가 연결된 뒤 다시 시도해 주세요."
+            )
+            return
+        }
+        let writeType:
+            CBCharacteristicWriteType
+        if characteristic.properties
+            .contains(.writeWithoutResponse) {
+            writeType = .withoutResponse
+        } else if characteristic.properties
+            .contains(.write) {
+            writeType = .withResponse
+        } else {
+            timeSyncState = .failed(
+                "이 Rivo의 시간 쓰기 특성을 지원하지 않습니다."
+            )
+            return
+        }
+
+        timeSyncState = .sending
+        let packet =
+            RivoTimeSyncPacketEncoder.packet(
+                for: Date()
+            )
+        peripheral.writeValue(
+            packet,
+            for: characteristic,
+            type: writeType
+        )
+        if writeType == .withoutResponse {
+            noteTimePacketSent()
+        }
     }
 
     private var savedPeripheralIdentifier: UUID? {
@@ -340,6 +415,10 @@ final class RivoRemoteManager:
         peripheral.delegate = self
         writeCharacteristic = nil
         notifyCharacteristic = nil
+        periodicTimeSyncTask?.cancel()
+        automaticTimeSyncPeripheralIdentifier =
+            nil
+        timeSyncState = .idle
         assembler.reset()
         state = .connecting(displayName(for: peripheral))
         centralManager.connect(peripheral)
@@ -443,6 +522,34 @@ final class RivoRemoteManager:
             forKey: DefaultsKey.deviceType
         )
         state = .ready(displayName(for: peripheral))
+        if automaticTimeSyncPeripheralIdentifier
+            != peripheral.identifier {
+            automaticTimeSyncPeripheralIdentifier =
+                peripheral.identifier
+            syncTime()
+        }
+    }
+
+    private func noteTimePacketSent() {
+        timeSyncState = .sent(Date())
+        schedulePeriodicTimeSync()
+    }
+
+    private func schedulePeriodicTimeSync() {
+        periodicTimeSyncTask?.cancel()
+        periodicTimeSyncTask =
+            Task { [weak self] in
+                try? await Task.sleep(
+                    nanoseconds:
+                        43_200_000_000_000
+                )
+                guard !Task.isCancelled,
+                      let self,
+                      self.state.isReady else {
+                    return
+                }
+                self.syncTime()
+            }
     }
 
     private func updateState(
@@ -581,6 +688,10 @@ final class RivoRemoteManager:
         connectionTimeoutTask?.cancel()
         writeCharacteristic = nil
         notifyCharacteristic = nil
+        periodicTimeSyncTask?.cancel()
+        automaticTimeSyncPeripheralIdentifier =
+            nil
+        timeSyncState = .idle
         assembler.reset()
         if !shouldReconnect,
            savedPeripheralIdentifier == nil {
@@ -697,6 +808,26 @@ final class RivoRemoteManager:
                 )
             }
             eventSequence &+= 1
+        }
+    }
+
+    func peripheral(
+        _ peripheral: CBPeripheral,
+        didWriteValueFor characteristic: CBCharacteristic,
+        error: Error?
+    ) {
+        guard characteristic.uuid
+                == Self.uartWriteCharacteristic,
+              case .sending = timeSyncState else {
+            return
+        }
+        if let error {
+            timeSyncState = .failed(
+                "현재 시간을 보내지 못했습니다: "
+                    + error.localizedDescription
+            )
+        } else {
+            noteTimePacketSent()
         }
     }
 }

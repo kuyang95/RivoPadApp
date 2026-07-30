@@ -4,6 +4,67 @@ import XCTest
 @testable import shortcuts_example
 
 final class RivoRemoteProtocolTests: XCTestCase {
+    func testTimePacketMatchesAndroidSignedChecksumRange() {
+        let packet = RivoTimeSyncPacketEncoder.packet(
+            for: RivoClockValue(
+                year: 2026,
+                month: 7,
+                day: 29,
+                hour: 18,
+                minute: 30,
+                second: 45,
+                millisecond: 513
+            )
+        )
+
+        XCTAssertEqual(
+            packet,
+            Data([
+                0x41, 0x54, 0x44, 0x54,
+                0x0B, 0x00, 0x01, 0x00,
+                0xEA, 0x07, 0x07, 0x1D,
+                0x12, 0x1E, 0x2D, 0x01,
+                0x02, 0xAC, 0x01, 0x0D,
+                0x0A
+            ])
+        )
+    }
+
+    func testTimePacketUsesProvidedCalendarFields() {
+        var calendar = Calendar(
+            identifier: .gregorian
+        )
+        calendar.timeZone =
+            TimeZone(secondsFromGMT: 9 * 60 * 60)!
+        let date = calendar.date(
+            from: DateComponents(
+                year: 2025,
+                month: 12,
+                day: 31,
+                hour: 23,
+                minute: 59,
+                second: 58
+            )
+        )!
+
+        let packet = Array(
+            RivoTimeSyncPacketEncoder.packet(
+                for: date,
+                calendar: calendar
+            )
+        )
+
+        XCTAssertEqual(
+            Array(packet[8 ... 16]),
+            [
+                0xE9, 0x07,
+                0x0C, 0x1F, 0x17,
+                0x3B, 0x3A,
+                0x00, 0x00
+            ]
+        )
+    }
+
     func testAssemblerReconstructsFragmentedAndCoalescedPackets() {
         let first = makeButtonPacket(key: ascii("-"))
         let second = makeButtonPacket(key: ascii("_"))

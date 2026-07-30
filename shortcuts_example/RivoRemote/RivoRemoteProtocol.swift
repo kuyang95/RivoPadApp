@@ -34,6 +34,151 @@ nonisolated enum RivoDeviceType:
     }
 }
 
+nonisolated struct RivoClockValue:
+    Equatable,
+    Sendable
+{
+    let year: Int
+    let month: Int
+    let day: Int
+    let hour: Int
+    let minute: Int
+    let second: Int
+    let millisecond: Int
+}
+
+nonisolated enum RivoTimeSyncPacketEncoder {
+    static func packet(
+        for date: Date,
+        calendar: Calendar = .current
+    ) -> Data {
+        let components =
+            calendar.dateComponents(
+                [
+                    .year,
+                    .month,
+                    .day,
+                    .hour,
+                    .minute,
+                    .second,
+                    .nanosecond,
+                ],
+                from: date
+            )
+        return packet(
+            for:
+                RivoClockValue(
+                    year:
+                        components.year ?? 0,
+                    month:
+                        components.month ?? 0,
+                    day: components.day ?? 0,
+                    hour:
+                        components.hour ?? 0,
+                    minute:
+                        components.minute ?? 0,
+                    second:
+                        components.second ?? 0,
+                    millisecond:
+                        (
+                            components.nanosecond
+                                ?? 0
+                        ) / 1_000_000
+                )
+        )
+    }
+
+    static func packet(
+        for value: RivoClockValue
+    ) -> Data {
+        var bytes =
+            [UInt8](repeating: 0, count: 21)
+        bytes[0] = ascii("A")
+        bytes[1] = ascii("T")
+        bytes[2] = ascii("D")
+        bytes[3] = ascii("T")
+        writeLittleEndian(
+            11,
+            into: &bytes,
+            offset: 4
+        )
+        bytes[6] = 1
+        bytes[7] = 0
+        writeLittleEndian(
+            value.year,
+            into: &bytes,
+            offset: 8
+        )
+        bytes[10] =
+            UInt8(
+                truncatingIfNeeded:
+                    value.month
+            )
+        bytes[11] =
+            UInt8(
+                truncatingIfNeeded:
+                    value.day
+            )
+        bytes[12] =
+            UInt8(
+                truncatingIfNeeded:
+                    value.hour
+            )
+        bytes[13] =
+            UInt8(
+                truncatingIfNeeded:
+                    value.minute
+            )
+        bytes[14] =
+            UInt8(
+                truncatingIfNeeded:
+                    value.second
+            )
+        writeLittleEndian(
+            value.millisecond,
+            into: &bytes,
+            offset: 15
+        )
+
+        let checksum =
+            bytes[0 ..< 16].reduce(0) {
+                partial, byte in
+                partial
+                    + Int(
+                        Int8(bitPattern: byte)
+                    )
+            } & 0xFFFF
+        writeLittleEndian(
+            checksum,
+            into: &bytes,
+            offset: 17
+        )
+        bytes[19] = 0x0D
+        bytes[20] = 0x0A
+        return Data(bytes)
+    }
+
+    private static func writeLittleEndian(
+        _ value: Int,
+        into bytes: inout [UInt8],
+        offset: Int
+    ) {
+        bytes[offset] =
+            UInt8(truncatingIfNeeded: value)
+        bytes[offset + 1] =
+            UInt8(
+                truncatingIfNeeded:
+                    value >> 8
+            )
+    }
+
+    private static func ascii(
+        _ character: Character
+    ) -> UInt8 {
+        character.asciiValue!
+    }
+}
+
 nonisolated enum RivoButton:
     String,
     CaseIterable,

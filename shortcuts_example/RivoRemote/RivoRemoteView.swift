@@ -50,6 +50,23 @@ struct RivoRemoteView: View {
             .padding(.vertical, 8)
             .accessibilityElement(children: .combine)
 
+            if manager.state.isReady {
+                HStack(alignment: .firstTextBaseline) {
+                    Label(
+                        manager.timeSyncState.title,
+                        systemImage: "clock"
+                    )
+                    Spacer()
+                    if case .sent(let date) =
+                        manager.timeSyncState {
+                        Text(date, style: .time)
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+            }
+
             stateActions
         }
     }
@@ -57,6 +74,16 @@ struct RivoRemoteView: View {
     @ViewBuilder
     private var stateActions: some View {
         if manager.state.isReady {
+            Button(
+                "시간 다시 맞추기",
+                systemImage: "clock.arrow.circlepath"
+            ) {
+                manager.syncTime()
+            }
+            .disabled(
+                manager.timeSyncState == .sending
+            )
+
             Button(
                 "연결 끊기",
                 systemImage: "personalhotspot.slash"
