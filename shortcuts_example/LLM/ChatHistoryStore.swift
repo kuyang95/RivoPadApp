@@ -40,6 +40,31 @@ nonisolated struct StoredChatConversation:
     let createdAt: Date
     var updatedAt: Date
     var messages: [StoredChatMessage]
+    var textContexts:
+        [StoredChatTextContext]?
+    var fileAttachment:
+        StoredChatFileAttachment?
+
+    init(
+        id: UUID,
+        title: String,
+        createdAt: Date,
+        updatedAt: Date,
+        messages: [StoredChatMessage],
+        textContexts:
+            [StoredChatTextContext]? = nil,
+        fileAttachment:
+            StoredChatFileAttachment? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.messages = messages
+        self.textContexts = textContexts
+        self.fileAttachment =
+            fileAttachment
+    }
 
     var preview: String {
         messages.last(where: {
@@ -47,6 +72,8 @@ nonisolated struct StoredChatConversation:
                 in: .whitespacesAndNewlines
             ).isEmpty
         })?.text
+            ?? fileAttachment?.name
+            ?? textContexts?.last?.name
             ?? AppLocalization.string(
                 "메시지가 없습니다."
             )
@@ -92,7 +119,7 @@ nonisolated struct StoredChatDatabase: Codable, Equatable, Sendable {
     var conversations: [StoredChatConversation]
 
     static let empty = Self(
-        schemaVersion: 1,
+        schemaVersion: 2,
         conversations: []
     )
 }
@@ -125,12 +152,18 @@ actor ChatHistoryStore {
 
     private let fileURL: URL
     private let fileManager: FileManager
+    private let attachmentStore:
+        ChatAttachmentStore
 
     init(
         fileURL: URL? = nil,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        attachmentStore:
+            ChatAttachmentStore = .shared
     ) {
         self.fileManager = fileManager
+        self.attachmentStore =
+            attachmentStore
         if let fileURL {
             self.fileURL = fileURL
             return
@@ -168,24 +201,58 @@ actor ChatHistoryStore {
         }
     }
 
-    func upsert(_ conversation: StoredChatConversation) throws {
+    func upsert(
+        _ conversation: StoredChatConversation
+    ) async throws {
         var database = try loadDatabase()
+        var replacedAttachment:
+            StoredChatFileAttachment?
         if let index = database.conversations.firstIndex(where: {
             $0.id == conversation.id
         }) {
+            let previous = database
+                .conversations[index]
+                .fileAttachment
+            if previous?.storedName
+                != conversation
+                    .fileAttachment?
+                    .storedName {
+                replacedAttachment =
+                    previous
+            }
             database.conversations[index] = conversation
         } else {
             database.conversations.append(conversation)
         }
         try saveDatabase(database)
+        if let replacedAttachment {
+            await attachmentStore.delete(
+                replacedAttachment
+            )
+        }
     }
 
-    func deleteConversation(id: UUID) throws {
+    func deleteConversation(
+        id: UUID
+    ) async throws {
         var database = try loadDatabase()
+        let deletedAttachments =
+            database.conversations
+            .filter {
+                $0.id == id
+            }
+            .compactMap(
+                \.fileAttachment
+            )
         database.conversations.removeAll {
             $0.id == id
         }
         try saveDatabase(database)
+        for attachment in deletedAttachments {
+            await attachmentStore.delete(
+                attachment
+            )
+        }
     }
 
     @discardableResult
@@ -217,8 +284,18 @@ actor ChatHistoryStore {
         return database.conversations[index]
     }
 
-    func deleteAllConversations() throws {
+    func deleteAllConversations()
+        async throws
+    {
+        let attachments = try loadDatabase()
+            .conversations
+            .compactMap(\.fileAttachment)
         try saveDatabase(.empty)
+        for attachment in attachments {
+            await attachmentStore.delete(
+                attachment
+            )
+        }
     }
 
     private func loadDatabase() throws -> StoredChatDatabase {
@@ -276,6 +353,27 @@ nonisolated enum ChatHistorySearch {
                     [conversation.title]
                     + conversation.messages
                         .map(\.text)
+                    + (
+                        conversation
+                            .textContexts
+                            ?? []
+                    )
+                    .flatMap {
+                        [
+                            $0.name,
+                            $0.text,
+                        ]
+                    }
+                    + [
+                        conversation
+                            .fileAttachment?
+                            .name
+                            ?? "",
+                        conversation
+                            .fileAttachment?
+                            .extractedText
+                            ?? "",
+                    ]
                 )
                 .joined(separator: "\n"),
                 locale: locale

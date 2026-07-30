@@ -230,9 +230,35 @@ final class ChatHistoryStoreTests: XCTestCase {
                     ),
                 ]
             )
+        let attachment =
+            StoredChatConversation(
+                id: UUID(),
+                title: "첨부 대화",
+                createdAt: Date(),
+                updatedAt: Date(),
+                messages: [],
+                textContexts: [
+                    StoredChatTextContext(
+                        name: "영수증",
+                        text: "합계 12000원"
+                    ),
+                ],
+                fileAttachment:
+                    StoredChatFileAttachment(
+                        name: "세금계산서.pdf",
+                        kind: .document,
+                        mimeType:
+                            "application/pdf",
+                        storedName:
+                            "test.pdf",
+                        extractedText:
+                            "공급자 Rivo"
+                    )
+            )
         let conversations = [
             weather,
             travel,
+            attachment,
         ]
 
         XCTAssertEqual(
@@ -258,6 +284,22 @@ final class ChatHistoryStoreTests: XCTestCase {
             )
             .map(\.id),
             [travel.id]
+        )
+        XCTAssertEqual(
+            ChatHistorySearch.filtered(
+                conversations,
+                query: "세금계산서 Rivo"
+            )
+            .map(\.id),
+            [attachment.id]
+        )
+        XCTAssertEqual(
+            ChatHistorySearch.filtered(
+                conversations,
+                query: "영수증 12000원"
+            )
+            .map(\.id),
+            [attachment.id]
         )
         XCTAssertEqual(
             ChatHistorySearch.filtered(

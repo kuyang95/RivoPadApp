@@ -1,5 +1,7 @@
 import SwiftUI
 import CoreImage
+import PhotosUI
+import UniformTypeIdentifiers
 import UIKit
 
 enum ChatIntentInput: Equatable {
@@ -31,6 +33,14 @@ struct LLMContentView: View {
     @State private var speechTask: Task<Void, Never>?
     @State private var voiceErrorDescription: String?
     @State private var shouldSpeakNextResponse = false
+    @State private var isAttachmentMenuPresented =
+        false
+    @State private var isDocumentImporterPresented =
+        false
+    @State private var isPhotoPickerPresented =
+        false
+    @State private var selectedPhotoItem:
+        PhotosPickerItem?
 
     init(intent: ChatIntentInput) {
         self.intent = intent
@@ -100,6 +110,10 @@ struct LLMContentView: View {
                         response
                     )
                 }
+                if let summary =
+                        vm.attachmentSummary {
+                    attachmentBanner(summary)
+                }
 
                 if vm.messages.isEmpty, !vm.isLoadingModel {
                     ContentUnavailableView(
@@ -127,7 +141,10 @@ struct LLMContentView: View {
                     .defaultScrollAnchor(.bottom)
                 }
 
+                quickPromptBar
+
                 if let error = voiceErrorDescription
+                    ?? vm.attachmentErrorDescription
                     ?? vm.historyErrorDescription {
                     Text(error)
                         .font(.footnote)
@@ -142,13 +159,31 @@ struct LLMContentView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 12)
                         .accessibilityLabel("음성을 듣는 중입니다.")
-                } else if !vm.status.isEmpty {
-                    Text(vm.status)
+                } else if vm.isPreparingAttachment,
+                          let attachmentStatus =
+                            vm.attachmentStatusDescription {
+                    Text(attachmentStatus)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 12)
-                        .accessibilityLabel("AI 상태: \(vm.status)")
+                        .accessibilityLabel(
+                            attachmentStatus
+                        )
+                } else if !vm.status.isEmpty
+                            || vm.attachmentStatusDescription
+                                != nil {
+                    Text(
+                        vm.attachmentStatusDescription
+                            ?? vm.status
+                    )
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .accessibilityLabel(
+                            "AI 상태: \(vm.attachmentStatusDescription ?? vm.status)"
+                        )
                 }
 
                 if let contextNotice =
@@ -196,6 +231,7 @@ struct LLMContentView: View {
                     .disabled(
                         !vm.isReadyForInput
                             || vm.isGenerating
+                            || vm.isPreparingAttachment
                             || (
                                 speechTask != nil
                                     && !stt.isRecording
@@ -223,6 +259,7 @@ struct LLMContentView: View {
                             vm.isLoadingModel
                                 || vm.isInitialQueryRunning
                                 || vm.isGenerating
+                                || vm.isPreparingAttachment
                                 || stt.isRecording
                         )
                         .submitLabel(.send)
@@ -251,13 +288,22 @@ struct LLMContentView: View {
                 .padding(.bottom, 8)
             }
 
-            if vm.isLoadingModel || vm.isInitialQueryRunning {
+            if vm.isLoadingModel
+                || vm.isInitialQueryRunning
+                || vm.isPreparingAttachment {
                 Color.black.opacity(0.4).ignoresSafeArea()
                 VStack(spacing: 16) {
                     ProgressView().progressViewStyle(.circular)
                     Text(
                         vm.isLoadingModel
                             ? "로컬 모델을 불러오는 중"
+                            : vm.isPreparingAttachment
+                            ? (
+                                vm.attachmentStatusDescription
+                                ?? AppLocalization.string(
+                                    "첨부 준비 중…"
+                                )
+                            )
                             : "분석 중…"
                     )
                         .font(.headline)
@@ -271,6 +317,77 @@ struct LLMContentView: View {
         }
         .navigationTitle(navigationTitle)
         .navigationBarTitleDisplayMode(.inline)
+        .confirmationDialog(
+            "대화에 첨부",
+            isPresented:
+                $isAttachmentMenuPresented,
+            titleVisibility: .visible
+        ) {
+            Button("문서") {
+                isDocumentImporterPresented =
+                    true
+            }
+            Button("클립보드") {
+                Task {
+                    await vm.attachClipboardText(
+                        UIPasteboard
+                            .general.string
+                    )
+                }
+            }
+            Button("사진") {
+                isPhotoPickerPresented = true
+            }
+            Button("취소", role: .cancel) {}
+        } message: {
+            Text(
+                "PDF·TXT 문서, 클립보드 텍스트 또는 사진을 현재 대화의 문맥으로 사용합니다."
+            )
+        }
+        .fileImporter(
+            isPresented:
+                $isDocumentImporterPresented,
+            allowedContentTypes: [
+                .pdf,
+                UTType(
+                    filenameExtension: "txt"
+                ) ?? .plainText,
+            ],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first
+                else {
+                    return
+                }
+                Task {
+                    await vm.attachDocument(
+                        at: url
+                    )
+                }
+            case .failure(let error):
+                vm.attachmentErrorDescription =
+                    error.localizedDescription
+            }
+        }
+        .photosPicker(
+            isPresented:
+                $isPhotoPickerPresented,
+            selection:
+                $selectedPhotoItem,
+            matching: .images
+        )
+        .onChange(
+            of: selectedPhotoItem
+        ) { _, item in
+            guard let item else {
+                return
+            }
+            Task {
+                await attachPhoto(item)
+            }
+        }
         .task {
             guard !didStart else { return }
             didStart = true
@@ -311,6 +428,169 @@ struct LLMContentView: View {
             of: remoteControl.latestEvent
         ) { _, event in
             handleRemoteEvent(event)
+        }
+    }
+
+    private var quickPromptBar:
+        some View
+    {
+        ScrollView(
+            .horizontal,
+            showsIndicators: false
+        ) {
+            HStack(spacing: 8) {
+                quickPromptButton(
+                    title: "첨부",
+                    systemImage:
+                        "paperclip"
+                ) {
+                    isAttachmentMenuPresented =
+                        true
+                }
+                quickPromptButton(
+                    title: "요약",
+                    systemImage:
+                        "text.alignleft"
+                ) {
+                    vm.sendQuickPrompt(
+                        AppLocalization.string(
+                            "대화와 첨부 내용을 요약해 주세요."
+                        )
+                    )
+                }
+                quickPromptButton(
+                    title: "정보 목록",
+                    systemImage:
+                        "list.bullet"
+                ) {
+                    vm.sendQuickPrompt(
+                        AppLocalization.string(
+                            "핵심 정보를 항목별로 나열해 주세요."
+                        )
+                    )
+                }
+                quickPromptButton(
+                    title: "다음 행동",
+                    systemImage:
+                        "arrow.right.circle"
+                ) {
+                    vm.sendQuickPrompt(
+                        AppLocalization.string(
+                            "다음으로 무엇을 하면 좋을지 알려 주세요."
+                        )
+                    )
+                }
+            }
+            .padding(.horizontal, 12)
+        }
+        .disabled(
+            !vm.isReadyForInput
+                || vm.isGenerating
+                || vm.isPreparingAttachment
+                || stt.isRecording
+        )
+        .accessibilityElement(
+            children: .contain
+        )
+    }
+
+    private func quickPromptButton(
+        title: String,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(
+                AppLocalization.string(
+                    title
+                ),
+                systemImage: systemImage
+            )
+            .font(.subheadline.bold())
+        }
+        .buttonStyle(.bordered)
+    }
+
+    private func attachmentBanner(
+        _ summary: ChatAttachmentSummary
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(
+                systemName:
+                    "paperclip.circle.fill"
+            )
+            .foregroundStyle(.indigo)
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text("대화 첨부")
+                    .font(.subheadline.bold())
+                Text(summary.description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            Color.indigo.opacity(0.08)
+        )
+        .accessibilityElement(
+            children: .combine
+        )
+        .accessibilityLabel(
+            AppLocalization.format(
+                "대화 첨부: %@",
+                summary.description
+            )
+        )
+    }
+
+    @MainActor
+    private func attachPhoto(
+        _ item: PhotosPickerItem
+    ) async {
+        defer {
+            selectedPhotoItem = nil
+        }
+        do {
+            guard let data =
+                    try await item
+                    .loadTransferable(
+                        type: Data.self
+                    ) else {
+                throw ChatAttachmentError
+                    .invalidImage
+            }
+            let contentType =
+                item.supportedContentTypes
+                .first(where: {
+                    $0.conforms(to: .image)
+                })
+                ?? .jpeg
+            let pathExtension =
+                contentType
+                .preferredFilenameExtension
+                ?? "jpg"
+            await vm.attachImage(
+                data: data,
+                suggestedName:
+                    AppLocalization.string(
+                        "첨부 사진"
+                    )
+                    + "."
+                    + pathExtension,
+                mimeType:
+                    contentType
+                    .preferredMIMEType
+                    ?? "image/jpeg"
+            )
+        } catch {
+            vm.attachmentErrorDescription =
+                error.localizedDescription
         }
     }
 
