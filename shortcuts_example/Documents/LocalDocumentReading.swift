@@ -13,14 +13,84 @@ nonisolated struct LocalDocumentAppearance:
     var lineHeightLevel: Int
     var colorIndex: Int
     var showsLineSeparators: Bool
+    var usesSingleLineInLandscape: Bool
 
     static let defaultValue =
         LocalDocumentAppearance(
             fontLevel: 5,
             lineHeightLevel: 5,
             colorIndex: 0,
-            showsLineSeparators: false
+            showsLineSeparators: false,
+            usesSingleLineInLandscape:
+                false
         )
+
+    init(
+        fontLevel: Int,
+        lineHeightLevel: Int,
+        colorIndex: Int,
+        showsLineSeparators: Bool,
+        usesSingleLineInLandscape:
+            Bool = false
+    ) {
+        self.fontLevel = fontLevel
+        self.lineHeightLevel =
+            lineHeightLevel
+        self.colorIndex = colorIndex
+        self.showsLineSeparators =
+            showsLineSeparators
+        self.usesSingleLineInLandscape =
+            usesSingleLineInLandscape
+    }
+
+    private enum CodingKeys:
+        String,
+        CodingKey
+    {
+        case fontLevel
+        case lineHeightLevel
+        case colorIndex
+        case showsLineSeparators
+        case usesSingleLineInLandscape
+    }
+
+    init(from decoder: Decoder) throws {
+        let container =
+            try decoder.container(
+                keyedBy: CodingKeys.self
+            )
+        self.init(
+            fontLevel:
+                try container.decode(
+                    Int.self,
+                    forKey: .fontLevel
+                ),
+            lineHeightLevel:
+                try container.decode(
+                    Int.self,
+                    forKey: .lineHeightLevel
+                ),
+            colorIndex:
+                try container.decode(
+                    Int.self,
+                    forKey: .colorIndex
+                ),
+            showsLineSeparators:
+                try container.decode(
+                    Bool.self,
+                    forKey:
+                        .showsLineSeparators
+                ),
+            usesSingleLineInLandscape:
+                try container
+                .decodeIfPresent(
+                    Bool.self,
+                    forKey:
+                        .usesSingleLineInLandscape
+                )
+                ?? false
+        )
+    }
 
     func normalized(
         colorCount: Int =
@@ -40,7 +110,9 @@ nonisolated struct LocalDocumentAppearance:
                     max(colorCount - 1, 0)
                 ),
             showsLineSeparators:
-                showsLineSeparators
+                showsLineSeparators,
+            usesSingleLineInLandscape:
+                usesSingleLineInLandscape
         )
     }
 }
@@ -82,6 +154,17 @@ final class LocalDocumentAppearanceStore {
             return
         }
         defaults.set(data, forKey: key)
+    }
+}
+
+nonisolated enum LocalDocumentLayoutPolicy {
+    static func usesSingleLine(
+        preferenceEnabled: Bool,
+        width: CGFloat,
+        height: CGFloat
+    ) -> Bool {
+        preferenceEnabled
+            && width > height
     }
 }
 

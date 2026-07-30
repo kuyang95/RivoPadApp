@@ -121,6 +121,13 @@ final class AppLocalizationTests:
             ),
             "The selected XLSX document could not be read."
         )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "가로 화면 한 줄 읽기",
+                bundle: japanese
+            ),
+            "横画面の一行読み"
+        )
     }
 
     func testDynamicFormatTranslationsPreserveArguments()
@@ -131,6 +138,19 @@ final class AppLocalizationTests:
         )
         let japanese = try localizedBundle(
             language: "ja"
+        )
+
+        XCTAssertEqual(
+            String(
+                format:
+                    AppLocalization.string(
+                        "문서 문장 %lld/%lld",
+                        bundle: english
+                    ),
+                2,
+                9
+            ),
+            "Document sentence 2 of 9"
         )
 
         let englishRate = String(

@@ -159,6 +159,8 @@ struct LocalDocumentView: View {
     @EnvironmentObject private var remoteControl:
         RivoScreenRemoteControlCenter
     @StateObject private var viewModel: LocalDocumentViewModel
+    @StateObject private var speechController:
+        LocalDocumentSpeechController
 
     private let appearanceStore:
         LocalDocumentAppearanceStore
@@ -182,8 +184,6 @@ struct LocalDocumentView: View {
     @State private var exportFileName =
         "VisionCraftText"
 
-    private let tts = TTSManager.shared
-
     init(fileURL: URL) {
         let appearanceStore =
             LocalDocumentAppearanceStore()
@@ -193,6 +193,10 @@ struct LocalDocumentView: View {
             wrappedValue: LocalDocumentViewModel(
                 fileURL: fileURL
             )
+        )
+        _speechController = StateObject(
+            wrappedValue:
+                LocalDocumentSpeechController()
         )
         _appearance = State(
             initialValue:
@@ -223,21 +227,12 @@ struct LocalDocumentView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("읽기", systemImage: "speaker.wave.2") {
-                    let text =
-                        LocalDocumentTextSegmenter
-                        .text(
-                            fromLine:
-                                currentLineIndex,
-                            in: viewModel.text
-                        )
-                    tts.speak(text)
-                    feedback =
-                        "\(currentLineIndex + 1)번째 줄부터 읽기를 시작했습니다."
+                    startDocumentReading()
                 }
                 .disabled(viewModel.text.isEmpty)
 
                 Button("정지", systemImage: "speaker.slash") {
-                    tts.stop()
+                    speechController.stop()
                     feedback = "문서 읽기를 중지했습니다."
                 }
 
@@ -256,7 +251,7 @@ struct LocalDocumentView: View {
                 ) {
                     isEditing.toggle()
                     displayMode = .text
-                    tts.stop()
+                    speechController.stop()
                 }
                 .disabled(viewModel.text.isEmpty)
 
@@ -291,6 +286,8 @@ struct LocalDocumentView: View {
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 0) {
                 if showsTextReadingControls {
+                    speechBar
+                    Divider()
                     navigationBar
                     Divider()
                 }
@@ -301,7 +298,25 @@ struct LocalDocumentView: View {
             await viewModel.load()
         }
         .onDisappear {
-            tts.stop()
+            speechController.stop()
+        }
+        .onChange(of: viewModel.text) {
+            _, _ in
+            speechController.reset()
+        }
+        .onChange(
+            of:
+                speechController
+                .selection.currentIndex
+        ) {
+            _, _ in
+            guard let lineIndex =
+                    speechController
+                    .currentSegment?
+                    .lineIndex else {
+                return
+            }
+            moveToLine(lineIndex)
         }
         .onChange(of: appearance) {
             _, value in
@@ -416,165 +431,554 @@ struct LocalDocumentView: View {
                 in: viewModel.text
             )
         return GeometryReader { geometry in
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(
-                        alignment: .leading,
-                        spacing: 0
-                    ) {
-                        ForEach(lines) { line in
-                            Text(
-                                line.text.isEmpty
-                                    ? " "
-                                    : line.text
+            if usesSingleLineLayout(
+                size: geometry.size
+            ) {
+                singleLineReadableText(
+                    lines: lines,
+                    size: geometry.size
+                )
+            } else {
+                verticalReadableText(
+                    lines: lines,
+                    size: geometry.size
+                )
+            }
+        }
+    }
+
+    private func verticalReadableText(
+        lines: [LocalDocumentLine],
+        size: CGSize
+    ) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(
+                    alignment: .leading,
+                    spacing: 0
+                ) {
+                    ForEach(lines) { line in
+                        Text(
+                            attributedText(
+                                for: line
                             )
-                            .font(
-                                .system(
-                                    size:
-                                        documentFontSize
-                                )
+                        )
+                        .font(
+                            .system(
+                                size:
+                                    documentFontSize
                             )
-                            .lineSpacing(
+                        )
+                        .lineSpacing(
+                            documentLineSpacing
+                        )
+                        .frame(
+                            maxWidth: .infinity,
+                            alignment: .leading
+                        )
+                        .padding(
+                            .vertical,
+                            max(
                                 documentLineSpacing
+                                    / 2,
+                                4
                             )
-                            .frame(
-                                maxWidth: .infinity,
-                                alignment: .leading
-                            )
-                            .padding(
-                                .vertical,
-                                max(
-                                    documentLineSpacing
-                                        / 2,
-                                    4
-                                )
-                            )
-                            .overlay(
-                                alignment: .bottom
-                            ) {
-                                if appearance
-                                    .showsLineSeparators {
-                                    Rectangle()
-                                        .fill(
-                                            documentForeground
-                                                .opacity(
-                                                    0.18
-                                                )
-                                        )
-                                        .frame(height: 1)
-                                }
+                        )
+                        .overlay(
+                            alignment: .bottom
+                        ) {
+                            if appearance
+                                .showsLineSeparators {
+                                Rectangle()
+                                    .fill(
+                                        documentForeground
+                                            .opacity(
+                                                0.18
+                                            )
+                                    )
+                                    .frame(height: 1)
                             }
-                            .accessibilityLabel(
-                                line.text.isEmpty
-                                    ? "빈 줄"
-                                    : line.text
+                        }
+                        .accessibilityLabel(
+                            line.text.isEmpty
+                                ? "빈 줄"
+                                : line.text
+                        )
+                        .accessibilityValue(
+                            speechAccessibilityValue(
+                                for: line
                             )
-                            .id(line.id)
-                            .background {
-                                GeometryReader {
-                                    lineGeometry in
-                                    Color.clear
-                                        .preference(
-                                            key:
-                                                LocalDocumentLineOffsetPreferenceKey
-                                                .self,
-                                            value: [
-                                                line.index:
-                                                    lineGeometry
-                                                    .frame(
-                                                        in:
-                                                            .named(
-                                                                "local-document-scroll"
-                                                            )
-                                                    )
-                                                    .minY,
-                                            ]
-                                        )
-                                }
+                        )
+                        .id(line.id)
+                        .background {
+                            GeometryReader {
+                                lineGeometry in
+                                Color.clear
+                                    .preference(
+                                        key:
+                                            LocalDocumentLineOffsetPreferenceKey
+                                            .self,
+                                        value: [
+                                            line.index:
+                                                lineGeometry
+                                                .frame(
+                                                    in:
+                                                        .named(
+                                                            "local-document-scroll"
+                                                        )
+                                                )
+                                                .minY,
+                                        ]
+                                    )
                             }
                         }
                     }
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 20)
-                    .textSelection(.enabled)
                 }
-                .coordinateSpace(
-                    name:
-                        "local-document-scroll"
+                .padding(.horizontal, 28)
+                .padding(.vertical, 20)
+                .textSelection(.enabled)
+            }
+            .coordinateSpace(
+                name:
+                    "local-document-scroll"
+            )
+            .background(documentBackground)
+            .foregroundStyle(documentForeground)
+            .onPreferenceChange(
+                LocalDocumentLineOffsetPreferenceKey
+                    .self
+            ) { offsets in
+                guard let visible =
+                        offsets.min(
+                            by: {
+                                abs($0.value)
+                                    < abs($1.value)
+                            }
+                        )?.key else {
+                    return
+                }
+                currentLineIndex =
+                    min(
+                        max(visible, 0),
+                        max(lines.count - 1, 0)
+                    )
+            }
+            .task(id: navigationRevision) {
+                await scrollToCurrentLine(
+                    lines: lines,
+                    proxy: proxy,
+                    anchor: .top
                 )
-                .background(documentBackground)
-                .foregroundStyle(documentForeground)
-                .onPreferenceChange(
-                    LocalDocumentLineOffsetPreferenceKey
-                        .self
-                ) { offsets in
-                    guard let visible =
-                            offsets.min(
-                                by: {
-                                    abs($0.value)
-                                        < abs($1.value)
-                                }
-                            )?.key else {
-                        return
-                    }
-                    currentLineIndex =
-                        min(
-                            max(visible, 0),
-                            max(lines.count - 1, 0)
+            }
+            .onAppear {
+                updateVisibleLineCapacity(
+                    height: size.height
+                )
+            }
+            .onChange(of: size) {
+                _, updatedSize in
+                updateVisibleLineCapacity(
+                    height:
+                        updatedSize.height
+                )
+            }
+            .onChange(
+                of: appearance.fontLevel
+            ) {
+                _, _ in
+                updateVisibleLineCapacity(
+                    height: size.height
+                )
+            }
+            .onChange(
+                of:
+                    appearance
+                    .lineHeightLevel
+            ) {
+                _, _ in
+                updateVisibleLineCapacity(
+                    height: size.height
+                )
+            }
+        }
+    }
+
+    private func singleLineReadableText(
+        lines: [LocalDocumentLine],
+        size: CGSize
+    ) -> some View {
+        let line =
+            lines.indices.contains(
+                currentLineIndex
+            )
+            ? lines[currentLineIndex]
+            : LocalDocumentLine(
+                index: 0,
+                text: ""
+            )
+        return ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                HStack(spacing: 0) {
+                    Color.clear
+                        .frame(
+                            width: 1,
+                            height: 1
                         )
+                        .id(
+                            singleLineStartID(
+                                for: line
+                            )
+                        )
+                    ForEach(
+                        singleLinePieces(
+                            for: line
+                        )
+                    ) { piece in
+                        Text(piece.text)
+                            .background(
+                                piece.isHighlighted
+                                    ? documentForeground
+                                    .opacity(0.28)
+                                    : Color.clear
+                            )
+                            .id(piece.id)
+                    }
                 }
-                .task(id: navigationRevision) {
-                    guard lines.indices.contains(
-                              currentLineIndex
-                          ) else {
-                        return
-                    }
-                    await Task.yield()
-                    withAnimation(
-                        .easeInOut(
-                            duration: 0.2
-                        )
-                    ) {
-                        proxy.scrollTo(
-                            currentLineIndex,
-                            anchor: .top
-                        )
-                    }
-                }
-                .onAppear {
-                    updateVisibleLineCapacity(
-                        height:
-                            geometry.size.height
+                .font(
+                    .system(
+                        size: documentFontSize
                     )
-                }
-                .onChange(of: geometry.size) {
-                    _, size in
-                    updateVisibleLineCapacity(
-                        height: size.height
+                )
+                .fixedSize(
+                    horizontal: true,
+                    vertical: false
+                )
+                .frame(
+                    minWidth:
+                        max(size.width - 56, 1),
+                    minHeight:
+                        max(size.height - 40, 1),
+                    alignment: .leading
+                )
+                .padding(.horizontal, 28)
+                .padding(.vertical, 20)
+                .id(line.id)
+                .accessibilityLabel(
+                    line.text.isEmpty
+                        ? "한 줄 읽기, 빈 줄"
+                        : "한 줄 읽기, \(line.text)"
+                )
+                .accessibilityValue(
+                    speechAccessibilityValue(
+                        for: line
                     )
-                }
-                .onChange(
-                    of: appearance.fontLevel
+                )
+            }
+            .background(documentBackground)
+            .foregroundStyle(documentForeground)
+            .textSelection(.enabled)
+            .task(id: navigationRevision) {
+                await Task.yield()
+                withAnimation(
+                    .easeInOut(
+                        duration: 0.2
+                    )
                 ) {
-                    _, _ in
-                    updateVisibleLineCapacity(
-                        height:
-                            geometry.size.height
-                    )
-                }
-                .onChange(
-                    of:
-                        appearance
-                        .lineHeightLevel
-                ) {
-                    _, _ in
-                    updateVisibleLineCapacity(
-                        height:
-                            geometry.size.height
+                    proxy.scrollTo(
+                        singleLineTargetID(
+                            for: line
+                        ),
+                        anchor:
+                            speechController
+                            .currentSegment?
+                            .lineIndex
+                                == line.index
+                            ? .center
+                            : .leading
                     )
                 }
             }
+            .onAppear {
+                visibleLineCapacity = 1
+            }
+            .onChange(of: size) {
+                _, _ in
+                visibleLineCapacity = 1
+            }
         }
+    }
+
+    private func singleLinePieces(
+        for line: LocalDocumentLine
+    ) -> [LocalDocumentLinePiece] {
+        let source = line.text as NSString
+        let segments =
+            speechController
+            .selection.segments
+            .filter {
+                $0.lineIndex == line.index
+                    && $0.utf16Location >= 0
+                    && NSMaxRange(
+                        $0.utf16Range
+                    ) <= source.length
+            }
+            .sorted {
+                $0.utf16Location
+                    < $1.utf16Location
+            }
+        guard !segments.isEmpty else {
+            return [
+                LocalDocumentLinePiece(
+                    id:
+                        "line-\(line.index)-all",
+                    text:
+                        line.text.isEmpty
+                        ? " "
+                        : line.text,
+                    isHighlighted: false
+                ),
+            ]
+        }
+
+        var pieces:
+            [LocalDocumentLinePiece] = []
+        var cursor = 0
+        for segment in segments {
+            if segment.utf16Location
+                > cursor {
+                let gapRange = NSRange(
+                    location: cursor,
+                    length:
+                        segment.utf16Location
+                        - cursor
+                )
+                pieces.append(
+                    LocalDocumentLinePiece(
+                        id:
+                            "line-\(line.index)-gap-\(cursor)",
+                        text:
+                            source.substring(
+                                with: gapRange
+                            ),
+                        isHighlighted:
+                            false
+                    )
+                )
+            }
+            pieces.append(
+                LocalDocumentLinePiece(
+                    id:
+                        singleLineSegmentID(
+                            segment.id
+                        ),
+                    text: source.substring(
+                        with:
+                            segment.utf16Range
+                    ),
+                    isHighlighted:
+                        speechController
+                        .currentSegment?.id
+                            == segment.id
+                )
+            )
+            cursor = NSMaxRange(
+                segment.utf16Range
+            )
+        }
+        if cursor < source.length {
+            pieces.append(
+                LocalDocumentLinePiece(
+                    id:
+                        "line-\(line.index)-tail-\(cursor)",
+                    text: source.substring(
+                        from: cursor
+                    ),
+                    isHighlighted: false
+                )
+            )
+        }
+        return pieces
+    }
+
+    private func singleLineStartID(
+        for line: LocalDocumentLine
+    ) -> String {
+        "line-\(line.index)-start"
+    }
+
+    private func singleLineSegmentID(
+        _ segmentID: Int
+    ) -> String {
+        "document-sentence-\(segmentID)"
+    }
+
+    private func singleLineTargetID(
+        for line: LocalDocumentLine
+    ) -> String {
+        guard let segment =
+                speechController
+                .currentSegment,
+              segment.lineIndex
+                == line.index else {
+            return singleLineStartID(
+                for: line
+            )
+        }
+        return singleLineSegmentID(
+            segment.id
+        )
+    }
+
+    private func speechAccessibilityValue(
+        for line: LocalDocumentLine
+    ) -> String {
+        guard let segment =
+                speechController
+                .currentSegment,
+              segment.lineIndex
+                == line.index else {
+            return ""
+        }
+        return AppLocalization.format(
+            "현재 발화 문장, %@",
+            segment.text
+        )
+    }
+
+    @MainActor
+    private func scrollToCurrentLine(
+        lines: [LocalDocumentLine],
+        proxy: ScrollViewProxy,
+        anchor: UnitPoint
+    ) async {
+        guard lines.indices.contains(
+                  currentLineIndex
+              ) else {
+            return
+        }
+        await Task.yield()
+        withAnimation(
+            .easeInOut(
+                duration: 0.2
+            )
+        ) {
+            proxy.scrollTo(
+                currentLineIndex,
+                anchor: anchor
+            )
+        }
+    }
+
+    private var speechBar: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+            HStack {
+                Label(
+                    "문장 음성",
+                    systemImage:
+                        "text.bubble.waveform"
+                )
+                .font(.subheadline.bold())
+                Spacer()
+                Text(
+                    speechController
+                        .currentPositionDescription
+                        ?? "현재 줄에서 시작"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 12) {
+                documentSpeechButton(
+                    title: "이전 문장",
+                    systemImage:
+                        "backward.end.fill"
+                ) {
+                    _ = speechController
+                        .previous(
+                            text:
+                                viewModel.text,
+                            startingAtLine:
+                                currentLineIndex
+                        )
+                }
+
+                documentSpeechButton(
+                    title:
+                        "현재 문장 다시 읽기",
+                    systemImage:
+                        "arrow.counterclockwise"
+                ) {
+                    _ = speechController
+                        .replay(
+                            text:
+                                viewModel.text,
+                            startingAtLine:
+                                currentLineIndex
+                        )
+                }
+
+                documentSpeechButton(
+                    title:
+                        speechController
+                            .isSpeaking
+                            ? "문서 읽기 정지"
+                            : "문서 읽기",
+                    systemImage:
+                        speechController
+                            .isSpeaking
+                            ? "stop.fill"
+                            : "play.fill"
+                ) {
+                    _ = speechController
+                        .toggle(
+                            text:
+                                viewModel.text,
+                            startingAtLine:
+                                currentLineIndex
+                        )
+                }
+
+                documentSpeechButton(
+                    title: "다음 문장",
+                    systemImage:
+                        "forward.end.fill"
+                ) {
+                    _ = speechController
+                        .next(
+                            text:
+                                viewModel.text,
+                            startingAtLine:
+                                currentLineIndex
+                        )
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.bar)
+        .accessibilityElement(
+            children: .contain
+        )
+    }
+
+    private func documentSpeechButton(
+        title: String,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .frame(
+                    maxWidth: .infinity
+                )
+        }
+        .buttonStyle(.bordered)
+        .accessibilityLabel(title)
     }
 
     private var navigationBar: some View {
@@ -678,6 +1082,15 @@ struct LocalDocumentView: View {
                             $appearance
                             .showsLineSeparators
                     )
+                    Toggle(
+                        "가로 화면 한 줄 읽기",
+                        isOn:
+                            $appearance
+                            .usesSingleLineInLandscape
+                    )
+                    .accessibilityHint(
+                        "iPad를 가로로 돌리면 현재 논리 줄 하나를 줄바꿈 없이 표시합니다."
+                    )
                 }
 
                 Section("색상") {
@@ -768,6 +1181,81 @@ struct LocalDocumentView: View {
         displayMode == .text
             && !isEditing
             && !viewModel.text.isEmpty
+    }
+
+    private func usesSingleLineLayout(
+        size: CGSize
+    ) -> Bool {
+        LocalDocumentLayoutPolicy
+            .usesSingleLine(
+                preferenceEnabled:
+                    appearance
+                    .usesSingleLineInLandscape,
+                width: size.width,
+                height: size.height
+            )
+    }
+
+    private func attributedText(
+        for line: LocalDocumentLine
+    ) -> AttributedString {
+        let source =
+            line.text.isEmpty
+            ? " "
+            : line.text
+        guard let segment =
+                speechController
+                .currentSegment,
+              segment.lineIndex
+                == line.index,
+              !line.text.isEmpty else {
+            return AttributedString(source)
+        }
+        let sourceText =
+            line.text as NSString
+        let range = segment.utf16Range
+        guard range.location != NSNotFound,
+              range.location >= 0,
+              range.length > 0,
+              NSMaxRange(range)
+                <= sourceText.length else {
+            return AttributedString(source)
+        }
+
+        var result = AttributedString(
+            sourceText.substring(
+                to: range.location
+            )
+        )
+        var highlighted =
+            AttributedString(
+                sourceText.substring(
+                    with: range
+                )
+            )
+        highlighted.backgroundColor =
+            documentForeground.opacity(0.28)
+        result += highlighted
+        result += AttributedString(
+            sourceText.substring(
+                from: NSMaxRange(range)
+            )
+        )
+        return result
+    }
+
+    private func startDocumentReading() {
+        guard speechController.play(
+            text: viewModel.text,
+            startingAtLine:
+                currentLineIndex
+        ) else {
+            feedback =
+                "읽을 문서 텍스트가 없습니다."
+            return
+        }
+        feedback =
+            "\(currentLineIndex + 1)번째 줄부터 문장 읽기를 시작했습니다."
     }
 
     private var documentTheme:
@@ -978,29 +1466,25 @@ struct LocalDocumentView: View {
     }
 
     private func toggleDocumentReadingFromRemote() {
-        if tts.isSpeaking {
-            tts.stop()
+        if speechController.isSpeaking {
+            speechController.stop()
             announceRemoteFeedback(
                 "문서 읽기를 중지했습니다."
             )
             return
         }
-        let text =
-            LocalDocumentTextSegmenter.text(
-                fromLine: currentLineIndex,
-                in: viewModel.text
-            )
-        guard !text.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        ).isEmpty else {
+        guard speechController.play(
+            text: viewModel.text,
+            startingAtLine:
+                currentLineIndex
+        ) else {
             announceRemoteFeedback(
                 "읽을 문서 텍스트가 없습니다."
             )
             return
         }
         feedback =
-            "\(currentLineIndex + 1)번째 줄부터 읽기를 시작했습니다."
-        tts.speak(text)
+            "\(currentLineIndex + 1)번째 줄부터 문장 읽기를 시작했습니다."
     }
 
     private func announceRemoteFeedback(
@@ -1119,6 +1603,14 @@ struct LocalDocumentView: View {
             question: trimmedQuestion
         )
     }
+}
+
+private struct LocalDocumentLinePiece:
+    Identifiable
+{
+    let id: String
+    let text: String
+    let isHighlighted: Bool
 }
 
 private nonisolated struct

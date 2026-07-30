@@ -410,3 +410,12 @@
 "M4 문맥 한도에 맞춰 첨부 내용 일부만 사용합니다. 저장된 첨부는 그대로 유지됩니다." = "Only part of the attachment is used to fit the M4 context limit. The saved attachment remains unchanged.";
 "M4 문맥 한도에 맞춰 질문 관련 첨부 구간 %lld/%lld개를 사용합니다. 저장된 첨부는 그대로 유지됩니다." = "To fit the M4 context limit, %lld of %lld attachment sections relevant to the question are used. The saved attachment remains unchanged.";
 "M4 문맥 한도에 맞춰 오래된 메시지 %lld개를 제외하고 질문 관련 첨부 구간 %lld/%lld개를 사용합니다. 저장된 기록과 첨부는 그대로 유지됩니다." = "To fit the M4 context limit, %lld older messages were omitted and %lld of %lld attachment sections relevant to the question are used. Saved history and attachments remain unchanged.";
+"가로 화면 한 줄 읽기" = "Single-Line Reading in Landscape";
+"iPad를 가로로 돌리면 현재 논리 줄 하나를 줄바꿈 없이 표시합니다." = "When iPad is in landscape, show the current logical line without wrapping.";
+"문장 음성" = "Sentence Speech";
+"현재 줄에서 시작" = "Start from Current Line";
+"문서 문장 %lld/%lld" = "Document sentence %lld of %lld";
+"문서 읽기" = "Read Document";
+"문서 읽기 정지" = "Stop Reading Document";
+"한 줄 읽기, 빈 줄" = "Single-line reading, blank line";
+"현재 발화 문장, %@" = "Current spoken sentence, %@";

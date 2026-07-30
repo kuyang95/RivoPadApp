@@ -126,7 +126,9 @@ final class LocalDocumentImportTests: XCTestCase {
                 fontLevel: 99,
                 lineHeightLevel: -5,
                 colorIndex: 999,
-                showsLineSeparators: true
+                showsLineSeparators: true,
+                usesSingleLineInLandscape:
+                    true
             )
         )
 
@@ -138,8 +140,89 @@ final class LocalDocumentImportTests: XCTestCase {
                 colorIndex:
                     LocalDocumentColorTheme
                     .all.count - 1,
-                showsLineSeparators: true
+                showsLineSeparators: true,
+                usesSingleLineInLandscape:
+                    true
             )
+        )
+    }
+
+    func testDocumentAppearanceMigratesLegacySavedValues()
+        throws
+    {
+        let suiteName =
+            "LocalDocumentLegacyAppearance-"
+            + UUID().uuidString
+        let defaults =
+            try XCTUnwrap(
+                UserDefaults(
+                    suiteName: suiteName
+                )
+            )
+        defer {
+            defaults.removePersistentDomain(
+                forName: suiteName
+            )
+        }
+        defaults.set(
+            try XCTUnwrap(
+                """
+                {
+                  "fontLevel": 7,
+                  "lineHeightLevel": 4,
+                  "colorIndex": 2,
+                  "showsLineSeparators": true
+                }
+                """.data(using: .utf8)
+            ),
+            forKey: "appearance"
+        )
+
+        let appearance =
+            LocalDocumentAppearanceStore(
+                defaults: defaults,
+                key: "appearance"
+            )
+            .load()
+
+        XCTAssertEqual(
+            appearance.fontLevel,
+            7
+        )
+        XCTAssertTrue(
+            appearance.showsLineSeparators
+        )
+        XCTAssertFalse(
+            appearance
+                .usesSingleLineInLandscape
+        )
+    }
+
+    func testSingleLineLayoutRequiresLandscapeAndPreference()
+    {
+        XCTAssertTrue(
+            LocalDocumentLayoutPolicy
+                .usesSingleLine(
+                    preferenceEnabled: true,
+                    width: 1_024,
+                    height: 768
+                )
+        )
+        XCTAssertFalse(
+            LocalDocumentLayoutPolicy
+                .usesSingleLine(
+                    preferenceEnabled: true,
+                    width: 768,
+                    height: 1_024
+                )
+        )
+        XCTAssertFalse(
+            LocalDocumentLayoutPolicy
+                .usesSingleLine(
+                    preferenceEnabled: false,
+                    width: 1_024,
+                    height: 768
+                )
         )
     }
 
@@ -250,5 +333,163 @@ final class LocalDocumentImportTests: XCTestCase {
                     "문서 내보내기"
                 ) == true
         )
+    }
+
+    func testDocumentSentenceSegmentsKeepLineAndExactRanges()
+    {
+        let text =
+            """
+              첫 문장입니다. 둘째입니다!
+
+            마지막 줄
+            """
+        let segments =
+            LocalDocumentSentenceSegmenter
+            .segments(in: text)
+
+        XCTAssertEqual(
+            segments.map(\.text),
+            [
+                "첫 문장입니다.",
+                "둘째입니다!",
+                "마지막 줄",
+            ]
+        )
+        XCTAssertEqual(
+            segments.map(\.lineIndex),
+            [0, 0, 2]
+        )
+        let firstLine =
+            (
+                LocalDocumentTextSegmenter
+                    .lines(in: text)
+                    .first?
+                    .text
+                ?? ""
+            ) as NSString
+        XCTAssertEqual(
+            firstLine.substring(
+                with:
+                    segments[0].utf16Range
+            ),
+            "첫 문장입니다."
+        )
+    }
+
+    func testDocumentSpeechSelectionStartsAtVisibleLine()
+    {
+        var selection =
+            LocalDocumentSpeechSelection(
+                text:
+                    "첫째입니다. 둘째입니다.\n\n셋째입니다.",
+                startingAtLine: 2
+            )
+
+        XCTAssertEqual(
+            selection.currentSegment?.text,
+            "셋째입니다."
+        )
+        XCTAssertTrue(
+            selection.movePrevious()
+        )
+        XCTAssertEqual(
+            selection.currentSegment?.text,
+            "둘째입니다."
+        )
+        XCTAssertTrue(
+            selection.canMovePrevious
+        )
+        XCTAssertTrue(
+            selection.canMoveNext
+        )
+    }
+
+    func testDocumentSpeechControllerAdvancesAndStops()
+    {
+        let synthesizer =
+            TestDocumentSpeechSynthesizer()
+        let controller =
+            LocalDocumentSpeechController(
+                tts: synthesizer
+            )
+
+        XCTAssertTrue(
+            controller.play(
+                text:
+                    "첫 문장입니다. 둘째입니다.",
+                startingAtLine: 0
+            )
+        )
+        XCTAssertEqual(
+            synthesizer.spokenTexts,
+            ["첫 문장입니다."]
+        )
+        synthesizer.finishCurrent()
+        XCTAssertEqual(
+            synthesizer.spokenTexts,
+            [
+                "첫 문장입니다.",
+                "둘째입니다.",
+            ]
+        )
+        XCTAssertEqual(
+            controller.currentSegment?
+                .text,
+            "둘째입니다."
+        )
+        synthesizer.finishCurrent()
+        XCTAssertFalse(
+            controller.isSpeaking
+        )
+
+        _ = controller.previous(
+            text:
+                "첫 문장입니다. 둘째입니다.",
+            startingAtLine: 0
+        )
+        XCTAssertEqual(
+            synthesizer.spokenTexts.last,
+            "첫 문장입니다."
+        )
+        let staleCompletion =
+            synthesizer.completion
+        controller.stop()
+        staleCompletion?()
+        XCTAssertFalse(
+            controller.isSpeaking
+        )
+        XCTAssertEqual(
+            synthesizer.spokenTexts.last,
+            "첫 문장입니다."
+        )
+    }
+}
+
+@MainActor
+private final class
+    TestDocumentSpeechSynthesizer:
+    LocalDocumentSpeechSynthesizing
+{
+    private(set) var spokenTexts:
+        [String] = []
+    var completion: (() -> Void)?
+
+    func speak(
+        _ text: String,
+        rate: Float?,
+        completion: (() -> Void)?
+    ) {
+        spokenTexts.append(text)
+        self.completion = completion
+    }
+
+    func stop() {
+        completion = nil
+    }
+
+    func finishCurrent() {
+        let current = completion
+        completion = nil
+        current?()
     }
 }

@@ -225,6 +225,12 @@ struct AppSettingsView: View {
                     $documentAppearance
                     .showsLineSeparators
             )
+            Toggle(
+                "가로 화면 한 줄 읽기",
+                isOn:
+                    $documentAppearance
+                    .usesSingleLineInLandscape
+            )
         }
     }
 
