@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9EA600022FA6000100000002 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 9EA600032FA6000100000003 /* ZIPFoundation */; };
+		9EA600042FA6000100000004 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 9EA600032FA6000100000003 /* ZIPFoundation */; };
 		9E0351482F4BF88000D864AF /* MLXEmbedders in Frameworks */ = {isa = PBXBuildFile; productRef = 9E0351472F4BF88000D864AF /* MLXEmbedders */; };
 		9E03514A2F4BF88000D864AF /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = 9E0351492F4BF88000D864AF /* MLXLLM */; };
 		9E03514C2F4BF88000D864AF /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 9E03514B2F4BF88000D864AF /* MLXLMCommon */; };
@@ -228,6 +230,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9EA600042FA6000100000004 /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -235,6 +238,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9EA600022FA6000100000002 /* ZIPFoundation in Frameworks */,
 				9E03514A2F4BF88000D864AF /* MLXLLM in Frameworks */,
 				9E03514C2F4BF88000D864AF /* MLXLMCommon in Frameworks */,
 				9E03514E2F4BF88000D864AF /* MLXVLM in Frameworks */,
@@ -418,6 +422,7 @@
 			);
 			name = shortcuts_exampleTests;
 			packageProductDependencies = (
+				9EA600032FA6000100000003 /* ZIPFoundation */,
 			);
 			productName = shortcuts_exampleTests;
 			productReference = 9E5CB1002F6B000100000001 /* shortcuts_exampleTests.xctest */;
@@ -448,6 +453,7 @@
 			);
 			name = shortcuts_example;
 			packageProductDependencies = (
+				9EA600032FA6000100000003 /* ZIPFoundation */,
 				9E0351472F4BF88000D864AF /* MLXEmbedders */,
 				9E0351492F4BF88000D864AF /* MLXLLM */,
 				9E03514B2F4BF88000D864AF /* MLXLMCommon */,
@@ -574,6 +580,7 @@
 			mainGroup = 9E901E8E2F2C4D010028581D;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				9EA600012FA6000100000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 				9E0351462F4BF88000D864AF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
 				9E5CA0012F6A000100000001 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */,
 				9E71A0002F7D000100000001 /* XCRemoteSwiftPackageReference "stream-video-swift-webrtc" */,
@@ -1519,6 +1526,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		9EA600012FA6000100000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/weichsel/ZIPFoundation.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.9.20;
+			};
+		};
 		9E0351462F4BF88000D864AF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm/";
@@ -1546,6 +1561,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		9EA600032FA6000100000003 /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9EA600012FA6000100000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
+		};
 		9E0351472F4BF88000D864AF /* MLXEmbedders */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9E0351462F4BF88000D864AF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;

@@ -114,6 +114,13 @@ final class AppLocalizationTests:
             ),
             "次の行動"
         )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "선택한 XLSX 문서를 읽을 수 없습니다.",
+                bundle: english
+            ),
+            "The selected XLSX document could not be read."
+        )
     }
 
     func testDynamicFormatTranslationsPreserveArguments()
@@ -191,6 +198,16 @@ final class AppLocalizationTests:
                     ),
                 3
             )
+        let englishSelectedSections =
+            String(
+                format:
+                    AppLocalization.string(
+                        "M4 문맥 한도에 맞춰 질문 관련 첨부 구간 %lld/%lld개를 사용합니다. 저장된 첨부는 그대로 유지됩니다.",
+                        bundle: english
+                    ),
+                2,
+                7
+            )
 
         XCTAssertEqual(englishRate, "1.25×")
         XCTAssertEqual(
@@ -220,6 +237,10 @@ final class AppLocalizationTests:
         XCTAssertEqual(
             japaneseAttachmentCount,
             "テキストコンテキスト3件"
+        )
+        XCTAssertEqual(
+            englishSelectedSections,
+            "To fit the M4 context limit, 2 of 7 attachment sections relevant to the question are used. The saved attachment remains unchanged."
         )
     }
 

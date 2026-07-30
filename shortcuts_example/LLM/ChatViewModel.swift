@@ -533,6 +533,20 @@ final class ChatViewModel: ObservableObject {
                 try await replaceFileAttachment(
                     attachment
                 )
+            } else if pathExtension
+                        == "xlsx" {
+                let attachment =
+                    try await attachmentStore
+                    .importSpreadsheet(
+                        from: url
+                    )
+                try await replaceFileAttachment(
+                    attachment
+                )
+            } else if pathExtension
+                        == "xls" {
+                throw ChatAttachmentError
+                    .unsupportedLegacySpreadsheet
             } else if pathExtension == "txt"
                         || pathExtension == "text" {
                 let text = try await
@@ -769,26 +783,27 @@ final class ChatViewModel: ObservableObject {
         attachmentStatusDescription = nil
         attachmentErrorDescription = nil
 
+        let attachmentBudget =
+            hasAttachmentContext
+            ? max(
+                800,
+                replayCharacterLimit
+                    * 2 / 3
+            )
+            : 0
+        let attachmentContext =
+            ChatAttachmentPromptBuilder
+            .context(
+                textContexts:
+                    textContexts,
+                fileAttachment:
+                    fileAttachment,
+                maximumCharacters:
+                    attachmentBudget,
+                query: prompt
+            )
         let modelPrompt: String
         if needsContextReplay {
-            let attachmentBudget =
-                hasAttachmentContext
-                ? max(
-                    800,
-                    replayCharacterLimit
-                        * 2 / 3
-                )
-                : 0
-            let attachmentContext =
-                ChatAttachmentPromptBuilder
-                .context(
-                    textContexts:
-                        textContexts,
-                    fileAttachment:
-                        fileAttachment,
-                    maximumCharacters:
-                        attachmentBudget
-                )
             let replayBudget = max(
                 600,
                 replayCharacterLimit
@@ -821,9 +836,13 @@ final class ChatViewModel: ObservableObject {
                attachmentContext.isTruncated {
                 contextNoticeDescription =
                     AppLocalization.format(
-                        "M4 문맥 한도에 맞춰 오래된 메시지 %lld개와 첨부 내용 일부를 제외했습니다. 저장된 기록과 첨부는 그대로 유지됩니다.",
+                        "M4 문맥 한도에 맞춰 오래된 메시지 %lld개를 제외하고 질문 관련 첨부 구간 %lld/%lld개를 사용합니다. 저장된 기록과 첨부는 그대로 유지됩니다.",
                         replay
-                            .omittedMessageCount
+                            .omittedMessageCount,
+                        attachmentContext
+                            .selectedChunkCount,
+                        attachmentContext
+                            .totalChunkCount
                     )
             } else if replay.isTruncated {
                 contextNoticeDescription =
@@ -835,8 +854,38 @@ final class ChatViewModel: ObservableObject {
             } else if attachmentContext
                 .isTruncated {
                 contextNoticeDescription =
-                    AppLocalization.string(
-                        "M4 문맥 한도에 맞춰 첨부 내용 일부만 사용합니다. 저장된 첨부는 그대로 유지됩니다."
+                    AppLocalization.format(
+                        "M4 문맥 한도에 맞춰 질문 관련 첨부 구간 %lld/%lld개를 사용합니다. 저장된 첨부는 그대로 유지됩니다.",
+                        attachmentContext
+                            .selectedChunkCount,
+                        attachmentContext
+                            .totalChunkCount
+                    )
+            } else {
+                contextNoticeDescription =
+                    nil
+            }
+        } else if hasAttachmentContext {
+            modelPrompt =
+                ChatAttachmentPromptBuilder
+                .prompt(
+                    context:
+                        attachmentContext.text,
+                    imageName:
+                        fileAttachment?.kind
+                            == .image
+                        ? fileAttachment?.name
+                        : nil,
+                    conversationPrompt: prompt
+                )
+            if attachmentContext.isTruncated {
+                contextNoticeDescription =
+                    AppLocalization.format(
+                        "M4 문맥 한도에 맞춰 질문 관련 첨부 구간 %lld/%lld개를 사용합니다. 저장된 첨부는 그대로 유지됩니다.",
+                        attachmentContext
+                            .selectedChunkCount,
+                        attachmentContext
+                            .totalChunkCount
                     )
             } else {
                 contextNoticeDescription =
@@ -844,6 +893,7 @@ final class ChatViewModel: ObservableObject {
             }
         } else {
             modelPrompt = prompt
+            contextNoticeDescription = nil
         }
         messages.append(.init(role: "user", text: prompt, image: nil))
         conversationUpdatedAt = Date()

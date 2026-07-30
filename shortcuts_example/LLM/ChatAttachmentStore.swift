@@ -94,6 +94,10 @@ nonisolated enum ChatAttachmentError:
     case unsupportedDocument
     case invalidImage
     case invalidPDF
+    case invalidSpreadsheet
+    case encryptedSpreadsheet
+    case spreadsheetLimitExceeded
+    case unsupportedLegacySpreadsheet
     case documentHasNoText
     case fileTooLarge(maximumMegabytes: Int)
     case contextTooLarge(maximumKilobytes: Int)
@@ -107,7 +111,7 @@ nonisolated enum ChatAttachmentError:
             )
         case .unsupportedDocument:
             return AppLocalization.string(
-                "PDF와 TXT 문서만 첨부할 수 있습니다."
+                "PDF, TXT와 XLSX 문서만 첨부할 수 있습니다."
             )
         case .invalidImage:
             return AppLocalization.string(
@@ -116,6 +120,22 @@ nonisolated enum ChatAttachmentError:
         case .invalidPDF:
             return AppLocalization.string(
                 "선택한 PDF를 열 수 없습니다."
+            )
+        case .invalidSpreadsheet:
+            return AppLocalization.string(
+                "선택한 XLSX 문서를 읽을 수 없습니다."
+            )
+        case .encryptedSpreadsheet:
+            return AppLocalization.string(
+                "암호화된 XLSX 문서는 로컬에서 열 수 없습니다. 암호를 해제한 복사본을 첨부해 주세요."
+            )
+        case .spreadsheetLimitExceeded:
+            return AppLocalization.string(
+                "XLSX 문서가 시트·행·셀 또는 압축 해제 제한을 초과했습니다."
+            )
+        case .unsupportedLegacySpreadsheet:
+            return AppLocalization.string(
+                "구형 XLS 문서는 아직 지원하지 않습니다. XLSX로 저장한 뒤 다시 첨부해 주세요."
             )
         case .documentHasNoText:
             return AppLocalization.string(
@@ -145,7 +165,7 @@ nonisolated enum ChatAttachmentError:
 
 nonisolated enum ChatAttachmentContextPolicy {
     static let maximumStoredTextBytes =
-        256 * 1_024
+        1_024 * 1_024
 
     static func appending(
         name rawName: String,
@@ -206,6 +226,8 @@ nonisolated struct ChatAttachmentPromptContext:
 {
     let text: String
     let isTruncated: Bool
+    let selectedChunkCount: Int
+    let totalChunkCount: Int
 }
 
 nonisolated enum ChatAttachmentPromptBuilder {
@@ -214,10 +236,14 @@ nonisolated enum ChatAttachmentPromptBuilder {
             [StoredChatTextContext],
         fileAttachment:
             StoredChatFileAttachment?,
-        maximumCharacters: Int
+        maximumCharacters: Int,
+        query: String = ""
     ) -> ChatAttachmentPromptContext {
-        var blocks = textContexts.map {
-            "[\(safe($0.name))]\n\(safe($0.text))"
+        var sources = textContexts.map {
+            ChatAttachmentSource(
+                name: safe($0.name),
+                text: safe($0.text)
+            )
         }
         if let fileAttachment,
            fileAttachment.kind == .document,
@@ -227,42 +253,78 @@ nonisolated enum ChatAttachmentPromptBuilder {
                     in: .whitespacesAndNewlines
                 ),
            !extracted.isEmpty {
-            blocks.append(
-                "[\(safe(fileAttachment.name))]\n"
-                    + safe(extracted)
+            sources.append(
+                ChatAttachmentSource(
+                    name:
+                        safe(
+                            fileAttachment
+                                .name
+                        ),
+                    text: safe(extracted)
+                )
             )
         }
 
         guard maximumCharacters > 0,
-              !blocks.isEmpty else {
+              !sources.isEmpty else {
             return ChatAttachmentPromptContext(
                 text: "",
                 isTruncated:
-                    !blocks.isEmpty
+                    !sources.isEmpty,
+                selectedChunkCount: 0,
+                totalChunkCount:
+                    sources.isEmpty ? 0 : 1
             )
         }
 
-        var selected: [String] = []
+        let chunks = makeChunks(
+            sources: sources
+        )
+        guard !chunks.isEmpty else {
+            return ChatAttachmentPromptContext(
+                text: "",
+                isTruncated: false,
+                selectedChunkCount: 0,
+                totalChunkCount: 0
+            )
+        }
+
+        let ranked = rankedChunks(
+            chunks,
+            query: query
+        )
+        var selected:
+            [ChatAttachmentChunk] = []
+        var selectedIDs: Set<Int> = []
         var remaining = maximumCharacters
-        var didTruncate = false
-        for block in blocks.reversed() {
+        var didClipChunk = false
+
+        for chunk in ranked {
+            guard !selectedIDs
+                .contains(chunk.id) else {
+                continue
+            }
+            let block = chunk.rendered
             let separatorCount =
                 selected.isEmpty ? 0 : 2
-            guard remaining > separatorCount
-            else {
-                didTruncate = true
+            guard remaining
+                    > separatorCount else {
                 break
             }
             let available =
                 remaining - separatorCount
             if block.count <= available {
-                selected.append(block)
+                selected.append(chunk)
+                selectedIDs.insert(chunk.id)
                 remaining -=
                     block.count
                     + separatorCount
                 continue
             }
 
+            guard selected.isEmpty else {
+                continue
+            }
             let marker =
                 AppLocalization.string(
                     "\n[첨부 내용 일부 생략]"
@@ -276,26 +338,45 @@ nonisolated enum ChatAttachmentPromptBuilder {
             )
             if !clipped.isEmpty {
                 selected.append(
-                    clipped + marker
+                    chunk.withRendered(
+                        clipped + marker
+                    )
                 )
             } else if available > 0 {
                 selected.append(
-                    String(
-                        block.prefix(available)
+                    chunk.withRendered(
+                        String(
+                            block.prefix(
+                                available
+                            )
+                        )
                     )
                 )
             }
-            didTruncate = true
-            break
-        }
-        if selected.count < blocks.count {
-            didTruncate = true
+            selectedIDs.insert(chunk.id)
+            didClipChunk = true
         }
 
+        let ordered = selected.sorted {
+            if $0.sourceIndex
+                != $1.sourceIndex {
+                return $0.sourceIndex
+                    < $1.sourceIndex
+            }
+            return $0.chunkIndex
+                < $1.chunkIndex
+        }
         return ChatAttachmentPromptContext(
-            text: selected.reversed()
+            text: ordered.map(\.rendered)
                 .joined(separator: "\n\n"),
-            isTruncated: didTruncate
+            isTruncated:
+                didClipChunk
+                || selectedIDs.count
+                    < chunks.count,
+            selectedChunkCount:
+                selectedIDs.count,
+            totalChunkCount:
+                chunks.count
         )
     }
 
@@ -345,6 +426,438 @@ nonisolated enum ChatAttachmentPromptBuilder {
                 with: "›"
             )
     }
+
+    private static func makeChunks(
+        sources: [ChatAttachmentSource]
+    ) -> [ChatAttachmentChunk] {
+        var chunks: [ChatAttachmentChunk] = []
+        var nextID = 0
+        for (
+            sourceIndex,
+            source
+        ) in sources.enumerated() {
+            let pieces = chunkText(
+                source.text
+            )
+            for (
+                chunkIndex,
+                text
+            ) in pieces.enumerated() {
+                chunks.append(
+                    ChatAttachmentChunk(
+                        id: nextID,
+                        sourceIndex:
+                            sourceIndex,
+                        chunkIndex:
+                            chunkIndex,
+                        chunkCount:
+                            pieces.count,
+                        sourceName:
+                            source.name,
+                        text: text
+                    )
+                )
+                nextID += 1
+            }
+        }
+        return chunks
+    }
+
+    private static func chunkText(
+        _ text: String,
+        targetCharacters: Int = 820,
+        overlapCharacters: Int = 100
+    ) -> [String] {
+        let normalized = text
+            .replacingOccurrences(
+                of: "\r\n",
+                with: "\n"
+            )
+            .replacingOccurrences(
+                of: "\r",
+                with: "\n"
+            )
+            .trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+        guard !normalized.isEmpty else {
+            return []
+        }
+
+        var chunks: [String] = []
+        var current = ""
+        let lines = normalized.split(
+            separator: "\n",
+            omittingEmptySubsequences: false
+        )
+        for lineValue in lines {
+            let line = String(lineValue)
+                .trimmingCharacters(
+                    in: .whitespaces
+                )
+            guard !line.isEmpty else {
+                if !current.isEmpty,
+                   !current.hasSuffix("\n") {
+                    current += "\n"
+                }
+                continue
+            }
+            if line.count
+                > targetCharacters {
+                flushChunk(
+                    &current,
+                    into: &chunks
+                )
+                chunks.append(
+                    contentsOf:
+                        fixedChunks(
+                            line,
+                            targetCharacters:
+                                targetCharacters,
+                            overlapCharacters:
+                                overlapCharacters
+                        )
+                )
+                continue
+            }
+
+            let separator =
+                current.isEmpty ? "" : "\n"
+            if current.count
+                + separator.count
+                + line.count
+                > targetCharacters {
+                flushChunk(
+                    &current,
+                    into: &chunks
+                )
+            }
+            if !current.isEmpty {
+                current += "\n"
+            }
+            current += line
+        }
+        flushChunk(
+            &current,
+            into: &chunks
+        )
+        return chunks
+    }
+
+    private static func fixedChunks(
+        _ text: String,
+        targetCharacters: Int,
+        overlapCharacters: Int
+    ) -> [String] {
+        var result: [String] = []
+        var start = text.startIndex
+        while start < text.endIndex {
+            let end = text.index(
+                start,
+                offsetBy:
+                    targetCharacters,
+                limitedBy: text.endIndex
+            ) ?? text.endIndex
+            result.append(
+                String(text[start..<end])
+            )
+            guard end < text.endIndex
+            else {
+                break
+            }
+            start = text.index(
+                end,
+                offsetBy:
+                    -min(
+                        overlapCharacters,
+                        text.distance(
+                            from: start,
+                            to: end
+                        ) - 1
+                    )
+            )
+        }
+        return result
+    }
+
+    private static func flushChunk(
+        _ current: inout String,
+        into chunks: inout [String]
+    ) {
+        let trimmed =
+            current.trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+        if !trimmed.isEmpty {
+            chunks.append(trimmed)
+        }
+        current = ""
+    }
+
+    private static func rankedChunks(
+        _ chunks: [ChatAttachmentChunk],
+        query: String
+    ) -> [ChatAttachmentChunk] {
+        let queryTerms = searchableTerms(
+            query
+        )
+        let scored = chunks.map {
+            chunk in
+            (
+                chunk,
+                relevanceScore(
+                    chunk,
+                    queryTerms:
+                        queryTerms
+                )
+            )
+        }
+        let hasRelevantChunk =
+            scored.contains {
+                $0.1 > 0
+            }
+        if hasRelevantChunk {
+            return scored.sorted {
+                if $0.1 != $1.1 {
+                    return $0.1 > $1.1
+                }
+                if $0.0.sourceIndex
+                    != $1.0.sourceIndex {
+                    return $0.0.sourceIndex
+                        > $1.0.sourceIndex
+                }
+                return $0.0.chunkIndex
+                    < $1.0.chunkIndex
+            }
+            .map(\.0)
+        }
+
+        var priorities: [Int] = []
+        let grouped = Dictionary(
+            grouping: chunks,
+            by: \.sourceIndex
+        )
+        for sourceIndex in grouped
+            .keys.sorted(by: >) {
+            guard let sourceChunks =
+                    grouped[sourceIndex]?
+                    .sorted(by: {
+                        $0.chunkIndex
+                            < $1.chunkIndex
+                    }),
+                  !sourceChunks.isEmpty
+            else {
+                continue
+            }
+            let indexes = [
+                0,
+                sourceChunks.count - 1,
+                sourceChunks.count / 2,
+                sourceChunks.count / 4,
+                sourceChunks.count * 3 / 4,
+            ]
+            for index in indexes
+            where sourceChunks.indices
+                .contains(index) {
+                let id =
+                    sourceChunks[index].id
+                if !priorities.contains(id) {
+                    priorities.append(id)
+                }
+            }
+        }
+        priorities.append(
+            contentsOf:
+                chunks.reversed()
+                    .map(\.id)
+        )
+        let byID = Dictionary(
+            uniqueKeysWithValues:
+                chunks.map {
+                    ($0.id, $0)
+                }
+        )
+        var used: Set<Int> = []
+        return priorities.compactMap {
+            identifier in
+            guard used.insert(
+                identifier
+            ).inserted else {
+                return nil
+            }
+            return byID[identifier]
+        }
+    }
+
+    private static func relevanceScore(
+        _ chunk: ChatAttachmentChunk,
+        queryTerms: Set<String>
+    ) -> Int {
+        guard !queryTerms.isEmpty else {
+            return 0
+        }
+        let bodyTerms = searchableTerms(
+            chunk.text
+        )
+        let nameTerms = searchableTerms(
+            chunk.sourceName
+        )
+        let bodyMatches =
+            prefixMatchCount(
+                queryTerms,
+                in: bodyTerms
+            )
+        let nameMatches =
+            prefixMatchCount(
+                queryTerms,
+                in: nameTerms
+            )
+        return bodyMatches * 10
+            + nameMatches * 4
+    }
+
+    private static func prefixMatchCount(
+        _ queryTerms: Set<String>,
+        in candidateTerms: Set<String>
+    ) -> Int {
+        queryTerms.reduce(0) {
+            count,
+            queryTerm in
+            let didMatch =
+                candidateTerms.contains(
+                    queryTerm
+                )
+                || candidateTerms
+                    .contains {
+                        candidate in
+                        guard min(
+                            candidate.count,
+                            queryTerm.count
+                        ) >= 2 else {
+                            return false
+                        }
+                        return candidate
+                            .hasPrefix(
+                                queryTerm
+                            )
+                            || queryTerm
+                                .hasPrefix(
+                                    candidate
+                                )
+                    }
+            return count
+                + (didMatch ? 1 : 0)
+        }
+    }
+
+    private static func searchableTerms(
+        _ text: String
+    ) -> Set<String> {
+        let normalized = text.folding(
+            options: [
+                .caseInsensitive,
+                .diacriticInsensitive,
+                .widthInsensitive,
+            ],
+            locale:
+                Locale(
+                    identifier: "en_US_POSIX"
+                )
+        )
+        let baseTerms = normalized
+            .split {
+                !$0.isLetter
+                    && !$0.isNumber
+            }
+            .map(String.init)
+            .filter {
+                $0.count >= 2
+                    || $0.allSatisfy(
+                        \.isNumber
+                    )
+            }
+        var result = Set(baseTerms)
+        for term in baseTerms
+        where term.count >= 6 {
+            let characters = Array(term)
+            for index in 0..<(characters.count - 1) {
+                result.insert(
+                    String(
+                        characters[
+                            index...index + 1
+                        ]
+                    )
+                )
+            }
+        }
+        return result
+    }
+}
+
+private nonisolated struct
+    ChatAttachmentSource
+{
+    let name: String
+    let text: String
+}
+
+private nonisolated struct
+    ChatAttachmentChunk
+{
+    let id: Int
+    let sourceIndex: Int
+    let chunkIndex: Int
+    let chunkCount: Int
+    let sourceName: String
+    let text: String
+    private let renderedOverride: String?
+
+    init(
+        id: Int,
+        sourceIndex: Int,
+        chunkIndex: Int,
+        chunkCount: Int,
+        sourceName: String,
+        text: String,
+        renderedOverride: String? = nil
+    ) {
+        self.id = id
+        self.sourceIndex = sourceIndex
+        self.chunkIndex = chunkIndex
+        self.chunkCount = chunkCount
+        self.sourceName = sourceName
+        self.text = text
+        self.renderedOverride =
+            renderedOverride
+    }
+
+    var rendered: String {
+        if let renderedOverride {
+            return renderedOverride
+        }
+        if chunkCount == 1 {
+            return "[\(sourceName)]\n\(text)"
+        }
+        return "[\(sourceName) · "
+            + "\(chunkIndex + 1)/"
+            + "\(chunkCount)]\n\(text)"
+    }
+
+    func withRendered(
+        _ rendered: String
+    ) -> ChatAttachmentChunk {
+        ChatAttachmentChunk(
+            id: id,
+            sourceIndex: sourceIndex,
+            chunkIndex: chunkIndex,
+            chunkCount: chunkCount,
+            sourceName: sourceName,
+            text: text,
+            renderedOverride: rendered
+        )
+    }
 }
 
 actor ChatAttachmentStore {
@@ -356,6 +869,10 @@ actor ChatAttachmentStore {
         32 * 1_024 * 1_024
     static let maximumTextDocumentBytes =
         5 * 1_024 * 1_024
+    static let maximumSpreadsheetBytes =
+        XLSXTextExtractor
+        .maximumWorkbookBytes
+    static let maximumPDFPages = 100
 
     private let fileManager: FileManager
     private let attachmentDirectory: URL
@@ -509,6 +1026,53 @@ actor ChatAttachmentStore {
         }
     }
 
+    func importSpreadsheet(
+        from sourceURL: URL
+    ) throws -> StoredChatFileAttachment {
+        let data = try readSecurityScopedData(
+            at: sourceURL,
+            maximumBytes:
+                Self.maximumSpreadsheetBytes
+        )
+        let extracted =
+            try XLSXTextExtractor.extract(
+                from: data
+            )
+        let displayName = displayName(
+            sourceURL.lastPathComponent,
+            fallback:
+                AppLocalization.string(
+                    "첨부 스프레드시트.xlsx"
+                )
+        )
+        let storedName = newStoredName(
+            sourceName: displayName,
+            fallbackExtension: "xlsx"
+        )
+        let destination = try destinationURL(
+            storedName: storedName
+        )
+        do {
+            try data.write(
+                to: destination,
+                options: .atomic
+            )
+            return StoredChatFileAttachment(
+                name: displayName,
+                kind: .document,
+                mimeType:
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                storedName: storedName,
+                extractedText: extracted
+            )
+        } catch {
+            try? fileManager.removeItem(
+                at: destination
+            )
+            throw error
+        }
+    }
+
     func readTextDocument(
         from sourceURL: URL
     ) throws -> String {
@@ -526,18 +1090,17 @@ actor ChatAttachmentStore {
             throw ChatAttachmentError
                 .documentHasNoText
         }
-        guard text.utf8.count
-                <= ChatAttachmentContextPolicy
-                    .maximumStoredTextBytes else {
-            throw ChatAttachmentError
-                .contextTooLarge(
-                    maximumKilobytes:
-                        ChatAttachmentContextPolicy
-                        .maximumStoredTextBytes
-                        / 1_024
+        return limitedText(
+            text,
+            maximumBytes:
+                ChatAttachmentContextPolicy
+                .maximumStoredTextBytes
+                - 256,
+            marker:
+                AppLocalization.string(
+                    "\n\n[TXT 내용 일부 생략]"
                 )
-        }
-        return text
+        )
     }
 
     func existingURL(
@@ -626,10 +1189,17 @@ actor ChatAttachmentStore {
         }
         var pageTexts: [String] = []
         pageTexts.reserveCapacity(
-            document.pageCount
+            min(
+                document.pageCount,
+                Self.maximumPDFPages
+            )
         )
 
-        for pageIndex in 0..<document.pageCount {
+        let pagesToRead = min(
+            document.pageCount,
+            Self.maximumPDFPages
+        )
+        for pageIndex in 0..<pagesToRead {
             try Task.checkCancellation()
             guard let page =
                     document.page(
@@ -669,31 +1239,32 @@ actor ChatAttachmentStore {
                 }
             }
 
-            let currentBytes = pageTexts
-                .reduce(0) {
-                    $0 + $1.utf8.count + 2
-                }
-            guard currentBytes
-                    <= ChatAttachmentContextPolicy
-                        .maximumStoredTextBytes else {
-                throw ChatAttachmentError
-                    .contextTooLarge(
-                        maximumKilobytes:
-                            ChatAttachmentContextPolicy
-                            .maximumStoredTextBytes
-                            / 1_024
-                    )
-            }
         }
 
-        let text = pageTexts.joined(
+        var text = pageTexts.joined(
             separator: "\n\n"
         )
         guard !text.isEmpty else {
             throw ChatAttachmentError
                 .documentHasNoText
         }
-        return text
+        if document.pageCount > pagesToRead {
+            text += AppLocalization.format(
+                "\n\n[PDF %lld페이지 생략]",
+                document.pageCount
+                    - pagesToRead
+            )
+        }
+        return limitedText(
+            text,
+            maximumBytes:
+                ChatAttachmentContextPolicy
+                .maximumStoredTextBytes,
+            marker:
+                AppLocalization.string(
+                    "\n\n[PDF 내용 일부 생략]"
+                )
+        )
     }
 
     private func recognizeText(
@@ -767,6 +1338,40 @@ actor ChatAttachmentStore {
                         / 1_024
                 )
         }
+    }
+
+    private func limitedText(
+        _ text: String,
+        maximumBytes: Int,
+        marker: String
+    ) -> String {
+        guard text.utf8.count
+                > maximumBytes else {
+            return text
+        }
+        let markerBytes =
+            marker.utf8.count
+        let contentLimit = max(
+            0,
+            maximumBytes - markerBytes
+        )
+        var prefix = Data(
+            text.utf8.prefix(
+                contentLimit
+            )
+        )
+        while !prefix.isEmpty,
+              String(
+                  data: prefix,
+                  encoding: .utf8
+              ) == nil {
+            prefix.removeLast()
+        }
+        let clipped = String(
+            data: prefix,
+            encoding: .utf8
+        ) ?? ""
+        return clipped + marker
     }
 
     private func destinationURL(

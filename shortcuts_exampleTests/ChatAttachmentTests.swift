@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import XCTest
+import ZIPFoundation
 
 @testable import shortcuts_example
 
@@ -51,7 +52,7 @@ final class ChatAttachmentTests:
             XCTAssertEqual(
                 $0 as? ChatAttachmentError,
                 .contextTooLarge(
-                    maximumKilobytes: 256
+                    maximumKilobytes: 1_024
                 )
             )
         }
@@ -113,6 +114,59 @@ final class ChatAttachmentTests:
         XCTAssertTrue(
             prompt.contains(
                 "영수증‹사진›"
+            )
+        )
+    }
+
+    func testPromptSelectsQuestionRelevantLongDocumentChunks()
+    {
+        let filler = String(
+            repeating:
+                "일반 안내와 제품 소개입니다. ",
+            count: 100
+        )
+        let contexts = [
+            StoredChatTextContext(
+                name: "이용 약관.txt",
+                text:
+                    filler
+                    + "\n배송은 영업일 기준 이틀이 걸립니다."
+                    + filler
+                    + "\n환불 조건은 구매 후 30일 이내 신청입니다."
+                    + filler
+            ),
+        ]
+
+        let refund =
+            ChatAttachmentPromptBuilder
+            .context(
+                textContexts: contexts,
+                fileAttachment: nil,
+                maximumCharacters: 1_000,
+                query: "환불 조건이 뭐야?"
+            )
+        XCTAssertTrue(
+            refund.text.contains(
+                "환불 조건은 구매 후 30일"
+            )
+        )
+        XCTAssertTrue(refund.isTruncated)
+        XCTAssertLessThan(
+            refund.selectedChunkCount,
+            refund.totalChunkCount
+        )
+
+        let delivery =
+            ChatAttachmentPromptBuilder
+            .context(
+                textContexts: contexts,
+                fileAttachment: nil,
+                maximumCharacters: 1_000,
+                query: "배송 기간 알려줘"
+            )
+        XCTAssertTrue(
+            delivery.text.contains(
+                "배송은 영업일 기준 이틀"
             )
         )
     }
@@ -239,6 +293,109 @@ final class ChatAttachmentTests:
         XCTAssertNotNil(
             storedURL
         )
+    }
+
+    func testXLSXExtractsSheetsCellsAndStoresOriginal()
+        async throws
+    {
+        let fixture = try makeFixture()
+        defer {
+            try? FileManager.default
+                .removeItem(
+                    at: fixture.root
+                )
+        }
+        let source = fixture.root
+            .appendingPathComponent(
+                "sales.xlsx"
+            )
+        try makeXLSXData().write(
+            to: source
+        )
+
+        let attachment =
+            try await fixture.attachmentStore
+            .importSpreadsheet(
+                from: source
+            )
+
+        XCTAssertEqual(
+            attachment.kind,
+            .document
+        )
+        XCTAssertEqual(
+            attachment.mimeType,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        XCTAssertTrue(
+            attachment.extractedText?
+                .contains("[매출]") == true
+        )
+        XCTAssertTrue(
+            attachment.extractedText?
+                .contains(
+                    "제품\t수량\t활성"
+                ) == true
+        )
+        XCTAssertTrue(
+            attachment.extractedText?
+                .contains(
+                    "사과\t12\ttrue"
+                ) == true
+        )
+        XCTAssertTrue(
+            attachment.extractedText?
+                .contains("[메모]") == true
+        )
+        XCTAssertTrue(
+            attachment.extractedText?
+                .contains(
+                    "로컬 추출\t3.5"
+                ) == true
+        )
+        let storedURL =
+            await fixture.attachmentStore
+            .existingURL(
+                for: attachment
+            )
+        XCTAssertNotNil(storedURL)
+    }
+
+    func testXLSXRejectsMissingWorkbookParts()
+        throws
+    {
+        XCTAssertThrowsError(
+            try XLSXTextExtractor.extract(
+                from: makeZIPData(
+                    entries: [
+                        "xl/worksheets/sheet1.xml":
+                            "<worksheet/>",
+                    ]
+                )
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? ChatAttachmentError,
+                .invalidSpreadsheet
+            )
+        }
+    }
+
+    func testXLSXRejectsEncryptedOLEContainer()
+    {
+        XCTAssertThrowsError(
+            try XLSXTextExtractor.extract(
+                from: Data([
+                    0xD0, 0xCF, 0x11, 0xE0,
+                    0xA1, 0xB1, 0x1A, 0xE1,
+                ])
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? ChatAttachmentError,
+                .encryptedSpreadsheet
+            )
+        }
     }
 
     func testHistoryRoundTripsContextsAndCleansReplacedFile()
@@ -433,5 +590,122 @@ final class ChatAttachmentTests:
                 )
             )
         }
+    }
+
+    private func makeXLSXData()
+        throws -> Data
+    {
+        try makeZIPData(
+            entries: [
+                "xl/workbook.xml":
+                    """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                      xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+                      <sheets>
+                        <sheet name="매출" sheetId="1" r:id="rId1"/>
+                        <sheet name="메모" sheetId="2" r:id="rId2"/>
+                      </sheets>
+                    </workbook>
+                    """,
+                "xl/_rels/workbook.xml.rels":
+                    """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+                      <Relationship Id="rId1"
+                        Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"
+                        Target="worksheets/sheet1.xml"/>
+                      <Relationship Id="rId2"
+                        Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"
+                        Target="worksheets/sheet2.xml"/>
+                    </Relationships>
+                    """,
+                "xl/sharedStrings.xml":
+                    """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                      count="5" uniqueCount="5">
+                      <si><t>제품</t></si>
+                      <si><t>수량</t></si>
+                      <si><t>활성</t></si>
+                      <si><r><t>사</t></r><r><t>과</t></r></si>
+                      <si><t>로컬 추출</t></si>
+                    </sst>
+                    """,
+                "xl/worksheets/sheet1.xml":
+                    """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+                      <sheetData>
+                        <row r="1">
+                          <c r="A1" t="s"><v>0</v></c>
+                          <c r="B1" t="s"><v>1</v></c>
+                          <c r="C1" t="s"><v>2</v></c>
+                        </row>
+                        <row r="2">
+                          <c r="A2" t="s"><v>3</v></c>
+                          <c r="B2"><v>12</v></c>
+                          <c r="C2" t="b"><v>1</v></c>
+                        </row>
+                      </sheetData>
+                    </worksheet>
+                    """,
+                "xl/worksheets/sheet2.xml":
+                    """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+                      <sheetData>
+                        <row r="1">
+                          <c r="A1" t="s"><v>4</v></c>
+                          <c r="B1"><f>7/2</f><v>3.5</v></c>
+                        </row>
+                      </sheetData>
+                    </worksheet>
+                    """,
+            ]
+        )
+    }
+
+    private func makeZIPData(
+        entries: [String: String]
+    ) throws -> Data {
+        let archive = try Archive(
+            accessMode: .create
+        )
+        for (
+            path,
+            string
+        ) in entries.sorted(
+            by: {
+                $0.key < $1.key
+            }
+        ) {
+            let data = Data(string.utf8)
+            try archive.addEntry(
+                with: path,
+                type: .file,
+                uncompressedSize:
+                    Int64(data.count),
+                compressionMethod:
+                    .deflate
+            ) {
+                position,
+                size in
+                let lower = Int(position)
+                let upper = min(
+                    data.count,
+                    lower + size
+                )
+                guard lower < upper else {
+                    return Data()
+                }
+                return data.subdata(
+                    in: lower..<upper
+                )
+            }
+        }
+        return try XCTUnwrap(
+            archive.data
+        )
     }
 }
