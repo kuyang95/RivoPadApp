@@ -6,6 +6,8 @@ struct AppSettingsView: View {
         AppSettingsStore.shared
     @ObservedObject private var webSearch =
         WebSearchConfigurationStore.shared
+    @ObservedObject private var appFonts =
+        AppFontCatalogStore.shared
     @Environment(\.openURL)
     private var openURL
 
@@ -17,6 +19,8 @@ struct AppSettingsView: View {
     @State private var webSearchStatus: String?
     @State private var webSearchError: String?
     @State private var showsWebSearchConsent =
+        false
+    @State private var showsFontSelection =
         false
 
     @AppStorage("reader.epub.theme")
@@ -88,6 +92,18 @@ struct AppSettingsView: View {
         } message: {
             Text(
                 "검색어가 개인 Brave API 키로 Brave Search에 전송됩니다. Brave는 과금·장애 대응·남용 방지를 위해 검색어 로그를 최대 90일 보관할 수 있습니다. 검색 결과와 로컬 AI 답변은 VisionCraft 대화 기록에 저장하지 않습니다."
+            )
+        }
+        .sheet(
+            isPresented:
+                $showsFontSelection
+        ) {
+            AppFontSelectionView(
+                catalog: appFonts,
+                languageCode:
+                    settings
+                    .appLanguage
+                    .effectiveLanguageCode
             )
         }
     }
@@ -224,19 +240,29 @@ struct AppSettingsView: View {
     }
 
     private var appearanceSection: some View {
-        Section("앱 모양") {
-            Picker(
-                "앱 글꼴",
-                selection:
-                    $settings.fontChoice
-            ) {
-                ForEach(
-                    AppFontChoice.allCases
-                ) { choice in
-                    Text(choice.title)
-                        .tag(choice)
-                }
+        Section {
+            Button {
+                showsFontSelection = true
+            } label: {
+                LabeledContent(
+                    "앱 글꼴",
+                    value:
+                        appFonts
+                        .selectedLabel(
+                            languageCode:
+                                settings
+                                .appLanguage
+                                .effectiveLanguageCode
+                        )
+                )
             }
+            .foregroundStyle(.primary)
+        } header: {
+            Text("앱 모양")
+        } footer: {
+            Text(
+                "언어에 맞는 추가 글꼴은 선택할 때만 내려받으며, 크기와 SHA-256 검증을 통과한 파일을 앱 안에 보관합니다."
+            )
         }
     }
 
@@ -571,6 +597,7 @@ struct AppSettingsView: View {
 
     private func resetSettings() {
         settings.resetToDefaults()
+        appFonts.resetSelection()
         MagnifierDisplayPreferenceStore()
             .reset()
         documentAppearance = .defaultValue
@@ -608,5 +635,196 @@ struct AppSettingsView: View {
             webSearchError =
                 error.localizedDescription
         }
+    }
+}
+
+private struct AppFontSelectionView:
+    View
+{
+    @ObservedObject var catalog:
+        AppFontCatalogStore
+    let languageCode: String
+
+    @Environment(\.dismiss)
+    private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if let errorMessage =
+                    catalog.errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .foregroundStyle(
+                                .red
+                            )
+                            .accessibilityLabel(
+                                "오류: \(errorMessage)"
+                            )
+                    }
+                }
+
+                Section {
+                    ForEach(
+                        catalog.visibleOptions(
+                            languageCode:
+                                languageCode
+                        )
+                    ) { option in
+                        fontRow(option)
+                    }
+                } footer: {
+                    Text(
+                        "추가 글꼴은 VisionCraft 서버에서 HTTPS로 받고 파일 크기와 SHA-256을 확인한 뒤 이 앱에서만 사용합니다."
+                    )
+                }
+            }
+            .navigationTitle(
+                "앱 글꼴 선택"
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .overlay {
+                if catalog.isManifestLoading,
+                   catalog.options.count <= 2 {
+                    ProgressView(
+                        "글꼴 목록을 불러오는 중"
+                    )
+                }
+            }
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button("닫기") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(
+                    placement:
+                        .primaryAction
+                ) {
+                    Button(
+                        "목록 새로 고침",
+                        systemImage:
+                            "arrow.clockwise"
+                    ) {
+                        Task {
+                            await catalog
+                                .refreshManifest()
+                        }
+                    }
+                    .disabled(
+                        catalog
+                            .isManifestLoading
+                            || catalog
+                            .downloadingKey
+                            != nil
+                    )
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func fontRow(
+        _ option: AppFontOption
+    ) -> some View {
+        let isSelected =
+            catalog.effectiveOption(
+                languageCode:
+                    languageCode
+            ).key == option.key
+        let isDownloading =
+            catalog.downloadingKey
+                == option.key
+
+        VStack(
+            alignment: .leading,
+            spacing: 6
+        ) {
+            Button {
+                Task {
+                    if await catalog
+                        .select(option) {
+                        dismiss()
+                    }
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(
+                            option.label(
+                                languageCode:
+                                    languageCode
+                            )
+                        )
+                        if isDownloading {
+                            Text(
+                                "글꼴을 내려받아 확인하는 중"
+                            )
+                            .font(.footnote)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                        }
+                    }
+                    Spacer()
+                    if isDownloading {
+                        ProgressView()
+                    } else if isSelected {
+                        Image(
+                            systemName:
+                                "checkmark.circle.fill"
+                        )
+                        .foregroundStyle(
+                            .tint
+                        )
+                        .accessibilityHidden(
+                            true
+                        )
+                    }
+                }
+                .contentShape(
+                    Rectangle()
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(
+                catalog.downloadingKey
+                    != nil
+            )
+            .accessibilityValue(
+                isSelected
+                    ? "선택됨"
+                    : ""
+            )
+
+            if let license =
+                option.license {
+                HStack(spacing: 8) {
+                    Text(license)
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    if let licenseURL =
+                        option.licenseURL {
+                        Link(
+                            "라이선스 보기",
+                            destination:
+                                licenseURL
+                        )
+                        .font(.caption)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 4)
     }
 }

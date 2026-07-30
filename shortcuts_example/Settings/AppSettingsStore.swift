@@ -54,34 +54,6 @@ nonisolated enum AppSpeechRate:
     }
 }
 
-nonisolated enum AppFontChoice:
-    String,
-    CaseIterable,
-    Codable,
-    Identifiable,
-    Sendable
-{
-    case system
-    case nanumSquareRound
-
-    var id: Self {
-        self
-    }
-
-    var title: String {
-        switch self {
-        case .system:
-            return AppLocalization.string(
-                "iPad 시스템 글꼴"
-            )
-        case .nanumSquareRound:
-            return AppLocalization.string(
-                "나눔스퀘어라운드"
-            )
-        }
-    }
-}
-
 nonisolated enum AppLanguage:
     String,
     CaseIterable,
@@ -245,8 +217,6 @@ final class AppSettingsStore:
             "settings.scanCurvedPageCorrection.v1"
         static let ocrAutoCorrection =
             "settings.ocrAutoCorrection.v1"
-        static let fontChoice =
-            "settings.fontChoice.v1"
         static let appLanguage =
             AppLanguage.preferenceKey
         static let sharedTextEntryMode =
@@ -333,15 +303,6 @@ final class AppSettingsStore:
         }
     }
 
-    @Published var fontChoice: AppFontChoice {
-        didSet {
-            defaults.set(
-                fontChoice.rawValue,
-                forKey: Key.fontChoice
-            )
-        }
-    }
-
     @Published var appLanguage: AppLanguage {
         didSet {
             defaults.set(
@@ -415,12 +376,6 @@ final class AppSettingsStore:
                 defaults: defaults,
                 fallback: true
             )
-        fontChoice = defaults
-            .string(
-                forKey: Key.fontChoice
-            )
-            .flatMap(AppFontChoice.init)
-            ?? .nanumSquareRound
         appLanguage = defaults
             .string(
                 forKey: Key.appLanguage
@@ -449,7 +404,6 @@ final class AppSettingsStore:
         documentScanCurvedPageCorrectionEnabled =
             true
         ocrAutoCorrectionEnabled = true
-        fontChoice = .nanumSquareRound
         appLanguage = .system
         sharedTextEntryMode = .voice
     }

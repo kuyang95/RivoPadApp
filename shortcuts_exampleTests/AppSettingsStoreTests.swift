@@ -62,10 +62,6 @@ final class AppSettingsStoreTests:
             store.ocrAutoCorrectionEnabled
         )
         XCTAssertEqual(
-            store.fontChoice,
-            .nanumSquareRound
-        )
-        XCTAssertEqual(
             store.appLanguage,
             .system
         )
@@ -94,7 +90,6 @@ final class AppSettingsStoreTests:
             false
         store.ocrAutoCorrectionEnabled =
             false
-        store.fontChoice = .system
         store.appLanguage = .japanese
         store.sharedTextEntryMode = .chat
 
@@ -128,10 +123,6 @@ final class AppSettingsStoreTests:
                 .ocrAutoCorrectionEnabled
         )
         XCTAssertEqual(
-            restored.fontChoice,
-            .system
-        )
-        XCTAssertEqual(
             restored.appLanguage,
             .japanese
         )
@@ -146,10 +137,6 @@ final class AppSettingsStoreTests:
         defaults.set(
             "impossible",
             forKey: "settings.speechRate.v1"
-        )
-        defaults.set(
-            "impossible",
-            forKey: "settings.fontChoice.v1"
         )
         defaults.set(
             "impossible",
@@ -168,10 +155,6 @@ final class AppSettingsStoreTests:
         XCTAssertEqual(
             store.speechRate,
             .normal
-        )
-        XCTAssertEqual(
-            store.fontChoice,
-            .nanumSquareRound
         )
         XCTAssertEqual(
             store.sharedTextEntryMode,
@@ -202,7 +185,6 @@ final class AppSettingsStoreTests:
             false
         store.ocrAutoCorrectionEnabled =
             false
-        store.fontChoice = .system
         store.appLanguage = .english
         store.sharedTextEntryMode = .chat
 
@@ -232,10 +214,6 @@ final class AppSettingsStoreTests:
         )
         XCTAssertTrue(
             store.ocrAutoCorrectionEnabled
-        )
-        XCTAssertEqual(
-            store.fontChoice,
-            .nanumSquareRound
         )
         XCTAssertEqual(
             store.appLanguage,

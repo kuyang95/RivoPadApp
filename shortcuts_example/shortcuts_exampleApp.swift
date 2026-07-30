@@ -13,6 +13,8 @@ struct shortcuts_exampleApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var appSettings =
         AppSettingsStore.shared
+    @StateObject private var appFonts =
+        AppFontCatalogStore.shared
     @StateObject private var shortcutRouter = ShortcutRouter()
     @StateObject private var appRouter = AppRouter()
     @StateObject private var rivoRemoteManager =
@@ -477,6 +479,7 @@ struct shortcuts_exampleApp: App {
                 openScannerFromLaunchArgumentsIfNeeded()
                 shortcutRouter.consumeLastIfNeeded()
                 consumeSharedInboxIfNeeded()
+                await appFonts.prepare()
             }
             .onOpenURL { url in
                 handleIncomingURL(url)
@@ -565,12 +568,12 @@ struct shortcuts_exampleApp: App {
         }
         .environment(
             \.font,
-            appSettings.fontChoice == .system
-                ? nil
-                : .custom(
-                    "NanumSquareRoundOTFEB",
-                    size: 16
-                )
+            appFonts.font(
+                languageCode:
+                    appSettings
+                    .appLanguage
+                    .effectiveLanguageCode
+            )
         )
         .environment(
             \.locale,
