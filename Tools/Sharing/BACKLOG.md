@@ -22,8 +22,8 @@ Android `ShareReceiverProcessor`, `Intent.ACTION_SEND`,
 ## 실기기 일괄 확인
 
 - [ ] Apple Developer 계정의 최신 Program License Agreement를 Account
-      Holder가 동의한 뒤 Share/Action Extension App Group 프로비저닝
-      프로필을 자동 갱신하고 M4 iPad에 서명 설치한다.
+      Holder가 동의한 뒤 Share/Action/Widget Extension App Group
+      프로비저닝 프로필을 자동 갱신하고 M4 iPad에 서명 설치한다.
 - [ ] 사진 앱의 사진 한 장을 RivoPad로 공유하면 앱이 열리고 OCR 결과가
       표시되며, 취소하거나 앱 전환에 실패해도 다음 실행에서 다시 처리된다.
 - [ ] Files의 일반 PDF와 스캔 PDF를 공유하면 로컬 문서 화면이 열리고

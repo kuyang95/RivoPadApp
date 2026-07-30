@@ -275,7 +275,13 @@ final class RivoRemoteManager:
         "com.rivo.shortcuts-example.rivo-central"
 
     @Published private(set) var state: RivoBluetoothState =
-        .inactive
+        .inactive {
+        didSet {
+            RivoWidgetStatusStore.save(
+                state: state
+            )
+        }
+    }
     @Published private(set) var discoveredDevices:
         [RivoDiscoveredDevice] = []
     @Published private(set) var recentEvents:
@@ -321,6 +327,9 @@ final class RivoRemoteManager:
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         super.init()
+        RivoWidgetStatusStore.save(
+            state: state
+        )
         restoreConnectionDiagnostics()
 
         if savedPeripheralIdentifier != nil {

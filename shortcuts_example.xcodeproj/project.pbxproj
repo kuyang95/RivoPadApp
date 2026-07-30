@@ -14,6 +14,7 @@
 		9E5CA0012F6A000100000002 /* onnxruntime in Frameworks */ = {isa = PBXBuildFile; productRef = 9E5CA0012F6A000100000003 /* onnxruntime */; };
 		9E5CC2012F80000100000001 /* shareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9E5CC2012F80000100000003 /* shareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9E5CC3012F80000200000001 /* actionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9E5CC3012F80000200000003 /* actionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		9E5CC4012F80000300000001 /* rivoWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9E5CC4012F80000300000003 /* rivoWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9E71A0022F7D000100000001 /* StreamWebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = 9E71A0012F7D000100000001 /* StreamWebRTC */; };
 		9ED29E682F47FA34007204D2 /* Intents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9ED29E672F47FA34007204D2 /* Intents.framework */; };
 		9ED29E732F47FA34007204D2 /* IntentsUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9ED29E722F47FA34007204D2 /* IntentsUI.framework */; };
@@ -43,6 +44,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 9E5CC3012F80000200000007;
 			remoteInfo = actionExtension;
+		};
+		9E5CC4012F80000300000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9E901E8F2F2C4D010028581D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9E5CC4012F80000300000007;
+			remoteInfo = rivoWidget;
 		};
 		9ED29E7B2F47FA34007204D2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -78,6 +86,7 @@
 				9ED29E7D2F47FA34007204D2 /* intentExtensionUI.appex in Embed Foundation Extensions */,
 				9E5CC2012F80000100000001 /* shareExtension.appex in Embed Foundation Extensions */,
 				9E5CC3012F80000200000001 /* actionExtension.appex in Embed Foundation Extensions */,
+				9E5CC4012F80000300000001 /* rivoWidget.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -99,6 +108,7 @@
 		9E5CB1002F6B000100000001 /* shortcuts_exampleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = shortcuts_exampleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9E5CC2012F80000100000003 /* shareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = shareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9E5CC3012F80000200000003 /* actionExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = actionExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		9E5CC4012F80000300000003 /* rivoWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = rivoWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9E901E972F2C4D010028581D /* shortcuts_example.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = shortcuts_example.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9ED29E662F47FA34007204D2 /* intentExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = intentExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9ED29E672F47FA34007204D2 /* Intents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Intents.framework; path = System/Library/Frameworks/Intents.framework; sourceTree = SDKROOT; };
@@ -121,6 +131,13 @@
 				Info.plist,
 			);
 			target = 9E5CC3012F80000200000007 /* actionExtension */;
+		};
+		9E5CC4012F80000300000004 /* Exceptions for "rivoWidget" folder in "rivoWidget" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 9E5CC4012F80000300000007 /* rivoWidget */;
 		};
 		9ED29E812F47FA34007204D2 /* Exceptions for "intentExtension" folder in "intentExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
@@ -170,6 +187,14 @@
 				9E5CC3012F80000200000004 /* Exceptions for "actionExtension" folder in "actionExtension" target */,
 			);
 			path = actionExtension;
+			sourceTree = "<group>";
+		};
+		9E5CC4012F80000300000005 /* rivoWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				9E5CC4012F80000300000004 /* Exceptions for "rivoWidget" folder in "rivoWidget" target */,
+			);
+			path = rivoWidget;
 			sourceTree = "<group>";
 		};
 		9ED29E692F47FA34007204D2 /* intentExtension */ = {
@@ -233,6 +258,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9E5CC4012F80000300000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9ED29E632F47FA34007204D2 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -266,6 +298,7 @@
 				9E5CB1002F6B000100000002 /* shortcuts_exampleTests */,
 				9E5CC2012F80000100000005 /* shareExtension */,
 				9E5CC3012F80000200000005 /* actionExtension */,
+				9E5CC4012F80000300000005 /* rivoWidget */,
 				9ED29E692F47FA34007204D2 /* intentExtension */,
 				9ED29E742F47FA34007204D2 /* intentExtensionUI */,
 				9ED29E912F47FA9A007204D2 /* appIntentExtension */,
@@ -281,6 +314,7 @@
 				9E5CB1002F6B000100000001 /* shortcuts_exampleTests.xctest */,
 				9E5CC2012F80000100000003 /* shareExtension.appex */,
 				9E5CC3012F80000200000003 /* actionExtension.appex */,
+				9E5CC4012F80000300000003 /* rivoWidget.appex */,
 				9ED29E662F47FA34007204D2 /* intentExtension.appex */,
 				9ED29E712F47FA34007204D2 /* intentExtensionUI.appex */,
 				9ED29E902F47FA9A007204D2 /* appIntentExtension.appex */,
@@ -344,6 +378,28 @@
 			productReference = 9E5CC3012F80000200000003 /* actionExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		9E5CC4012F80000300000007 /* rivoWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9E5CC4012F8000030000000D /* Build configuration list for PBXNativeTarget "rivoWidget" */;
+			buildPhases = (
+				9E5CC4012F80000300000008 /* Sources */,
+				9E5CC4012F80000300000006 /* Frameworks */,
+				9E5CC4012F80000300000009 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				9E5CC4012F80000300000005 /* rivoWidget */,
+			);
+			name = rivoWidget;
+			packageProductDependencies = (
+			);
+			productName = rivoWidget;
+			productReference = 9E5CC4012F80000300000003 /* rivoWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		9E5CB1002F6B000100000003 /* shortcuts_exampleTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 9E5CB1002F6B00010000000B /* Build configuration list for PBXNativeTarget "shortcuts_exampleTests" */;
@@ -385,6 +441,7 @@
 				9ED29E982F47FA9A007204D2 /* PBXTargetDependency */,
 				9E5CC2012F8000010000000A /* PBXTargetDependency */,
 				9E5CC3012F8000020000000A /* PBXTargetDependency */,
+				9E5CC4012F8000030000000A /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				9E901E992F2C4D020028581D /* shortcuts_example */,
@@ -491,6 +548,9 @@
 					9E5CC3012F80000200000007 = {
 						CreatedOnToolsVersion = 26.2;
 					};
+					9E5CC4012F80000300000007 = {
+						CreatedOnToolsVersion = 26.2;
+					};
 					9ED29E652F47FA34007204D2 = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -525,6 +585,7 @@
 				9E5CB1002F6B000100000003 /* shortcuts_exampleTests */,
 				9E5CC2012F80000100000007 /* shareExtension */,
 				9E5CC3012F80000200000007 /* actionExtension */,
+				9E5CC4012F80000300000007 /* rivoWidget */,
 				9ED29E652F47FA34007204D2 /* intentExtension */,
 				9ED29E702F47FA34007204D2 /* intentExtensionUI */,
 				9ED29E8F2F47FA9A007204D2 /* appIntentExtension */,
@@ -541,6 +602,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		9E5CC3012F80000200000009 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9E5CC4012F80000300000009 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -599,6 +667,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9E5CC4012F80000300000008 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9E5CB1002F6B000100000004 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -651,6 +726,11 @@
 			isa = PBXTargetDependency;
 			target = 9E5CC3012F80000200000007 /* actionExtension */;
 			targetProxy = 9E5CC3012F80000200000002 /* PBXContainerItemProxy */;
+		};
+		9E5CC4012F8000030000000A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9E5CC4012F80000300000007 /* rivoWidget */;
+			targetProxy = 9E5CC4012F80000300000002 /* PBXContainerItemProxy */;
 		};
 		9ED29E7C2F47FA34007204D2 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -786,6 +866,71 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.rivo.shortcuts-example.shortcuts-example.actionExtension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		9E5CC4012F8000030000000B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = rivoWidget/rivoWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z3TXJ872H6;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = rivoWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Rivo 상태";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.rivo.shortcuts-example.shortcuts-example.rivoWidget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		9E5CC4012F8000030000000C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = rivoWidget/rivoWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z3TXJ872H6;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = rivoWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Rivo 상태";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.rivo.shortcuts-example.shortcuts-example.rivoWidget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -1300,6 +1445,15 @@
 			buildConfigurations = (
 				9E5CC3012F8000020000000B /* Debug */,
 				9E5CC3012F8000020000000C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9E5CC4012F8000030000000D /* Build configuration list for PBXNativeTarget "rivoWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9E5CC4012F8000030000000B /* Debug */,
+				9E5CC4012F8000030000000C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

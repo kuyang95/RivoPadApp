@@ -309,11 +309,7 @@ struct shortcuts_exampleApp: App {
                 consumeSharedInboxIfNeeded()
             }
             .onOpenURL { url in
-                guard url.scheme == "rivopad",
-                      url.host == "share-inbox" else {
-                    return
-                }
-                consumeSharedInboxIfNeeded()
+                handleIncomingURL(url)
             }
           //  .onAppear { router.consumeLastIfNeeded() }
             .onChange(of: scenePhase) { _, phase in
@@ -399,6 +395,37 @@ struct shortcuts_exampleApp: App {
         didHandleDirectScannerLaunch = true
         path = NavigationPath()
         path.append(AppRoute.documentScanning)
+    }
+
+    private func handleIncomingURL(_ url: URL) {
+        if url.scheme?.lowercased() == "rivopad",
+           url.host?.lowercased()
+            == "share-inbox" {
+            consumeSharedInboxIfNeeded()
+            return
+        }
+        guard let destination =
+                AppDeepLinkRouter.destination(
+                    for: url
+                ) else {
+            return
+        }
+        let route: AppRoute
+        switch destination {
+        case .ai:
+            route = .chatHistory
+        case .reader:
+            route = .readerLibrary
+        case .camera:
+            route = .cameraTools
+        case .scanner:
+            route = .documentScanning
+        case .rivo:
+            route = .rivoRemote
+        case .visionLink:
+            route = .visionLink
+        }
+        replaceNavigation(with: route)
     }
 
     private func consumeSharedInboxIfNeeded() {
