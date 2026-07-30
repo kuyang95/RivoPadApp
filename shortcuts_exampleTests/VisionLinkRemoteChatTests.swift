@@ -267,62 +267,102 @@ final class VisionLinkRemoteChatTests:
         )
     }
 
-    func testUnsupportedDocumentReportsAttachmentErrorAndCleansFile()
+    func testStructuredDocumentsAppendExtractedContextAndCleanFiles()
         async throws
     {
         let fixture = try makeFixture()
         defer { fixture.remove() }
         let service = RemoteChatServiceStub()
-        let temporary = fixture.root
-            .appendingPathComponent("legacy.hwp")
-        try Data("fixture".utf8).write(
-            to: temporary
-        )
-        let attachment =
-            VisionLinkChatFileAttachment(
-                attachmentID: "attachment-2",
-                conversationID: "remote-5",
-                name: "legacy.hwp",
-                kind: .document,
+        service.extractedText =
+            "원격 문서에서 추출한 내용"
+        let documents = [
+            (
+                name: "table.xlsx",
                 mimeType:
-                    "application/x-hwp",
-                fileURL: temporary
-            )
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            ),
+            (
+                name: "legacy.xls",
+                mimeType:
+                    "application/vnd.ms-excel"
+            ),
+            (
+                name: "document.hwp",
+                mimeType:
+                    "application/x-hwp"
+            ),
+        ]
+        var temporaryURLs: [URL] = []
         var updates: [VisionLinkRemoteChatUpdate] =
             []
 
-        try await VisionLinkRemoteChatProcessor(
-            service: service,
-            conversationStore: fixture.store
-        )
-        .process(.file(attachment)) {
-            updates.append($0)
+        for (index, document) in
+                documents.enumerated() {
+            let temporary = fixture.root
+                .appendingPathComponent(
+                    document.name
+                )
+            try Data("fixture".utf8).write(
+                to: temporary
+            )
+            temporaryURLs.append(temporary)
+            let attachment =
+                VisionLinkChatFileAttachment(
+                    attachmentID:
+                        "attachment-\(index + 2)",
+                    conversationID: "remote-5",
+                    name: document.name,
+                    kind: .document,
+                    mimeType:
+                        document.mimeType,
+                    fileURL: temporary
+                )
+
+            try await VisionLinkRemoteChatProcessor(
+                service: service,
+                conversationStore: fixture.store
+            )
+            .process(.file(attachment)) {
+                updates.append($0)
+            }
         }
 
-        guard case .attachmentFailed(
-            let attachmentID,
-            let conversationID,
-            let message
-        ) = updates.first else {
-            return XCTFail(
-                "첨부 실패 응답이어야 합니다."
-            )
-        }
         XCTAssertEqual(
-            attachmentID,
-            "attachment-2"
+            service.extractionCalls,
+            3
         )
         XCTAssertEqual(
-            conversationID,
-            "remote-5"
+            updates,
+            documents.enumerated().map {
+                index,
+                document in
+                .attachmentReady(
+                    attachmentID:
+                        "attachment-\(index + 2)",
+                    conversationID:
+                        "remote-5",
+                    name: document.name
+                )
+            }
         )
         XCTAssertTrue(
-            message.contains("아직 지원되지")
+            temporaryURLs.allSatisfy {
+                !FileManager.default.fileExists(
+                    atPath: $0.path
+                )
+            }
         )
-        XCTAssertFalse(
-            FileManager.default.fileExists(
-                atPath: temporary.path
+        let context =
+            try await fixture.store.context(
+                conversationID: "remote-5"
             )
+        XCTAssertEqual(
+            context.sharedText,
+            documents.map {
+                "[\($0.name)]\n"
+                    + service.extractedText
+            }
+            .joined(separator: "\n\n")
         )
     }
 

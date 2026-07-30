@@ -279,6 +279,71 @@ final class LegacyDocumentAttachmentTests:
         }
     }
 
+    @MainActor
+    func testVisionLinkLocallyExtractsLegacyXLSAndHWP()
+        async throws
+    {
+        let root = try makeTemporaryRoot()
+        defer {
+            try? FileManager.default
+                .removeItem(at: root)
+        }
+        let xlsURL = root
+            .appendingPathComponent(
+                "remote.xls"
+            )
+        try makeOLEFile(
+            streams: [
+                "Workbook":
+                    try makeLegacyXLSWorkbook(),
+            ]
+        ).write(to: xlsURL)
+        let hwpURL = root
+            .appendingPathComponent(
+                "remote.hwp"
+            )
+        try makeHWP5File(
+            compressed: true
+        ).write(to: hwpURL)
+
+        let service =
+            VisionLinkLocalRemoteChatService
+            .shared
+        let spreadsheet =
+            try await service.extractDocumentText(
+                at: xlsURL,
+                mimeType:
+                    "application/vnd.ms-excel"
+            )
+        let hwp =
+            try await service.extractDocumentText(
+                at: hwpURL,
+                mimeType:
+                    "application/x-hwp"
+            )
+
+        XCTAssertTrue(
+            spreadsheet.contains(
+                "제품\t수량\t활성"
+            )
+        )
+        XCTAssertTrue(
+            spreadsheet.contains(
+                "사과\t12.0\ttrue"
+            )
+        )
+        XCTAssertTrue(
+            hwp.contains(
+                "첫 문단\t탭 뒤"
+            )
+        )
+        XCTAssertTrue(
+            hwp.contains(
+                "둘째 문단-끝"
+            )
+        )
+    }
+
     private func makeTemporaryRoot()
         throws -> URL
     {

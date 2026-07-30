@@ -945,6 +945,71 @@ final class VisionLinkDataReceiverTests:
         )
     }
 
+    func testStructuredChatAttachmentsAreAccepted()
+        async
+    {
+        let fixture = makeFixture()
+        defer { fixture.remove() }
+        let documents = [
+            (
+                name: "table.xlsx",
+                mimeType:
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            ),
+            (
+                name: "legacy.xls",
+                mimeType:
+                    "application/vnd.ms-excel"
+            ),
+            (
+                name: "document.hwp",
+                mimeType:
+                    "application/x-hwp"
+            ),
+        ]
+
+        for (index, document) in
+                documents.enumerated() {
+            let attachmentID =
+                "structured-\(index)"
+            let actions = await fixture
+                .receiver.receive(
+                    .control(
+                        controlData(
+                            [
+                                "type":
+                                    "file-start",
+                                "transferId":
+                                    attachmentID,
+                                "attachmentId":
+                                    attachmentID,
+                                "conversationId":
+                                    "conversation-1",
+                                "purpose":
+                                    "visioncraft-chat-attachment",
+                                "attachmentKind":
+                                    "document",
+                                "name":
+                                    document.name,
+                                "kind": "file",
+                                "mimeType":
+                                    document
+                                    .mimeType,
+                                "size": 100,
+                            ]
+                        )
+                    )
+                )
+            XCTAssertEqual(
+                controlType(in: actions),
+                "file-accepted"
+            )
+        }
+        _ = await fixture.receiver.receive(
+            .closed
+        )
+    }
+
     func testInvalidChatAttachmentMetadataIsRejected()
         async
     {

@@ -361,6 +361,45 @@ final class ChatAttachmentTests:
         XCTAssertNotNil(storedURL)
     }
 
+    func testVisionLinkLocallyExtractsXLSX()
+        async throws
+    {
+        let fixture = try makeFixture()
+        defer {
+            try? FileManager.default
+                .removeItem(
+                    at: fixture.root
+                )
+        }
+        let source = fixture.root
+            .appendingPathComponent(
+                "remote.xlsx"
+            )
+        try makeXLSXData().write(
+            to: source
+        )
+
+        let text = try await
+            VisionLinkLocalRemoteChatService
+            .shared
+            .extractDocumentText(
+                at: source,
+                mimeType:
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+        XCTAssertTrue(
+            text.contains(
+                "제품\t수량\t활성"
+            )
+        )
+        XCTAssertTrue(
+            text.contains(
+                "로컬 추출\t3.5"
+            )
+        )
+    }
+
     func testXLSXRejectsMissingWorkbookParts()
         throws
     {

@@ -38,8 +38,11 @@
 - 원격 대화 ID를 로컬 대화 기록 UUID에 영구 연결
 - 첫 요청 전체 문맥과 이후 최신 질문·답변을 로컬 대화 기록에 저장
 - 최대 64KB 클립보드 문맥 첨부와 누적 256KB 안전 제한
-- 최대 25MB 이미지·TXT·PDF 대화 첨부 수신과 교체·임시 파일 정리
+- 최대 25MB 이미지·TXT·PDF·HWP·XLS·XLSX 대화 첨부 수신과
+  교체·임시 파일 정리
 - 이미지 첨부는 M4 로컬 VLM, PDF는 내장 텍스트·Vision OCR 뒤 로컬 LLM 사용
+- XLSX·Excel 97-2003 BIFF8 XLS·HWP 5.x 원격 첨부를 안전한 로컬
+  파서로 추출해 대화 문맥에 누적
 - `chat-attachment-ready`·`chat-attachment-error` 회신
 - OCR·번역·이미지 분석·AI 대화·첨부를 하나의 직렬 큐에서 처리
 - Android 규격의 `live-reading-start`·`live-reading-stop` 세션 제어
@@ -82,7 +85,10 @@
 - [ ] 텍스트가 있는 PDF와 스캔 PDF를 각각 첨부하면 로컬 답변이 돌아온다.
 - [ ] TXT 첨부가 문맥으로 누적되고 다음 질문에서 사용된다.
 - [ ] 새 이미지·PDF 첨부가 기존 첨부를 교체하고 오래된 파일이 남지 않는다.
-- [ ] HWP/XLS/XLSX 첨부에는 현재 미지원 오류가 상대 기기에 표시된다.
+- [ ] HWP 5.x·Excel 97-2003 XLS·XLSX 첨부 뒤 질문하면 추출한 본문과
+  셀 내용을 참고한 답변이 돌아온다.
+- [ ] 암호화·손상·20MB 초과 HWP/XLS/XLSX는 상대 기기에 구체적인 오류가
+  표시되고 임시 파일이 남지 않는다.
 - [ ] AI 대화와 OCR·번역 요청을 연속 전송해도 요청 순서가 보존된다.
 - [ ] 첨부 또는 AI 답변 생성 중 채널을 끊으면 늦은 회신과 임시 파일이 남지 않는다.
 - [ ] Android에서 실시간 읽기를 시작하면 같은 세션 ID로 `started` 상태가 돌아온다.
@@ -126,7 +132,7 @@
 - [x] 로컬 AI 채팅과 VisionLink 대화 ID 연결
 - [x] `ai-chat` 메시지 문맥과 로컬 MLX 답변 회신
 - [x] 클립보드·이미지·TXT·PDF 대화 첨부
-- [ ] HWP/XLS/XLSX 대화 첨부 텍스트 추출
+- [x] HWP 5.x·BIFF8 XLS·XLSX 대화 첨부 텍스트 추출
 - [x] 원격 영상 프레임의 1.2초 간격 OCR과 최근 결과 중복 억제
 - [x] `visioncraft-feature`, `visioncraft-chat-attachment`,
   `chat-context-attachment`, `feature-request` 연결
@@ -147,9 +153,10 @@
   이미지 또는 PDF 추출문을 제한된 프롬프트로 합쳐 네트워크 없이 답한다.
 - iPad MLX VLM은 PDF 파일 자체를 입력받지 않으므로 PDFKit 내장 텍스트를
   먼저 사용하고, 텍스트가 없는 페이지는 Vision OCR로 추출해 LLM에 넣는다.
-- Android 수신 규격상 HWP/XLS/XLSX 전송은 허용하지만 현재 iPad 앱에는
-  안전한 로컬 파서가 없다. 파일은 영구 저장하지 않고 명시적 미지원 오류를
-  회신하며, 공용 문서 파서를 도입할 때 함께 연결한다.
+- Android처럼 PDF가 아닌 HWP/XLS/XLSX 원격 문서는 파일 원본을 대화
+  저장소에 남기지 않고 텍스트만 누적한다. HWP 5.x와 Excel 97-2003
+  BIFF8·XLSX만 로컬에서 읽으며 20MB 입력, 암호화, OLE/ZIP/DEFLATE와
+  행·셀·구역·출력 제한을 그대로 적용한다.
 - Android와 같이 원격 영상 렌더러와 별도의 1회성 프레임 샘플러를 두고
   OCR 완료 뒤 1.2초 후 다음 프레임을 요청한다. 화면 렌더링 속도와 OCR
   처리 속도가 서로 영향을 주지 않으며 동시에 여러 OCR을 쌓지 않는다.

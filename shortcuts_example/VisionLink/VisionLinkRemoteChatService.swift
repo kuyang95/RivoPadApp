@@ -259,6 +259,25 @@ struct VisionLinkRemoteChatProcessor {
                                 attachment.fileURL,
                             extractedText: text
                         )
+                } else if [
+                    "xlsx",
+                    "xls",
+                    "hwp",
+                ].contains(pathExtension) {
+                    let text = try await service
+                        .extractDocumentText(
+                            at: attachment.fileURL,
+                            mimeType:
+                                attachment.mimeType
+                        )
+                    try await conversationStore
+                        .appendContext(
+                            conversationID:
+                                attachment
+                                .conversationID,
+                            name: attachment.name,
+                            text: text
+                        )
                 } else {
                     throw VisionLinkRemoteChatError
                         .unsupportedDocument
@@ -401,6 +420,46 @@ final class VisionLinkLocalRemoteChatService:
         at url: URL,
         mimeType: String
     ) async throws -> String {
+        let pathExtension = url.pathExtension
+            .lowercased()
+        let text: String
+        switch pathExtension {
+        case "pdf":
+            text = try await extractPDFText(
+                at: url,
+                mimeType: mimeType
+            )
+        case "xlsx", "xls", "hwp":
+            text = try await Self
+                .extractStructuredDocumentText(
+                    at: url,
+                    pathExtension:
+                        pathExtension
+                )
+        default:
+            throw VisionLinkRemoteChatError
+                .unsupportedDocument
+        }
+
+        let trimmed = text.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !trimmed.isEmpty else {
+            throw VisionLinkRemoteChatError
+                .documentHasNoText
+        }
+        guard trimmed.utf8.count
+                <= Self.maximumDocumentTextSize else {
+            throw VisionLinkRemoteChatError
+                .documentTextTooLarge
+        }
+        return trimmed
+    }
+
+    private func extractPDFText(
+        at url: URL,
+        mimeType: String
+    ) async throws -> String {
         guard mimeType == "application/pdf",
               let document = PDFDocument(url: url)
         else {
@@ -449,16 +508,79 @@ final class VisionLinkLocalRemoteChatService:
         let text = pageTexts.joined(
             separator: "\n\n"
         )
-        guard !text.isEmpty else {
-            throw VisionLinkRemoteChatError
-                .documentHasNoText
-        }
-        guard text.utf8.count
-                <= Self.maximumDocumentTextSize else {
-            throw VisionLinkRemoteChatError
-                .documentTextTooLarge
-        }
         return text
+    }
+
+    nonisolated private static func
+        extractStructuredDocumentText(
+            at url: URL,
+            pathExtension: String
+        ) async throws -> String
+    {
+        try await Task.detached(
+            priority: .userInitiated
+        ) {
+            let maximumBytes: Int
+            switch pathExtension {
+            case "xlsx":
+                maximumBytes =
+                    XLSXTextExtractor
+                    .maximumWorkbookBytes
+            case "xls":
+                maximumBytes =
+                    LegacyXLSExtractor
+                    .maximumWorkbookBytes
+            case "hwp":
+                maximumBytes =
+                    HWP5TextExtractor
+                    .maximumDocumentBytes
+            default:
+                throw VisionLinkRemoteChatError
+                    .unsupportedDocument
+            }
+
+            let values = try url.resourceValues(
+                forKeys: [
+                    .fileSizeKey,
+                    .isRegularFileKey,
+                ]
+            )
+            guard values.isRegularFile != false
+            else {
+                throw VisionLinkRemoteChatError
+                    .unsupportedDocument
+            }
+            if let fileSize = values.fileSize,
+               fileSize > maximumBytes {
+                throw ChatAttachmentError
+                    .fileTooLarge(
+                        maximumMegabytes:
+                            maximumBytes
+                            / 1_024
+                            / 1_024
+                    )
+            }
+            let data = try Data(
+                contentsOf: url,
+                options: .mappedIfSafe
+            )
+
+            switch pathExtension {
+            case "xlsx":
+                return try XLSXTextExtractor
+                    .extract(from: data)
+            case "xls":
+                return try LegacyXLSExtractor
+                    .extract(from: data)
+            case "hwp":
+                return try HWP5TextExtractor
+                    .extract(from: data)
+            default:
+                throw VisionLinkRemoteChatError
+                    .unsupportedDocument
+            }
+        }
+        .value
     }
 
     private static let systemPrompt = """
@@ -671,7 +793,7 @@ nonisolated enum VisionLinkRemoteChatError:
     var errorDescription: String? {
         switch self {
         case .unsupportedDocument:
-            return "이 문서 형식은 iPad 로컬 대화 첨부에서 아직 지원되지 않습니다."
+            return "PDF, TXT, XLSX, XLS와 HWP 문서만 원격 대화에 첨부할 수 있습니다."
         case .invalidPDF:
             return "PDF 문서를 열 수 없습니다."
         case .documentHasNoText:
