@@ -938,6 +938,9 @@ final class MagnifierViewController:
     private var currentFilter: MagnifierFilter = .normal
     private var displayAdjustment:
         MagnifierDisplayAdjustment = .defaultValue
+    private let displayPreferenceStore:
+        MagnifierDisplayPreferenceStore =
+            MagnifierDisplayPreferenceStore()
     private var pinchStartZoom: CGFloat = 1
     private var isTorchEnabled = false
     private var isLiveReadingEnabled = true
@@ -1508,6 +1511,7 @@ final class MagnifierViewController:
                     : "카메라 조작 모드"
             )
         case .enterDisplayMode(let showGuide):
+            restoreSavedDisplayAdjustment()
             announceRemoteStatus(
                 showGuide
                     ? "화면 조작 모드. 4 이전 색상, 5 원본, 6 다음 색상, 7 8 9 임계값, 별표 0 샵 밝기, R2 반전, R1 카메라 조작"
@@ -1634,6 +1638,9 @@ final class MagnifierViewController:
     ) {
         displayAdjustment =
             displayAdjustment.updated(for: action)
+        persistDisplayAdjustment(
+            after: action
+        )
 
         let message: String
         switch action {
@@ -1678,6 +1685,47 @@ final class MagnifierViewController:
             return
         }
         announceRemoteStatus(message)
+    }
+
+    private func restoreSavedDisplayAdjustment() {
+        displayAdjustment =
+            displayPreferenceStore.load(
+                applyingTo:
+                    displayAdjustment
+            )
+        if displayAdjustment.colorIndex != nil {
+            filterControl.selectedSegmentIndex =
+                UISegmentedControl.noSegment
+        }
+    }
+
+    private func persistDisplayAdjustment(
+        after action:
+            RivoMagnifierRemoteAction
+    ) {
+        switch action {
+        case .previousColor,
+             .nextColor:
+            displayPreferenceStore.saveColor(
+                from: displayAdjustment
+            )
+        case .decreaseThreshold,
+             .resetThreshold,
+             .increaseThreshold:
+            displayPreferenceStore
+                .saveThreshold(
+                    from:
+                        displayAdjustment
+                )
+        case .invertColor:
+            displayPreferenceStore
+                .saveInversion(
+                    from:
+                        displayAdjustment
+                )
+        default:
+            break
+        }
     }
 
     private func focusAtCenter() {

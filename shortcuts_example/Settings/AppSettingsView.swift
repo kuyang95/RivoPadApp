@@ -565,6 +565,8 @@ struct AppSettingsView: View {
 
     private func resetSettings() {
         settings.resetToDefaults()
+        MagnifierDisplayPreferenceStore()
+            .reset()
         documentAppearance = .defaultValue
         readerTheme = "light"
         readerFontScale = 1.0
