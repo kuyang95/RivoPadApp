@@ -121,6 +121,15 @@ final class RivoRemoteControlCenter: ObservableObject {
                     consumed: true
                 )
             }
+            if action == .doubleTapped,
+               let guide = modeGuide(for: button) {
+                feedback = guide
+                announceFeedback()
+                return RivoRemoteDecision(
+                    command: nil,
+                    consumed: true
+                )
+            }
             guard action == .pressed else {
                 return RivoRemoteDecision(
                     command: nil,
@@ -128,6 +137,15 @@ final class RivoRemoteControlCenter: ObservableObject {
                 )
             }
 
+            if button == .l4 || button == .r4 {
+                feedback =
+                    "Android의 다른 앱 화면 확대 이동은 iPadOS에서 지원되지 않습니다. 앱의 카메라 돋보기를 사용해 주세요."
+                announceFeedback()
+                return RivoRemoteDecision(
+                    command: nil,
+                    consumed: true
+                )
+            }
             if button == .r3 {
                 feedback = "음성 읽기 정지"
                 return RivoRemoteDecision(
@@ -224,10 +242,33 @@ final class RivoRemoteControlCenter: ObservableObject {
 
     private func announceSelection() {
         feedback = selectedItemAnnouncement
+        announceFeedback()
+    }
+
+    private func announceFeedback() {
         UIAccessibility.post(
             notification: .announcement,
             argument: feedback
         )
+    }
+
+    private func modeGuide(
+        for button: RivoButton
+    ) -> String? {
+        switch button {
+        case .r1:
+            return "카메라 조작 안내. 빠른 메뉴에서 카메라 돋보기를 열면 R1 카메라 모드를 사용할 수 있습니다."
+        case .l2:
+            return "화면 색상 안내. 카메라 돋보기나 로컬 문서에서 L2 화면 색상 모드를 사용할 수 있습니다."
+        case .l3:
+            return "문서 조작 안내. TXT 또는 PDF 로컬 문서에서 L3 문서 탐색 모드를 사용할 수 있습니다."
+        case .l4:
+            return "화면 위치 점프 안내. Android의 다른 앱 화면 확대 이동은 iPadOS 공개 API로 지원되지 않습니다. 카메라 돋보기를 사용해 주세요."
+        case .r4:
+            return "화면 연속 이동 안내. Android의 다른 앱 화면 확대 스크롤은 iPadOS 공개 API로 지원되지 않습니다. 카메라 돋보기를 사용해 주세요."
+        default:
+            return nil
+        }
     }
 
     private func activateSelection() -> RivoRemoteCommand? {

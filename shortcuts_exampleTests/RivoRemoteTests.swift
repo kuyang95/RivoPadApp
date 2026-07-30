@@ -731,6 +731,62 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         )
     }
 
+    func testUnavailableScreenViewModesExplainIPadLimit() {
+        let controlCenter = RivoRemoteControlCenter()
+
+        let jumpDecision =
+            controlCenter.receiveDecision(
+                button(.l4, action: .pressed)
+            )
+
+        XCTAssertTrue(jumpDecision.consumed)
+        XCTAssertNil(jumpDecision.command)
+        XCTAssertTrue(
+            controlCenter.feedback.contains(
+                "iPadOS"
+            )
+        )
+
+        let scrollGuide =
+            controlCenter.receiveDecision(
+                button(.r4, action: .doubleTapped)
+            )
+
+        XCTAssertTrue(scrollGuide.consumed)
+        XCTAssertNil(scrollGuide.command)
+        XCTAssertTrue(
+            controlCenter.feedback.contains(
+                "화면 연속 이동 안내"
+            )
+        )
+    }
+
+    func testModeGuidesExplainWhereLocalActionsWork() {
+        let controlCenter = RivoRemoteControlCenter()
+
+        XCTAssertTrue(
+            controlCenter.receiveDecision(
+                button(.r1, action: .doubleTapped)
+            ).consumed
+        )
+        XCTAssertTrue(
+            controlCenter.feedback.contains(
+                "카메라 돋보기"
+            )
+        )
+
+        XCTAssertTrue(
+            controlCenter.receiveDecision(
+                button(.l3, action: .doubleTapped)
+            ).consumed
+        )
+        XCTAssertTrue(
+            controlCenter.feedback.contains(
+                "TXT 또는 PDF"
+            )
+        )
+    }
+
     func testScreenMapperMatchesAndroidCameraAndReaderKeys() {
         XCTAssertEqual(
             RivoScreenRemoteMapper.action(

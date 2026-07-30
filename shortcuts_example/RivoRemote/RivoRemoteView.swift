@@ -319,6 +319,14 @@ struct RivoRemoteView: View {
                 systemImage: "doc.viewfinder"
             )
             Label(
+                "모드 버튼 두 번: 현재 화면의 키 안내",
+                systemImage: "questionmark.circle"
+            )
+            Label(
+                "L4/R4: Android 전역 화면 이동은 iPadOS에서 제한",
+                systemImage: "hand.raised"
+            )
+            Label(
                 "독서: 4 이전 · 5 재생 · 6 다음",
                 systemImage: "book"
             )
