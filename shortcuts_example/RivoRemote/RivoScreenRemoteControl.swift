@@ -10,6 +10,7 @@ nonisolated enum RivoRemoteScreen:
     case documentScanner
     case publicationReader
     case localDocumentReader
+    case localAIChat
 }
 
 nonisolated enum RivoMagnifierRemoteAction:
@@ -91,6 +92,13 @@ nonisolated enum RivoLocalDocumentRemoteAction:
     }
 }
 
+nonisolated enum RivoLocalAIChatRemoteAction:
+    Equatable,
+    Sendable
+{
+    case toggleVoiceInput
+}
+
 nonisolated enum RivoScreenRemoteAction:
     Equatable,
     Sendable
@@ -104,6 +112,9 @@ nonisolated enum RivoScreenRemoteAction:
     )
     case localDocumentReader(
         RivoLocalDocumentRemoteAction
+    )
+    case localAIChat(
+        RivoLocalAIChatRemoteAction
     )
 }
 
@@ -121,6 +132,12 @@ nonisolated enum RivoScreenRemoteMapper {
         for input: RivoRemoteInput,
         on screen: RivoRemoteScreen
     ) -> RivoScreenRemoteAction? {
+        if case .localAIChat = screen,
+           case .sequence(let payload) = input,
+           payload == "a/" {
+            return .localAIChat(.toggleVoiceInput)
+        }
+
         guard case .button(
             let button,
             let buttonAction,
@@ -171,6 +188,8 @@ nonisolated enum RivoScreenRemoteMapper {
                 RivoScreenRemoteAction
                     .localDocumentReader
             )
+        case .localAIChat:
+            return nil
         }
     }
 
@@ -272,5 +291,15 @@ final class RivoScreenRemoteControlCenter:
             action: action
         )
         return true
+    }
+
+    @discardableResult
+    func receivePriorityInput(
+        _ input: RivoRemoteInput
+    ) -> Bool {
+        guard case .sequence = input else {
+            return false
+        }
+        return receive(input)
     }
 }

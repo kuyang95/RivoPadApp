@@ -409,6 +409,34 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         XCTAssertNotEqual(first?.id, second?.id)
     }
 
+    func testAIChatConsumesVoiceSequenceBeforeGlobalNavigation() {
+        let screenControl =
+            RivoScreenRemoteControlCenter()
+        screenControl.activate(.localAIChat)
+
+        XCTAssertTrue(
+            screenControl.receivePriorityInput(
+                .sequence("a/")
+            )
+        )
+        XCTAssertEqual(
+            screenControl.latestEvent?.action,
+            .localAIChat(.toggleVoiceInput)
+        )
+        XCTAssertFalse(
+            screenControl.receivePriorityInput(
+                button(.five, action: .pressed)
+            )
+        )
+
+        screenControl.deactivate(.localAIChat)
+        XCTAssertFalse(
+            screenControl.receivePriorityInput(
+                .sequence("a/")
+            )
+        )
+    }
+
     func testLocalDocumentMapperMatchesAndroidTextViewMatrix() {
         let mappings: [
             (

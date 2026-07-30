@@ -12,6 +12,8 @@ struct LLMContentView: View {
     let intent: ChatIntentInput
     @StateObject private var vm: ChatViewModel
     @ObservedObject private var stt = STTManager.shared
+    @EnvironmentObject private var remoteControl:
+        RivoScreenRemoteControlCenter
 
     @State private var didStart = false
     @State private var speechTask: Task<Void, Never>?
@@ -229,6 +231,11 @@ struct LLMContentView: View {
             }
             speak(response.text)
         }
+        .onChange(
+            of: remoteControl.latestEvent
+        ) { _, event in
+            handleRemoteEvent(event)
+        }
     }
 
     private var navigationTitle: String {
@@ -280,6 +287,33 @@ struct LLMContentView: View {
             } catch {
                 voiceErrorDescription = error.localizedDescription
             }
+        }
+    }
+
+    private func handleRemoteEvent(
+        _ event: RivoScreenRemoteEvent?
+    ) {
+        guard event?.screen == .localAIChat,
+              case .localAIChat(.toggleVoiceInput) =
+                event?.action else {
+            return
+        }
+
+        if speechTask != nil || stt.isRecording {
+            speechTask?.cancel()
+            speechTask = nil
+            stt.cancelRecording()
+            voiceErrorDescription = nil
+            UIAccessibility.post(
+                notification: .announcement,
+                argument: "음성 입력 취소"
+            )
+        } else {
+            startVoiceInput()
+            UIAccessibility.post(
+                notification: .announcement,
+                argument: "음성 입력 시작"
+            )
         }
     }
 

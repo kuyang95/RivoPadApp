@@ -53,6 +53,14 @@ struct shortcuts_exampleApp: App {
                                     conversationID: conversationID
                                 )
                             )
+                            .onAppear {
+                                rivoScreenRemoteControlCenter
+                                    .activate(.localAIChat)
+                            }
+                            .onDisappear {
+                                rivoScreenRemoteControlCenter
+                                    .deactivate(.localAIChat)
+                            }
                         case .localDocument(let fileURL):
                             LocalDocumentView(fileURL: fileURL)
                                 .onAppear {
@@ -77,6 +85,14 @@ struct shortcuts_exampleApp: App {
                                     question: question
                                 )
                             )
+                            .onAppear {
+                                rivoScreenRemoteControlCenter
+                                    .activate(.localAIChat)
+                            }
+                            .onDisappear {
+                                rivoScreenRemoteControlCenter
+                                    .deactivate(.localAIChat)
+                            }
                         case .readerLibrary:
                             ReaderLibraryView()
                         case .epubReader(let fileURL):
@@ -157,9 +173,25 @@ struct shortcuts_exampleApp: App {
                         switch event {
                         case .documentQA(let document, let question, _):
                             LLMContentView(intent: .documentQA(document: document, question: question))
+                                .onAppear {
+                                    rivoScreenRemoteControlCenter
+                                        .activate(.localAIChat)
+                                }
+                                .onDisappear {
+                                    rivoScreenRemoteControlCenter
+                                        .deactivate(.localAIChat)
+                                }
                             
                         case .imageQA(url: let url, question: let question, token: _):
                             LLMContentView(intent: .imageAnalysis(imageURL: url, question: question))
+                                .onAppear {
+                                    rivoScreenRemoteControlCenter
+                                        .activate(.localAIChat)
+                                }
+                                .onDisappear {
+                                    rivoScreenRemoteControlCenter
+                                        .deactivate(.localAIChat)
+                                }
                             
                         case .importImage:
                             DocumentScanRootView()
@@ -253,6 +285,10 @@ struct shortcuts_exampleApp: App {
             ) { _, _ in
                 guard let input =
                         rivoRemoteManager.lastInput else {
+                    return
+                }
+                guard !rivoScreenRemoteControlCenter
+                    .receivePriorityInput(input) else {
                     return
                 }
                 let decision =
