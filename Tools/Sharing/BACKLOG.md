@@ -16,6 +16,8 @@ Android `ShareReceiverProcessor`, `Intent.ACTION_SEND`,
 - 처리에 성공한 항목만 삭제해 앱 전환 실패나 강제 종료 뒤 재시도
 - `rivopad://share-inbox` URL과 앱 활성화 이벤트에서 수신함 소비
 - 수신함 저장·복구·삭제·잘못된 항목에 대한 자동 테스트
+- Action Extension에서 다른 앱의 선택 텍스트를 한 건 받아 같은 수신함에
+  저장하고 `VisionCraft에 질문` 또는 `나중에 열기` 제공
 
 ## 실기기 일괄 확인
 
@@ -28,6 +30,11 @@ Android `ShareReceiverProcessor`, `Intent.ACTION_SEND`,
       텍스트 추출/OCR과 AI 질문이 동작한다.
 - [ ] Safari의 페이지 URL과 선택 가능한 일반 텍스트를 공유하면 원문이
       유실되지 않고 M4 로컬 AI 입력으로 전달된다.
+- [ ] Safari, 메모, Mail에서 문장을 선택한 뒤 동작 메뉴의
+      `VisionCraft에 질문`을 실행하면 선택 범위만 전달되고 원본은
+      변경되지 않는다.
+- [ ] Action Extension에서 `나중에 열기`를 누른 뒤 본 앱을 실행하면
+      보류한 선택 텍스트가 한 번만 열린다.
 - [ ] 비행기 모드에서도 사진·PDF·텍스트 수신과 로컬 처리가 동작한다.
 - [ ] 100MB를 넘는 파일, 지원하지 않는 파일, 손상된 PDF에서 확장이
       종료되지 않고 이해 가능한 오류를 표시한다.
@@ -38,7 +45,6 @@ Android `ShareReceiverProcessor`, `Intent.ACTION_SEND`,
 
 ## 다음 구현
 
-- 선택 텍스트 전용 Action Extension과 동일 수신함 연결
 - 여러 사진 또는 여러 파일을 한 번에 공유하는 배치 수신
 - URL 본문을 명시적 네트워크 동의 뒤 추출하는 선택 기능
 - 오래 처리되지 않은 수신함 항목과 임시 payload의 보관·정리 정책
