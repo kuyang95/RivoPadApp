@@ -413,6 +413,16 @@ final class EPUBReaderTests: XCTestCase {
                 .chapter.next(),
             .word
         )
+        XCTAssertEqual(
+            EPUBReadAloudNavigationUnit
+                .word.shifted(by: -1),
+            .chapter
+        )
+        XCTAssertEqual(
+            EPUBReadAloudNavigationUnit
+                .sentence.shifted(by: 9),
+            .word
+        )
     }
 
     func testReadAloudSpeechChunksAtSentenceBoundaries()

@@ -1669,6 +1669,17 @@ final class LocalDocumentScannerViewController: UIViewController {
         present(alert, animated: true)
     }
 
+    func performRemoteAction(
+        _ action: RivoDocumentScannerRemoteAction
+    ) {
+        switch action {
+        case .close:
+            didTapCancel()
+        case .capture:
+            didTapShutter()
+        }
+    }
+
     @objc private func didTapShutter() {
         switch stateMachine.state {
         case .searching, .guiding, .stabilizing:

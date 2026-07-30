@@ -15,6 +15,8 @@ struct shortcuts_exampleApp: App {
         RivoRemoteManager()
     @StateObject private var rivoRemoteControlCenter =
         RivoRemoteControlCenter()
+    @StateObject private var rivoScreenRemoteControlCenter =
+        RivoScreenRemoteControlCenter()
     @StateObject private var visionLinkManager =
         VisionLinkManager()
 
@@ -67,6 +69,18 @@ struct shortcuts_exampleApp: App {
                             ReaderLibraryView()
                         case .epubReader(let fileURL):
                             EPUBReaderView(fileURL: fileURL)
+                                .onAppear {
+                                    rivoScreenRemoteControlCenter
+                                        .activate(
+                                            .publicationReader
+                                        )
+                                }
+                                .onDisappear {
+                                    rivoScreenRemoteControlCenter
+                                        .deactivate(
+                                            .publicationReader
+                                        )
+                                }
                         case .rivoRemote:
                             RivoRemoteView()
                         case .visionLink:
@@ -75,6 +89,14 @@ struct shortcuts_exampleApp: App {
                             CameraToolsView()
                         case .magnifier:
                             MagnifierView(mode: .magnifier)
+                                .onAppear {
+                                    rivoScreenRemoteControlCenter
+                                        .activate(.magnifier)
+                                }
+                                .onDisappear {
+                                    rivoScreenRemoteControlCenter
+                                        .deactivate(.magnifier)
+                                }
                                 .toolbar(
                                     .hidden,
                                     for: .navigationBar
@@ -82,6 +104,18 @@ struct shortcuts_exampleApp: App {
                                 .ignoresSafeArea()
                         case .liveTextReader:
                             MagnifierView(mode: .liveTextReader)
+                                .onAppear {
+                                    rivoScreenRemoteControlCenter
+                                        .activate(
+                                            .liveTextReader
+                                        )
+                                }
+                                .onDisappear {
+                                    rivoScreenRemoteControlCenter
+                                        .deactivate(
+                                            .liveTextReader
+                                        )
+                                }
                                 .toolbar(
                                     .hidden,
                                     for: .navigationBar
@@ -89,6 +123,18 @@ struct shortcuts_exampleApp: App {
                                 .ignoresSafeArea()
                         case .documentScanning:
                             DocumentScanRootView()
+                                .onAppear {
+                                    rivoScreenRemoteControlCenter
+                                        .activate(
+                                            .documentScanner
+                                        )
+                                }
+                                .onDisappear {
+                                    rivoScreenRemoteControlCenter
+                                        .deactivate(
+                                            .documentScanner
+                                        )
+                                }
                                 .toolbar(.hidden, for: .navigationBar)
                                 .ignoresSafeArea()
                         case .OCRResult (let image):
@@ -105,9 +151,33 @@ struct shortcuts_exampleApp: App {
                             
                         case .importImage:
                             DocumentScanRootView()
+                                .onAppear {
+                                    rivoScreenRemoteControlCenter
+                                        .activate(
+                                            .documentScanner
+                                        )
+                                }
+                                .onDisappear {
+                                    rivoScreenRemoteControlCenter
+                                        .deactivate(
+                                            .documentScanner
+                                        )
+                                }
                             
                         case .documentScanning:
                             DocumentScanRootView()
+                                .onAppear {
+                                    rivoScreenRemoteControlCenter
+                                        .activate(
+                                            .documentScanner
+                                        )
+                                }
+                                .onDisappear {
+                                    rivoScreenRemoteControlCenter
+                                        .deactivate(
+                                            .documentScanner
+                                        )
+                                }
                             
                         case .voiceQuery(image: let image, document: let document):
                          
@@ -126,6 +196,9 @@ struct shortcuts_exampleApp: App {
             }
             .environmentObject(appRouter)
             .environmentObject(rivoRemoteManager)
+            .environmentObject(
+                rivoScreenRemoteControlCenter
+            )
             .environmentObject(visionLinkManager)
             .overlay {
                 if rivoRemoteControlCenter.isMenuPresented {
@@ -170,9 +243,15 @@ struct shortcuts_exampleApp: App {
                         rivoRemoteManager.lastInput else {
                     return
                 }
-                if let command =
-                    rivoRemoteControlCenter.receive(input) {
+                let decision =
+                    rivoRemoteControlCenter
+                        .receiveDecision(input)
+                if let command = decision.command {
                     performRivoRemoteCommand(command)
+                }
+                if !decision.consumed {
+                    rivoScreenRemoteControlCenter
+                        .receive(input)
                 }
             }
             

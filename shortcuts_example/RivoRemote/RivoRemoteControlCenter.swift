@@ -20,6 +20,14 @@ nonisolated enum RivoRemoteCommand: Equatable, Sendable {
     case stopSpeech
 }
 
+nonisolated struct RivoRemoteDecision:
+    Equatable,
+    Sendable
+{
+    let command: RivoRemoteCommand?
+    let consumed: Bool
+}
+
 nonisolated struct RivoQuickMenuItem:
     Identifiable,
     Equatable,
@@ -76,15 +84,27 @@ final class RivoRemoteControlCenter: ObservableObject {
     func receive(
         _ input: RivoRemoteInput
     ) -> RivoRemoteCommand? {
+        receiveDecision(input).command
+    }
+
+    func receiveDecision(
+        _ input: RivoRemoteInput
+    ) -> RivoRemoteDecision {
         switch input {
         case .sequence(let payload):
             guard payload == "a/" else {
                 feedback = "지원하지 않는 시퀀스 \(payload)"
-                return nil
+                return RivoRemoteDecision(
+                    command: nil,
+                    consumed: true
+                )
             }
             feedback = "음성 명령: AI 채팅 열기"
             isMenuPresented = false
-            return .navigate(.aiChat)
+            return RivoRemoteDecision(
+                command: .navigate(.aiChat),
+                consumed: true
+            )
 
         case .button(
             let button,
@@ -92,48 +112,70 @@ final class RivoRemoteControlCenter: ObservableObject {
             _
         ):
             guard action == .pressed else {
-                return nil
+                return RivoRemoteDecision(
+                    command: nil,
+                    consumed: isMenuPresented
+                )
             }
 
             if button == .r3 {
                 feedback = "음성 읽기 정지"
-                return .stopSpeech
+                return RivoRemoteDecision(
+                    command: .stopSpeech,
+                    consumed: true
+                )
             }
             if button == .l1 {
                 isMenuPresented.toggle()
                 feedback = isMenuPresented
                     ? selectedItemAnnouncement
                     : "빠른 메뉴 닫힘"
-                return nil
+                return RivoRemoteDecision(
+                    command: nil,
+                    consumed: true
+                )
             }
             guard isMenuPresented else {
-                return nil
+                return RivoRemoteDecision(
+                    command: nil,
+                    consumed: false
+                )
             }
 
+            let command: RivoRemoteCommand?
             switch button {
             case .one:
                 selectedIndex = 0
                 announceSelection()
+                command = nil
             case .two, .four:
                 moveSelection(by: -1)
+                command = nil
             case .six, .eight:
                 moveSelection(by: 1)
+                command = nil
             case .seven:
                 selectedIndex = max(items.count - 1, 0)
                 announceSelection()
+                command = nil
             case .five:
-                return activateSelection()
+                command = activateSelection()
             case .zero:
                 isMenuPresented = false
                 feedback = "홈으로 이동"
-                return .home
+                command = .home
             case .star:
                 isMenuPresented = false
                 feedback = "빠른 메뉴 닫힘"
+                command = nil
             default:
                 feedback = "\(button.title) 버튼"
+                command = nil
             }
-            return nil
+            return RivoRemoteDecision(
+                command: command,
+                consumed: true
+            )
         }
     }
 

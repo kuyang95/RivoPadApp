@@ -304,9 +304,17 @@ nonisolated enum EPUBReadAloudNavigationUnit:
     }
 
     func next() -> Self {
+        shifted(by: 1)
+    }
+
+    func shifted(by delta: Int) -> Self {
         let units = Self.allCases
+        let offset =
+            (rawValue + delta) % units.count
         return units[
-            (rawValue + 1) % units.count
+            offset >= 0
+                ? offset
+                : offset + units.count
         ]
     }
 }
@@ -749,8 +757,15 @@ final class EPUBMediaOverlayPlaybackController:
     }
 
     func cycleNavigationUnit() {
+        cycleNavigationUnit(by: 1)
+    }
+
+    func cycleNavigationUnit(by delta: Int) {
+        guard delta != 0 else {
+            return
+        }
         navigationUnit =
-            navigationUnit.next()
+            navigationUnit.shifted(by: delta)
     }
 
     func setRate(_ value: Double) {

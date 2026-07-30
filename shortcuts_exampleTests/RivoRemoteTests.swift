@@ -303,6 +303,112 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         )
     }
 
+    func testClosedMenuLeavesScreenButtonsForActiveFeature() {
+        let controlCenter = RivoRemoteControlCenter()
+
+        let screenDecision =
+            controlCenter.receiveDecision(
+                button(.seven, action: .pressed)
+            )
+
+        XCTAssertFalse(screenDecision.consumed)
+        XCTAssertNil(screenDecision.command)
+
+        _ = controlCenter.receiveDecision(
+            button(.l1, action: .pressed)
+        )
+        let menuDecision =
+            controlCenter.receiveDecision(
+                button(.five, action: .pressed)
+            )
+
+        XCTAssertTrue(menuDecision.consumed)
+        XCTAssertEqual(
+            menuDecision.command,
+            .navigate(.aiChat)
+        )
+    }
+
+    func testScreenMapperMatchesAndroidCameraAndReaderKeys() {
+        XCTAssertEqual(
+            RivoScreenRemoteMapper.action(
+                for: button(.five, action: .pressed),
+                on: .magnifier
+            ),
+            .magnifier(.switchCamera)
+        )
+        XCTAssertEqual(
+            RivoScreenRemoteMapper.action(
+                for: button(.six, action: .pressed),
+                on: .liveTextReader
+            ),
+            .magnifier(.toggleTorch)
+        )
+        XCTAssertEqual(
+            RivoScreenRemoteMapper.action(
+                for: button(.seven, action: .pressed),
+                on: .documentScanner
+            ),
+            .documentScanner(.capture)
+        )
+        XCTAssertEqual(
+            RivoScreenRemoteMapper.action(
+                for: button(.four, action: .pressed),
+                on: .publicationReader
+            ),
+            .publicationReader(.previous)
+        )
+        XCTAssertEqual(
+            RivoScreenRemoteMapper.action(
+                for: button(.five, action: .pressed),
+                on: .publicationReader
+            ),
+            .publicationReader(.togglePlayback)
+        )
+        XCTAssertEqual(
+            RivoScreenRemoteMapper.action(
+                for: button(.eight, action: .pressed),
+                on: .publicationReader
+            ),
+            .publicationReader(.nextNavigationUnit)
+        )
+        XCTAssertNil(
+            RivoScreenRemoteMapper.action(
+                for: button(.seven, action: .released),
+                on: .documentScanner
+            )
+        )
+    }
+
+    func testScreenControlCenterPublishesRepeatedActions() {
+        let screenControl =
+            RivoScreenRemoteControlCenter()
+        screenControl.activate(.publicationReader)
+
+        XCTAssertTrue(
+            screenControl.receive(
+                button(.six, action: .pressed)
+            )
+        )
+        let first = screenControl.latestEvent
+        XCTAssertTrue(
+            screenControl.receive(
+                button(.six, action: .pressed)
+            )
+        )
+        let second = screenControl.latestEvent
+
+        XCTAssertEqual(
+            first?.action,
+            .publicationReader(.next)
+        )
+        XCTAssertEqual(
+            second?.action,
+            .publicationReader(.next)
+        )
+        XCTAssertNotEqual(first?.id, second?.id)
+    }
+
     private func button(
         _ button: RivoButton,
         action: RivoButtonAction

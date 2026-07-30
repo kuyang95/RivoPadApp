@@ -185,6 +185,7 @@ final class MagnifierViewController:
     private var lastLiveOCRTime: CFTimeInterval = 0
     private var lastSpokenText = ""
     private let liveOCRInterval: CFTimeInterval = 1.5
+    private var lastRemoteEventID: UInt64 = 0
 
     private let metalDevice = MTLCreateSystemDefaultDevice()
     private lazy var commandQueue = metalDevice?.makeCommandQueue()
@@ -695,6 +696,56 @@ final class MagnifierViewController:
         } catch {
             statusLabel.text = error.localizedDescription
         }
+    }
+
+    func synchronizeRemoteEventCursor(
+        to eventID: UInt64?
+    ) {
+        lastRemoteEventID = eventID ?? 0
+    }
+
+    func performRemoteAction(
+        _ action: RivoMagnifierRemoteAction,
+        eventID: UInt64
+    ) {
+        guard eventID != lastRemoteEventID else {
+            return
+        }
+        lastRemoteEventID = eventID
+
+        switch action {
+        case .close:
+            closeTapped()
+        case .switchCamera:
+            switchCameraTapped()
+        case .toggleTorch:
+            torchTapped()
+        case .capture:
+            captureTapped()
+        case .decreaseZoom:
+            adjustZoom(by: -0.5)
+        case .resetZoom:
+            setZoom(1)
+            announceCurrentZoom()
+        case .increaseZoom:
+            adjustZoom(by: 0.5)
+        }
+    }
+
+    private func adjustZoom(by delta: CGFloat) {
+        let currentZoom =
+            cameraInput?.device.videoZoomFactor
+                ?? CGFloat(zoomSlider.value)
+        setZoom(currentZoom + delta)
+        announceCurrentZoom()
+    }
+
+    private func announceCurrentZoom() {
+        UIAccessibility.post(
+            notification: .announcement,
+            argument:
+                "확대 배율 \(zoomLabel.text ?? "")"
+        )
     }
 
     private func updateZoomLabel(_ zoom: CGFloat) {

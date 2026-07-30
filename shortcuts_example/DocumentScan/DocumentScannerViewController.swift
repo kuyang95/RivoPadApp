@@ -21,6 +21,7 @@ final class DocumentScannerViewController: UIViewController {
         controller.onCancel = onCancel
         return controller
     }()
+    private var lastRemoteEventID: UInt64 = 0
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -36,5 +37,22 @@ final class DocumentScannerViewController: UIViewController {
             scanner.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         scanner.didMove(toParent: self)
+    }
+
+    func synchronizeRemoteEventCursor(
+        to eventID: UInt64?
+    ) {
+        lastRemoteEventID = eventID ?? 0
+    }
+
+    func performRemoteAction(
+        _ action: RivoDocumentScannerRemoteAction,
+        eventID: UInt64
+    ) {
+        guard eventID != lastRemoteEventID else {
+            return
+        }
+        lastRemoteEventID = eventID
+        scanner.performRemoteAction(action)
     }
 }

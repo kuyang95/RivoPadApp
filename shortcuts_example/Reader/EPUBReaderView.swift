@@ -537,6 +537,8 @@ private enum EPUBReaderTheme: String, CaseIterable, Identifiable {
 }
 
 struct EPUBReaderView: View {
+    @EnvironmentObject private var remoteControl:
+        RivoScreenRemoteControlCenter
     @StateObject private var viewModel: EPUBReaderViewModel
     @StateObject private var mediaOverlayPlayer:
         EPUBMediaOverlayPlaybackController
@@ -643,6 +645,11 @@ struct EPUBReaderView: View {
         .onChange(of: speechRate) {
             _, rate in
             mediaOverlayPlayer.setRate(rate)
+        }
+        .onChange(
+            of: remoteControl.latestEvent
+        ) { _, event in
+            handleRemoteEvent(event)
         }
         .onDisappear {
             viewModel.flushProgress()
@@ -1367,6 +1374,30 @@ struct EPUBReaderView: View {
             chapterIndex: target,
             segmentIndex: 0
         )
+    }
+
+    private func handleRemoteEvent(
+        _ event: RivoScreenRemoteEvent?
+    ) {
+        guard let event,
+              case .publicationReader(let action) =
+                event.action else {
+            return
+        }
+        switch action {
+        case .previous:
+            mediaOverlayPlayer.navigate(by: -1)
+        case .togglePlayback:
+            mediaOverlayPlayer.togglePlayback()
+        case .next:
+            mediaOverlayPlayer.navigate(by: 1)
+        case .previousNavigationUnit:
+            mediaOverlayPlayer
+                .cycleNavigationUnit(by: -1)
+        case .nextNavigationUnit:
+            mediaOverlayPlayer
+                .cycleNavigationUnit(by: 1)
+        }
     }
 
     private func selectLocation(

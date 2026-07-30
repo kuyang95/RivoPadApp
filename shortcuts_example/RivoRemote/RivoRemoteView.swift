@@ -175,6 +175,30 @@ struct RivoRemoteView: View {
                 "별표: 메뉴 닫기 · R3: 음성 읽기 정지",
                 systemImage: "speaker.slash"
             )
+            Label(
+                "돋보기: 4 닫기 · 5 전환 · 6 토치 · 7 읽기",
+                systemImage: "plus.magnifyingglass"
+            )
+            Label(
+                "돋보기: 별표 축소 · 0 초기화 · 샵 확대",
+                systemImage: "camera.metering.center.weighted"
+            )
+            Label(
+                "실시간 읽기: 7 일시정지와 재개",
+                systemImage: "text.viewfinder"
+            )
+            Label(
+                "문서 스캔: 4 닫기 · 7 수동 촬영",
+                systemImage: "doc.viewfinder"
+            )
+            Label(
+                "독서: 4 이전 · 5 재생 · 6 다음",
+                systemImage: "book"
+            )
+            Label(
+                "독서: 2 이전 단위 · 8 다음 단위",
+                systemImage: "arrow.left.arrow.right"
+            )
         }
     }
 
