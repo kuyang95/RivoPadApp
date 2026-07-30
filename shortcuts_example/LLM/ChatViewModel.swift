@@ -545,8 +545,22 @@ final class ChatViewModel: ObservableObject {
                 )
             } else if pathExtension
                         == "xls" {
-                throw ChatAttachmentError
-                    .unsupportedLegacySpreadsheet
+                let attachment =
+                    try await attachmentStore
+                    .importLegacySpreadsheet(
+                        from: url
+                    )
+                try await replaceFileAttachment(
+                    attachment
+                )
+            } else if pathExtension
+                        == "hwp" {
+                let attachment =
+                    try await attachmentStore
+                    .importHWP(from: url)
+                try await replaceFileAttachment(
+                    attachment
+                )
             } else if pathExtension == "txt"
                         || pathExtension == "text" {
                 let text = try await

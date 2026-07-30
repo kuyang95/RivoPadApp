@@ -341,7 +341,7 @@ struct LLMContentView: View {
             Button("취소", role: .cancel) {}
         } message: {
             Text(
-                "PDF·TXT·XLSX 문서, 클립보드 텍스트 또는 사진을 현재 대화의 문맥으로 사용합니다."
+                "PDF·TXT·XLSX·XLS·HWP 문서, 클립보드 텍스트 또는 사진을 현재 대화의 문맥으로 사용합니다."
             )
         }
         .fileImporter(
@@ -357,6 +357,9 @@ struct LLMContentView: View {
                 ) ?? .data,
                 UTType(
                     filenameExtension: "xls"
+                ) ?? .data,
+                UTType(
+                    filenameExtension: "hwp"
                 ) ?? .data,
             ],
             allowsMultipleSelection: false

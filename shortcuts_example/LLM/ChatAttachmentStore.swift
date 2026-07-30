@@ -98,6 +98,10 @@ nonisolated enum ChatAttachmentError:
     case encryptedSpreadsheet
     case spreadsheetLimitExceeded
     case unsupportedLegacySpreadsheet
+    case invalidHWP
+    case encryptedHWP
+    case hwpLimitExceeded
+    case unsupportedHWPVersion
     case documentHasNoText
     case fileTooLarge(maximumMegabytes: Int)
     case contextTooLarge(maximumKilobytes: Int)
@@ -111,7 +115,7 @@ nonisolated enum ChatAttachmentError:
             )
         case .unsupportedDocument:
             return AppLocalization.string(
-                "PDF, TXT와 XLSX 문서만 첨부할 수 있습니다."
+                "PDF, TXT, XLSX, XLS와 HWP 문서만 첨부할 수 있습니다."
             )
         case .invalidImage:
             return AppLocalization.string(
@@ -135,7 +139,23 @@ nonisolated enum ChatAttachmentError:
             )
         case .unsupportedLegacySpreadsheet:
             return AppLocalization.string(
-                "구형 XLS 문서는 아직 지원하지 않습니다. XLSX로 저장한 뒤 다시 첨부해 주세요."
+                "이 XLS 문서의 구형 BIFF 버전은 지원하지 않습니다. Excel 97-2003 XLS 또는 XLSX로 다시 저장해 주세요."
+            )
+        case .invalidHWP:
+            return AppLocalization.string(
+                "선택한 HWP 5.x 문서를 읽을 수 없습니다."
+            )
+        case .encryptedHWP:
+            return AppLocalization.string(
+                "암호·배포용·DRM 보안 HWP 문서는 로컬에서 열 수 없습니다. 보호를 해제한 복사본을 첨부해 주세요."
+            )
+        case .hwpLimitExceeded:
+            return AppLocalization.string(
+                "HWP 문서가 구역 수 또는 압축 해제 제한을 초과했습니다."
+            )
+        case .unsupportedHWPVersion:
+            return AppLocalization.string(
+                "HWP 5.x 문서만 지원합니다. HWPX 또는 HWP 5.x로 다시 저장해 주세요."
             )
         case .documentHasNoText:
             return AppLocalization.string(
@@ -872,6 +892,9 @@ actor ChatAttachmentStore {
     static let maximumSpreadsheetBytes =
         XLSXTextExtractor
         .maximumWorkbookBytes
+    static let maximumHWPBytes =
+        HWP5TextExtractor
+        .maximumDocumentBytes
     static let maximumPDFPages = 100
 
     private let fileManager: FileManager
@@ -1062,6 +1085,100 @@ actor ChatAttachmentStore {
                 kind: .document,
                 mimeType:
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                storedName: storedName,
+                extractedText: extracted
+            )
+        } catch {
+            try? fileManager.removeItem(
+                at: destination
+            )
+            throw error
+        }
+    }
+
+    func importLegacySpreadsheet(
+        from sourceURL: URL
+    ) throws -> StoredChatFileAttachment {
+        let data = try readSecurityScopedData(
+            at: sourceURL,
+            maximumBytes:
+                Self.maximumSpreadsheetBytes
+        )
+        let extracted =
+            try LegacyXLSExtractor.extract(
+                from: data
+            )
+        let displayName = displayName(
+            sourceURL.lastPathComponent,
+            fallback:
+                AppLocalization.string(
+                    "첨부 스프레드시트.xls"
+                )
+        )
+        let storedName = newStoredName(
+            sourceName: displayName,
+            fallbackExtension: "xls"
+        )
+        let destination = try destinationURL(
+            storedName: storedName
+        )
+        do {
+            try data.write(
+                to: destination,
+                options: .atomic
+            )
+            return StoredChatFileAttachment(
+                name: displayName,
+                kind: .document,
+                mimeType:
+                    "application/vnd.ms-excel",
+                storedName: storedName,
+                extractedText: extracted
+            )
+        } catch {
+            try? fileManager.removeItem(
+                at: destination
+            )
+            throw error
+        }
+    }
+
+    func importHWP(
+        from sourceURL: URL
+    ) throws -> StoredChatFileAttachment {
+        let data = try readSecurityScopedData(
+            at: sourceURL,
+            maximumBytes:
+                Self.maximumHWPBytes
+        )
+        let extracted =
+            try HWP5TextExtractor.extract(
+                from: data
+            )
+        let displayName = displayName(
+            sourceURL.lastPathComponent,
+            fallback:
+                AppLocalization.string(
+                    "첨부 문서.hwp"
+                )
+        )
+        let storedName = newStoredName(
+            sourceName: displayName,
+            fallbackExtension: "hwp"
+        )
+        let destination = try destinationURL(
+            storedName: storedName
+        )
+        do {
+            try data.write(
+                to: destination,
+                options: .atomic
+            )
+            return StoredChatFileAttachment(
+                name: displayName,
+                kind: .document,
+                mimeType:
+                    "application/x-hwp",
                 storedName: storedName,
                 extractedText: extracted
             )
