@@ -11,11 +11,19 @@ import Combine
 final class AppRouter: ObservableObject {
     
     @Published var route: AppRoute?
+    @Published private(set) var fileImportRequestID:
+        UInt64 = 0
+
+    func requestFileImport() {
+        fileImportRequestID &+= 1
+    }
 }
 
 enum AppRoute: Hashable {
     case chatHistory
     case localChat(conversationID: UUID?)
+    case voiceQuestion(question: String)
+    case voiceAction
     case localDocument(fileURL: URL)
     case documentQuestion(document: String, question: String)
     case readerLibrary

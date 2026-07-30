@@ -134,6 +134,9 @@ final class ChatViewModel: ObservableObject {
         switch intent {
         case .textChat:
             break
+        case .voiceQuestion(let question):
+            input = question
+            sendUserMessage()
         case .imageAnalysis, .documentQA:
             runInitialIntent(intent)
         }
@@ -152,7 +155,7 @@ final class ChatViewModel: ObservableObject {
             case .imageAnalysis:
                 try await llm.activateModel(.qwen3_vl_8b_4bit)
                 loadedKind = .vision
-            case .textChat, .documentQA:
+            case .textChat, .voiceQuestion, .documentQA:
                 try await llm.activateModel(.qwen3_8b_4bit)
                 loadedKind = .text
             }
@@ -173,7 +176,7 @@ final class ChatViewModel: ObservableObject {
 
     func runInitialIntent(_ intent: ChatIntentInput) {
         switch intent {
-        case .textChat:
+        case .textChat, .voiceQuestion:
             return
 
         case .imageAnalysis(let imageURL, let question):

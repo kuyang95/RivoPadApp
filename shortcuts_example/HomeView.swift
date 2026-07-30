@@ -126,6 +126,14 @@ struct HomeView: View {
         } message: {
             Text(fileImportError ?? "")
         }
+        .onChange(
+            of: appRouter.fileImportRequestID
+        ) { oldValue, newValue in
+            guard newValue != oldValue else {
+                return
+            }
+            isFileImporterPresented = true
+        }
     }
 
     private var rivoConnectionStatus: some View {

@@ -16,6 +16,7 @@ nonisolated enum RivoQuickDestination:
 
 nonisolated enum RivoRemoteCommand: Equatable, Sendable {
     case navigate(RivoQuickDestination)
+    case startVoiceAction
     case home
     case stopSpeech
 }
@@ -99,10 +100,10 @@ final class RivoRemoteControlCenter: ObservableObject {
                     consumed: true
                 )
             }
-            feedback = "음성 명령: AI 채팅 열기"
+            feedback = "음성 명령 듣기"
             isMenuPresented = false
             return RivoRemoteDecision(
-                command: .navigate(.aiChat),
+                command: .startVoiceAction,
                 consumed: true
             )
 

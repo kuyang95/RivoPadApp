@@ -299,7 +299,7 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         )
         XCTAssertEqual(
             controlCenter.receive(.sequence("a/")),
-            .navigate(.aiChat)
+            .startVoiceAction
         )
     }
 
@@ -434,6 +434,22 @@ final class RivoRemoteControlCenterTests: XCTestCase {
             screenControl.receivePriorityInput(
                 .sequence("a/")
             )
+        )
+    }
+
+    func testVoiceActionConsumesSecondSequenceAsCancel() {
+        let screenControl =
+            RivoScreenRemoteControlCenter()
+        screenControl.activate(.voiceAction)
+
+        XCTAssertTrue(
+            screenControl.receivePriorityInput(
+                .sequence("a/")
+            )
+        )
+        XCTAssertEqual(
+            screenControl.latestEvent?.action,
+            .voiceAction(.cancel)
         )
     }
 

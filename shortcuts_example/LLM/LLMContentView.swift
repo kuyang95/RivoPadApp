@@ -4,6 +4,7 @@ import UIKit
 
 enum ChatIntentInput: Equatable {
     case textChat(conversationID: UUID?)
+    case voiceQuestion(question: String)
     case imageAnalysis(imageURL: URL, question: String)
     case documentQA(document: String, question: String)
 }
@@ -31,6 +32,9 @@ struct LLMContentView: View {
         case .textChat(let conversationID):
             storedConversationID = conversationID ?? UUID()
             persistsHistory = true
+        case .voiceQuestion:
+            storedConversationID = UUID()
+            persistsHistory = true
         case .imageAnalysis, .documentQA:
             storedConversationID = UUID()
             persistsHistory = false
@@ -42,13 +46,21 @@ struct LLMContentView: View {
                 persistsHistory: persistsHistory
             )
         )
+        _shouldSpeakNextResponse = State(
+            initialValue: {
+                if case .voiceQuestion = intent {
+                    return true
+                }
+                return false
+            }()
+        )
 
         switch intent {
         case .imageAnalysis(let imageURL, let question):
             RVLogger.d("🔥 View에서 전달받은 imageURL: \(imageURL)")
             RVLogger.d("🔥 imageURL path: \(imageURL.path)")
             RVLogger.d("🔥 question: \(question)")
-        case .textChat, .documentQA:
+        case .textChat, .voiceQuestion, .documentQA:
             break
         }
     }
@@ -240,7 +252,7 @@ struct LLMContentView: View {
 
     private var navigationTitle: String {
         switch intent {
-        case .textChat:
+        case .textChat, .voiceQuestion:
             return "로컬 AI"
         case .imageAnalysis:
             return "이미지 질문"
@@ -249,11 +261,12 @@ struct LLMContentView: View {
         }
     }
 
-    private func startVoiceInput() {
+    @discardableResult
+    private func startVoiceInput() -> Bool {
         guard speechTask == nil,
               vm.isReadyForInput,
               !vm.isGenerating else {
-            return
+            return false
         }
 
         tts.stop()
@@ -288,6 +301,7 @@ struct LLMContentView: View {
                 voiceErrorDescription = error.localizedDescription
             }
         }
+        return true
     }
 
     private func handleRemoteEvent(
@@ -309,10 +323,13 @@ struct LLMContentView: View {
                 argument: "음성 입력 취소"
             )
         } else {
-            startVoiceInput()
+            let didStart = startVoiceInput()
             UIAccessibility.post(
                 notification: .announcement,
-                argument: "음성 입력 시작"
+                argument:
+                    didStart
+                        ? "음성 입력 시작"
+                        : "AI가 준비되거나 답변을 마친 뒤 다시 시도해 주세요."
             )
         }
     }

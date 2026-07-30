@@ -61,6 +61,47 @@ struct shortcuts_exampleApp: App {
                                 rivoScreenRemoteControlCenter
                                     .deactivate(.localAIChat)
                             }
+                        case .voiceQuestion(let question):
+                            LLMContentView(
+                                intent: .voiceQuestion(
+                                    question: question
+                                )
+                            )
+                            .onAppear {
+                                rivoScreenRemoteControlCenter
+                                    .activate(.localAIChat)
+                            }
+                            .onDisappear {
+                                rivoScreenRemoteControlCenter
+                                    .deactivate(.localAIChat)
+                            }
+                        case .voiceAction:
+                            LocalVoiceActionView(
+                                onRoute: {
+                                    replaceNavigation(
+                                        with: $0
+                                    )
+                                },
+                                onFileImport: {
+                                    path = NavigationPath()
+                                    Task { @MainActor in
+                                        await Task.yield()
+                                        appRouter
+                                            .requestFileImport()
+                                    }
+                                },
+                                onClose: {
+                                    path = NavigationPath()
+                                }
+                            )
+                            .onAppear {
+                                rivoScreenRemoteControlCenter
+                                    .activate(.voiceAction)
+                            }
+                            .onDisappear {
+                                rivoScreenRemoteControlCenter
+                                    .deactivate(.voiceAction)
+                            }
                         case .localDocument(let fileURL):
                             LocalDocumentView(fileURL: fileURL)
                                 .onAppear {
@@ -340,6 +381,8 @@ struct shortcuts_exampleApp: App {
         _ command: RivoRemoteCommand
     ) {
         switch command {
+        case .startVoiceAction:
+            replaceNavigation(with: .voiceAction)
         case .stopSpeech:
             TTSManager.shared.stop()
         case .home:
@@ -363,5 +406,12 @@ struct shortcuts_exampleApp: App {
             path = NavigationPath()
             path.append(route)
         }
+    }
+
+    private func replaceNavigation(
+        with route: AppRoute
+    ) {
+        path = NavigationPath()
+        path.append(route)
     }
 }

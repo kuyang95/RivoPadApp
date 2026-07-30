@@ -11,6 +11,7 @@ nonisolated enum RivoRemoteScreen:
     case publicationReader
     case localDocumentReader
     case localAIChat
+    case voiceAction
 }
 
 nonisolated enum RivoMagnifierRemoteAction:
@@ -99,6 +100,13 @@ nonisolated enum RivoLocalAIChatRemoteAction:
     case toggleVoiceInput
 }
 
+nonisolated enum RivoVoiceActionRemoteAction:
+    Equatable,
+    Sendable
+{
+    case cancel
+}
+
 nonisolated enum RivoScreenRemoteAction:
     Equatable,
     Sendable
@@ -115,6 +123,9 @@ nonisolated enum RivoScreenRemoteAction:
     )
     case localAIChat(
         RivoLocalAIChatRemoteAction
+    )
+    case voiceAction(
+        RivoVoiceActionRemoteAction
     )
 }
 
@@ -136,6 +147,11 @@ nonisolated enum RivoScreenRemoteMapper {
            case .sequence(let payload) = input,
            payload == "a/" {
             return .localAIChat(.toggleVoiceInput)
+        }
+        if case .voiceAction = screen,
+           case .sequence(let payload) = input,
+           payload == "a/" {
+            return .voiceAction(.cancel)
         }
 
         guard case .button(
@@ -189,6 +205,8 @@ nonisolated enum RivoScreenRemoteMapper {
                     .localDocumentReader
             )
         case .localAIChat:
+            return nil
+        case .voiceAction:
             return nil
         }
     }
