@@ -93,6 +93,13 @@ final class AppLocalizationTests:
             ),
             "すべての会話を削除しますか？"
         )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "답변 음성",
+                bundle: english
+            ),
+            "Spoken Answer"
+        )
     }
 
     func testDynamicFormatTranslationsPreserveArguments()
@@ -151,6 +158,16 @@ final class AppLocalizationTests:
                     ),
                 12
             )
+        let englishAnswerPosition =
+            String(
+                format:
+                    AppLocalization.string(
+                        "답변 문장 %lld/%lld",
+                        bundle: english
+                    ),
+                2,
+                5
+            )
 
         XCTAssertEqual(englishRate, "1.25×")
         XCTAssertEqual(
@@ -172,6 +189,10 @@ final class AppLocalizationTests:
         XCTAssertEqual(
             japaneseMessageCount,
             "メッセージ12件"
+        )
+        XCTAssertEqual(
+            englishAnswerPosition,
+            "Answer sentence 2 of 5"
         )
     }
 

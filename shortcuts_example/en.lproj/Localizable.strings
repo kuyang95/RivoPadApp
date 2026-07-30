@@ -312,3 +312,12 @@
 "모든 대화를 삭제하지 못했습니다: %@" = "Couldn’t delete all conversations: %@";
 "대화 기록을 저장하지 못했습니다: %@" = "Couldn’t save chat history: %@";
 "M4 문맥 한도에 맞춰 오래된 메시지 %lld개를 제외하고 최근 기록으로 이어갑니다. 저장된 기록은 그대로 유지됩니다." = "To fit the M4 context limit, %lld older messages were omitted and the conversation continues from recent history. All saved messages remain available.";
+"답변 음성" = "Spoken Answer";
+"답변 문장 %lld/%lld" = "Answer sentence %lld of %lld";
+"재생할 답변 준비됨" = "Answer ready to play";
+"이전 문장" = "Previous Sentence";
+"현재 문장 다시 읽기" = "Replay Current Sentence";
+"답변 읽기 정지" = "Stop Reading Answer";
+"답변 읽기" = "Read Answer";
+"다음 문장" = "Next Sentence";
+"읽을 수 있는 AI 답변이 없습니다." = "There is no AI answer available to read.";

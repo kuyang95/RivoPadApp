@@ -21,6 +21,8 @@ enum ChatIntentInput: Equatable {
 struct LLMContentView: View {
     let intent: ChatIntentInput
     @StateObject private var vm: ChatViewModel
+    @StateObject private var answerSpeech =
+        ChatAnswerSpeechController()
     @ObservedObject private var stt = STTManager.shared
     @EnvironmentObject private var remoteControl:
         RivoScreenRemoteControlCenter
@@ -29,8 +31,6 @@ struct LLMContentView: View {
     @State private var speechTask: Task<Void, Never>?
     @State private var voiceErrorDescription: String?
     @State private var shouldSpeakNextResponse = false
-
-    private let tts = TTSManager.shared
 
     init(intent: ChatIntentInput) {
         self.intent = intent
@@ -168,6 +168,14 @@ struct LLMContentView: View {
                     .padding(.horizontal, 12)
                 }
 
+                if let response =
+                        latestAssistantMessage,
+                   !vm.isGenerating {
+                    answerSpeechControls(
+                        for: response
+                    )
+                }
+
                 HStack(alignment: .bottom) {
                     Button {
                         if stt.isRecording {
@@ -272,12 +280,15 @@ struct LLMContentView: View {
             speechTask?.cancel()
             speechTask = nil
             stt.cancelRecording()
-            tts.stop()
+            answerSpeech.stop()
             vm.closeConversation()
         }
         .onChange(of: vm.isGenerating) { wasGenerating, isGenerating in
+            if isGenerating {
+                answerSpeech.stop()
+                return
+            }
             guard wasGenerating,
-                  !isGenerating,
                   shouldSpeakNextResponse else {
                 return
             }
@@ -291,7 +302,10 @@ struct LLMContentView: View {
                   }) else {
                 return
             }
-            speak(response.text)
+            _ = answerSpeech.play(
+                messageID: response.id,
+                text: response.text
+            )
         }
         .onChange(
             of: remoteControl.latestEvent
@@ -338,6 +352,130 @@ struct LLMContentView: View {
             return nil
         }
         return response
+    }
+
+    private var latestAssistantMessage:
+        ChatViewModel.Msg?
+    {
+        vm.messages.last(where: {
+            $0.role == "assistant"
+                && !$0.text
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    )
+                    .isEmpty
+        })
+    }
+
+    private func answerSpeechControls(
+        for response: ChatViewModel.Msg
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+            HStack {
+                Label(
+                    "답변 음성",
+                    systemImage:
+                        "text.bubble.waveform"
+                )
+                .font(.subheadline.bold())
+                Spacer()
+                Text(
+                    answerSpeech
+                        .activeMessageID
+                        == response.id
+                        ? answerSpeech
+                            .currentPositionDescription
+                            ?? ""
+                        : AppLocalization.string(
+                            "재생할 답변 준비됨"
+                        )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 12) {
+                speechControlButton(
+                    title: "이전 문장",
+                    systemImage:
+                        "backward.end.fill"
+                ) {
+                    _ = answerSpeech.previous(
+                        messageID: response.id,
+                        text: response.text
+                    )
+                }
+
+                speechControlButton(
+                    title: "현재 문장 다시 읽기",
+                    systemImage:
+                        "arrow.counterclockwise"
+                ) {
+                    _ = answerSpeech.replay(
+                        messageID: response.id,
+                        text: response.text
+                    )
+                }
+
+                speechControlButton(
+                    title:
+                        answerSpeech.isSpeaking
+                            ? "답변 읽기 정지"
+                            : "답변 읽기",
+                    systemImage:
+                        answerSpeech.isSpeaking
+                            ? "stop.fill"
+                            : "play.fill"
+                ) {
+                    _ = answerSpeech.toggle(
+                        messageID: response.id,
+                        text: response.text
+                    )
+                }
+
+                speechControlButton(
+                    title: "다음 문장",
+                    systemImage:
+                        "forward.end.fill"
+                ) {
+                    _ = answerSpeech.next(
+                        messageID: response.id,
+                        text: response.text
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            Color.secondary.opacity(0.08)
+        )
+        .accessibilityElement(
+            children: .contain
+        )
+    }
+
+    private func speechControlButton(
+        title: String,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: 30
+                )
+        }
+        .buttonStyle(.bordered)
+        .accessibilityLabel(
+            AppLocalization.string(title)
+        )
     }
 
     private func webSearchSourceBanner(
@@ -458,7 +596,7 @@ struct LLMContentView: View {
             return false
         }
 
-        tts.stop()
+        answerSpeech.stop()
         voiceErrorDescription = nil
         speechTask = Task {
             defer {
@@ -497,11 +635,34 @@ struct LLMContentView: View {
         _ event: RivoScreenRemoteEvent?
     ) {
         guard event?.screen == .localAIChat,
-              case .localAIChat(.toggleVoiceInput) =
+              case .localAIChat(let action) =
                 event?.action else {
             return
         }
 
+        switch action {
+        case .toggleVoiceInput:
+            toggleVoiceInputFromRemote()
+        case .previousSentence:
+            controlAnswerSpeechFromRemote(
+                action: .previous
+            )
+        case .replaySentence:
+            controlAnswerSpeechFromRemote(
+                action: .replay
+            )
+        case .nextSentence:
+            controlAnswerSpeechFromRemote(
+                action: .next
+            )
+        case .toggleAnswerReading:
+            controlAnswerSpeechFromRemote(
+                action: .toggle
+            )
+        }
+    }
+
+    private func toggleVoiceInputFromRemote() {
         if speechTask != nil || stt.isRecording {
             speechTask?.cancel()
             speechTask = nil
@@ -523,15 +684,85 @@ struct LLMContentView: View {
         }
     }
 
-    private func speak(_ text: String) {
-        let trimmed = text.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
-        guard !trimmed.isEmpty else {
+    private enum RemoteAnswerSpeechAction:
+        Equatable
+    {
+        case previous
+        case replay
+        case next
+        case toggle
+    }
+
+    private func controlAnswerSpeechFromRemote(
+        action: RemoteAnswerSpeechAction
+    ) {
+        guard !vm.isGenerating,
+              let response =
+                latestAssistantMessage else {
+            UIAccessibility.post(
+                notification: .announcement,
+                argument:
+                    AppLocalization.string(
+                        "읽을 수 있는 AI 답변이 없습니다."
+                    )
+            )
             return
         }
-        tts.stop()
-        tts.speak(trimmed)
+
+        let wasSpeaking =
+            answerSpeech.isSpeaking
+        let didHandle: Bool
+        switch action {
+        case .previous:
+            didHandle =
+                answerSpeech.previous(
+                    messageID: response.id,
+                    text: response.text
+                )
+        case .replay:
+            didHandle =
+                answerSpeech.replay(
+                    messageID: response.id,
+                    text: response.text
+                )
+        case .next:
+            didHandle =
+                answerSpeech.next(
+                    messageID: response.id,
+                    text: response.text
+                )
+        case .toggle:
+            didHandle =
+                answerSpeech.toggle(
+                    messageID: response.id,
+                    text: response.text
+                )
+        }
+
+        let announcement: String?
+        if !didHandle {
+            announcement =
+                AppLocalization.string(
+                    "읽을 수 있는 AI 답변이 없습니다."
+                )
+        } else if action == .toggle,
+                  wasSpeaking {
+            announcement =
+                AppLocalization.string(
+                    "답변 읽기 정지"
+                )
+        } else {
+            // The selected sentence itself is the
+            // feedback. An accessibility announcement
+            // here would overlap the app TTS.
+            announcement = nil
+        }
+        if let announcement {
+            UIAccessibility.post(
+                notification: .announcement,
+                argument: announcement
+            )
+        }
     }
 }
 

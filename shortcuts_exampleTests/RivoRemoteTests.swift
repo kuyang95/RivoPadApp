@@ -1046,11 +1046,58 @@ final class RivoRemoteControlCenterTests: XCTestCase {
                 button(.five, action: .pressed)
             )
         )
+        XCTAssertTrue(
+            screenControl.receivePriorityInput(
+                button(.r3, action: .pressed)
+            )
+        )
+        XCTAssertEqual(
+            screenControl.latestEvent?.action,
+            .localAIChat(
+                .toggleAnswerReading
+            )
+        )
 
         screenControl.deactivate(.localAIChat)
         XCTAssertFalse(
             screenControl.receivePriorityInput(
                 .sequence("a/")
+            )
+        )
+    }
+
+    func testAIChatMapsSentenceReadingKeys() {
+        let mappings: [
+            (
+                RivoButton,
+                RivoLocalAIChatRemoteAction
+            )
+        ] = [
+            (.four, .previousSentence),
+            (.five, .replaySentence),
+            (.six, .nextSentence),
+            (.r3, .toggleAnswerReading),
+        ]
+
+        for (button, action) in mappings {
+            XCTAssertEqual(
+                RivoScreenRemoteMapper.action(
+                    for: self.button(
+                        button,
+                        action: .pressed
+                    ),
+                    on: .localAIChat
+                ),
+                .localAIChat(action)
+            )
+        }
+        XCTAssertNil(
+            RivoScreenRemoteMapper.action(
+                for: button(
+                    .five,
+                    action: .released
+                ),
+                on: .localAIChat
             )
         )
     }
