@@ -65,6 +65,20 @@ final class AppLocalizationTests:
             ),
             "本文を読む"
         )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "웹 검색",
+                bundle: english
+            ),
+            "Web Search"
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "선택적 웹 검색",
+                bundle: japanese
+            ),
+            "任意のWeb検索"
+        )
     }
 
     func testDynamicFormatTranslationsPreserveArguments()
@@ -105,6 +119,15 @@ final class AppLocalizationTests:
             ),
             1200
         )
+        let englishSearchCount =
+            String(
+                format:
+                    AppLocalization.string(
+                        "검색 출처 %lld개",
+                        bundle: english
+                    ),
+                5
+            )
 
         XCTAssertEqual(englishRate, "1.25×")
         XCTAssertEqual(
@@ -118,6 +141,10 @@ final class AppLocalizationTests:
         XCTAssertEqual(
             japaneseBodyCount,
             "本文1200文字"
+        )
+        XCTAssertEqual(
+            englishSearchCount,
+            "5 search sources"
         )
     }
 

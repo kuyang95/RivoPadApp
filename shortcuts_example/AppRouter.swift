@@ -29,9 +29,19 @@ enum AppRoute: Hashable {
         initialURL: String?,
         autoLoad: Bool
     )
+    case webSearch(
+        initialQuery: String?,
+        autoSearch: Bool,
+        speaksAnswer: Bool
+    )
     case webPageQuestion(
         content: WebPageContent,
         question: String
+    )
+    case webSearchQuestion(
+        response: WebSearchResponse,
+        question: String,
+        speaksResponse: Bool
     )
     case voiceQuestion(question: String)
     case voiceAction

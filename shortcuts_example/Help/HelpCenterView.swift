@@ -99,6 +99,11 @@ struct HelpCenterView: View {
                     systemImage:
                         "square.and.arrow.down"
                 )
+                Label(
+                    "선택적 웹 검색을 켜면 검색어와 개인 API 키는 Brave로 보내고, 최종 AI 답변은 이 iPad에서 만듭니다.",
+                    systemImage:
+                        "globe.badge.chevron.backward"
+                )
             }
 
             Section {

@@ -49,6 +49,30 @@ struct ChatHistoryView: View {
             ) {
                 NavigationLink(
                     value:
+                        AppRoute.webSearch(
+                            initialQuery:
+                                nil,
+                            autoSearch:
+                                false,
+                            speaksAnswer:
+                                false
+                        )
+                ) {
+                    Label(
+                        "웹 검색",
+                        systemImage:
+                            "magnifyingglass"
+                    )
+                }
+                .accessibilityHint(
+                    "온라인에서 출처를 찾고 M4 로컬 AI로 답변합니다."
+                )
+            }
+            ToolbarItem(
+                placement: .topBarTrailing
+            ) {
+                NavigationLink(
+                    value:
                         AppRoute.webQuestion(
                             initialURL: nil,
                             autoLoad: false

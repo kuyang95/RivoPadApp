@@ -4,12 +4,19 @@ import UIKit
 struct AppSettingsView: View {
     @ObservedObject private var settings =
         AppSettingsStore.shared
+    @ObservedObject private var webSearch =
+        WebSearchConfigurationStore.shared
     @Environment(\.openURL)
     private var openURL
 
     @State private var documentAppearance =
         LocalDocumentAppearanceStore().load()
     @State private var showsResetConfirmation =
+        false
+    @State private var webSearchAPIKey = ""
+    @State private var webSearchStatus: String?
+    @State private var webSearchError: String?
+    @State private var showsWebSearchConsent =
         false
 
     @AppStorage("reader.epub.theme")
@@ -28,6 +35,7 @@ struct AppSettingsView: View {
             appearanceSection
             documentSection
             readerSection
+            webSearchSection
             connectionSection
             supportSection
             systemSection
@@ -56,6 +64,29 @@ struct AppSettingsView: View {
         } message: {
             Text(
                 "대화·문서·책은 삭제하지 않고 보기와 음성 설정만 초기화합니다."
+            )
+        }
+        .confirmationDialog(
+            "온라인 웹 검색을 켤까요?",
+            isPresented:
+                $showsWebSearchConsent,
+            titleVisibility: .visible
+        ) {
+            Button(
+                "동의하고 켜기"
+            ) {
+                webSearch.setEnabled(true)
+                webSearchStatus =
+                    "온라인 웹 검색을 켰습니다."
+                webSearchError = nil
+            }
+            Button(
+                "취소",
+                role: .cancel
+            ) {}
+        } message: {
+            Text(
+                "검색어가 개인 Brave API 키로 Brave Search에 전송됩니다. Brave는 과금·장애 대응·남용 방지를 위해 검색어 로그를 최대 90일 보관할 수 있습니다. 검색 결과와 로컬 AI 답변은 VisionCraft 대화 기록에 저장하지 않습니다."
             )
         }
     }
@@ -275,6 +306,134 @@ struct AppSettingsView: View {
         }
     }
 
+    private var webSearchSection:
+        some View
+    {
+        Section {
+            LabeledContent(
+                "공급자",
+                value:
+                    "Brave LLM Context"
+            )
+
+            SecureField(
+                "Brave Search API 키",
+                text: $webSearchAPIKey
+            )
+            .textInputAutocapitalization(
+                .never
+            )
+            .autocorrectionDisabled()
+            .privacySensitive()
+
+            HStack {
+                Button(
+                    "API 키 저장",
+                    systemImage:
+                        "key.fill"
+                ) {
+                    saveWebSearchAPIKey()
+                }
+                .disabled(
+                    webSearchAPIKey
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+                        .isEmpty
+                )
+
+                if webSearch.hasAPIKey {
+                    Button(
+                        "저장된 키 삭제",
+                        role: .destructive
+                    ) {
+                        removeWebSearchAPIKey()
+                    }
+                }
+            }
+
+            LabeledContent(
+                "키 상태",
+                value:
+                    webSearch.hasAPIKey
+                    ? "Keychain에 저장됨"
+                    : "저장되지 않음"
+            )
+
+            Toggle(
+                "온라인 웹 검색 사용",
+                isOn:
+                    Binding(
+                        get: {
+                            webSearch
+                                .isEnabled
+                        },
+                        set: {
+                            requested in
+                            if !requested {
+                                webSearch
+                                    .setEnabled(
+                                        false
+                                    )
+                                webSearchStatus =
+                                    "온라인 웹 검색을 껐습니다."
+                            } else if webSearch
+                                .hasAPIKey {
+                                showsWebSearchConsent =
+                                    true
+                            } else {
+                                webSearchError =
+                                    "먼저 개인 Brave Search API 키를 저장해 주세요."
+                            }
+                        }
+                    )
+            )
+
+            if let webSearchStatus {
+                Text(webSearchStatus)
+                    .font(.footnote)
+                    .foregroundStyle(.green)
+            }
+            if let webSearchError {
+                Text(webSearchError)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .accessibilityLabel(
+                        "오류: \(webSearchError)"
+                    )
+            }
+
+            Link(
+                "Brave API 키와 요금 확인",
+                destination: URL(
+                    string:
+                        "https://api-dashboard.search.brave.com/app/keys"
+                )!
+            )
+            Link(
+                "개인정보 안내",
+                destination: URL(
+                    string:
+                        "https://api-dashboard.search.brave.com/privacy-policy"
+                )!
+            )
+            Link(
+                "이용약관",
+                destination: URL(
+                    string:
+                        "https://api-dashboard.search.brave.com/documentation/resources/terms-of-service"
+                )!
+            )
+        } header: {
+            Text("선택적 웹 검색")
+        } footer: {
+            Text(
+                "검색어와 API 키는 Brave로 전송됩니다. AI 답변은 M4에서 만들며 검색 결과를 캐시하거나 대화 기록에 저장하지 않습니다. 현재 Search 요금은 요청 1,000회당 미화 5달러이며 월 5달러 크레딧이 포함되지만, 최신 조건은 Brave에서 확인하세요."
+            )
+        }
+    }
+
     private var connectionSection: some View {
         Section("연결") {
             NavigationLink(
@@ -347,5 +506,35 @@ struct AppSettingsView: View {
         readerFontScale = 1.0
         readerLineHeight = 1.7
         readerSpeechRate = 1.0
+    }
+
+    private func saveWebSearchAPIKey() {
+        do {
+            try webSearch.saveAPIKey(
+                webSearchAPIKey
+            )
+            webSearchAPIKey = ""
+            webSearchStatus =
+                "API 키를 Keychain에 저장했습니다."
+            webSearchError = nil
+        } catch {
+            webSearchStatus = nil
+            webSearchError =
+                error.localizedDescription
+        }
+    }
+
+    private func removeWebSearchAPIKey() {
+        do {
+            try webSearch.removeAPIKey()
+            webSearchAPIKey = ""
+            webSearchStatus =
+                "저장된 API 키를 삭제하고 웹 검색을 껐습니다."
+            webSearchError = nil
+        } catch {
+            webSearchStatus = nil
+            webSearchError =
+                error.localizedDescription
+        }
     }
 }

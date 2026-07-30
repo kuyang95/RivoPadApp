@@ -223,11 +223,17 @@ struct LocalVoiceActionView: View {
             status =
                 "저는 iPad에서 로컬로 동작하는 VisionCraft 도우미입니다."
             announce(status)
-        case .webSearch:
-            errorDescription =
-                "웹 검색은 아직 연결되지 않았습니다. "
-                + "로컬 AI 질문이나 앱 기능 명령을 말씀해 주세요."
-            announce(errorDescription ?? "")
+        case .webSearch(let question):
+            route(
+                .webSearch(
+                    initialQuery:
+                        question,
+                    autoSearch: true,
+                    speaksAnswer: true
+                ),
+                announcement:
+                    "온라인에서 출처를 찾고 M4 로컬 AI가 답변합니다."
+            )
         case .question(let question):
             route(
                 .voiceQuestion(question: question),

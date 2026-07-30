@@ -11,6 +11,11 @@ enum ChatIntentInput: Equatable {
         content: WebPageContent,
         question: String
     )
+    case webSearchQA(
+        response: WebSearchResponse,
+        question: String,
+        speaksResponse: Bool
+    )
 }
 
 struct LLMContentView: View {
@@ -41,7 +46,8 @@ struct LLMContentView: View {
             persistsHistory = true
         case .imageAnalysis,
              .documentQA,
-             .webPageQA:
+             .webPageQA,
+             .webSearchQA:
             storedConversationID = UUID()
             persistsHistory = false
         }
@@ -57,6 +63,13 @@ struct LLMContentView: View {
                 if case .voiceQuestion = intent {
                     return true
                 }
+                if case .webSearchQA(
+                    _,
+                    _,
+                    let speaksResponse
+                ) = intent {
+                    return speaksResponse
+                }
                 return false
             }()
         )
@@ -69,7 +82,8 @@ struct LLMContentView: View {
         case .textChat,
              .voiceQuestion,
              .documentQA,
-             .webPageQA:
+             .webPageQA,
+             .webSearchQA:
             break
         }
     }
@@ -79,6 +93,12 @@ struct LLMContentView: View {
             VStack(spacing: 8) {
                 if let source = webSource {
                     webSourceBanner(source)
+                }
+                if let response =
+                        webSearchResponse {
+                    webSearchSourceBanner(
+                        response
+                    )
                 }
 
                 if vm.messages.isEmpty, !vm.isLoadingModel {
@@ -273,6 +293,8 @@ struct LLMContentView: View {
             return "문서 질문"
         case .webPageQA:
             return "웹페이지 질문"
+        case .webSearchQA:
+            return "웹 검색 답변"
         }
     }
 
@@ -286,6 +308,76 @@ struct LLMContentView: View {
             return nil
         }
         return content
+    }
+
+    private var webSearchResponse:
+        WebSearchResponse?
+    {
+        guard case .webSearchQA(
+            let response,
+            _,
+            _
+        ) = intent else {
+            return nil
+        }
+        return response
+    }
+
+    private func webSearchSourceBanner(
+        _ response: WebSearchResponse
+    ) -> some View {
+        DisclosureGroup {
+            VStack(
+                alignment: .leading,
+                spacing: 10
+            ) {
+                ForEach(response.results) {
+                    result in
+                    Link(
+                        destination: result.url
+                    ) {
+                        HStack {
+                            Text(
+                                "[\(result.id)] \(result.title)"
+                            )
+                            .lineLimit(2)
+                            .multilineTextAlignment(
+                                .leading
+                            )
+                            Spacer()
+                            Image(
+                                systemName:
+                                    "arrow.up.right"
+                            )
+                        }
+                    }
+                }
+                Text(
+                    "검색 결과와 답변은 대화 기록에 저장하지 않습니다."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            .padding(.top, 8)
+        } label: {
+            Label(
+                "Brave 검색 출처 \(response.results.count)개",
+                systemImage:
+                    "checkmark.shield"
+            )
+            .font(.subheadline.bold())
+        }
+        .padding(12)
+        .background(
+            Color.indigo.opacity(0.09)
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 14,
+                style: .continuous
+            )
+        )
+        .padding(.horizontal, 12)
     }
 
     private func webSourceBanner(

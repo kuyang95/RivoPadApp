@@ -90,6 +90,19 @@ struct shortcuts_exampleApp: App {
                                 autoLoad:
                                     autoLoad
                             )
+                        case .webSearch(
+                            let initialQuery,
+                            let autoSearch,
+                            let speaksAnswer
+                        ):
+                            WebSearchView(
+                                initialQuery:
+                                    initialQuery,
+                                autoSearch:
+                                    autoSearch,
+                                speaksAnswer:
+                                    speaksAnswer
+                            )
                         case .webPageQuestion(
                             let content,
                             let question
@@ -101,6 +114,34 @@ struct shortcuts_exampleApp: App {
                                             content,
                                         question:
                                             question
+                                    )
+                            )
+                            .onAppear {
+                                rivoScreenRemoteControlCenter
+                                    .activate(
+                                        .localAIChat
+                                    )
+                            }
+                            .onDisappear {
+                                rivoScreenRemoteControlCenter
+                                    .deactivate(
+                                        .localAIChat
+                                    )
+                            }
+                        case .webSearchQuestion(
+                            let response,
+                            let question,
+                            let speaksResponse
+                        ):
+                            LLMContentView(
+                                intent:
+                                    .webSearchQA(
+                                        response:
+                                            response,
+                                        question:
+                                            question,
+                                        speaksResponse:
+                                            speaksResponse
                                     )
                             )
                             .onAppear {
