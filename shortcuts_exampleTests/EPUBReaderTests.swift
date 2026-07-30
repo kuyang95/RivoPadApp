@@ -191,6 +191,17 @@ final class EPUBReaderTests: XCTestCase {
                 segmentIndex: 0
             )
         )
+
+        EPUBProgressStore.removeProgress(
+            for: "book",
+            defaults: defaults
+        )
+        XCTAssertNil(
+            EPUBProgressStore.progress(
+                for: "book",
+                defaults: defaults
+            )
+        )
     }
 
     func testSMILClockSupportsAndroidClockForms()
@@ -617,6 +628,185 @@ final class EPUBReaderTests: XCTestCase {
         XCTAssertEqual(
             try Data(contentsOf: importedURL),
             expected
+        )
+    }
+
+    func testLibraryDeduplicatesPersistsAndDeletesBooks()
+        async throws
+    {
+        let testDirectory = FileManager.default
+            .temporaryDirectory
+            .appendingPathComponent(
+                "RivoEPUBLibraryDedupTests-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        let sourceDirectory = testDirectory
+            .appendingPathComponent(
+                "Source",
+                isDirectory: true
+            )
+        let booksDirectory = testDirectory
+            .appendingPathComponent(
+                "Books",
+                isDirectory: true
+            )
+        try FileManager.default.createDirectory(
+            at: sourceDirectory,
+            withIntermediateDirectories: true
+        )
+        defer {
+            try? FileManager.default.removeItem(
+                at: testDirectory
+            )
+        }
+
+        let expected = try EPUBFixture.makeBook()
+        let firstSource = sourceDirectory
+            .appendingPathComponent("first.epub")
+        let duplicateSource = sourceDirectory
+            .appendingPathComponent("duplicate.epub")
+        try expected.write(to: firstSource)
+        try expected.write(to: duplicateSource)
+
+        let store = EPUBLibraryStore(
+            booksDirectory: booksDirectory
+        )
+        let first = try await store
+            .importBookWithResult(
+                from: firstSource
+            )
+        let duplicate = try await store
+            .importBookWithResult(
+                from: duplicateSource
+            )
+
+        XCTAssertFalse(
+            first.reusedExistingBook
+        )
+        XCTAssertTrue(
+            duplicate.reusedExistingBook
+        )
+        XCTAssertEqual(
+            first.book.fileURL,
+            duplicate.book.fileURL
+        )
+        let booksAfterDuplicate =
+            try await store.books()
+        XCTAssertEqual(
+            booksAfterDuplicate.count,
+            1
+        )
+        XCTAssertEqual(
+            duplicate.book.contentDigest?
+                .count,
+            64
+        )
+
+        let opened = try await store.markOpened(
+            bookURL: first.book.fileURL,
+            publicationIdentifier:
+                "fixture-publication"
+        )
+        XCTAssertEqual(
+            opened?.publicationIdentifier,
+            "fixture-publication"
+        )
+
+        let reopenedStore = EPUBLibraryStore(
+            booksDirectory: booksDirectory
+        )
+        let restored = try await
+            reopenedStore.books()
+        XCTAssertEqual(restored.count, 1)
+        XCTAssertEqual(
+            restored.first?
+                .publicationIdentifier,
+            "fixture-publication"
+        )
+        XCTAssertEqual(
+            restored.first?.contentDigest,
+            duplicate.book.contentDigest
+        )
+
+        if let book = restored.first {
+            _ = try await reopenedStore
+                .deleteBook(book)
+        }
+        let booksAfterDelete =
+            try await reopenedStore.books()
+        XCTAssertTrue(
+            booksAfterDelete.isEmpty
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: firstSource.path
+            )
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: duplicateSource.path
+            )
+        )
+    }
+
+    func testLibraryMigratesLegacyManagedBook()
+        async throws
+    {
+        let testDirectory = FileManager.default
+            .temporaryDirectory
+            .appendingPathComponent(
+                "RivoEPUBLegacyLibraryTests-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        let booksDirectory = testDirectory
+            .appendingPathComponent(
+                "Books",
+                isDirectory: true
+            )
+        let legacyDirectory = booksDirectory
+            .appendingPathComponent(
+                "legacy-book",
+                isDirectory: true
+            )
+        try FileManager.default.createDirectory(
+            at: legacyDirectory,
+            withIntermediateDirectories: true
+        )
+        defer {
+            try? FileManager.default.removeItem(
+                at: testDirectory
+            )
+        }
+        let legacyURL = legacyDirectory
+            .appendingPathComponent(
+                "오래된 책.zip"
+            )
+        try Data("legacy".utf8).write(
+            to: legacyURL
+        )
+
+        let store = EPUBLibraryStore(
+            booksDirectory: booksDirectory
+        )
+        let books = try await store.books()
+
+        XCTAssertEqual(books.count, 1)
+        XCTAssertEqual(
+            books.first?.title,
+            "오래된 책"
+        )
+        XCTAssertEqual(
+            books.first?.formatDescription,
+            "DAISY ZIP"
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: legacyDirectory
+                    .appendingPathComponent(
+                        ".rivo-library-book.json"
+                    )
+                    .path
+            )
         )
     }
 

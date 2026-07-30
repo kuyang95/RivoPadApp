@@ -356,6 +356,13 @@ final class EPUBReaderViewModel: ObservableObject {
             isApplyingNavigation = true
             navigationRevision &+= 1
             EPUBProgressStore.lastBookURL = fileURL
+            _ = try? await
+                EPUBLibraryStore.shared
+                    .markOpened(
+                        bookURL: fileURL,
+                        publicationIdentifier:
+                            parsedBook.identifier
+                    )
         } catch {
             errorDescription = error.localizedDescription
         }

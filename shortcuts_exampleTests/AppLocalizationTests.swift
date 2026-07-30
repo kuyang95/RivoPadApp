@@ -128,6 +128,20 @@ final class AppLocalizationTests:
             ),
             "横画面の一行読み"
         )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "내 서재",
+                bundle: english
+            ),
+            "My Library"
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "서재에서 삭제",
+                bundle: japanese
+            ),
+            "ライブラリから削除"
+        )
     }
 
     func testDynamicFormatTranslationsPreserveArguments()
@@ -151,6 +165,17 @@ final class AppLocalizationTests:
                 9
             ),
             "Document sentence 2 of 9"
+        )
+        XCTAssertEqual(
+            String(
+                format:
+                    AppLocalization.string(
+                        "책 %lld권",
+                        bundle: english
+                    ),
+                3
+            ),
+            "3 Books"
         )
 
         let englishRate = String(
