@@ -144,7 +144,7 @@
 
 | 기능 | iPad 상태 | 남은 차이 |
 | --- | --- | --- |
-| Siri/단축어/App Intent | 🟡 | AI·스캔·음성 일부 완료, 전체 화면 바로가기 ⏳ |
+| Siri/단축어/App Intent | ✅ | AI·이미지·OCR·스캔·음성 요청과 AI·독서·카메라·스캔·돋보기·실시간 읽기·파일·Rivo·VisionLink 9개 바로가기 완료, 실제 Siri 발화 🧪 |
 | 홈 화면 위젯 | ✅ | 소형 최근 BLE 스냅샷, 중형 AI·스캔·카메라·독서 바로가기와 갱신 시각 완료, 실제 홈 배치 🧪 |
 | Share Extension | ✅ | 사진·PDF·텍스트·URL 수신과 앱 재활성화 복구 완료, 실제 공유 시트 확인 🧪 |
 | Action Extension | ✅ | 선택 텍스트 수신·즉시 질문·나중에 열기 완료, 실제 앱별 선택 메뉴 확인 🧪 |
@@ -185,7 +185,7 @@ iPad 앱에서는 동일 구현하지 않으며, 제품 범위와 대체 경로�
 5. DAISY/SMIL 재생 🟡
 6. 문서 뷰어 탐색·외형·저장
 7. Rivo 화면별 조작·시간 동기화·상태 복원
-8. Share/Action Extension·위젯·App Intent
+8. Share/Action Extension·위젯·App Intent ✅
 9. 통합 설정·다국어·도움말
 10. 스캐너의 보류된 다중 페이지·PDF·성능 작업
 

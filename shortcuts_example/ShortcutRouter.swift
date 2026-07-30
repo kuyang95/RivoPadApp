@@ -15,6 +15,8 @@ final class ShortcutRouter: ObservableObject {
     }
 
     @Published var intentEvent: IntentEvent?
+    @Published var appDestination:
+        AppDeepLinkDestination?
 
     func consumeLastIfNeeded() {
         
@@ -97,6 +99,13 @@ final class ShortcutRouter: ObservableObject {
             
             intentEvent = .voiceQuery(image: image, document: nil)
             RVLogger.d("무사히?1")
+
+        case .openScreen:
+            guard let destination =
+                    env.openScreenDestination else {
+                return
+            }
+            appDestination = destination
         }
 
         // 🔥 consume 이후 안전하게 삭제
@@ -105,22 +114,32 @@ final class ShortcutRouter: ObservableObject {
 
     func reset() {
         intentEvent = nil
+        appDestination = nil
     }
 }
 
 
 import Foundation
 
-enum ShortcutRoute: String, Codable {
+nonisolated enum ShortcutRoute:
+    String,
+    Codable,
+    Sendable
+{
     case documentQA
     case importImage
     case imageQA
     case documentScanning
     case voiceQuery
+    case openScreen
 }
 
 // 필요하면 JSONValue는 이전에 쓰던 그대로 사용
-enum JSONValue: Codable, Equatable {
+nonisolated indirect enum JSONValue:
+    Codable,
+    Equatable,
+    Sendable
+{
     case string(String)
     case number(Double)
     case bool(Bool)
@@ -152,14 +171,27 @@ enum JSONValue: Codable, Equatable {
     }
 }
 
-struct AttachmentRef: Codable {
-    enum Kind: String, Codable { case image, file }
+nonisolated struct AttachmentRef:
+    Codable,
+    Sendable
+{
+    nonisolated enum Kind:
+        String,
+        Codable,
+        Sendable
+    {
+        case image
+        case file
+    }
     let kind: Kind
     let fileName: String      // attachments 폴더 안의 파일명
     let uti: String?
 }
 
-struct ShortcutEnvelope: Codable {
+nonisolated struct ShortcutEnvelope:
+    Codable,
+    Sendable
+{
     let id: UUID
     let route: ShortcutRoute
     let createdAt: Date
@@ -168,7 +200,41 @@ struct ShortcutEnvelope: Codable {
     var attachments: [AttachmentRef]
 }
 
-enum ShortcutBridge {
+extension ShortcutEnvelope {
+    nonisolated static func openScreen(
+        _ destination:
+            AppDeepLinkDestination,
+        id: UUID = UUID(),
+        createdAt: Date = Date()
+    ) -> ShortcutEnvelope {
+        ShortcutEnvelope(
+            id: id,
+            route: .openScreen,
+            createdAt: createdAt,
+            schemaVersion: 1,
+            params: [
+                "screen": .string(
+                    destination.rawValue
+                )
+            ],
+            attachments: []
+        )
+    }
+
+    nonisolated var openScreenDestination:
+        AppDeepLinkDestination? {
+        guard route == .openScreen,
+              case .string(let rawValue) =
+                params["screen"] else {
+            return nil
+        }
+        return AppDeepLinkDestination(
+            rawValue: rawValue
+        )
+    }
+}
+
+nonisolated enum ShortcutBridge {
 
     static let suiteName = "group.com.rivo.shortcuts.example"
     static let lastKey = "shortcut_last_envelope_v1"
@@ -255,4 +321,3 @@ enum ShortcutBridge {
         }
     }
 }
-

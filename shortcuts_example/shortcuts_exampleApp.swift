@@ -306,6 +306,7 @@ struct shortcuts_exampleApp: App {
             )
             .task {
                 openScannerFromLaunchArgumentsIfNeeded()
+                shortcutRouter.consumeLastIfNeeded()
                 consumeSharedInboxIfNeeded()
             }
             .onOpenURL { url in
@@ -327,6 +328,17 @@ struct shortcuts_exampleApp: App {
 
                 path.append(dest)          // ✅ App이 push 처리
                 shortcutRouter.intentEvent = nil   // ✅ 이벤트 소비
+            }
+            .onChange(
+                of: shortcutRouter.appDestination
+            ) { _, destination in
+                guard let destination else {
+                    return
+                }
+                openAppDestination(
+                    destination
+                )
+                shortcutRouter.appDestination = nil
             }
             .onChange(of: appRouter.route) { _, route in
                 guard let route else { return }
@@ -410,6 +422,21 @@ struct shortcuts_exampleApp: App {
                 ) else {
             return
         }
+        openAppDestination(destination)
+    }
+
+    private func openAppDestination(
+        _ destination:
+            AppDeepLinkDestination
+    ) {
+        if destination == .files {
+            path = NavigationPath()
+            Task { @MainActor in
+                await Task.yield()
+                appRouter.requestFileImport()
+            }
+            return
+        }
         let route: AppRoute
         switch destination {
         case .ai:
@@ -418,8 +445,14 @@ struct shortcuts_exampleApp: App {
             route = .readerLibrary
         case .camera:
             route = .cameraTools
+        case .magnifier:
+            route = .magnifier
+        case .liveText:
+            route = .liveTextReader
         case .scanner:
             route = .documentScanning
+        case .files:
+            return
         case .rivo:
             route = .rivoRemote
         case .visionLink:

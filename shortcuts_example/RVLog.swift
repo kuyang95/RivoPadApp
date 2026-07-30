@@ -8,7 +8,7 @@
 import os
 import Foundation
 
-enum RVLogger {
+nonisolated enum RVLogger {
     static let subsystem = Bundle.main.bundleIdentifier ?? "com.rivo.pangmo"
     static let network = Logger(subsystem: subsystem, category: "network")
     static let ui = Logger(subsystem: subsystem, category: "ui")

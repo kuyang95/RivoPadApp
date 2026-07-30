@@ -15,7 +15,7 @@ struct DocumentScanIntent : AppIntent {
     func perform() async throws -> some IntentResult {
         let id = UUID()
         
-        var env = ShortcutEnvelope(
+        let env = ShortcutEnvelope(
             id: id,
             route: .documentScanning,
             createdAt: Date(),

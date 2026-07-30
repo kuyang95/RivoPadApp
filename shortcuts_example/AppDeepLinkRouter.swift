@@ -1,17 +1,43 @@
+import AppIntents
 import Foundation
 
 nonisolated enum AppDeepLinkDestination:
     String,
     CaseIterable,
-    Equatable,
-    Sendable
+    Hashable,
+    Sendable,
+    AppEnum
 {
     case ai
     case reader
     case camera
+    case magnifier
+    case liveText = "live-text"
     case scanner
+    case files
     case rivo
     case visionLink = "vision-link"
+
+    static var typeDisplayRepresentation:
+        TypeDisplayRepresentation {
+        "VisionCraft 화면"
+    }
+
+    static var caseDisplayRepresentations:
+        [AppDeepLinkDestination:
+            DisplayRepresentation] {
+        [
+            .ai: "AI 채팅",
+            .reader: "독서",
+            .camera: "카메라",
+            .magnifier: "돋보기",
+            .liveText: "실시간 글자 읽기",
+            .scanner: "문서 스캔",
+            .files: "파일 열기",
+            .rivo: "Rivo 리모컨",
+            .visionLink: "VisionLink"
+        ]
+    }
 }
 
 nonisolated enum AppDeepLinkRouter {
