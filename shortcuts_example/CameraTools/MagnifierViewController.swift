@@ -146,6 +146,207 @@ nonisolated enum MagnifierZoomPolicy {
     }
 }
 
+nonisolated struct MagnifierDisplayAdjustment:
+    Equatable,
+    Sendable
+{
+    static let defaultThreshold: CGFloat = 0.5
+    static let thresholdStep: CGFloat = 0.01
+    static let brightnessStep: CGFloat = 0.1
+
+    var colorIndex: Int?
+    var threshold: CGFloat
+    var isInverted: Bool
+    var brightness: CGFloat
+
+    static let defaultValue =
+        MagnifierDisplayAdjustment(
+            colorIndex: nil,
+            threshold: defaultThreshold,
+            isInverted: false,
+            brightness: 0
+        )
+
+    func updated(
+        for action: RivoMagnifierRemoteAction,
+        colorCount: Int =
+            LocalDocumentColorTheme.all.count
+    ) -> Self {
+        var updated = self
+        switch action {
+        case .previousColor:
+            guard colorCount > 0 else {
+                return updated
+            }
+            let current = min(
+                max(colorIndex ?? 0, 0),
+                colorCount - 1
+            )
+            updated.colorIndex =
+                (current - 1 + colorCount)
+                % colorCount
+            updated.isInverted = false
+        case .originalColor:
+            updated.colorIndex = nil
+            updated.isInverted = false
+        case .nextColor:
+            guard colorCount > 0 else {
+                return updated
+            }
+            let current = min(
+                max(colorIndex ?? 0, 0),
+                colorCount - 1
+            )
+            updated.colorIndex =
+                (current + 1) % colorCount
+            updated.isInverted = false
+        case .decreaseThreshold:
+            updated.threshold = max(
+                updated.threshold
+                    - Self.thresholdStep,
+                0
+            )
+        case .resetThreshold:
+            updated.threshold =
+                Self.defaultThreshold
+        case .increaseThreshold:
+            updated.threshold = min(
+                updated.threshold
+                    + Self.thresholdStep,
+                1.05
+            )
+        case .decreaseBrightness:
+            updated.brightness = max(
+                updated.brightness
+                    - Self.brightnessStep,
+                -0.5
+            )
+        case .resetBrightness:
+            updated.brightness = 0
+        case .increaseBrightness:
+            updated.brightness = min(
+                updated.brightness
+                    + Self.brightnessStep,
+                0.5
+            )
+        case .invertColor:
+            updated.isInverted.toggle()
+        default:
+            break
+        }
+        return updated
+    }
+
+    func applying(to image: CIImage) -> CIImage {
+        var output = image
+        if let colorIndex,
+           !LocalDocumentColorTheme.all.isEmpty {
+            let themes =
+                LocalDocumentColorTheme.all
+            let index = min(
+                max(colorIndex, 0),
+                themes.count - 1
+            )
+            let theme = themes[index]
+            let scale: CGFloat = 20
+            let bias =
+                0.5 - scale * threshold
+            let luminanceVector = CIVector(
+                x: scale * 0.2126,
+                y: scale * 0.7152,
+                z: scale * 0.0722,
+                w: 0
+            )
+            output = output.applyingFilter(
+                "CIColorMatrix",
+                parameters: [
+                    "inputRVector": luminanceVector,
+                    "inputGVector": luminanceVector,
+                    "inputBVector": luminanceVector,
+                    "inputAVector":
+                        CIVector(
+                            x: 0,
+                            y: 0,
+                            z: 0,
+                            w: 1
+                        ),
+                    "inputBiasVector":
+                        CIVector(
+                            x: bias,
+                            y: bias,
+                            z: bias,
+                            w: 0
+                        )
+                ]
+            )
+            .applyingFilter(
+                "CIColorClamp",
+                parameters: [
+                    "inputMinComponents":
+                        CIVector(
+                            x: 0,
+                            y: 0,
+                            z: 0,
+                            w: 0
+                        ),
+                    "inputMaxComponents":
+                        CIVector(
+                            x: 1,
+                            y: 1,
+                            z: 1,
+                            w: 1
+                        )
+                ]
+            )
+            .applyingFilter(
+                "CIFalseColor",
+                parameters: [
+                    "inputColor0":
+                        Self.color(
+                            from: theme.backgroundHex
+                        ),
+                    "inputColor1":
+                        Self.color(
+                            from: theme.foregroundHex
+                        )
+                ]
+            )
+        }
+        if isInverted {
+            output = output.applyingFilter(
+                "CIColorInvert"
+            )
+        }
+        if brightness != 0 {
+            output = output.applyingFilter(
+                "CIColorControls",
+                parameters: [
+                    kCIInputBrightnessKey:
+                        brightness
+                ]
+            )
+        }
+        return output
+    }
+
+    private static func color(
+        from rgbHex: Int
+    ) -> CIColor {
+        CIColor(
+            red:
+                CGFloat((rgbHex >> 16) & 0xFF)
+                / 255,
+            green:
+                CGFloat((rgbHex >> 8) & 0xFF)
+                / 255,
+            blue:
+                CGFloat(rgbHex & 0xFF)
+                / 255,
+            alpha: 1
+        )
+    }
+}
+
 final class MagnifierViewController:
     UIViewController,
     AVCaptureVideoDataOutputSampleBufferDelegate,
@@ -178,6 +379,8 @@ final class MagnifierViewController:
     private var latestPixelBuffer: CVPixelBuffer?
     private var currentPosition: AVCaptureDevice.Position = .back
     private var currentFilter: MagnifierFilter = .normal
+    private var displayAdjustment:
+        MagnifierDisplayAdjustment = .defaultValue
     private var pinchStartZoom: CGFloat = 1
     private var isTorchEnabled = false
     private var isLiveReadingEnabled = true
@@ -714,6 +917,18 @@ final class MagnifierViewController:
         lastRemoteEventID = eventID
 
         switch action {
+        case .enterCameraMode(let showGuide):
+            announceRemoteStatus(
+                showGuide
+                    ? "카메라 조작 모드. 4 닫기, 5 카메라 전환, 6 토치, 7 촬영 또는 읽기, R2 초점, 별표 0 샵 확대"
+                    : "카메라 조작 모드"
+            )
+        case .enterDisplayMode(let showGuide):
+            announceRemoteStatus(
+                showGuide
+                    ? "화면 조작 모드. 4 이전 색상, 5 원본, 6 다음 색상, 7 8 9 임계값, 별표 0 샵 밝기, R2 반전, R1 카메라 조작"
+                    : "화면 조작 모드"
+            )
         case .close:
             closeTapped()
         case .switchCamera:
@@ -722,6 +937,8 @@ final class MagnifierViewController:
             torchTapped()
         case .capture:
             captureTapped()
+        case .focus:
+            focusAtCenter()
         case .decreaseZoom:
             adjustZoom(by: -0.5)
         case .resetZoom:
@@ -729,6 +946,17 @@ final class MagnifierViewController:
             announceCurrentZoom()
         case .increaseZoom:
             adjustZoom(by: 0.5)
+        case .previousColor,
+             .originalColor,
+             .nextColor,
+             .decreaseThreshold,
+             .resetThreshold,
+             .increaseThreshold,
+             .decreaseBrightness,
+             .resetBrightness,
+             .increaseBrightness,
+             .invertColor:
+            applyRemoteDisplayAction(action)
         }
     }
 
@@ -805,9 +1033,124 @@ final class MagnifierViewController:
         currentFilter = MagnifierFilter(
             rawValue: filterControl.selectedSegmentIndex
         ) ?? .normal
+        displayAdjustment.colorIndex = nil
+        displayAdjustment.isInverted = false
         UIAccessibility.post(
             notification: .announcement,
             argument: "\(currentFilter.title) 필터"
+        )
+    }
+
+    private func applyRemoteDisplayAction(
+        _ action: RivoMagnifierRemoteAction
+    ) {
+        displayAdjustment =
+            displayAdjustment.updated(for: action)
+
+        let message: String
+        switch action {
+        case .previousColor,
+             .nextColor:
+            filterControl.selectedSegmentIndex =
+                UISegmentedControl.noSegment
+            let index =
+                displayAdjustment.colorIndex ?? 0
+            let theme =
+                LocalDocumentColorTheme.all[index]
+            message = "색상 \(theme.name)"
+        case .originalColor:
+            currentFilter = .normal
+            filterControl.selectedSegmentIndex =
+                MagnifierFilter.normal.rawValue
+            message = "원본 색상"
+        case .decreaseThreshold,
+             .resetThreshold,
+             .increaseThreshold:
+            message = String(
+                format:
+                    "색상 임계값 %.0f퍼센트",
+                displayAdjustment.threshold
+                    * 100
+            )
+        case .decreaseBrightness,
+             .resetBrightness,
+             .increaseBrightness:
+            message = String(
+                format:
+                    "미리보기 밝기 %+.0f",
+                displayAdjustment.brightness
+                    * 100
+            )
+        case .invertColor:
+            message =
+                displayAdjustment.isInverted
+                ? "미리보기 색상 반전"
+                : "미리보기 색상 반전 해제"
+        default:
+            return
+        }
+        announceRemoteStatus(message)
+    }
+
+    private func focusAtCenter() {
+        guard let device = cameraInput?.device else {
+            announceRemoteStatus(
+                "카메라가 준비되지 않았습니다."
+            )
+            return
+        }
+
+        do {
+            try device.lockForConfiguration()
+            let center = CGPoint(x: 0.5, y: 0.5)
+            var didAdjust = false
+            if device.isFocusPointOfInterestSupported {
+                device.focusPointOfInterest = center
+                if device.isFocusModeSupported(
+                    .autoFocus
+                ) {
+                    device.focusMode = .autoFocus
+                } else if device.isFocusModeSupported(
+                    .continuousAutoFocus
+                ) {
+                    device.focusMode =
+                        .continuousAutoFocus
+                }
+                didAdjust = true
+            }
+            if device
+                .isExposurePointOfInterestSupported {
+                device.exposurePointOfInterest =
+                    center
+                if device.isExposureModeSupported(
+                    .continuousAutoExposure
+                ) {
+                    device.exposureMode =
+                        .continuousAutoExposure
+                }
+                didAdjust = true
+            }
+            device.unlockForConfiguration()
+            announceRemoteStatus(
+                didAdjust
+                    ? "화면 중앙에 초점을 맞춥니다."
+                    : "이 카메라는 수동 초점을 지원하지 않습니다."
+            )
+        } catch {
+            announceRemoteStatus(
+                "초점을 맞추지 못했습니다: "
+                    + error.localizedDescription
+            )
+        }
+    }
+
+    private func announceRemoteStatus(
+        _ message: String
+    ) {
+        statusLabel.text = message
+        UIAccessibility.post(
+            notification: .announcement,
+            argument: message
         )
     }
 
@@ -917,8 +1260,14 @@ final class MagnifierViewController:
         guard let pixelBuffer else {
             return nil
         }
-        return currentFilter.apply(
-            to: CIImage(cvPixelBuffer: pixelBuffer)
+        let image =
+            CIImage(cvPixelBuffer: pixelBuffer)
+        let baseImage =
+            displayAdjustment.colorIndex == nil
+                ? currentFilter.apply(to: image)
+                : image
+        return displayAdjustment.applying(
+            to: baseImage
         )
     }
 

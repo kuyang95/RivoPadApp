@@ -18,13 +18,34 @@ nonisolated enum RivoMagnifierRemoteAction:
     Equatable,
     Sendable
 {
+    case enterCameraMode(showGuide: Bool)
+    case enterDisplayMode(showGuide: Bool)
     case close
     case switchCamera
     case toggleTorch
     case capture
+    case focus
     case decreaseZoom
     case resetZoom
     case increaseZoom
+    case previousColor
+    case originalColor
+    case nextColor
+    case decreaseThreshold
+    case resetThreshold
+    case increaseThreshold
+    case decreaseBrightness
+    case resetBrightness
+    case increaseBrightness
+    case invertColor
+}
+
+nonisolated enum RivoMagnifierRemoteMode:
+    Equatable,
+    Sendable
+{
+    case camera
+    case display
 }
 
 nonisolated enum RivoDocumentScannerRemoteAction:
@@ -232,6 +253,8 @@ nonisolated enum RivoScreenRemoteMapper {
     static func action(
         for input: RivoRemoteInput,
         on screen: RivoRemoteScreen,
+        magnifierMode:
+            RivoMagnifierRemoteMode = .camera,
         localDocumentMode:
             RivoLocalDocumentRemoteMode = .text
     ) -> RivoScreenRemoteAction? {
@@ -254,6 +277,16 @@ nonisolated enum RivoScreenRemoteMapper {
             return nil
         }
 
+        if screen == .magnifier
+            || screen == .liveTextReader,
+           let action = magnifierModeAction(
+               for: button,
+               buttonAction: buttonAction,
+               mode: magnifierMode
+           ) {
+            return .magnifier(action)
+        }
+
         if case .localDocumentReader = screen,
            let action = localDocumentModeAction(
                for: button,
@@ -269,8 +302,7 @@ nonisolated enum RivoScreenRemoteMapper {
 
         switch screen {
         case .magnifier, .liveTextReader:
-            return magnifierAction(for: button)
-                .map(RivoScreenRemoteAction.magnifier)
+            return nil
         case .documentScanner:
             switch button {
             case .four:
@@ -322,6 +354,8 @@ nonisolated enum RivoScreenRemoteMapper {
             return .toggleTorch
         case .seven:
             return .capture
+        case .r2:
+            return .focus
         case .star:
             return .decreaseZoom
         case .zero:
@@ -330,6 +364,74 @@ nonisolated enum RivoScreenRemoteMapper {
             return .increaseZoom
         default:
             return nil
+        }
+    }
+
+    private static func magnifierModeAction(
+        for button: RivoButton,
+        buttonAction: RivoButtonAction,
+        mode: RivoMagnifierRemoteMode
+    ) -> RivoMagnifierRemoteAction? {
+        if button == .r1 {
+            switch buttonAction {
+            case .pressed:
+                return .enterCameraMode(
+                    showGuide: false
+                )
+            case .doubleTapped:
+                return .enterCameraMode(
+                    showGuide: true
+                )
+            default:
+                return nil
+            }
+        }
+        if button == .l2 {
+            switch buttonAction {
+            case .pressed:
+                return .enterDisplayMode(
+                    showGuide: false
+                )
+            case .doubleTapped:
+                return .enterDisplayMode(
+                    showGuide: true
+                )
+            default:
+                return nil
+            }
+        }
+        guard buttonAction == .pressed else {
+            return nil
+        }
+
+        switch mode {
+        case .camera:
+            return magnifierAction(for: button)
+        case .display:
+            switch button {
+            case .four:
+                return .previousColor
+            case .five:
+                return .originalColor
+            case .six:
+                return .nextColor
+            case .seven:
+                return .decreaseThreshold
+            case .eight:
+                return .resetThreshold
+            case .nine:
+                return .increaseThreshold
+            case .star:
+                return .decreaseBrightness
+            case .zero:
+                return .resetBrightness
+            case .sharp:
+                return .increaseBrightness
+            case .r2:
+                return .invertColor
+            default:
+                return nil
+            }
         }
     }
 
@@ -436,6 +538,8 @@ final class RivoScreenRemoteControlCenter:
         RivoScreenRemoteEvent?
     @Published private(set) var localDocumentMode:
         RivoLocalDocumentRemoteMode = .text
+    @Published private(set) var magnifierMode:
+        RivoMagnifierRemoteMode = .camera
 
     private var nextEventID: UInt64 = 0
 
@@ -444,6 +548,10 @@ final class RivoScreenRemoteControlCenter:
         latestEvent = nil
         if screen == .localDocumentReader {
             localDocumentMode = .text
+        }
+        if screen == .magnifier
+            || screen == .liveTextReader {
+            magnifierMode = .camera
         }
     }
 
@@ -462,6 +570,8 @@ final class RivoScreenRemoteControlCenter:
                 RivoScreenRemoteMapper.action(
                     for: input,
                     on: activeScreen,
+                    magnifierMode:
+                        magnifierMode,
                     localDocumentMode:
                         localDocumentMode
                 ) else {
@@ -475,6 +585,18 @@ final class RivoScreenRemoteControlCenter:
                 localDocumentMode = .text
             case .enterDisplayMode:
                 localDocumentMode = .display
+            default:
+                break
+            }
+        }
+        if case .magnifier(
+            let magnifierAction
+        ) = action {
+            switch magnifierAction {
+            case .enterCameraMode:
+                magnifierMode = .camera
+            case .enterDisplayMode:
+                magnifierMode = .display
             default:
                 break
             }

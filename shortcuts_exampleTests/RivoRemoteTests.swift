@@ -1,3 +1,4 @@
+import CoreImage
 import Foundation
 import XCTest
 
@@ -701,6 +702,166 @@ final class RivoRemoteControlCenterTests: XCTestCase {
             RivoScreenRemoteMapper.action(
                 for: button(.seven, action: .released),
                 on: .documentScanner
+            )
+        )
+    }
+
+    func testMagnifierDisplayModeRoutesAndroidDisplayKeys() {
+        let screenControl =
+            RivoScreenRemoteControlCenter()
+        screenControl.activate(.magnifier)
+
+        XCTAssertTrue(
+            screenControl.receive(
+                button(.l2, action: .pressed)
+            )
+        )
+        XCTAssertEqual(
+            screenControl.magnifierMode,
+            .display
+        )
+        XCTAssertEqual(
+            screenControl.latestEvent?.action,
+            .magnifier(
+                .enterDisplayMode(showGuide: false)
+            )
+        )
+        XCTAssertTrue(
+            screenControl.receive(
+                button(.four, action: .pressed)
+            )
+        )
+        XCTAssertEqual(
+            screenControl.latestEvent?.action,
+            .magnifier(.previousColor)
+        )
+        XCTAssertTrue(
+            screenControl.receive(
+                button(.r2, action: .pressed)
+            )
+        )
+        XCTAssertEqual(
+            screenControl.latestEvent?.action,
+            .magnifier(.invertColor)
+        )
+
+        XCTAssertTrue(
+            screenControl.receive(
+                button(.r1, action: .doubleTapped)
+            )
+        )
+        XCTAssertEqual(
+            screenControl.magnifierMode,
+            .camera
+        )
+        XCTAssertEqual(
+            screenControl.latestEvent?.action,
+            .magnifier(
+                .enterCameraMode(showGuide: true)
+            )
+        )
+        XCTAssertTrue(
+            screenControl.receive(
+                button(.r2, action: .pressed)
+            )
+        )
+        XCTAssertEqual(
+            screenControl.latestEvent?.action,
+            .magnifier(.focus)
+        )
+    }
+
+    func testMagnifierDisplayAdjustmentMatchesAndroidBounds() {
+        var adjustment =
+            MagnifierDisplayAdjustment.defaultValue
+
+        adjustment = adjustment.updated(
+            for: .previousColor
+        )
+        XCTAssertEqual(
+            adjustment.colorIndex,
+            LocalDocumentColorTheme.all.count - 1
+        )
+        adjustment = adjustment.updated(
+            for: .nextColor
+        )
+        XCTAssertEqual(adjustment.colorIndex, 0)
+        adjustment = adjustment.updated(
+            for: .originalColor
+        )
+        XCTAssertNil(adjustment.colorIndex)
+
+        for _ in 0 ..< 100 {
+            adjustment = adjustment.updated(
+                for: .increaseThreshold
+            )
+            adjustment = adjustment.updated(
+                for: .increaseBrightness
+            )
+        }
+        XCTAssertEqual(adjustment.threshold, 1.05)
+        XCTAssertEqual(adjustment.brightness, 0.5)
+
+        for _ in 0 ..< 200 {
+            adjustment = adjustment.updated(
+                for: .decreaseThreshold
+            )
+            adjustment = adjustment.updated(
+                for: .decreaseBrightness
+            )
+        }
+        XCTAssertEqual(adjustment.threshold, 0)
+        XCTAssertEqual(adjustment.brightness, -0.5)
+
+        adjustment = adjustment.updated(
+            for: .resetThreshold
+        )
+        adjustment = adjustment.updated(
+            for: .resetBrightness
+        )
+        adjustment = adjustment.updated(
+            for: .invertColor
+        )
+        XCTAssertEqual(
+            adjustment.threshold,
+            MagnifierDisplayAdjustment
+                .defaultThreshold
+        )
+        XCTAssertEqual(adjustment.brightness, 0)
+        XCTAssertTrue(adjustment.isInverted)
+    }
+
+    func testMagnifierAndroidColorFilterRenders() {
+        var adjustment =
+            MagnifierDisplayAdjustment.defaultValue
+        adjustment = adjustment.updated(
+            for: .nextColor
+        )
+        let source = CIImage(
+            color: CIColor(
+                red: 0.4,
+                green: 0.6,
+                blue: 0.2
+            )
+        )
+        .cropped(
+            to: CGRect(
+                x: 0,
+                y: 0,
+                width: 2,
+                height: 2
+            )
+        )
+        let output = adjustment.applying(to: source)
+
+        XCTAssertNotNil(
+            CIContext(
+                options: [
+                    .useSoftwareRenderer: true
+                ]
+            ).createCGImage(
+                output,
+                from: output.extent
             )
         )
     }

@@ -263,12 +263,20 @@ struct RivoRemoteView: View {
                 systemImage: "speaker.slash"
             )
             Label(
-                "돋보기: 4 닫기 · 5 전환 · 6 토치 · 7 읽기",
+                "돋보기 R1 카메라 모드: 4 닫기 · 5 전환 · 6 토치 · 7 읽기 · R2 초점",
                 systemImage: "plus.magnifyingglass"
             )
             Label(
-                "돋보기: 별표 축소 · 0 초기화 · 샵 확대",
+                "카메라 모드: 별표 축소 · 0 초기화 · 샵 확대",
                 systemImage: "camera.metering.center.weighted"
+            )
+            Label(
+                "돋보기 L2 화면 모드: 4/5/6 색상 · 7/8/9 임계값",
+                systemImage: "camera.filters"
+            )
+            Label(
+                "화면 모드: 별표/0/샵 미리보기 밝기 · R2 반전",
+                systemImage: "sun.max"
             )
             Label(
                 "실시간 읽기: 7 일시정지와 재개",
