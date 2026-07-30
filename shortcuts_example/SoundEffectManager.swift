@@ -61,6 +61,10 @@ final class SoundEffectManager {
     // MARK: - Play
 
     func play(_ effect: Effect, volume: Float = 1.0) {
+        guard AppSettingsStore.shared
+            .soundEffectsEnabled else {
+            return
+        }
         guard let player = players[effect] else {
             print("⚠️ Not preloaded:", effect.rawValue)
             return

@@ -64,7 +64,9 @@ struct OCRResultView: View {
 
                 if isTTSEnabled {
                     TTSManager.shared.stop()
-                    TTSManager.shared.speak("텍스트 추출중")
+                    TTSManager.shared.speakFeedback(
+                        "텍스트 추출중"
+                    )
                 }
 
                 vm.runOCR(image: image)
@@ -114,7 +116,9 @@ extension OCRResultView {
             Button {
                 if vm.llmService.isLoading {
                     TTSManager.shared.stop()
-                    TTSManager.shared.speak("모델 로딩중입니다")
+                    TTSManager.shared.speakFeedback(
+                        "모델 로딩중입니다"
+                    )
                     return
                 }
 

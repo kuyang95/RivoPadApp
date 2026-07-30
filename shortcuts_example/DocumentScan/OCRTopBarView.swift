@@ -51,7 +51,9 @@ extension OCRTopBarView {
             if vm.llmService.isLoading {
 
                 TTSManager.shared.stop()
-                TTSManager.shared.speak("모델 로딩중입니다")
+                TTSManager.shared.speakFeedback(
+                    "모델 로딩중입니다"
+                )
 
                 return
             }

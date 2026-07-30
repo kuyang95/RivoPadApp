@@ -187,7 +187,9 @@ final class OCRResultViewModel: ObservableObject {
 
         if isTTSEnabled {
             TTSManager.shared.stop()
-            TTSManager.shared.speak("AI 답변 생성중")
+            TTSManager.shared.speakFeedback(
+                "AI 답변 생성중"
+            )
         }
 
         let fullPrompt = """

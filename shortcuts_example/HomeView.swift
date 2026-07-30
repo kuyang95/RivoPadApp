@@ -92,6 +92,29 @@ struct HomeView: View {
                     .accessibilityHint(
                         "이미지, PDF, 텍스트 또는 EPUB 파일을 엽니다."
                     )
+
+                    Button {
+                        appRouter.route = .settings
+                    } label: {
+                        Label(
+                            "설정",
+                            systemImage: "gearshape"
+                        )
+                        .font(
+                            .system(
+                                size: 40,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundColor(.white)
+                        .frame(maxWidth: 520)
+                        .frame(height: 88)
+                        .background(Color.gray)
+                        .cornerRadius(24)
+                    }
+                    .accessibilityHint(
+                        "음성, 스캐너, 문서와 독서 기본 설정을 엽니다."
+                    )
                 }
                 .padding(32)
                 .frame(maxWidth: .infinity)

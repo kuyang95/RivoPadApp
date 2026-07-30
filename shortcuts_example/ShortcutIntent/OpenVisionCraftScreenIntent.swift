@@ -46,6 +46,18 @@ struct VisionCraftAppShortcuts:
         AppShortcut(
             intent:
                 OpenVisionCraftScreenIntent(
+                    screen: .settings
+                ),
+            phrases: [
+                "\(.applicationName) 설정 열기",
+                "\(.applicationName) 음성 설정"
+            ],
+            shortTitle: "설정",
+            systemImageName: "gearshape"
+        )
+        AppShortcut(
+            intent:
+                OpenVisionCraftScreenIntent(
                     screen: .ai
                 ),
             phrases: [

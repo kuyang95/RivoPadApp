@@ -593,7 +593,7 @@ struct VoiceQueryResponseView: View {
                 )
             )
             soundEffectManager.play(.startingLLM)
-            tts.speak("답변 생성중")
+            tts.speakFeedback("답변 생성중")
 
             messages.append(
                 Message(

@@ -8,6 +8,7 @@ nonisolated enum AppDeepLinkDestination:
     Sendable,
     AppEnum
 {
+    case settings
     case ai
     case reader
     case camera
@@ -27,6 +28,7 @@ nonisolated enum AppDeepLinkDestination:
         [AppDeepLinkDestination:
             DisplayRepresentation] {
         [
+            .settings: "설정",
             .ai: "AI 채팅",
             .reader: "독서",
             .camera: "카메라",

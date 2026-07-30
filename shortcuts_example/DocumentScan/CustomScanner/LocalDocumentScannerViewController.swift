@@ -1285,6 +1285,9 @@ final class LocalDocumentScannerViewController: UIViewController {
         let scannerDiagnostics = diagnostics
         let resourceSampler = diagnostics.beginProcessing(ticket: ticket)
         let processingTrace = diagnostics.trace(ticket: ticket)
+        let enhanceColors =
+            AppSettingsStore.shared
+            .documentScanColorEnhancementEnabled
         let capturedPhoto = ScannerCapturedPhoto(
             pixelBuffer: capture.photoPixelBuffer,
             encodedData: capture.photoData
@@ -1298,7 +1301,8 @@ final class LocalDocumentScannerViewController: UIViewController {
              stillMetalSampler,
              scannerDiagnostics,
              resourceSampler,
-             processingTrace] in
+             processingTrace,
+             enhanceColors] in
             var outcome = "cancelled"
             defer {
                 resourceSampler?.finish(outcome: outcome)
@@ -1392,7 +1396,7 @@ final class LocalDocumentScannerViewController: UIViewController {
                         detectedQuad: detection.quad,
                         captureRotationDegrees:
                             capture.captureRotationDegrees,
-                        enhanceColors: true,
+                        enhanceColors: enhanceColors,
                         trace: processingTrace
                     )
                 } else {
@@ -1406,8 +1410,13 @@ final class LocalDocumentScannerViewController: UIViewController {
                             maximum:
                                 scannerConfiguration.outputLongEdgePixels
                         )
+                    let pixels =
+                        enhanceColors
+                        ? AndroidDocumentColorMath
+                            .enhance(normalized)
+                        : normalized
                     output = bridge.ciImage(
-                        from: AndroidDocumentColorMath.enhance(normalized)
+                        from: pixels
                     )
                 }
                 scannerDiagnostics.logDuration(

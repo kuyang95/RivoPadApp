@@ -36,13 +36,23 @@ final class TTSManager: ObservableObject {
         utterance.voice = AVSpeechSynthesisVoice(language: "ko-KR")
         utterance.rate = min(
             max(
-                rate ?? 0.5,
+                rate
+                    ?? AppSettingsStore.shared
+                    .speechRate.avSpeechRate,
                 AVSpeechUtteranceMinimumSpeechRate
             ),
             AVSpeechUtteranceMaximumSpeechRate
         )
         
         synthesizer.speak(utterance)
+    }
+
+    func speakFeedback(_ text: String) {
+        guard AppSettingsStore.shared
+            .voiceFeedbackEnabled else {
+            return
+        }
+        speak(text)
     }
     
     func stop() {

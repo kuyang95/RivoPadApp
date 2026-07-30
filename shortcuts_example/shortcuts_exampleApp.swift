@@ -11,6 +11,8 @@ import UIKit
 @main
 struct shortcuts_exampleApp: App {
     @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var appSettings =
+        AppSettingsStore.shared
     @StateObject private var shortcutRouter = ShortcutRouter()
     @StateObject private var appRouter = AppRouter()
     @StateObject private var rivoRemoteManager =
@@ -51,6 +53,8 @@ struct shortcuts_exampleApp: App {
                     .environmentObject(shortcutRouter)
                     .navigationDestination(for: AppRoute.self) { event in
                         switch event {
+                        case .settings:
+                            AppSettingsView()
                         case .chatHistory:
                             ChatHistoryView()
                         case .localChat(let conversationID):
@@ -285,6 +289,7 @@ struct shortcuts_exampleApp: App {
                     }
                
             }
+            .environmentObject(appSettings)
             .environmentObject(appRouter)
             .environmentObject(rivoRemoteManager)
             .environmentObject(
@@ -393,7 +398,16 @@ struct shortcuts_exampleApp: App {
                 )
             }
             
-        }.environment(\.font, .custom("NanumSquareRoundOTFEB", size: 16))
+        }
+        .environment(
+            \.font,
+            appSettings.fontChoice == .system
+                ? nil
+                : .custom(
+                    "NanumSquareRoundOTFEB",
+                    size: 16
+                )
+        )
     }
 
     private func openScannerFromLaunchArgumentsIfNeeded() {
@@ -439,6 +453,8 @@ struct shortcuts_exampleApp: App {
         }
         let route: AppRoute
         switch destination {
+        case .settings:
+            route = .settings
         case .ai:
             route = .chatHistory
         case .reader:

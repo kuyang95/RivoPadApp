@@ -239,7 +239,9 @@ struct LocalVoiceActionView: View {
     }
 
     private func announce(_ message: String) {
-        TTSManager.shared.speak(message)
+        TTSManager.shared.speakFeedback(
+            message
+        )
         UIAccessibility.post(
             notification: .announcement,
             argument: message
