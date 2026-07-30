@@ -224,6 +224,102 @@ final class RivoRemoteProtocolTests: XCTestCase {
         )
     }
 
+    func testAdvertisementClassifierFallsBackToKnownRivoNames() {
+        XCTAssertEqual(
+            RivoAdvertisementClassifier.match(
+                serviceUUIDs: [],
+                advertisedName: "Rivo Mini 2048",
+                peripheralName: nil
+            ),
+            RivoAdvertisementMatch(
+                type: .mini,
+                source: .advertisedName
+            )
+        )
+        XCTAssertEqual(
+            RivoAdvertisementClassifier.match(
+                serviceUUIDs: [],
+                advertisedName: nil,
+                peripheralName: "RIVO-3-A12"
+            ),
+            RivoAdvertisementMatch(
+                type: .three,
+                source: .peripheralName
+            )
+        )
+        XCTAssertEqual(
+            RivoAdvertisementClassifier.match(
+                serviceUUIDs: [],
+                advertisedName: "RivoThree",
+                peripheralName: nil
+            )?.type,
+            .three
+        )
+    }
+
+    func testAdvertisementServiceUUIDWinsOverConflictingName() {
+        XCTAssertEqual(
+            RivoAdvertisementClassifier.match(
+                serviceUUIDs: [
+                    "0000F121-0000-1000-8000-00805F9B34FB"
+                ],
+                advertisedName: "Rivo 3",
+                peripheralName: nil
+            ),
+            RivoAdvertisementMatch(
+                type: .mini,
+                source: .serviceUUID
+            )
+        )
+    }
+
+    func testAdvertisementClassifierRejectsGenericNames() {
+        XCTAssertNil(
+            RivoAdvertisementClassifier.match(
+                serviceUUIDs: ["180F"],
+                advertisedName: "Rivo",
+                peripheralName: "Headphones"
+            )
+        )
+        XCTAssertNil(
+            RivoAdvertisementClassifier.match(
+                serviceUUIDs: [],
+                advertisedName: "Arrival Mini",
+                peripheralName: nil
+            )
+        )
+        XCTAssertEqual(
+            RivoAdvertisementClassifier.match(
+                serviceUUIDs: [],
+                advertisedName: "Rivo",
+                peripheralName: nil,
+                savedType: .three
+            ),
+            RivoAdvertisementMatch(
+                type: .three,
+                source: .savedDevice
+            )
+        )
+    }
+
+    func testConnectionDiagnosticCodableRoundTrip() throws {
+        let diagnostic = RivoConnectionDiagnostic(
+            id: UUID(),
+            recordedAt: Date(timeIntervalSince1970: 123),
+            level: .failure,
+            stage: .characteristics,
+            message: "UART 알림 특성을 찾지 못했습니다."
+        )
+
+        let data = try JSONEncoder().encode([diagnostic])
+        let decoded = try JSONDecoder().decode(
+            [RivoConnectionDiagnostic].self,
+            from: data
+        )
+
+        XCTAssertEqual(decoded, [diagnostic])
+    }
+
     private func makeButtonPacket(key: UInt8) -> Data {
         Data([
             ascii("a"), ascii("t"),
@@ -427,6 +523,46 @@ final class RivoButtonGestureRecognizerTests:
 
 @MainActor
 final class RivoRemoteControlCenterTests: XCTestCase {
+    func testRemoteManagerRestoresAndClearsDiagnostics() throws {
+        let suiteName =
+            "RivoRemoteTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(
+                forName: suiteName
+            )
+        }
+        let diagnostic = RivoConnectionDiagnostic(
+            id: UUID(),
+            recordedAt: Date(timeIntervalSince1970: 456),
+            level: .warning,
+            stage: .services,
+            message: "서비스 확인 기록"
+        )
+        defaults.set(
+            try JSONEncoder().encode([diagnostic]),
+            forKey: "rivo.remote.connectionDiagnostics"
+        )
+
+        let manager =
+            RivoRemoteManager(defaults: defaults)
+
+        XCTAssertEqual(
+            manager.connectionDiagnostics,
+            [diagnostic]
+        )
+        manager.clearConnectionDiagnostics()
+        XCTAssertTrue(
+            manager.connectionDiagnostics.isEmpty
+        )
+        XCTAssertNil(
+            defaults.data(
+                forKey:
+                    "rivo.remote.connectionDiagnostics"
+            )
+        )
+    }
+
     func testQuickMenuNavigationSelectsReader() {
         let controlCenter = RivoRemoteControlCenter()
 

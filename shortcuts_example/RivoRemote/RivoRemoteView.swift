@@ -12,6 +12,7 @@ struct RivoRemoteView: View {
                 discoveredDevicesSection
             }
 
+            connectionDiagnosticsSection
             controlsSection
             eventSection
             limitationsSection
@@ -132,6 +133,11 @@ struct RivoRemoteView: View {
                                 .font(.headline)
                             Text(device.type.title)
                                 .foregroundStyle(.secondary)
+                            Text(
+                                "\(device.discoverySource.title)으로 식별"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 5) {
@@ -154,6 +160,87 @@ struct RivoRemoteView: View {
                 )
                 .accessibilityHint("이 리모컨에 연결합니다.")
             }
+        }
+    }
+
+    @ViewBuilder
+    private var connectionDiagnosticsSection:
+        some View
+    {
+        Section {
+            if manager.connectionDiagnostics.isEmpty {
+                Text(
+                    "검색하거나 연결하면 단계별 기록이 여기에 표시됩니다."
+                )
+                .foregroundStyle(.secondary)
+            } else {
+                ForEach(
+                    manager.connectionDiagnostics.prefix(12)
+                ) { diagnostic in
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(
+                            systemName: diagnosticIcon(
+                                for: diagnostic.level
+                            )
+                        )
+                        .foregroundStyle(
+                            diagnosticColor(
+                                for: diagnostic.level
+                            )
+                        )
+                        .frame(width: 22)
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 4
+                        ) {
+                            HStack {
+                                Text(diagnostic.stage.title)
+                                    .font(.headline)
+                                Text(diagnostic.level.title)
+                                    .font(.caption.bold())
+                                    .foregroundStyle(
+                                        diagnosticColor(
+                                            for:
+                                                diagnostic.level
+                                        )
+                                    )
+                                Spacer()
+                                Text(
+                                    diagnostic.recordedAt,
+                                    style: .time
+                                )
+                                .font(
+                                    .caption
+                                        .monospacedDigit()
+                                )
+                                .foregroundStyle(.secondary)
+                            }
+                            Text(diagnostic.message)
+                                .font(.subheadline)
+                        }
+                    }
+                    .accessibilityElement(
+                        children: .combine
+                    )
+                }
+            }
+        } header: {
+            HStack {
+                Text("연결 진단")
+                Spacer()
+                if !manager.connectionDiagnostics.isEmpty {
+                    Button("지우기") {
+                        manager
+                            .clearConnectionDiagnostics()
+                    }
+                    .textCase(nil)
+                }
+            }
+        } footer: {
+            Text(
+                "최근 80개 기록은 앱을 다시 열어도 이 iPad에 남습니다."
+            )
         }
     }
 
@@ -287,5 +374,35 @@ struct RivoRemoteView: View {
             ),
             1
         )
+    }
+
+    private func diagnosticIcon(
+        for level: RivoConnectionDiagnosticLevel
+    ) -> String {
+        switch level {
+        case .info:
+            return "info.circle.fill"
+        case .success:
+            return "checkmark.circle.fill"
+        case .warning:
+            return "exclamationmark.triangle.fill"
+        case .failure:
+            return "xmark.octagon.fill"
+        }
+    }
+
+    private func diagnosticColor(
+        for level: RivoConnectionDiagnosticLevel
+    ) -> Color {
+        switch level {
+        case .info:
+            return .blue
+        case .success:
+            return .green
+        case .warning:
+            return .orange
+        case .failure:
+            return .red
+        }
     }
 }

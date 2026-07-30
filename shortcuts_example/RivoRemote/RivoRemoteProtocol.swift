@@ -32,6 +32,103 @@ nonisolated enum RivoDeviceType:
         }
         return nil
     }
+
+    static func from(deviceName: String) -> Self? {
+        let compact = deviceName
+            .lowercased()
+            .unicodeScalars
+            .filter {
+                CharacterSet.alphanumerics
+                    .contains($0)
+            }
+            .map(String.init)
+            .joined()
+
+        if compact.hasPrefix("rivomini") {
+            return .mini
+        }
+        if compact.hasPrefix("rivo3")
+            || compact.hasPrefix("rivothree") {
+            return .three
+        }
+        return nil
+    }
+}
+
+nonisolated enum RivoDiscoverySource:
+    String,
+    Codable,
+    Equatable,
+    Sendable
+{
+    case serviceUUID
+    case advertisedName
+    case peripheralName
+    case savedDevice
+
+    var title: String {
+        switch self {
+        case .serviceUUID:
+            return "서비스 UUID"
+        case .advertisedName:
+            return "광고 이름"
+        case .peripheralName:
+            return "기기 이름"
+        case .savedDevice:
+            return "저장된 기기 정보"
+        }
+    }
+}
+
+nonisolated struct RivoAdvertisementMatch:
+    Equatable,
+    Sendable
+{
+    let type: RivoDeviceType
+    let source: RivoDiscoverySource
+}
+
+nonisolated enum RivoAdvertisementClassifier {
+    static func match(
+        serviceUUIDs: [String],
+        advertisedName: String?,
+        peripheralName: String?,
+        savedType: RivoDeviceType? = nil
+    ) -> RivoAdvertisementMatch? {
+        if let type = serviceUUIDs.lazy.compactMap({
+            RivoDeviceType.from(serviceUUID: $0)
+        }).first {
+            return RivoAdvertisementMatch(
+                type: type,
+                source: .serviceUUID
+            )
+        }
+        if let advertisedName,
+           let type = RivoDeviceType.from(
+               deviceName: advertisedName
+           ) {
+            return RivoAdvertisementMatch(
+                type: type,
+                source: .advertisedName
+            )
+        }
+        if let peripheralName,
+           let type = RivoDeviceType.from(
+               deviceName: peripheralName
+           ) {
+            return RivoAdvertisementMatch(
+                type: type,
+                source: .peripheralName
+            )
+        }
+        if let savedType {
+            return RivoAdvertisementMatch(
+                type: savedType,
+                source: .savedDevice
+            )
+        }
+        return nil
+    }
 }
 
 nonisolated struct RivoClockValue:
