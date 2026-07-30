@@ -176,6 +176,26 @@ struct AppSettingsView: View {
     private var scannerSection: some View {
         Section {
             Toggle(
+                "문서 자동 촬영",
+                isOn:
+                    $settings
+                    .documentScanAutomaticCaptureEnabled
+            )
+            .accessibilityHint(
+                "문서가 안정적으로 맞춰지면 자동 촬영합니다. 꺼도 모서리 안내와 수동 촬영은 계속 사용할 수 있습니다."
+            )
+
+            Toggle(
+                "휘어진 페이지 자동 보정",
+                isOn:
+                    $settings
+                    .documentScanCurvedPageCorrectionEnabled
+            )
+            .accessibilityHint(
+                "UVDoc 로컬 모델로 책처럼 휘어진 페이지를 펴 줍니다. 꺼도 모서리와 원근 보정은 유지됩니다."
+            )
+
+            Toggle(
                 "문서 색상 자동 보정",
                 isOn:
                     $settings
@@ -198,7 +218,7 @@ struct AppSettingsView: View {
             Text("문서 스캐너")
         } footer: {
             Text(
-                "모서리·원근·곡면 보정은 항상 적용됩니다. OCR 교정은 Qwen3-VL을 이 iPad에서 실행하므로 처음에는 모델 준비 시간이 필요하며, 실패하면 Vision OCR 원문을 유지합니다."
+                "모서리 검출과 원근 보정은 항상 적용됩니다. UVDoc과 OCR 교정은 이 iPad에서 로컬 모델을 실행하므로 처음에는 준비 시간이 필요하며, 실패하면 각각 원근 보정 결과와 Vision OCR 원문을 유지합니다."
             )
         }
     }

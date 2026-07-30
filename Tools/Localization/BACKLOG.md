@@ -27,6 +27,7 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 - 긴 첨부의 질문 관련 구간 수, PDF/TXT 생략과 XLSX 형식·암호화·제한 오류
 - 공유 텍스트의 음성 질문·AI 채팅 기본 진입 설정과 문맥 준비 상태
 - OCR 오타 자동 교정 설정·진행 상태·PDF 페이지 진행 문구
+- 스캐너 자동 촬영·UVDoc 곡면 보정 설정과 fallback 설명
 
 ## 다음 번역 묶음
 

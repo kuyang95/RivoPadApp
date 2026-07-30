@@ -291,6 +291,82 @@ final class ScannerRegressionTests: XCTestCase {
         XCTAssertEqual(machine.state, .capturing(ticket: ticket))
     }
 
+    func testDisabledAutomaticCaptureKeepsManualCaptureAvailable()
+    {
+        var machine =
+            DocumentScannerStateMachine(
+                automaticCaptureEnabled:
+                    false
+            )
+        _ = machine.handle(.start)
+        _ = machine.handle(.cameraReady)
+
+        for _ in 0..<10 {
+            XCTAssertEqual(
+                machine.handle(
+                    .frameEvaluated(
+                        passingGates()
+                    )
+                ),
+                [.stopGuidance]
+            )
+            XCTAssertEqual(
+                machine.state,
+                .stabilizing(
+                    passedGateFrames: 0
+                )
+            )
+        }
+
+        let effects = machine.handle(
+            .manualCaptureRequested
+        )
+        guard case .lockingFocus(
+            let ticket
+        ) = machine.state else {
+            return XCTFail(
+                "Manual capture must remain available"
+            )
+        }
+        XCTAssertEqual(
+            effects,
+            [
+                .stopGuidance,
+                .lockFocus(ticket: ticket),
+            ]
+        )
+    }
+
+    func testDisablingAutomaticCaptureResetsPendingGateFrames()
+    {
+        var machine =
+            DocumentScannerStateMachine()
+        _ = machine.handle(.start)
+        _ = machine.handle(.cameraReady)
+        _ = machine.handle(
+            .frameEvaluated(
+                passingGates()
+            )
+        )
+        XCTAssertEqual(
+            machine.state,
+            .stabilizing(
+                passedGateFrames: 1
+            )
+        )
+
+        machine.setAutomaticCaptureEnabled(
+            false
+        )
+        XCTAssertEqual(
+            machine.state,
+            .searching
+        )
+        XCTAssertFalse(
+            machine.automaticCaptureEnabled
+        )
+    }
+
     func testGuidanceBreaksTheConsecutiveGateSequence() {
         var machine = DocumentScannerStateMachine()
         _ = machine.handle(.start)
@@ -1265,6 +1341,87 @@ final class ScannerRegressionTests: XCTestCase {
         )
     }
 
+    func testCurvedPageSettingSkipsAndRestoresDewarper()
+        async throws
+    {
+        let dewarper =
+            ScannerDewarperSpy()
+        let processor =
+            AndroidParityDocumentProcessor(
+                perspectiveCorrector:
+                    ScannerPerspectiveIdentity(),
+                dewarper: dewarper,
+                enhancer:
+                    ScannerEnhancerIdentity(),
+                backend: .cpuParity,
+                outputLongEdgePixels: 16
+            )
+        let image = CIImage(
+            color: CIColor(
+                red: 0.8,
+                green: 0.8,
+                blue: 0.8
+            )
+        ).cropped(
+            to: CGRect(
+                x: 0,
+                y: 0,
+                width: 8,
+                height: 8
+            )
+        )
+        let quad = DocumentQuad(
+            topLeft:
+                NormalizedPoint(
+                    x: 0,
+                    y: 0
+                ),
+            topRight:
+                NormalizedPoint(
+                    x: 1,
+                    y: 0
+                ),
+            bottomRight:
+                NormalizedPoint(
+                    x: 1,
+                    y: 1
+                ),
+            bottomLeft:
+                NormalizedPoint(
+                    x: 0,
+                    y: 1
+                )
+        )
+
+        _ = try await processor.process(
+            image,
+            detectedQuad: quad,
+            applyCurvedPageCorrection:
+                false,
+            enhanceColors: false
+        )
+        let disabledCallCount =
+            await dewarper.callCount
+        XCTAssertEqual(
+            disabledCallCount,
+            0
+        )
+
+        _ = try await processor.process(
+            image,
+            detectedQuad: quad,
+            applyCurvedPageCorrection:
+                true,
+            enhanceColors: false
+        )
+        let enabledCallCount =
+            await dewarper.callCount
+        XCTAssertEqual(
+            enabledCallCount,
+            1
+        )
+    }
+
     private func passingGates(
         quad: DocumentQuad = DocumentQuad(
             topLeft: NormalizedPoint(x: 0.1, y: 0.1),
@@ -1360,5 +1517,41 @@ final class ScannerRegressionTests: XCTestCase {
         return zip(first, second).reduce(0) { maximum, values in
             max(maximum, abs(Int(values.0) - Int(values.1)))
         }
+    }
+}
+
+private final class ScannerPerspectiveIdentity:
+    DocumentPerspectiveCorrecting,
+    @unchecked Sendable
+{
+    func correct(
+        _ image: CIImage,
+        using quad: DocumentQuad
+    ) async throws -> CIImage {
+        image
+    }
+}
+
+private actor ScannerDewarperSpy:
+    CurvedDocumentDewarping
+{
+    private(set) var callCount = 0
+
+    func dewarp(
+        _ image: CIImage
+    ) async throws -> CIImage {
+        callCount += 1
+        return image
+    }
+}
+
+private final class ScannerEnhancerIdentity:
+    DocumentImageEnhancing,
+    @unchecked Sendable
+{
+    func enhance(
+        _ image: CIImage
+    ) async throws -> CIImage {
+        image
     }
 }

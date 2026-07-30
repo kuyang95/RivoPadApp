@@ -57,6 +57,15 @@ extension LocalDocumentScannerError: LocalizedError {
 /// contract and uses only the bundled LCNet + UVDoc models.
 final class LocalDocumentScannerViewController: UIViewController {
     var allowsAutomaticStart = true
+    var automaticCaptureEnabled = true {
+        didSet {
+            stateMachine
+                .setAutomaticCaptureEnabled(
+                    automaticCaptureEnabled
+                )
+        }
+    }
+    var curvedPageCorrectionEnabled = true
 
     var onScanCompleted: ((UIImage) -> Void)?
     var onCancel: (() -> Void)?
@@ -498,6 +507,13 @@ final class LocalDocumentScannerViewController: UIViewController {
         }
 
         let documentProcessor = processor
+        guard curvedPageCorrectionEnabled
+        else {
+            dewarperPrewarmTask = nil
+            updateBackendLabel()
+            return
+        }
+
         dewarperPrewarmTask = Task {
             [weak self, documentProcessor, scannerDiagnostics] in
             let startedAt = ProcessInfo.processInfo.systemUptime
@@ -535,7 +551,10 @@ final class LocalDocumentScannerViewController: UIViewController {
             }
             let backend = await processor.inferenceBackend
             let dewarperText: String
-            if let backend {
+            if !curvedPageCorrectionEnabled {
+                dewarperText =
+                    "UVDoc 곡면 보정 꺼짐"
+            } else if let backend {
                 dewarperText = backend == .coreML
                     ? "UVDoc Core ML"
                     : "UVDoc CPU"
@@ -1153,6 +1172,10 @@ final class LocalDocumentScannerViewController: UIViewController {
             setStatus("초점이 선명해질 때까지 기다려 주세요.")
         } else if !gates.focusReady {
             setStatus("카메라 초점을 맞추는 중입니다.")
+        } else if !automaticCaptureEnabled {
+            setStatus(
+                "수동 촬영 준비가 완료되었습니다."
+            )
         } else {
             setStatus("촬영 준비가 완료되었습니다.")
         }
@@ -1375,6 +1398,8 @@ final class LocalDocumentScannerViewController: UIViewController {
         let enhanceColors =
             AppSettingsStore.shared
             .documentScanColorEnhancementEnabled
+        let applyCurvedPageCorrection =
+            curvedPageCorrectionEnabled
         let capturedPhoto = ScannerCapturedPhoto(
             pixelBuffer: capture.photoPixelBuffer,
             encodedData: capture.photoData
@@ -1388,7 +1413,8 @@ final class LocalDocumentScannerViewController: UIViewController {
              scannerDiagnostics,
              resourceSampler,
              processingTrace,
-             enhanceColors] in
+             enhanceColors,
+             applyCurvedPageCorrection] in
             var outcome = "cancelled"
             defer {
                 resourceSampler?.finish(outcome: outcome)
@@ -1482,6 +1508,8 @@ final class LocalDocumentScannerViewController: UIViewController {
                         detectedQuad: detection.quad,
                         captureRotationDegrees:
                             capture.captureRotationDegrees,
+                        applyCurvedPageCorrection:
+                            applyCurvedPageCorrection,
                         enhanceColors: enhanceColors,
                         trace: processingTrace
                     )

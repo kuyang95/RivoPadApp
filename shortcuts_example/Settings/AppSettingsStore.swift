@@ -164,6 +164,10 @@ final class AppSettingsStore:
             "settings.speechRate.v1"
         static let scanColorEnhancement =
             "settings.scanColorEnhancement.v1"
+        static let scanAutomaticCapture =
+            "settings.scanAutomaticCapture.v1"
+        static let scanCurvedPageCorrection =
+            "settings.scanCurvedPageCorrection.v1"
         static let ocrAutoCorrection =
             "settings.ocrAutoCorrection.v1"
         static let fontChoice =
@@ -210,6 +214,32 @@ final class AppSettingsStore:
                 documentScanColorEnhancementEnabled,
                 forKey:
                     Key.scanColorEnhancement
+            )
+        }
+    }
+
+    @Published var
+        documentScanAutomaticCaptureEnabled:
+        Bool
+    {
+        didSet {
+            save(
+                documentScanAutomaticCaptureEnabled,
+                forKey:
+                    Key.scanAutomaticCapture
+            )
+        }
+    }
+
+    @Published var
+        documentScanCurvedPageCorrectionEnabled:
+        Bool
+    {
+        didSet {
+            save(
+                documentScanCurvedPageCorrectionEnabled,
+                forKey:
+                    Key.scanCurvedPageCorrection
             )
         }
     }
@@ -278,6 +308,20 @@ final class AppSettingsStore:
                 defaults: defaults,
                 fallback: true
             )
+        documentScanAutomaticCaptureEnabled =
+            Self.bool(
+                forKey:
+                    Key.scanAutomaticCapture,
+                defaults: defaults,
+                fallback: true
+            )
+        documentScanCurvedPageCorrectionEnabled =
+            Self.bool(
+                forKey:
+                    Key.scanCurvedPageCorrection,
+                defaults: defaults,
+                fallback: true
+            )
         ocrAutoCorrectionEnabled =
             Self.bool(
                 forKey:
@@ -307,6 +351,10 @@ final class AppSettingsStore:
         voiceFeedbackEnabled = true
         speechRate = .normal
         documentScanColorEnhancementEnabled =
+            true
+        documentScanAutomaticCaptureEnabled =
+            true
+        documentScanCurvedPageCorrectionEnabled =
             true
         ocrAutoCorrectionEnabled = true
         fontChoice = .nanumSquareRound

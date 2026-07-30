@@ -94,6 +94,7 @@ actor AndroidParityDocumentProcessor {
         _ image: CIImage,
         detectedQuad: DocumentQuad,
         captureRotationDegrees: Int = 0,
+        applyCurvedPageCorrection: Bool = true,
         enhanceColors: Bool = true,
         trace: ScannerProcessingTrace? = nil
     ) async throws -> CIImage {
@@ -101,6 +102,8 @@ actor AndroidParityDocumentProcessor {
             imageBridge.rgbaImage(from: image),
             detectedQuad: detectedQuad,
             captureRotationDegrees: captureRotationDegrees,
+            applyCurvedPageCorrection:
+                applyCurvedPageCorrection,
             enhanceColors: enhanceColors,
             trace: trace
         )
@@ -113,6 +116,7 @@ actor AndroidParityDocumentProcessor {
         _ source: ScannerRGBAImage,
         detectedQuad: DocumentQuad,
         captureRotationDegrees: Int = 0,
+        applyCurvedPageCorrection: Bool = true,
         enhanceColors: Bool = true,
         trace: ScannerProcessingTrace? = nil
     ) async throws -> CIImage {
@@ -190,7 +194,9 @@ actor AndroidParityDocumentProcessor {
         )
 
         let dewarpedPixels: ScannerRGBAImage
-        if prepareDewarper(), let dewarper {
+        if applyCurvedPageCorrection,
+           prepareDewarper(),
+           let dewarper {
             let dewarpStage = trace?.beginStage("uvdocTotal")
             do {
                 if let uvdocEngine = dewarper as? UVDocDewarpEngine {
@@ -233,7 +239,10 @@ actor AndroidParityDocumentProcessor {
             }
         } else {
             trace?.beginStage("uvdocTotal").finish(
-                outcome: "unavailable"
+                outcome:
+                    applyCurvedPageCorrection
+                        ? "unavailable"
+                        : "disabled"
             )
             dewarpedPixels = uprightPixels
         }

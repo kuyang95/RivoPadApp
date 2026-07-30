@@ -32,10 +32,15 @@
 "독서 화면의 오디오·TTS 속도는 책별 독서 설정을 따릅니다." = "Audio and text-to-speech rates in Reading follow each book’s settings.";
 "문서 색상 자동 보정" = "Automatic Document Color Enhancement";
 "촬영한 문서의 배경과 글자 대비를 Android VisionCraft 방식으로 강화합니다." = "Improve background and text contrast in captured documents using the Android VisionCraft method.";
+"문서 자동 촬영" = "Automatic Document Capture";
+"문서가 안정적으로 맞춰지면 자동 촬영합니다. 꺼도 모서리 안내와 수동 촬영은 계속 사용할 수 있습니다." = "Capture automatically when the document is aligned and stable. Edge guidance and manual capture remain available when this is off.";
+"휘어진 페이지 자동 보정" = "Automatic Curved-Page Correction";
+"UVDoc 로컬 모델로 책처럼 휘어진 페이지를 펴 줍니다. 꺼도 모서리와 원근 보정은 유지됩니다." = "Flatten book-like curved pages using the on-device UVDoc model. Edge and perspective correction remain active when this is off.";
 "OCR 오타 자동 교정" = "Automatic OCR Error Correction";
 "정적인 사진과 스캔 문서의 Vision OCR 결과를 이미지와 대조해 M4 로컬 AI로 교정합니다." = "Compare Vision OCR results from still images and scanned documents with the image and correct them using on-device M4 AI.";
 "문서 스캐너" = "Document Scanner";
 "모서리·원근·곡면 보정은 항상 적용됩니다. OCR 교정은 Qwen3-VL을 이 iPad에서 실행하므로 처음에는 모델 준비 시간이 필요하며, 실패하면 Vision OCR 원문을 유지합니다." = "Edge, perspective, and curve correction are always applied. OCR correction runs Qwen3-VL on this iPad, so the model may take time to prepare the first time. Vision OCR text is preserved if correction fails.";
+"모서리 검출과 원근 보정은 항상 적용됩니다. UVDoc과 OCR 교정은 이 iPad에서 로컬 모델을 실행하므로 처음에는 준비 시간이 필요하며, 실패하면 각각 원근 보정 결과와 Vision OCR 원문을 유지합니다." = "Edge detection and perspective correction are always applied. UVDoc and OCR correction run on-device models, so initial preparation may take time. If they fail, the perspective-corrected image and original Vision OCR text are preserved.";
 "모서리 검출과 원근·곡면 보정은 항상 적용하고, 이 항목은 마지막 색상 강화 단계만 제어합니다." = "Edge detection and perspective and curve correction are always applied. This controls only the final color-enhancement step.";
 "텍스트 추출중" = "Extracting Text";
 "OCR 오타 교정중" = "Correcting OCR Errors";

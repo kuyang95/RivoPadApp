@@ -10,6 +10,20 @@ final class DocumentScannerViewController: UIViewController {
         }
     }
 
+    var automaticCaptureEnabled = true {
+        didSet {
+            scanner.automaticCaptureEnabled =
+                automaticCaptureEnabled
+        }
+    }
+
+    var curvedPageCorrectionEnabled = true {
+        didSet {
+            scanner.curvedPageCorrectionEnabled =
+                curvedPageCorrectionEnabled
+        }
+    }
+
     var onScanCompleted: ((UIImage) -> Void)? {
         didSet {
             scanner.onScanCompleted = onScanCompleted
@@ -36,6 +50,10 @@ final class DocumentScannerViewController: UIViewController {
 
         scanner.allowsAutomaticStart =
             allowsAutomaticStart
+        scanner.automaticCaptureEnabled =
+            automaticCaptureEnabled
+        scanner.curvedPageCorrectionEnabled =
+            curvedPageCorrectionEnabled
         addChild(scanner)
         scanner.view.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scanner.view)

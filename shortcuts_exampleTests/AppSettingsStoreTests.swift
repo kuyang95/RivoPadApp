@@ -51,6 +51,14 @@ final class AppSettingsStoreTests:
                 .documentScanColorEnhancementEnabled
         )
         XCTAssertTrue(
+            store
+                .documentScanAutomaticCaptureEnabled
+        )
+        XCTAssertTrue(
+            store
+                .documentScanCurvedPageCorrectionEnabled
+        )
+        XCTAssertTrue(
             store.ocrAutoCorrectionEnabled
         )
         XCTAssertEqual(
@@ -74,6 +82,12 @@ final class AppSettingsStoreTests:
         store
             .documentScanColorEnhancementEnabled =
             false
+        store
+            .documentScanAutomaticCaptureEnabled =
+            false
+        store
+            .documentScanCurvedPageCorrectionEnabled =
+            false
         store.ocrAutoCorrectionEnabled =
             false
         store.fontChoice = .system
@@ -95,6 +109,14 @@ final class AppSettingsStoreTests:
         XCTAssertFalse(
             restored
                 .documentScanColorEnhancementEnabled
+        )
+        XCTAssertFalse(
+            restored
+                .documentScanAutomaticCaptureEnabled
+        )
+        XCTAssertFalse(
+            restored
+                .documentScanCurvedPageCorrectionEnabled
         )
         XCTAssertFalse(
             restored
@@ -154,6 +176,12 @@ final class AppSettingsStoreTests:
         store
             .documentScanColorEnhancementEnabled =
             false
+        store
+            .documentScanAutomaticCaptureEnabled =
+            false
+        store
+            .documentScanCurvedPageCorrectionEnabled =
+            false
         store.ocrAutoCorrectionEnabled =
             false
         store.fontChoice = .system
@@ -174,6 +202,14 @@ final class AppSettingsStoreTests:
         XCTAssertTrue(
             store
                 .documentScanColorEnhancementEnabled
+        )
+        XCTAssertTrue(
+            store
+                .documentScanAutomaticCaptureEnabled
+        )
+        XCTAssertTrue(
+            store
+                .documentScanCurvedPageCorrectionEnabled
         )
         XCTAssertTrue(
             store.ocrAutoCorrectionEnabled

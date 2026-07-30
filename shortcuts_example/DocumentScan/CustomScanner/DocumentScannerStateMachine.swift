@@ -3,11 +3,26 @@ import Foundation
 nonisolated struct DocumentScannerStateMachine: Sendable {
     private(set) var state: DocumentScanState = .idle
     let configuration: CustomDocumentScannerConfiguration
+    private(set) var automaticCaptureEnabled:
+        Bool
 
     init(
-        configuration: CustomDocumentScannerConfiguration = .androidParitySeed
+        configuration: CustomDocumentScannerConfiguration = .androidParitySeed,
+        automaticCaptureEnabled: Bool = true
     ) {
         self.configuration = configuration
+        self.automaticCaptureEnabled =
+            automaticCaptureEnabled
+    }
+
+    mutating func setAutomaticCaptureEnabled(
+        _ enabled: Bool
+    ) {
+        automaticCaptureEnabled = enabled
+        if !enabled,
+           case .stabilizing = state {
+            state = .searching
+        }
     }
 
     mutating func handle(_ event: DocumentScanEvent) -> [DocumentScanEffect] {
@@ -137,6 +152,13 @@ nonisolated struct DocumentScannerStateMachine: Sendable {
 
         guard gates.allGatesPass else {
             state = .stabilizing(passedGateFrames: 0)
+            return [.stopGuidance]
+        }
+
+        guard automaticCaptureEnabled else {
+            state = .stabilizing(
+                passedGateFrames: 0
+            )
             return [.stopGuidance]
         }
 

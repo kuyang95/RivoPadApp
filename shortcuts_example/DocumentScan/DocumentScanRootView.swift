@@ -15,6 +15,8 @@ struct DocumentScanRootView: View {
         RivoScreenRemoteControlCenter
     @Environment(\.dismiss)
     private var dismiss
+    @ObservedObject private var settings =
+        AppSettingsStore.shared
 
     @StateObject private var session:
         DocumentScanSessionModel
@@ -56,6 +58,12 @@ struct DocumentScanRootView: View {
                 command: scannerCommand,
                 isActive:
                     phase == .camera,
+                automaticCaptureEnabled:
+                    settings
+                    .documentScanAutomaticCaptureEnabled,
+                curvedPageCorrectionEnabled:
+                    settings
+                    .documentScanCurvedPageCorrectionEnabled,
                 onScanCompleted:
                     reviewCapturedPage,
                 onCancel: handleScannerCancel
@@ -682,6 +690,8 @@ private struct DocumentScannerController:
     let command:
         DocumentScannerCommand?
     let isActive: Bool
+    let automaticCaptureEnabled: Bool
+    let curvedPageCorrectionEnabled: Bool
     let onScanCompleted:
         (UIImage) -> Void
     let onCancel:
@@ -698,6 +708,10 @@ private struct DocumentScannerController:
             DocumentScannerViewController()
         controller.allowsAutomaticStart =
             isActive
+        controller.automaticCaptureEnabled =
+            automaticCaptureEnabled
+        controller.curvedPageCorrectionEnabled =
+            curvedPageCorrectionEnabled
         controller.onScanCompleted =
             onScanCompleted
         controller.onCancel = onCancel
@@ -717,6 +731,10 @@ private struct DocumentScannerController:
         controller.onCancel = onCancel
         controller.allowsAutomaticStart =
             isActive
+        controller.automaticCaptureEnabled =
+            automaticCaptureEnabled
+        controller.curvedPageCorrectionEnabled =
+            curvedPageCorrectionEnabled
 
         if let remoteEvent,
            remoteEvent.id
