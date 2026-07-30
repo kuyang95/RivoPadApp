@@ -5,6 +5,8 @@
 //  Created by meee on 1/30/26.
 //
 import SwiftUI
+import UniformTypeIdentifiers
+import UIKit
 
 @main
 struct shortcuts_exampleApp: App {
@@ -24,6 +26,8 @@ struct shortcuts_exampleApp: App {
 
     @State private var path = NavigationPath()   // ✅ App이 path 관리
     @State private var didHandleDirectScannerLaunch = false
+    @State private var isConsumingSharedInbox = false
+    @State private var sharedInboxError: String?
 
     init() {
         //UIApplication.shared.isIdleTimerDisabled = true
@@ -302,12 +306,22 @@ struct shortcuts_exampleApp: App {
             )
             .task {
                 openScannerFromLaunchArgumentsIfNeeded()
+                consumeSharedInboxIfNeeded()
+            }
+            .onOpenURL { url in
+                guard url.scheme == "rivopad",
+                      url.host == "share-inbox" else {
+                    return
+                }
+                consumeSharedInboxIfNeeded()
             }
           //  .onAppear { router.consumeLastIfNeeded() }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
                    //  UIApplication.shared.isIdleTimerDisabled = true
-                    shortcutRouter.consumeLastIfNeeded() }
+                    shortcutRouter.consumeLastIfNeeded()
+                    consumeSharedInboxIfNeeded()
+                }
             }
             .onChange(of: shortcutRouter.intentEvent) { _, dest in
                 guard let dest else { return }
@@ -348,6 +362,28 @@ struct shortcuts_exampleApp: App {
                         .releaseAll()
                 }
             }
+            .alert(
+                "공유 항목을 열지 못했습니다",
+                isPresented: Binding(
+                    get: {
+                        sharedInboxError != nil
+                    },
+                    set: { isPresented in
+                        if !isPresented {
+                            sharedInboxError = nil
+                        }
+                    }
+                )
+            ) {
+                Button("확인", role: .cancel) {
+                    sharedInboxError = nil
+                }
+            } message: {
+                Text(
+                    sharedInboxError
+                        ?? "알 수 없는 오류입니다."
+                )
+            }
             
         }.environment(\.font, .custom("NanumSquareRoundOTFEB", size: 16))
     }
@@ -363,6 +399,109 @@ struct shortcuts_exampleApp: App {
         didHandleDirectScannerLaunch = true
         path = NavigationPath()
         path.append(AppRoute.documentScanning)
+    }
+
+    private func consumeSharedInboxIfNeeded() {
+        guard !isConsumingSharedInbox else {
+            return
+        }
+        isConsumingSharedInbox = true
+        Task { @MainActor in
+            defer {
+                isConsumingSharedInbox = false
+            }
+            do {
+                guard let item = try
+                        SharedInboxStore.shared
+                        .pendingItems()
+                        .first else {
+                    return
+                }
+                let route = try await route(
+                    for: item
+                )
+                try SharedInboxStore.shared
+                    .remove(item)
+                replaceNavigation(with: route)
+            } catch {
+                sharedInboxError =
+                    error.localizedDescription
+            }
+        }
+    }
+
+    private func route(
+        for item: SharedInboxItem
+    ) async throws -> AppRoute {
+        switch item.kind {
+        case .text:
+            guard let text = item.text?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ),
+            !text.isEmpty else {
+                throw SharedInboxStoreError
+                    .emptyText
+            }
+            let bounded = String(
+                text.prefix(24_000)
+            )
+            return .voiceQuestion(
+                question:
+                    "다음 공유 내용을 읽고 핵심을 한국어로 설명해 줘.\n\n"
+                    + bounded
+            )
+        case .image:
+            let url = try SharedInboxStore
+                .shared.payloadURL(for: item)
+            let data = try Data(contentsOf: url)
+            guard let image = UIImage(data: data) else {
+                throw CocoaError(
+                    .fileReadCorruptFile
+                )
+            }
+            return .OCRResult(image: image)
+        case .file:
+            let url = try SharedInboxStore
+                .shared.payloadURL(for: item)
+            let contentType = UTType(
+                item.typeIdentifier ?? ""
+            )
+                ?? UTType(
+                    filenameExtension:
+                        url.pathExtension
+                )
+            if contentType?
+                .conforms(to: .image) == true {
+                let data = try Data(
+                    contentsOf: url
+                )
+                guard let image =
+                        UIImage(data: data) else {
+                    throw CocoaError(
+                        .fileReadCorruptFile
+                    )
+                }
+                return .OCRResult(image: image)
+            }
+            if url.pathExtension
+                .lowercased() == "epub" {
+                let bookURL = try await
+                    EPUBLibraryStore.shared
+                    .importBook(from: url)
+                EPUBProgressStore.lastBookURL =
+                    bookURL
+                return .epubReader(
+                    fileURL: bookURL
+                )
+            }
+            let importedURL = try await
+                LocalDocumentImportService.shared
+                .importDocument(from: url)
+            return .localDocument(
+                fileURL: importedURL
+            )
+        }
     }
 
     static func shouldOpenScanner(

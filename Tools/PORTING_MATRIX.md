@@ -29,7 +29,7 @@
 | 음성 인식 | ✅ | Apple Speech 기반 |
 | 음성 답변·문장 단위 TTS | 🟡 | 기본 TTS 완료, 문장 단위 재생 제어는 ⏳ |
 | “스캐너 열어” 등 앱 명령 | ✅ | `a/` 온디바이스 STT와 로컬 규칙 분류로 스캔·카메라·OCR·독서·AI·파일 화면 라우팅 |
-| 다른 앱 사진·PDF·텍스트 수신 | 🟡 | 기존 Intent/Shortcut 기반 일부 완료, Share Extension은 ⏳ |
+| 다른 앱 사진·PDF·텍스트 수신 | ✅ | Share Extension → App Group 수신함 → 사진 OCR·PDF 문서·로컬 AI 라우팅 완료, 실제 공유 시트 확인 🧪 |
 | 선택 텍스트 처리 | ⏳ | Action Extension 필요 |
 
 ## 2. 카메라·돋보기·라이브 OCR
@@ -146,7 +146,7 @@
 | --- | --- | --- |
 | Siri/단축어/App Intent | 🟡 | AI·스캔·음성 일부 완료, 전체 화면 바로가기 ⏳ |
 | 홈 화면 위젯 | ⏳ | 기능 바로가기·최근 BLE 상태 |
-| Share Extension | ⏳ | 사진·PDF·텍스트 |
+| Share Extension | ✅ | 사진·PDF·텍스트·URL 수신과 앱 재활성화 복구 완료, 실제 공유 시트 확인 🧪 |
 | Action Extension | ⏳ | 선택 텍스트 |
 | 다국어 UI | ⏳ | 한국어 하드코딩 문자열 정리 필요 |
 | TTS/음성 피드백 설정 | 🟡 | 기본 서비스 완료, 통합 설정 화면 ⏳ |

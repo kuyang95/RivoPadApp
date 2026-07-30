@@ -15,6 +15,7 @@ Android `TextEditorViewerScreen`과 iPad의 `LocalDocumentView`를 대조해,
 - 10단계 글자 크기와 줄 간격, 줄 구분선, 설정 영구 저장
 - UTF-8 TXT와 여러 페이지 PDF Files 내보내기
 - 문서 전체를 문맥으로 전달하는 로컬 AI 질문
+- Share Extension의 PDF를 App Group 로컬 수신함으로 받아 문서 화면 열기
 
 ## 실기기 일괄 확인
 
@@ -41,7 +42,7 @@ Android `TextEditorViewerScreen`과 iPad의 `LocalDocumentView`를 대조해,
 - 사용자가 선택한 폴더의 보안 범위 북마크와 문서 목록
 - XLS/XLSX 셀 텍스트 추출과 시트 탐색
 - HWP/HWPX 텍스트 추출 또는 안전한 변환 경로
-- Share/Action Extension에서 사진·PDF·선택 텍스트 바로 열기
+- 선택 텍스트 Action Extension에서 문서·AI 화면 바로 열기
 
 ## iPadOS 제약
 
