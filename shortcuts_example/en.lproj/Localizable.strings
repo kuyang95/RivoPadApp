@@ -524,3 +524,13 @@
 "서재에는 책을 최대 %lld권까지 보관할 수 있습니다." = "The library can store up to %lld books.";
 "책 재생 위치" = "Book Playback Position";
 "조절을 마치면 선택한 위치로 이동합니다." = "Move to the selected position when you finish adjusting.";
+"오늘 M4 로컬 AI" = "Today’s On-Device M4 AI";
+"일일 제한 없음" = "No Daily Limit";
+"아직 실행 기록 없음" = "No Activity Yet";
+"%ld회 완료 · %@" = "%ld completed · %@";
+"%ld초 처리" = "%ld sec processing";
+"%ld분 처리" = "%ld min processing";
+"오늘 M4 로컬 AI, %@, %@, 일일 제한 없음" = "Today’s on-device M4 AI, %@, %@, no daily limit";
+"AI 대화 기록을 엽니다." = "Open AI chat history.";
+"오늘 활동 없음" = "No Activity Today";
+"%ld자 생성 · 실패 %ld · 취소 %ld" = "%ld chars generated · %ld failed · %ld canceled";

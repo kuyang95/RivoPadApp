@@ -32,6 +32,7 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 - OCR 오타 자동 교정 설정·진행 상태·PDF 페이지 진행 문구
 - 스캐너 자동 촬영·UVDoc 곡면 보정 설정과 fallback 설명
 - 로컬 진단·개인정보, M4 자원 상태, MetricKit 개수와 JSON 내보내기
+- 홈과 소형 위젯의 오늘 M4 로컬 AI 완료·실패·취소·처리량·무제한 문구
 
 ## 다음 번역 묶음
 

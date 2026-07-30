@@ -835,9 +835,11 @@ final class LLMService: ObservableObject {
         generationID = operationID
         generationConversationID = conversationID
         isGenerating = true
+        let usageStartedAt = Date()
 
         return AsyncThrowingStream { continuation in
             let task = Task { @MainActor [weak self] in
+                var generatedCharacters = 0
                 do {
                     guard self?.activeOperationID == operationID else {
                         throw CancellationError()
@@ -848,13 +850,59 @@ final class LLMService: ObservableObject {
                         guard self?.activeOperationID == operationID else {
                             throw CancellationError()
                         }
+                        generatedCharacters =
+                            min(
+                                10_000_000,
+                                generatedCharacters
+                                    + min(
+                                        chunk.count,
+                                        10_000_000
+                                            - generatedCharacters
+                                    )
+                            )
                         continuation.yield(chunk)
                     }
                     continuation.finish()
+                    LocalAIUsageStore
+                        .shared.record(
+                            .completed,
+                            generatedCharacters:
+                                generatedCharacters,
+                            duration:
+                                Date()
+                                .timeIntervalSince(
+                                    usageStartedAt
+                                )
+                        )
                 } catch is CancellationError {
-                    continuation.finish(throwing: CancellationError())
+                    continuation.finish(
+                        throwing:
+                            CancellationError()
+                    )
+                    LocalAIUsageStore
+                        .shared.record(
+                            .cancelled,
+                            generatedCharacters:
+                                generatedCharacters,
+                            duration:
+                                Date()
+                                .timeIntervalSince(
+                                    usageStartedAt
+                                )
+                        )
                 } catch {
                     continuation.finish(throwing: error)
+                    LocalAIUsageStore
+                        .shared.record(
+                            .failed,
+                            generatedCharacters:
+                                generatedCharacters,
+                            duration:
+                                Date()
+                                .timeIntervalSince(
+                                    usageStartedAt
+                                )
+                        )
                 }
 
                 self?.finishGeneration(operationID)

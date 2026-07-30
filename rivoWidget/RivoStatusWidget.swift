@@ -746,10 +746,385 @@ struct VisionCraftShortcutWidget:
     }
 }
 
+private struct LocalAIUsageWidgetSnapshot:
+    Codable
+{
+    let schemaVersion: Int
+    let dayIdentifier: String
+    let completedRequests: Int
+    let failedRequests: Int
+    let cancelledRequests: Int
+    let generatedCharacters: Int
+    let inferenceSeconds: Double
+    let updatedAt: Date
+
+    var totalRequests: Int {
+        completedRequests
+            + failedRequests
+            + cancelledRequests
+    }
+}
+
+private struct LocalAIUsageEntry:
+    TimelineEntry
+{
+    let date: Date
+    let snapshot:
+        LocalAIUsageWidgetSnapshot?
+}
+
+private struct LocalAIUsageProvider:
+    TimelineProvider
+{
+    private static let suiteName =
+        "group.com.rivo.shortcuts.example"
+    private static let snapshotKey =
+        "localAI.usage.today.v1"
+
+    func placeholder(
+        in context: Context
+    ) -> LocalAIUsageEntry {
+        LocalAIUsageEntry(
+            date: Date(),
+            snapshot:
+                LocalAIUsageWidgetSnapshot(
+                    schemaVersion: 1,
+                    dayIdentifier:
+                        Self.dayIdentifier(
+                            for: Date()
+                        ),
+                    completedRequests: 4,
+                    failedRequests: 0,
+                    cancelledRequests: 1,
+                    generatedCharacters:
+                        2_840,
+                    inferenceSeconds: 52,
+                    updatedAt: Date()
+                )
+        )
+    }
+
+    func getSnapshot(
+        in context: Context,
+        completion:
+            @escaping (LocalAIUsageEntry)
+            -> Void
+    ) {
+        completion(
+            context.isPreview
+                ? placeholder(in: context)
+                : entry(at: Date())
+        )
+    }
+
+    func getTimeline(
+        in context: Context,
+        completion:
+            @escaping (
+                Timeline<
+                    LocalAIUsageEntry
+                >
+            ) -> Void
+    ) {
+        let now = Date()
+        let calendar = Calendar.current
+        let nextMidnight =
+            calendar.date(
+                byAdding: .day,
+                value: 1,
+                to:
+                    calendar
+                    .startOfDay(
+                        for: now
+                    )
+            )
+            ?? now.addingTimeInterval(
+                86_400
+            )
+        completion(
+            Timeline(
+                entries: [entry(at: now)],
+                policy:
+                    .after(
+                        nextMidnight
+                        .addingTimeInterval(
+                            60
+                        )
+                    )
+            )
+        )
+    }
+
+    private func entry(
+        at date: Date
+    ) -> LocalAIUsageEntry {
+        LocalAIUsageEntry(
+            date: date,
+            snapshot:
+                loadSnapshot(
+                    at: date
+                )
+        )
+    }
+
+    private func loadSnapshot(
+        at date: Date
+    ) -> LocalAIUsageWidgetSnapshot? {
+        guard let defaults =
+                UserDefaults(
+                    suiteName:
+                        Self.suiteName
+                ),
+              let data =
+                defaults.data(
+                    forKey:
+                        Self.snapshotKey
+                ) else {
+            return nil
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy =
+            .iso8601
+        guard let snapshot =
+                try? decoder.decode(
+                    LocalAIUsageWidgetSnapshot
+                        .self,
+                    from: data
+                ),
+              snapshot.schemaVersion == 1,
+              snapshot.dayIdentifier
+                == Self.dayIdentifier(
+                    for: date
+                ),
+              snapshot.completedRequests
+                >= 0,
+              snapshot.completedRequests
+                <= 1_000_000,
+              snapshot.failedRequests >= 0,
+              snapshot.failedRequests
+                <= 1_000_000,
+              snapshot.cancelledRequests
+                >= 0,
+              snapshot.cancelledRequests
+                <= 1_000_000,
+              snapshot.generatedCharacters
+                >= 0,
+              snapshot.generatedCharacters
+                <= 1_000_000_000,
+              snapshot.inferenceSeconds
+                .isFinite,
+              snapshot.inferenceSeconds
+                >= 0,
+              snapshot.inferenceSeconds
+                <= 86_400 else {
+            return nil
+        }
+        return snapshot
+    }
+
+    private static func dayIdentifier(
+        for date: Date
+    ) -> String {
+        let components =
+            Calendar.current
+            .dateComponents(
+                [
+                    .year,
+                    .month,
+                    .day,
+                ],
+                from: date
+            )
+        return String(
+            format:
+                "%04d-%02d-%02d",
+            components.year ?? 0,
+            components.month ?? 0,
+            components.day ?? 0
+        )
+    }
+}
+
+private struct
+    LocalAIUsageWidgetView:
+        View
+{
+    let entry: LocalAIUsageEntry
+
+    private let newChatURL =
+        URL(
+            string:
+                "rivopad://open/ai-new"
+        )!
+
+    var body: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 7
+        ) {
+            HStack {
+                Image(
+                    systemName:
+                        "apple.intelligence"
+                )
+                .font(.title2)
+                .foregroundStyle(.indigo)
+                .accessibilityHidden(true)
+                Spacer()
+                Text("일일 제한 없음")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(
+                        .indigo
+                    )
+            }
+
+            Spacer(minLength: 0)
+
+            Text("오늘 M4 로컬 AI")
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+            Text(
+                widgetLocalizedFormat(
+                    "%ld회 완료",
+                    completedRequests
+                )
+            )
+            .font(.title2)
+            .fontWeight(.bold)
+            .lineLimit(1)
+            Text(activityDetail)
+                .font(.caption2)
+                .foregroundStyle(
+                    .secondary
+                )
+                .lineLimit(2)
+        }
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity,
+            alignment: .topLeading
+        )
+        .containerBackground(
+            for: .widget
+        ) {
+            Color(
+                uiColor:
+                    .secondarySystemBackground
+            )
+        }
+        .widgetURL(newChatURL)
+        .accessibilityElement(
+            children: .combine
+        )
+        .accessibilityLabel(
+            widgetLocalizedFormat(
+                "오늘 M4 로컬 AI, %ld회 완료, %@, 일일 제한 없음",
+                completedRequests,
+                activityDetail
+            )
+        )
+        .accessibilityHint(
+            "새 AI 대화를 엽니다."
+        )
+    }
+
+    private var completedRequests:
+        Int
+    {
+        entry.snapshot?
+            .completedRequests
+            ?? 0
+    }
+
+    private var activityDetail:
+        String
+    {
+        guard let snapshot =
+                entry.snapshot,
+              snapshot.totalRequests > 0
+        else {
+            return widgetLocalized(
+                "오늘 활동 없음"
+            )
+        }
+        if snapshot.failedRequests > 0
+            || snapshot.cancelledRequests
+                > 0 {
+            return widgetLocalizedFormat(
+                "%ld자 생성 · %@\n실패 %ld · 취소 %ld",
+                snapshot.generatedCharacters,
+                durationText(
+                    snapshot
+                    .inferenceSeconds
+                ),
+                snapshot.failedRequests,
+                snapshot
+                    .cancelledRequests
+            )
+        }
+        return widgetLocalizedFormat(
+            "%ld자 생성 · %@",
+            snapshot.generatedCharacters,
+            durationText(
+                snapshot.inferenceSeconds
+            )
+        )
+    }
+
+    private func durationText(
+        _ seconds: Double
+    ) -> String {
+        if seconds < 60 {
+            return widgetLocalizedFormat(
+                "%ld초 처리",
+                Int(seconds.rounded())
+            )
+        }
+        return widgetLocalizedFormat(
+            "%ld분 처리",
+            Int(
+                (seconds / 60)
+                    .rounded()
+            )
+        )
+    }
+}
+
+struct LocalAIUsageWidget: Widget {
+    let kind = "LocalAIUsageWidget"
+
+    var body:
+        some WidgetConfiguration
+    {
+        StaticConfiguration(
+            kind: kind,
+            provider:
+                LocalAIUsageProvider()
+        ) { entry in
+            LocalAIUsageWidgetView(
+                entry: entry
+            )
+        }
+        .configurationDisplayName(
+            "오늘 M4 로컬 AI 활동"
+        )
+        .description(
+            "로컬 AI의 오늘 완료 응답과 처리량을 표시합니다."
+        )
+        .supportedFamilies([
+            .systemSmall
+        ])
+    }
+}
+
 @main
 struct RivoWidgetBundle: WidgetBundle {
     var body: some Widget {
         RivoStatusWidget()
         VisionCraftShortcutWidget()
+        LocalAIUsageWidget()
     }
 }

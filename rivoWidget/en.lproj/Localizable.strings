@@ -29,3 +29,15 @@
 "VisionCraft 빠른 실행" = "VisionCraft Quick Launch";
 "홈 화면에서 자주 쓰는 기능 하나를 바로 엽니다." = "Open one frequently used feature directly from the Home Screen.";
 "새 AI 대화, 대화 기록, 스캔, 실시간 읽기, 돋보기, 음성 명령, 문서와 독서를 바로 엽니다." = "Quickly open a new AI chat, chat history, scanner, live reader, magnifier, voice command, documents, or reading.";
+"오늘 M4 로컬 AI" = "Today’s On-Device M4 AI";
+"일일 제한 없음" = "No Daily Limit";
+"%ld회 완료" = "%ld Completed";
+"오늘 활동 없음" = "No Activity Today";
+"%ld자 생성 · %@\n실패 %ld · 취소 %ld" = "%ld chars generated · %@\n%ld failed · %ld canceled";
+"%ld자 생성 · %@" = "%ld chars generated · %@";
+"%ld초 처리" = "%ld sec processing";
+"%ld분 처리" = "%ld min processing";
+"오늘 M4 로컬 AI, %ld회 완료, %@, 일일 제한 없음" = "Today’s on-device M4 AI, %ld completed, %@, no daily limit";
+"새 AI 대화를 엽니다." = "Open a new AI chat.";
+"오늘 M4 로컬 AI 활동" = "Today’s M4 AI Activity";
+"로컬 AI의 오늘 완료 응답과 처리량을 표시합니다." = "See today’s completed responses and processing activity from on-device AI.";

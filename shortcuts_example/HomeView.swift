@@ -4,6 +4,8 @@ struct HomeView: View {
     @EnvironmentObject var appRouter: AppRouter
     @EnvironmentObject private var rivoRemoteManager:
         RivoRemoteManager
+    @ObservedObject private var localAIUsage =
+        LocalAIUsageStore.shared
     @State private var isFileImporterPresented = false
     @State private var fileImportError: String?
     
@@ -15,6 +17,7 @@ struct HomeView: View {
             ScrollView {
                 VStack(spacing: 32) {
                     rivoConnectionStatus
+                    localAIUsageStatus
 
                     Button {
                         appRouter.route = .chatHistory
@@ -153,6 +156,9 @@ struct HomeView: View {
             }
             isFileImporterPresented = true
         }
+        .onAppear {
+            localAIUsage.refresh()
+        }
     }
 
     private var rivoConnectionStatus: some View {
@@ -197,6 +203,137 @@ struct HomeView: View {
             "Rivo 리모컨, \(rivoHomeStatusTitle)"
         )
         .accessibilityHint("연결 관리 화면을 엽니다.")
+    }
+
+    private var localAIUsageStatus:
+        some View
+    {
+        Button {
+            appRouter.route = .chatHistory
+        } label: {
+            HStack(spacing: 14) {
+                Image(
+                    systemName:
+                        "apple.intelligence"
+                )
+                .font(.title2)
+                .foregroundStyle(.indigo)
+                .accessibilityHidden(true)
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text(
+                        "오늘 M4 로컬 AI"
+                    )
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    Text(
+                        localAIUsageTitle
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                    if let detail =
+                            localAIUsageDetail {
+                        Text(detail)
+                            .font(.caption2)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                            .lineLimit(1)
+                    }
+                }
+                Spacer()
+                Text("일일 제한 없음")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.indigo)
+                Image(
+                    systemName:
+                        "chevron.right"
+                )
+                .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 20)
+            .frame(maxWidth: 520)
+            .frame(height: 88)
+            .background(
+                Color.indigo
+                    .opacity(0.08)
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(
+            children: .combine
+        )
+        .accessibilityLabel(
+            AppLocalization.format(
+                "오늘 M4 로컬 AI, %@, %@, 일일 제한 없음",
+                localAIUsageTitle,
+                localAIUsageDetail
+                    ?? AppLocalization.string(
+                        "오늘 활동 없음"
+                    )
+            )
+        )
+        .accessibilityHint(
+            "AI 대화 기록을 엽니다."
+        )
+    }
+
+    private var localAIUsageTitle: String {
+        let usage = localAIUsage.snapshot
+        guard usage.totalRequests > 0 else {
+            return AppLocalization.string(
+                "아직 실행 기록 없음"
+            )
+        }
+        return AppLocalization.format(
+            "%ld회 완료 · %@",
+            usage.completedRequests,
+            localAIUsageDuration(
+                usage.inferenceSeconds
+            )
+        )
+    }
+
+    private var localAIUsageDetail:
+        String?
+    {
+        let usage = localAIUsage.snapshot
+        guard usage.totalRequests > 0 else {
+            return nil
+        }
+        return AppLocalization.format(
+            "%ld자 생성 · 실패 %ld · 취소 %ld",
+            usage.generatedCharacters,
+            usage.failedRequests,
+            usage.cancelledRequests
+        )
+    }
+
+    private func localAIUsageDuration(
+        _ seconds: Double
+    ) -> String {
+        if seconds < 60 {
+            return AppLocalization.format(
+                "%ld초 처리",
+                Int(seconds.rounded())
+            )
+        }
+        return AppLocalization.format(
+            "%ld분 처리",
+            Int((seconds / 60).rounded())
+        )
     }
 
     private var rivoHomeStatusTitle: String {

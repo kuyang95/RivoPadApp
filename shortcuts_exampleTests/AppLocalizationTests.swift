@@ -167,6 +167,20 @@ final class AppLocalizationTests:
             ),
             "Book Playback Position"
         )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "오늘 M4 로컬 AI",
+                bundle: english
+            ),
+            "Today’s On-Device M4 AI"
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "일일 제한 없음",
+                bundle: japanese
+            ),
+            "1日の上限なし"
+        )
     }
 
     func testDynamicFormatTranslationsPreserveArguments()
@@ -278,6 +292,17 @@ final class AppLocalizationTests:
                 2,
                 7
             )
+        let englishLocalAIUsage =
+            String(
+                format:
+                    AppLocalization.string(
+                        "%ld자 생성 · 실패 %ld · 취소 %ld",
+                        bundle: english
+                    ),
+                1_240,
+                2,
+                1
+            )
 
         XCTAssertEqual(englishRate, "1.25×")
         XCTAssertEqual(
@@ -311,6 +336,10 @@ final class AppLocalizationTests:
         XCTAssertEqual(
             englishSelectedSections,
             "To fit the M4 context limit, 2 of 7 attachment sections relevant to the question are used. The saved attachment remains unchanged."
+        )
+        XCTAssertEqual(
+            englishLocalAIUsage,
+            "1240 chars generated · 2 failed · 1 canceled"
         )
     }
 
