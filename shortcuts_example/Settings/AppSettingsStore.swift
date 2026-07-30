@@ -82,6 +82,75 @@ nonisolated enum AppFontChoice:
     }
 }
 
+nonisolated enum SharedTextEntryMode:
+    String,
+    CaseIterable,
+    Codable,
+    Identifiable,
+    Sendable
+{
+    case voice
+    case chat
+
+    var id: Self {
+        self
+    }
+
+    var title: String {
+        switch self {
+        case .voice:
+            return AppLocalization.string(
+                "음성 질문"
+            )
+        case .chat:
+            return AppLocalization.string(
+                "AI 채팅"
+            )
+        }
+    }
+
+    var automaticallyStartsVoiceInput:
+        Bool
+    {
+        self == .voice
+    }
+}
+
+nonisolated struct SharedTextEntryPlan:
+    Equatable,
+    Sendable
+{
+    static let maximumCharacters =
+        24_000
+
+    let text: String
+    let automaticallyStartsVoiceInput:
+        Bool
+
+    static func make(
+        rawText: String,
+        mode: SharedTextEntryMode
+    ) -> Self? {
+        let trimmed = rawText
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+        return Self(
+            text: String(
+                trimmed.prefix(
+                    maximumCharacters
+                )
+            ),
+            automaticallyStartsVoiceInput:
+                mode
+                .automaticallyStartsVoiceInput
+        )
+    }
+}
+
 @MainActor
 final class AppSettingsStore:
     ObservableObject
@@ -97,6 +166,8 @@ final class AppSettingsStore:
             "settings.scanColorEnhancement.v1"
         static let fontChoice =
             "settings.fontChoice.v1"
+        static let sharedTextEntryMode =
+            "settings.sharedTextEntryMode.v1"
     }
 
     static let shared = AppSettingsStore()
@@ -150,6 +221,18 @@ final class AppSettingsStore:
         }
     }
 
+    @Published var sharedTextEntryMode:
+        SharedTextEntryMode
+    {
+        didSet {
+            defaults.set(
+                sharedTextEntryMode.rawValue,
+                forKey:
+                    Key.sharedTextEntryMode
+            )
+        }
+    }
+
     private let defaults: UserDefaults
 
     init(
@@ -187,6 +270,15 @@ final class AppSettingsStore:
             )
             .flatMap(AppFontChoice.init)
             ?? .nanumSquareRound
+        sharedTextEntryMode = defaults
+            .string(
+                forKey:
+                    Key.sharedTextEntryMode
+            )
+            .flatMap(
+                SharedTextEntryMode.init
+            )
+            ?? .voice
     }
 
     func resetToDefaults() {
@@ -196,6 +288,7 @@ final class AppSettingsStore:
         documentScanColorEnhancementEnabled =
             true
         fontChoice = .nanumSquareRound
+        sharedTextEntryMode = .voice
     }
 
     private func save(

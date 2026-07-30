@@ -47,6 +47,11 @@ enum AppRoute: Hashable {
         speaksResponse: Bool
     )
     case voiceQuestion(question: String)
+    case sharedTextQuestion(
+        text: String,
+        automaticallyStartsVoiceInput:
+            Bool
+    )
     case voiceAction
     case documentLibrary
     case localDocument(fileURL: URL)

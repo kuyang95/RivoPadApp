@@ -173,6 +173,25 @@ struct shortcuts_exampleApp: App {
                                 rivoScreenRemoteControlCenter
                                     .deactivate(.localAIChat)
                             }
+                        case .sharedTextQuestion(
+                            let text,
+                            let automaticallyStartsVoiceInput
+                        ):
+                            LLMContentView(
+                                intent: .sharedTextQuestion(
+                                    text: text,
+                                    automaticallyStartsVoiceInput:
+                                        automaticallyStartsVoiceInput
+                                )
+                            )
+                            .onAppear {
+                                rivoScreenRemoteControlCenter
+                                    .activate(.localAIChat)
+                            }
+                            .onDisappear {
+                                rivoScreenRemoteControlCenter
+                                    .deactivate(.localAIChat)
+                            }
                         case .voiceAction:
                             LocalVoiceActionView(
                                 onRoute: {
@@ -675,13 +694,21 @@ struct shortcuts_exampleApp: App {
                     autoLoad: true
                 )
             }
-            let bounded = String(
-                text.prefix(24_000)
-            )
-            return .voiceQuestion(
-                question:
-                    "다음 공유 내용을 읽고 핵심을 한국어로 설명해 줘.\n\n"
-                    + bounded
+            guard let plan =
+                    SharedTextEntryPlan.make(
+                        rawText: text,
+                        mode:
+                            appSettings
+                            .sharedTextEntryMode
+                    ) else {
+                throw SharedInboxStoreError
+                    .emptyText
+            }
+            return .sharedTextQuestion(
+                text: plan.text,
+                automaticallyStartsVoiceInput:
+                    plan
+                    .automaticallyStartsVoiceInput
             )
         case .image:
             let url = try SharedInboxStore

@@ -13,6 +13,11 @@ Android `ShareReceiverProcessor`, `Intent.ACTION_SEND`,
 - 손상된 manifest와 payload 없는 항목을 무시하고 정상 항목만 시간순 복구
 - 사진은 OCR 결과, PDF는 로컬 문서, 텍스트와 URL은 M4 로컬 AI 질문으로
   라우팅
+- 일반 공유 텍스트는 Android처럼 설정에 따라 음성 질문 또는 AI 채팅으로
+  연다. 음성 질문은 공유 문맥 준비 뒤 온디바이스 듣기를 자동 시작하고,
+  AI 채팅은 공유 문맥을 저장한 새 대화에서 질문을 기다린다.
+- 공유 텍스트 앞뒤 공백 제거·빈 입력 거절·24,000자 상한과 설정
+  기본값·저장·잘못된 값 fallback 자동 테스트
 - 처리에 성공한 항목만 삭제해 앱 전환 실패나 강제 종료 뒤 재시도
 - `rivopad://share-inbox` URL과 앱 활성화 이벤트에서 수신함 소비
 - 수신함 저장·복구·삭제·잘못된 항목에 대한 자동 테스트
@@ -30,6 +35,9 @@ Android `ShareReceiverProcessor`, `Intent.ACTION_SEND`,
       텍스트 추출/OCR과 AI 질문이 동작한다.
 - [ ] Safari의 페이지 URL과 선택 가능한 일반 텍스트를 공유하면 원문이
       유실되지 않고 M4 로컬 AI 입력으로 전달된다.
+- [ ] 설정을 음성 질문·AI 채팅으로 각각 바꿔 Safari·메모의 같은 텍스트를
+      공유하면 자동 듣기 여부만 달라지고 두 경우 모두 질문에서 공유 내용을
+      문맥으로 사용한다.
 - [ ] Safari, 메모, Mail에서 문장을 선택한 뒤 동작 메뉴의
       `VisionCraft에 질문`을 실행하면 선택 범위만 전달되고 원본은
       변경되지 않는다.
@@ -46,7 +54,6 @@ Android `ShareReceiverProcessor`, `Intent.ACTION_SEND`,
 ## 다음 구현
 
 - 여러 사진 또는 여러 파일을 한 번에 공유하는 배치 수신
-- URL 본문을 명시적 네트워크 동의 뒤 추출하는 선택 기능
 - 오래 처리되지 않은 수신함 항목과 임시 payload의 보관·정리 정책
 
 ## iPadOS 제약

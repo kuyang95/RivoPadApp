@@ -63,6 +63,14 @@
 "iPadOS" = "iPadOS";
 "일반 iPad 앱은 시스템 전체 밝기·화면 필터·VoiceOver·다른 앱의 터치를 직접 바꿀 수 없습니다." = "A regular iPad app cannot directly change system-wide brightness, display filters, VoiceOver, or touches in other apps.";
 "보기·음성 설정 초기화" = "Reset Display and Voice Settings";
+"음성 질문" = "Voice Question";
+"공유 텍스트 열기" = "Open Shared Text In";
+"다른 앱에서 공유" = "Shared from Other Apps";
+"음성 질문은 공유 내용을 문맥으로 준비한 뒤 바로 듣기를 시작합니다. AI 채팅은 문맥을 첨부한 새 대화에서 질문을 기다립니다." = "Voice Question prepares the shared content as context and starts listening. AI Chat attaches it to a new chat and waits for your question.";
+"공유 텍스트 질문" = "Shared Text Question";
+"공유 텍스트를 준비하는 중…" = "Preparing shared text…";
+"공유 텍스트" = "Shared Text";
+"공유 텍스트 문맥을 준비했습니다." = "Shared text context is ready.";
 "느리게" = "Slow";
 "보통" = "Normal";
 "빠르게" = "Fast";

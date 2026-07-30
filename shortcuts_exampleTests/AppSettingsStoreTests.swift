@@ -54,6 +54,10 @@ final class AppSettingsStoreTests:
             store.fontChoice,
             .nanumSquareRound
         )
+        XCTAssertEqual(
+            store.sharedTextEntryMode,
+            .voice
+        )
     }
 
     func testChangesPersistAcrossStoreInstances()
@@ -68,6 +72,7 @@ final class AppSettingsStoreTests:
             .documentScanColorEnhancementEnabled =
             false
         store.fontChoice = .system
+        store.sharedTextEntryMode = .chat
 
         let restored = AppSettingsStore(
             defaults: defaults
@@ -90,6 +95,10 @@ final class AppSettingsStoreTests:
             restored.fontChoice,
             .system
         )
+        XCTAssertEqual(
+            restored.sharedTextEntryMode,
+            .chat
+        )
     }
 
     func testInvalidEnumValuesUseDefaults()
@@ -102,6 +111,11 @@ final class AppSettingsStoreTests:
             "impossible",
             forKey: "settings.fontChoice.v1"
         )
+        defaults.set(
+            "impossible",
+            forKey:
+                "settings.sharedTextEntryMode.v1"
+        )
 
         let store = AppSettingsStore(
             defaults: defaults
@@ -113,6 +127,10 @@ final class AppSettingsStoreTests:
         XCTAssertEqual(
             store.fontChoice,
             .nanumSquareRound
+        )
+        XCTAssertEqual(
+            store.sharedTextEntryMode,
+            .voice
         )
     }
 
@@ -128,6 +146,7 @@ final class AppSettingsStoreTests:
             .documentScanColorEnhancementEnabled =
             false
         store.fontChoice = .system
+        store.sharedTextEntryMode = .chat
 
         store.resetToDefaults()
 
@@ -150,6 +169,10 @@ final class AppSettingsStoreTests:
             .nanumSquareRound
         )
         XCTAssertEqual(
+            store.sharedTextEntryMode,
+            .voice
+        )
+        XCTAssertEqual(
             AppSpeechRate.normal.avSpeechRate,
             AVSpeechUtteranceDefaultSpeechRate
         )
@@ -164,6 +187,66 @@ final class AppSettingsStoreTests:
         XCTAssertLessThan(
             AppSpeechRate.fast.avSpeechRate,
             AppSpeechRate.veryFast.avSpeechRate
+        )
+        XCTAssertTrue(
+            SharedTextEntryMode
+                .voice
+                .automaticallyStartsVoiceInput
+        )
+        XCTAssertFalse(
+            SharedTextEntryMode
+                .chat
+                .automaticallyStartsVoiceInput
+        )
+    }
+
+    func testSharedTextEntryPlanTrimsBoundsAndChoosesMode()
+    {
+        XCTAssertNil(
+            SharedTextEntryPlan.make(
+                rawText: " \n ",
+                mode: .voice
+            )
+        )
+
+        let voice =
+            SharedTextEntryPlan.make(
+                rawText:
+                    "  "
+                    + String(
+                        repeating: "가",
+                        count:
+                            SharedTextEntryPlan
+                            .maximumCharacters
+                            + 10
+                    )
+                    + "  ",
+                mode: .voice
+            )
+        XCTAssertEqual(
+            voice?.text.count,
+            SharedTextEntryPlan
+                .maximumCharacters
+        )
+        XCTAssertEqual(
+            voice?
+                .automaticallyStartsVoiceInput,
+            true
+        )
+
+        let chat =
+            SharedTextEntryPlan.make(
+                rawText: " 공유 문장 ",
+                mode: .chat
+            )
+        XCTAssertEqual(
+            chat?.text,
+            "공유 문장"
+        )
+        XCTAssertEqual(
+            chat?
+                .automaticallyStartsVoiceInput,
+            false
         )
     }
 }

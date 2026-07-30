@@ -7,6 +7,11 @@ import UIKit
 enum ChatIntentInput: Equatable {
     case textChat(conversationID: UUID?)
     case voiceQuestion(question: String)
+    case sharedTextQuestion(
+        text: String,
+        automaticallyStartsVoiceInput:
+            Bool
+    )
     case imageAnalysis(imageURL: URL, question: String)
     case capturedImageAnalysis(
         image: UIImage,
@@ -58,6 +63,9 @@ struct LLMContentView: View {
         case .voiceQuestion:
             storedConversationID = UUID()
             persistsHistory = true
+        case .sharedTextQuestion:
+            storedConversationID = UUID()
+            persistsHistory = true
         case .imageAnalysis,
              .capturedImageAnalysis,
              .documentQA,
@@ -107,6 +115,7 @@ struct LLMContentView: View {
             )
         case .textChat,
              .voiceQuestion,
+             .sharedTextQuestion,
              .documentQA,
              .webPageQA,
              .webSearchQA:
@@ -417,6 +426,15 @@ struct LLMContentView: View {
             guard !didStart else { return }
             didStart = true
             await vm.prepare(for: intent)
+            if case .sharedTextQuestion(
+                _,
+                let automaticallyStartsVoiceInput
+            ) = intent,
+            automaticallyStartsVoiceInput,
+            vm.attachmentSummary != nil {
+                await Task.yield()
+                _ = startVoiceInput()
+            }
         }
         .onDisappear {
             speechTask?.cancel()
@@ -621,8 +639,11 @@ struct LLMContentView: View {
 
     private var navigationTitle: String {
         switch intent {
-        case .textChat, .voiceQuestion:
+        case .textChat,
+             .voiceQuestion:
             return "로컬 AI"
+        case .sharedTextQuestion:
+            return "공유 텍스트 질문"
         case .imageAnalysis,
              .capturedImageAnalysis:
             return "이미지 질문"

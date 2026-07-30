@@ -31,6 +31,7 @@ struct AppSettingsView: View {
     var body: some View {
         Form {
             feedbackSection
+            sharingSection
             scannerSection
             appearanceSection
             documentSection
@@ -87,6 +88,33 @@ struct AppSettingsView: View {
         } message: {
             Text(
                 "검색어가 개인 Brave API 키로 Brave Search에 전송됩니다. Brave는 과금·장애 대응·남용 방지를 위해 검색어 로그를 최대 90일 보관할 수 있습니다. 검색 결과와 로컬 AI 답변은 VisionCraft 대화 기록에 저장하지 않습니다."
+            )
+        }
+    }
+
+    private var sharingSection:
+        some View
+    {
+        Section {
+            Picker(
+                "공유 텍스트 열기",
+                selection:
+                    $settings
+                    .sharedTextEntryMode
+            ) {
+                ForEach(
+                    SharedTextEntryMode
+                        .allCases
+                ) { mode in
+                    Text(mode.title)
+                        .tag(mode)
+                }
+            }
+        } header: {
+            Text("다른 앱에서 공유")
+        } footer: {
+            Text(
+                "음성 질문은 공유 내용을 문맥으로 준비한 뒤 바로 듣기를 시작합니다. AI 채팅은 문맥을 첨부한 새 대화에서 질문을 기다립니다."
             )
         }
     }

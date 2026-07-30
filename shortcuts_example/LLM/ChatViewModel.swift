@@ -211,6 +211,11 @@ final class ChatViewModel: ObservableObject {
         case .voiceQuestion(let question):
             input = question
             sendUserMessage()
+        case .sharedTextQuestion(
+            let text,
+            _
+        ):
+            await attachSharedText(text)
         case .imageAnalysis,
              .capturedImageAnalysis,
              .documentQA,
@@ -235,7 +240,8 @@ final class ChatViewModel: ObservableObject {
                 try await llm.activateModel(.qwen3_vl_8b_4bit)
                 loadedKind = .vision
             case .textChat,
-                 .voiceQuestion:
+                 .voiceQuestion,
+                 .sharedTextQuestion:
                 if fileAttachment?.kind
                     == .image {
                     try await llm.activateModel(
@@ -272,7 +278,9 @@ final class ChatViewModel: ObservableObject {
 
     func runInitialIntent(_ intent: ChatIntentInput) {
         switch intent {
-        case .textChat, .voiceQuestion:
+        case .textChat,
+             .voiceQuestion,
+             .sharedTextQuestion:
             return
 
         case .imageAnalysis(let imageURL, let question):
@@ -534,6 +542,52 @@ final class ChatViewModel: ObservableObject {
             attachmentStatusDescription =
                 AppLocalization.string(
                     "클립보드 문맥을 첨부했습니다."
+                )
+        } catch {
+            textContexts = previousContexts
+            refreshAttachmentSummary()
+            attachmentErrorDescription =
+                userMessage(for: error)
+            attachmentStatusDescription = nil
+        }
+    }
+
+    func attachSharedText(
+        _ rawText: String
+    ) async {
+        guard beginPreparingAttachment(
+            status:
+                AppLocalization.string(
+                    "공유 텍스트를 준비하는 중…"
+                )
+        ) else {
+            return
+        }
+        defer {
+            isPreparingAttachment = false
+        }
+
+        let previousContexts = textContexts
+        do {
+            textContexts = try
+                ChatAttachmentContextPolicy
+                .appending(
+                    name:
+                        AppLocalization.string(
+                            "공유 텍스트"
+                        ),
+                    text: rawText,
+                    to: textContexts
+                )
+            try await finishAttachmentChange(
+                preferredTitle:
+                    AppLocalization.string(
+                        "공유 텍스트"
+                    )
+            )
+            attachmentStatusDescription =
+                AppLocalization.string(
+                    "공유 텍스트 문맥을 준비했습니다."
                 )
         } catch {
             textContexts = previousContexts
