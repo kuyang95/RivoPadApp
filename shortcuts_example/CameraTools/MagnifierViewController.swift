@@ -350,7 +350,8 @@ nonisolated struct MagnifierDisplayAdjustment:
 final class MagnifierViewController:
     UIViewController,
     AVCaptureVideoDataOutputSampleBufferDelegate,
-    MTKViewDelegate
+    MTKViewDelegate,
+    UIDocumentPickerDelegate
 {
     var onClose: (() -> Void)?
     var onCapture: ((UIImage) -> Void)?
@@ -423,10 +424,14 @@ final class MagnifierViewController:
     )
     private let torchButton = UIButton(type: .system)
     private let switchCameraButton = UIButton(type: .system)
+    private let photoSaveButton = UIButton(type: .system)
     private let captureButton = UIButton(type: .system)
     private let statusLabel = UILabel()
     private let liveTextLabel = UILabel()
     private let tts = TTSManager.shared
+    private let photoSaveService =
+        MagnifierPhotoSaveService()
+    private var pendingPhotoExportURL: URL?
 
     init(mode: MagnifierCameraMode = .magnifier) {
         self.mode = mode
@@ -571,6 +576,14 @@ final class MagnifierViewController:
             action: #selector(switchCameraTapped)
         )
         configureActionButton(
+            photoSaveButton,
+            title: "사진 저장",
+            systemImage: "camera.fill",
+            action: #selector(photoSaveTapped)
+        )
+        photoSaveButton.accessibilityHint =
+            "현재 필터와 확대가 적용된 프레임을 사진 보관함이나 Files에 저장합니다."
+        configureActionButton(
             captureButton,
             title: mode == .magnifier
                 ? "텍스트 읽기"
@@ -583,12 +596,18 @@ final class MagnifierViewController:
         captureButton.configuration?.baseBackgroundColor =
             .systemIndigo
 
+        var actionButtons = [
+            torchButton,
+            switchCameraButton,
+        ]
+        if mode == .magnifier {
+            actionButtons.append(
+                photoSaveButton
+            )
+        }
+        actionButtons.append(captureButton)
         let actionStack = UIStackView(
-            arrangedSubviews: [
-                torchButton,
-                switchCameraButton,
-                captureButton
-            ]
+            arrangedSubviews: actionButtons
         )
         actionStack.axis = .horizontal
         actionStack.alignment = .fill
@@ -918,9 +937,13 @@ final class MagnifierViewController:
 
         switch action {
         case .enterCameraMode(let showGuide):
+            let seventhKeyAction =
+                mode == .magnifier
+                ? "7 사진 저장"
+                : "7 읽기 일시정지 또는 재개"
             announceRemoteStatus(
                 showGuide
-                    ? "카메라 조작 모드. 4 닫기, 5 카메라 전환, 6 토치, 7 촬영 또는 읽기, R2 초점, 별표 0 샵 확대"
+                    ? "카메라 조작 모드. 4 닫기, 5 카메라 전환, 6 토치, \(seventhKeyAction), R2 초점, 별표 0 샵 확대"
                     : "카메라 조작 모드"
             )
         case .enterDisplayMode(let showGuide):
@@ -936,7 +959,11 @@ final class MagnifierViewController:
         case .toggleTorch:
             torchTapped()
         case .capture:
-            captureTapped()
+            if mode == .magnifier {
+                saveCurrentFrameToPhotos()
+            } else {
+                captureTapped()
+            }
         case .focus:
             focusAtCenter()
         case .decreaseZoom:
@@ -1179,6 +1206,166 @@ final class MagnifierViewController:
         UIImpactFeedbackGenerator(style: .medium)
             .impactOccurred()
         onCapture?(image)
+    }
+
+    @objc private func photoSaveTapped() {
+        guard let image = capturedImage() else {
+            announceRemoteStatus(
+                "카메라 프레임을 기다리는 중입니다."
+            )
+            return
+        }
+        presentPhotoSaveOptions(
+            for: image
+        )
+    }
+
+    private func presentPhotoSaveOptions(
+        for image: UIImage
+    ) {
+        let alert = UIAlertController(
+            title: "사진 저장",
+            message:
+                "저장할 위치를 선택합니다. 사진 보관함은 추가 전용 권한만 사용합니다.",
+            preferredStyle: .actionSheet
+        )
+        alert.addAction(
+            UIAlertAction(
+                title: "사진 보관함",
+                style: .default
+            ) { [weak self] _ in
+                self?.saveImageToPhotos(image)
+            }
+        )
+        alert.addAction(
+            UIAlertAction(
+                title: "Files",
+                style: .default
+            ) { [weak self] _ in
+                self?.exportImageToFiles(image)
+            }
+        )
+        alert.addAction(
+            UIAlertAction(
+                title: "취소",
+                style: .cancel
+            )
+        )
+        if let popover =
+                alert.popoverPresentationController {
+            popover.sourceView = photoSaveButton
+            popover.sourceRect =
+                photoSaveButton.bounds
+        }
+        present(alert, animated: true)
+    }
+
+    private func saveCurrentFrameToPhotos() {
+        guard let image = capturedImage() else {
+            announceRemoteStatus(
+                "카메라 프레임을 기다리는 중입니다."
+            )
+            return
+        }
+        saveImageToPhotos(image)
+    }
+
+    private func saveImageToPhotos(
+        _ image: UIImage
+    ) {
+        photoSaveButton.isEnabled = false
+        statusLabel.text =
+            "사진 보관함에 저장하는 중"
+        Task { [weak self] in
+            guard let self else {
+                return
+            }
+            defer {
+                self.photoSaveButton
+                    .isEnabled = true
+            }
+            do {
+                let capture =
+                    try MagnifierPhotoCapture(
+                        image: image
+                    )
+                try await self
+                    .photoSaveService
+                    .saveToPhotoLibrary(
+                        capture
+                    )
+                UIImpactFeedbackGenerator(
+                    style: .medium
+                ).impactOccurred()
+                self.announceRemoteStatus(
+                    "사진 보관함에 저장했습니다."
+                )
+            } catch {
+                self.announceRemoteStatus(
+                    "사진을 저장하지 못했습니다: "
+                        + error
+                            .localizedDescription
+                )
+            }
+        }
+    }
+
+    private func exportImageToFiles(
+        _ image: UIImage
+    ) {
+        do {
+            photoSaveService
+                .removeTemporaryExport(
+                    at:
+                        pendingPhotoExportURL
+                )
+            let capture =
+                try MagnifierPhotoCapture(
+                    image: image
+                )
+            let url =
+                try photoSaveService
+                    .makeTemporaryExportURL(
+                        for: capture
+                    )
+            pendingPhotoExportURL = url
+            let picker =
+                UIDocumentPickerViewController(
+                    forExporting: [url],
+                    asCopy: true
+                )
+            picker.delegate = self
+            present(picker, animated: true)
+        } catch {
+            announceRemoteStatus(
+                "Files로 내보내지 못했습니다: "
+                    + error.localizedDescription
+            )
+        }
+    }
+
+    func documentPicker(
+        _ controller: UIDocumentPickerViewController,
+        didPickDocumentsAt urls: [URL]
+    ) {
+        photoSaveService.removeTemporaryExport(
+            at: pendingPhotoExportURL
+        )
+        pendingPhotoExportURL = nil
+        announceRemoteStatus(
+            "Files에 사진을 저장했습니다."
+        )
+    }
+
+    func documentPickerWasCancelled(
+        _ controller: UIDocumentPickerViewController
+    ) {
+        photoSaveService.removeTemporaryExport(
+            at: pendingPhotoExportURL
+        )
+        pendingPhotoExportURL = nil
+        statusLabel.text =
+            "Files 저장을 취소했습니다."
     }
 
     @objc private func handlePinch(

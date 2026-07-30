@@ -1147,6 +1147,7 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "for document scan";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "음성 입력을 위해 필요합니다.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "문서 자동 촬영 중 기기 흔들림을 감지하기 위해 필요합니다.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "카메라에서 촬영한 사진을 사진 보관함에 저장하기 위해 필요합니다.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "음성 인식을 위해 필요합니다.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -1212,6 +1213,7 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "for document scan";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "음성 입력을 위해 필요합니다.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "문서 자동 촬영 중 기기 흔들림을 감지하기 위해 필요합니다.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "카메라에서 촬영한 사진을 사진 보관함에 저장하기 위해 필요합니다.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "음성 인식을 위해 필요합니다.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;

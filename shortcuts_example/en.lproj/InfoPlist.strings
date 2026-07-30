@@ -3,4 +3,5 @@
 "NSCameraUsageDescription" = "Camera access is required for document scanning, magnification, and live text reading.";
 "NSMicrophoneUsageDescription" = "Microphone access is required for voice input.";
 "NSMotionUsageDescription" = "Motion access is required to detect device shake during automatic document capture.";
+"NSPhotoLibraryAddUsageDescription" = "Photo add access is required to save pictures captured with the camera.";
 "NSSpeechRecognitionUsageDescription" = "Speech recognition is required to convert voice input to text.";

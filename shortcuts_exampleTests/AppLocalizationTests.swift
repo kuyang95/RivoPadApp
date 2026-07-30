@@ -320,6 +320,13 @@ final class AppLocalizationTests:
             )
             .contains("Bluetooth")
         )
+        XCTAssertTrue(
+            infoPlistString(
+                "NSPhotoLibraryAddUsageDescription",
+                bundle: english
+            )
+            .contains("Photo")
+        )
     }
 
     private func localizedBundle(
