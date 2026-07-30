@@ -81,6 +81,98 @@ final class RivoRemoteProtocolTests: XCTestCase {
         )
     }
 
+    func testRestorationPrefersSavedDeviceAndMapsEveryState()
+    {
+        let saved = UUID()
+        let connected = UUID()
+        let candidates = [
+            RivoRestoredPeripheralCandidate(
+                identifier: connected,
+                state: .connected
+            ),
+            RivoRestoredPeripheralCandidate(
+                identifier: saved,
+                state: .disconnected
+            ),
+        ]
+
+        XCTAssertTrue(
+            RivoRestorationPolicy
+                .shouldPrepareCentralManager(
+                    savedIdentifier: saved,
+                    hasActivatedBluetooth: false
+                )
+        )
+        XCTAssertTrue(
+            RivoRestorationPolicy
+                .shouldPrepareCentralManager(
+                    savedIdentifier: nil,
+                    hasActivatedBluetooth: true
+                )
+        )
+        XCTAssertFalse(
+            RivoRestorationPolicy
+                .shouldPrepareCentralManager(
+                    savedIdentifier: nil,
+                    hasActivatedBluetooth: false
+                )
+        )
+        XCTAssertEqual(
+            RivoRestorationPolicy.decision(
+                candidates: candidates,
+                savedIdentifier: saved
+            ),
+            RivoRestorationDecision(
+                candidate: candidates[1],
+                action: .connect
+            )
+        )
+        XCTAssertEqual(
+            RivoRestorationPolicy.decision(
+                candidates: candidates,
+                savedIdentifier: nil
+            ),
+            RivoRestorationDecision(
+                candidate: candidates[0],
+                action: .resumeServices
+            )
+        )
+
+        let expectedActions:
+            [
+                RivoRestoredPeripheralState:
+                    RivoRestorationAction
+            ] = [
+                .connected:
+                    .resumeServices,
+                .connecting:
+                    .awaitConnection,
+                .disconnected:
+                    .connect,
+                .disconnecting:
+                    .awaitDisconnection,
+            ]
+        for (state, action)
+            in expectedActions {
+            let candidate =
+                RivoRestoredPeripheralCandidate(
+                    identifier: UUID(),
+                    state: state
+                )
+            XCTAssertEqual(
+                RivoRestorationPolicy
+                    .decision(
+                        candidates: [candidate],
+                        savedIdentifier: nil
+                    ),
+                RivoRestorationDecision(
+                    candidate: candidate,
+                    action: action
+                )
+            )
+        }
+    }
+
     func testTimePacketMatchesAndroidSignedChecksumRange() {
         let packet = RivoTimeSyncPacketEncoder.packet(
             for: RivoClockValue(
