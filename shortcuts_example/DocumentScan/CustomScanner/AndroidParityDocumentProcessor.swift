@@ -238,46 +238,121 @@ actor AndroidParityDocumentProcessor {
             dewarpedPixels = uprightPixels
         }
 
+        return try await finishPixels(
+            dewarpedPixels,
+            enhanceColors: enhanceColors,
+            trace: trace
+        )
+    }
+
+    /// Handles manual captures where neither the still image nor the preview
+    /// produced a document quad. Android keeps the visible camera crop,
+    /// rotates it upright, normalizes the long edge, and optionally applies
+    /// the same document color enhancement. Keeping these stages inside this
+    /// actor lets the no-quad path use Metal and avoids the former multi-second
+    /// CPU-only fallback.
+    func processFallback(
+        _ source: ScannerRGBAImage,
+        captureRotationDegrees: Int = 0,
+        enhanceColors: Bool = true,
+        trace: ScannerProcessingTrace? = nil
+    ) async throws -> CIImage {
+        try Task.checkCancellation()
+        let rotateStage = trace?.beginStage(
+            "fallbackUprightRotate"
+        )
+        let normalizedRotation =
+            ((captureRotationDegrees % 360) + 360) % 360
+        let uprightPixels: ScannerRGBAImage
+        let rotationBackend: String
+        if normalizedRotation == 0 {
+            uprightPixels = source
+            rotationBackend = "passthrough"
+        } else if let metalImageSampler {
+            do {
+                uprightPixels = try metalImageSampler
+                    .rotatedClockwise(
+                        source,
+                        degrees: normalizedRotation
+                    )
+                rotationBackend = "metal"
+            } catch {
+                uprightPixels = AndroidScannerImageMath
+                    .rotatedClockwise(
+                        source,
+                        degrees: normalizedRotation
+                    )
+                rotationBackend = "cpuFallback"
+            }
+        } else {
+            uprightPixels = AndroidScannerImageMath
+                .rotatedClockwise(
+                    source,
+                    degrees: normalizedRotation
+                )
+            rotationBackend = "cpu"
+        }
+        rotateStage?.finish(
+            details: "input=\(source.width)x\(source.height) "
+                + "output=\(uprightPixels.width)x"
+                + "\(uprightPixels.height) "
+                + "rotation=\(normalizedRotation) "
+                + "backend=\(rotationBackend)"
+        )
+        try Task.checkCancellation()
+        return try await finishPixels(
+            uprightPixels,
+            enhanceColors: enhanceColors,
+            trace: trace
+        )
+    }
+
+    private func finishPixels(
+        _ source: ScannerRGBAImage,
+        enhanceColors: Bool,
+        trace: ScannerProcessingTrace?
+    ) async throws -> CIImage {
         let normalizeStage = trace?.beginStage("outputNormalize")
         let normalizedPixels: ScannerRGBAImage
         let normalizationBackend: String
-        if max(dewarpedPixels.width, dewarpedPixels.height)
+        if max(source.width, source.height)
             > outputLongEdgePixels,
            let metalImageSampler {
             do {
                 normalizedPixels = try metalImageSampler
                     .normalizedLongEdge(
-                        dewarpedPixels,
+                        source,
                         maximum: outputLongEdgePixels
                     )
                 normalizationBackend = "metal"
             } catch {
                 normalizedPixels = AndroidScannerImageMath
                     .normalizedLongEdge(
-                        dewarpedPixels,
+                        source,
                         maximum: outputLongEdgePixels
                     )
                 normalizationBackend = "cpuFallback"
             }
         } else {
             normalizedPixels = AndroidScannerImageMath.normalizedLongEdge(
-                dewarpedPixels,
+                source,
                 maximum: outputLongEdgePixels
             )
             normalizationBackend =
-                max(dewarpedPixels.width, dewarpedPixels.height)
+                max(source.width, source.height)
                     > outputLongEdgePixels
                 ? "cpu"
                 : "passthrough"
         }
         normalizeStage?.finish(
-            details: "input=\(dewarpedPixels.width)x"
-                + "\(dewarpedPixels.height) "
+            details: "input=\(source.width)x"
+                + "\(source.height) "
                 + "output=\(normalizedPixels.width)x"
                 + "\(normalizedPixels.height) "
                 + "backend=\(normalizationBackend)"
         )
 
+        try Task.checkCancellation()
         guard enhanceColors else {
             return imageBridge.ciImage(from: normalizedPixels)
         }

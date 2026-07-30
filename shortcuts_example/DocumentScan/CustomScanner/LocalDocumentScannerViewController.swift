@@ -1280,7 +1280,6 @@ final class LocalDocumentScannerViewController: UIViewController {
         let stillDetector = detector
         let documentProcessor = processor
         let scannerConfiguration = configuration
-        let bridge = imageBridge
         let stillMetalSampler = liveMetalSampler
         let scannerDiagnostics = diagnostics
         let resourceSampler = diagnostics.beginProcessing(ticket: ticket)
@@ -1297,7 +1296,6 @@ final class LocalDocumentScannerViewController: UIViewController {
              stillDetector,
              documentProcessor,
              scannerConfiguration,
-             bridge,
              stillMetalSampler,
              scannerDiagnostics,
              resourceSampler,
@@ -1400,24 +1398,14 @@ final class LocalDocumentScannerViewController: UIViewController {
                         trace: processingTrace
                     )
                 } else {
-                    let upright = AndroidScannerImageMath.rotatedClockwise(
+                    output = try await documentProcessor
+                        .processFallback(
                         prepared.image,
-                        degrees: capture.captureRotationDegrees
-                    )
-                    let normalized = AndroidScannerImageMath
-                        .normalizedLongEdge(
-                            upright,
-                            maximum:
-                                scannerConfiguration.outputLongEdgePixels
+                        captureRotationDegrees:
+                            capture.captureRotationDegrees,
+                        enhanceColors: enhanceColors,
+                        trace: processingTrace
                         )
-                    let pixels =
-                        enhanceColors
-                        ? AndroidDocumentColorMath
-                            .enhance(normalized)
-                        : normalized
-                    output = bridge.ciImage(
-                        from: pixels
-                    )
                 }
                 scannerDiagnostics.logDuration(
                     "documentProcess",

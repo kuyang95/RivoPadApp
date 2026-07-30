@@ -1175,6 +1175,45 @@ final class ScannerRegressionTests: XCTestCase {
         XCTAssertEqual(pixelNative, adaptedPixels)
     }
 
+    func testNoQuadFallbackRotatesAndNormalizesWithPixelParity()
+        async throws
+    {
+        let source = try patternedImage(
+            width: 32,
+            height: 20
+        )
+        let processor = AndroidParityDocumentProcessor(
+            outputLongEdgePixels: 16
+        )
+        let output = try await processor
+            .processFallback(
+                source,
+                captureRotationDegrees: 90,
+                enhanceColors: false
+            )
+        let actual = try ScannerCIImageBridge()
+            .rgbaImage(from: output)
+        let expected = AndroidScannerImageMath
+            .normalizedLongEdge(
+                AndroidScannerImageMath
+                    .rotatedClockwise(
+                        source,
+                        degrees: 90
+                    ),
+                maximum: 16
+            )
+
+        XCTAssertEqual(actual.width, 10)
+        XCTAssertEqual(actual.height, 16)
+        XCTAssertLessThanOrEqual(
+            maximumChannelDifference(
+                actual.bytes,
+                expected.bytes
+            ),
+            1
+        )
+    }
+
     private func passingGates(
         quad: DocumentQuad = DocumentQuad(
             topLeft: NormalizedPoint(x: 0.1, y: 0.1),

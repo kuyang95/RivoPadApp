@@ -62,18 +62,28 @@ BGRA/Metal 경로는 전처리와 촬영 시 LCNet 합계를 약 66% 줄였고,
 
 ### SCAN-001: 모서리 미검출 수동 촬영 fallback 가속
 
-상태: 확정된 성능 부채
+상태: Metal 구현 완료, M4 성능 재측정 필요
 
 현재 `LocalDocumentScannerViewController.processPhoto`의
 `detection == nil` 분기는 전체 해상도 이미지에 CPU 회전, 정규화,
 색상 강화를 순차 수행한다. 실제 M4 측정에서 약 4.3초가 걸렸다.
 
-할 일:
+완료:
 
 - 기존 `AndroidMetalImageSampler`의 회전·정규화·색상 강화 경로 재사용
-- 큰 RGBA 중간 배열의 동시 생존 범위 축소
-- 취소 시 GPU/후처리 결과가 화면으로 전달되지 않는지 확인
-- 진단에 fallback backend와 각 하위 단계 시간을 남기기
+- `AndroidParityDocumentProcessor.processFallback`에서 Metal 실패 시에만
+  CPU로 되돌아가도록 구성
+- 회전·긴 변 정규화 결과가 Android CPU 기준과 채널 오차 1 이내인지
+  시뮬레이터 회귀 테스트
+- 취소 검사를 회전 전후와 색상 강화 전에 유지
+- 진단에 `fallbackUprightRotate`, `outputNormalize`, `colorEnhance`
+  backend와 시간을 기록
+
+남음:
+
+- 같은 `quadAvailable=false` 장면으로 M4의 300ms 이하와 최고 메모리
+  500MB 이하를 다시 측정
+- 색상 강화 켜기/끄기 및 0/90/180/270도 결과를 실촬영으로 확인
 
 완료 조건:
 
