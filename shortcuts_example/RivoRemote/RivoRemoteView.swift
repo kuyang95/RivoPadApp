@@ -68,6 +68,22 @@ struct RivoRemoteView: View {
                 .accessibilityElement(children: .combine)
             }
 
+            if let reconnectAttempt =
+                manager.reconnectAttempt {
+                HStack {
+                    ProgressView()
+                    Text(reconnectAttempt.title)
+                }
+                .accessibilityElement(children: .combine)
+
+                Button(
+                    "지금 다시 연결",
+                    systemImage: "bolt.horizontal.circle"
+                ) {
+                    manager.retryConnectionNow()
+                }
+            }
+
             stateActions
         }
     }
@@ -107,7 +123,7 @@ struct RivoRemoteView: View {
             Button("검색 중지", systemImage: "stop.fill") {
                 manager.stopScanning()
             }
-        } else {
+        } else if manager.reconnectAttempt == nil {
             Button(
                 "Rivo 리모컨 검색",
                 systemImage: "antenna.radiowaves.left.and.right"

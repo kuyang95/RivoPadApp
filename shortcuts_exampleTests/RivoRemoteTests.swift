@@ -5,6 +5,36 @@ import XCTest
 @testable import shortcuts_example
 
 final class RivoRemoteProtocolTests: XCTestCase {
+    func testReconnectBackoffGrowsAndCapsUntilReset() {
+        var backoff = RivoReconnectBackoff()
+        let attempts = (0 ..< 8).map { _ in
+            backoff.nextAttempt()
+        }
+
+        XCTAssertEqual(
+            attempts.map(\.delay),
+            [1, 2, 4, 8, 16, 30, 30, 30]
+        )
+        XCTAssertEqual(
+            attempts.map(\.number),
+            Array(1 ... 8)
+        )
+        XCTAssertEqual(
+            attempts[2].title,
+            "4초 뒤 자동으로 다시 연결합니다. 3번째 재시도"
+        )
+
+        backoff.reset()
+
+        XCTAssertEqual(
+            backoff.nextAttempt(),
+            RivoReconnectAttempt(
+                number: 1,
+                delay: 1
+            )
+        )
+    }
+
     func testTimePacketMatchesAndroidSignedChecksumRange() {
         let packet = RivoTimeSyncPacketEncoder.packet(
             for: RivoClockValue(

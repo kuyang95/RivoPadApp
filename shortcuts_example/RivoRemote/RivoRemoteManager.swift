@@ -157,6 +157,45 @@ nonisolated enum RivoTimeSyncState:
     }
 }
 
+nonisolated struct RivoReconnectAttempt:
+    Equatable,
+    Sendable
+{
+    let number: Int
+    let delay: TimeInterval
+
+    var title: String {
+        let seconds = Int(delay.rounded())
+        return "\(seconds)초 뒤 자동으로 다시 연결합니다. \(number)번째 재시도"
+    }
+}
+
+nonisolated struct RivoReconnectBackoff:
+    Equatable,
+    Sendable
+{
+    static let delays: [TimeInterval] = [
+        1, 2, 4, 8, 16, 30
+    ]
+
+    private(set) var failureCount = 0
+
+    mutating func nextAttempt() -> RivoReconnectAttempt {
+        let delay = Self.delays[
+            min(failureCount, Self.delays.count - 1)
+        ]
+        failureCount += 1
+        return RivoReconnectAttempt(
+            number: failureCount,
+            delay: delay
+        )
+    }
+
+    mutating func reset() {
+        failureCount = 0
+    }
+}
+
 nonisolated struct RivoDiscoveredDevice:
     Identifiable,
     Equatable,
@@ -233,6 +272,8 @@ final class RivoRemoteManager:
         RivoTimeSyncState = .idle
     @Published private(set) var connectionDiagnostics:
         [RivoConnectionDiagnostic] = []
+    @Published private(set) var reconnectAttempt:
+        RivoReconnectAttempt?
 
     private let defaults: UserDefaults
     private var centralManager: CBCentralManager?
@@ -246,6 +287,7 @@ final class RivoRemoteManager:
     private var shouldReconnect = false
     private var connectionTimeoutTask: Task<Void, Never>?
     private var reconnectTask: Task<Void, Never>?
+    private var reconnectBackoff = RivoReconnectBackoff()
     private var periodicTimeSyncTask:
         Task<Void, Never>?
     private var automaticTimeSyncPeripheralIdentifier:
@@ -287,6 +329,19 @@ final class RivoRemoteManager:
         guard !state.isReady else {
             return
         }
+        guard reconnectTask == nil else {
+            return
+        }
+        switch state {
+        case .preparing,
+             .scanning,
+             .connecting,
+             .discovering:
+            return
+        default:
+            break
+        }
+        resetReconnectBackoff()
         wantsScan = true
         shouldReconnect = true
         prepareCentralManager()
@@ -302,6 +357,40 @@ final class RivoRemoteManager:
     }
 
     func startScanning() {
+        resetReconnectBackoff()
+        beginScanning()
+    }
+
+    func retryConnectionNow() {
+        guard !state.isReady else {
+            return
+        }
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        resetReconnectBackoff()
+        wantsScan = true
+        shouldReconnect = true
+        recordDiagnostic(
+            .info,
+            stage: .reconnecting,
+            message: "사용자가 Rivo 연결을 지금 다시 시도합니다."
+        )
+        prepareCentralManager()
+        guard let centralManager else {
+            return
+        }
+        guard centralManager.state == .poweredOn else {
+            updateState(for: centralManager.state)
+            return
+        }
+        if savedPeripheralIdentifier != nil {
+            attemptSavedConnection()
+        } else {
+            beginScanning()
+        }
+    }
+
+    private func beginScanning() {
         prepareCentralManager()
         guard let centralManager else {
             return
@@ -339,6 +428,10 @@ final class RivoRemoteManager:
 
     func stopScanning() {
         wantsScan = false
+        shouldReconnect = false
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        reconnectAttempt = nil
         centralManager?.stopScan()
         if case .scanning = state {
             state = .inactive
@@ -363,6 +456,7 @@ final class RivoRemoteManager:
             )
             return
         }
+        resetReconnectBackoff()
         discoveredTypes[device.id] = device.type
         connect(peripheral, using: centralManager)
     }
@@ -372,6 +466,8 @@ final class RivoRemoteManager:
         shouldReconnect = false
         connectionTimeoutTask?.cancel()
         reconnectTask?.cancel()
+        reconnectTask = nil
+        resetReconnectBackoff()
         periodicTimeSyncTask?.cancel()
         automaticTimeSyncPeripheralIdentifier =
             nil
@@ -521,7 +617,7 @@ final class RivoRemoteManager:
         guard let centralManager,
               centralManager.state == .poweredOn,
               let identifier = savedPeripheralIdentifier else {
-            startScanning()
+            beginScanning()
             return
         }
 
@@ -535,7 +631,7 @@ final class RivoRemoteManager:
                 message:
                     "저장된 Rivo를 찾지 못해 주변 검색으로 전환합니다."
             )
-            startScanning()
+            beginScanning()
             return
         }
         if let savedDeviceType {
@@ -558,6 +654,8 @@ final class RivoRemoteManager:
         wantsScan = false
         connectionTimeoutTask?.cancel()
         reconnectTask?.cancel()
+        reconnectTask = nil
+        reconnectAttempt = nil
 
         if let activePeripheral,
            activePeripheral.identifier != peripheral.identifier {
@@ -620,30 +718,43 @@ final class RivoRemoteManager:
     }
 
     private func scheduleReconnect() {
-        guard shouldReconnect else {
+        guard shouldReconnect,
+              reconnectTask == nil else {
             return
         }
-        reconnectTask?.cancel()
+        let attempt = reconnectBackoff.nextAttempt()
+        reconnectAttempt = attempt
         recordDiagnostic(
             .info,
             stage: .reconnecting,
-            message: "1초 뒤 Rivo 연결을 다시 시도합니다."
+            message: attempt.title
         )
         reconnectTask = Task { [weak self] in
             try? await Task.sleep(
-                nanoseconds: 1_000_000_000
+                nanoseconds:
+                    UInt64(
+                        attempt.delay
+                            * 1_000_000_000
+                    )
             )
             guard !Task.isCancelled,
                   let self,
                   self.shouldReconnect else {
                 return
             }
+            self.reconnectTask = nil
+            self.reconnectAttempt = nil
             if self.savedPeripheralIdentifier != nil {
                 self.attemptSavedConnection()
             } else {
-                self.startScanning()
+                self.beginScanning()
             }
         }
+    }
+
+    private func resetReconnectBackoff() {
+        reconnectBackoff.reset()
+        reconnectAttempt = nil
     }
 
     private func displayName(
@@ -686,6 +797,9 @@ final class RivoRemoteManager:
         }
 
         connectionTimeoutTask?.cancel()
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        resetReconnectBackoff()
         connectedDeviceType = type
         defaults.set(
             peripheral.identifier.uuidString,
@@ -875,6 +989,9 @@ final class RivoRemoteManager:
                 state = .inactive
             }
         case .poweredOff:
+            reconnectTask?.cancel()
+            reconnectTask = nil
+            reconnectAttempt = nil
             state = .bluetoothOff
             recordDiagnostic(
                 .warning,
@@ -882,6 +999,9 @@ final class RivoRemoteManager:
                 message: "Bluetooth가 꺼져 있습니다."
             )
         case .unauthorized:
+            reconnectTask?.cancel()
+            reconnectTask = nil
+            reconnectAttempt = nil
             state = .permissionDenied
             recordDiagnostic(
                 .failure,
@@ -889,6 +1009,9 @@ final class RivoRemoteManager:
                 message: "Bluetooth 권한이 허용되지 않았습니다."
             )
         case .unsupported:
+            reconnectTask?.cancel()
+            reconnectTask = nil
+            reconnectAttempt = nil
             state = .unsupported
             recordDiagnostic(
                 .failure,
