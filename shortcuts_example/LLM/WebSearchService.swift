@@ -153,16 +153,14 @@ final class BraveLLMContextSearchService:
     private let configuration:
         any WebSearchConfigurationProviding
     private let session: URLSession
-    private let localeIdentifier: String
+    private let localeIdentifier: String?
     private let now: @Sendable () -> Date
 
     init(
         configuration:
             any WebSearchConfigurationProviding,
         session: URLSession? = nil,
-        localeIdentifier: String =
-            Locale.preferredLanguages.first
-            ?? Locale.current.identifier,
+        localeIdentifier: String? = nil,
         now: @escaping @Sendable () -> Date = {
             Date()
         }
@@ -241,6 +239,8 @@ final class BraveLLMContextSearchService:
             SearchLocale(
                 identifier:
                     localeIdentifier
+                    ?? AppLanguage.current()
+                        .effectiveLanguageCode
             )
         let body: Data
         do {

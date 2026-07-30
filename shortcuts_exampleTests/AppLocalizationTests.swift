@@ -6,6 +6,24 @@ import XCTest
 final class AppLocalizationTests:
     XCTestCase
 {
+    func testExplicitAppLanguageSelectsBundle()
+    {
+        XCTAssertEqual(
+            AppLocalization.string(
+                "설정",
+                language: .english
+            ),
+            "Settings"
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "도움말",
+                language: .japanese
+            ),
+            "ヘルプ"
+        )
+    }
+
     func testEnglishAndJapaneseShellStringsLoad()
         throws
     {

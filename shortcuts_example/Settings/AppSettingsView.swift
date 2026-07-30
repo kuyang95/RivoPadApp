@@ -522,6 +522,19 @@ struct AppSettingsView: View {
 
     private var systemSection: some View {
         Section {
+            Picker(
+                "앱 언어",
+                selection:
+                    $settings.appLanguage
+            ) {
+                ForEach(
+                    AppLanguage.allCases
+                ) { language in
+                    Text(language.title)
+                        .tag(language)
+                }
+            }
+
             Button(
                 "VisionCraft 권한 설정 열기",
                 systemImage: "gear"
@@ -536,18 +549,11 @@ struct AppSettingsView: View {
                 openURL(url)
             }
 
-            LabeledContent(
-                "앱 언어",
-                value:
-                    AppLocalization.string(
-                        "iPad 시스템 설정 사용"
-                    )
-            )
         } header: {
             Text("iPadOS")
         } footer: {
             Text(
-                "일반 iPad 앱은 시스템 전체 밝기·화면 필터·VoiceOver·다른 앱의 터치를 직접 바꿀 수 없습니다."
+                "앱 언어는 VisionCraft 화면과 번역·검색 기본 언어에 즉시 적용됩니다. 시스템 권한 문구는 iPadOS의 앱 언어 설정을 따릅니다. 일반 iPad 앱은 시스템 전체 밝기·화면 필터·VoiceOver·다른 앱의 터치를 직접 바꿀 수 없습니다."
             )
         }
     }
@@ -555,7 +561,7 @@ struct AppSettingsView: View {
     private var resetSection: some View {
         Section {
             Button(
-                "보기·음성 설정 초기화",
+                "앱 설정 초기화",
                 role: .destructive
             ) {
                 showsResetConfirmation = true

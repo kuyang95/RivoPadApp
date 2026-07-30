@@ -66,6 +66,10 @@ final class AppSettingsStoreTests:
             .nanumSquareRound
         )
         XCTAssertEqual(
+            store.appLanguage,
+            .system
+        )
+        XCTAssertEqual(
             store.sharedTextEntryMode,
             .voice
         )
@@ -91,6 +95,7 @@ final class AppSettingsStoreTests:
         store.ocrAutoCorrectionEnabled =
             false
         store.fontChoice = .system
+        store.appLanguage = .japanese
         store.sharedTextEntryMode = .chat
 
         let restored = AppSettingsStore(
@@ -127,6 +132,10 @@ final class AppSettingsStoreTests:
             .system
         )
         XCTAssertEqual(
+            restored.appLanguage,
+            .japanese
+        )
+        XCTAssertEqual(
             restored.sharedTextEntryMode,
             .chat
         )
@@ -147,6 +156,11 @@ final class AppSettingsStoreTests:
             forKey:
                 "settings.sharedTextEntryMode.v1"
         )
+        defaults.set(
+            "impossible",
+            forKey:
+                "settings.appLanguage.v1"
+        )
 
         let store = AppSettingsStore(
             defaults: defaults
@@ -162,6 +176,10 @@ final class AppSettingsStoreTests:
         XCTAssertEqual(
             store.sharedTextEntryMode,
             .voice
+        )
+        XCTAssertEqual(
+            store.appLanguage,
+            .system
         )
     }
 
@@ -185,6 +203,7 @@ final class AppSettingsStoreTests:
         store.ocrAutoCorrectionEnabled =
             false
         store.fontChoice = .system
+        store.appLanguage = .english
         store.sharedTextEntryMode = .chat
 
         store.resetToDefaults()
@@ -217,6 +236,10 @@ final class AppSettingsStoreTests:
         XCTAssertEqual(
             store.fontChoice,
             .nanumSquareRound
+        )
+        XCTAssertEqual(
+            store.appLanguage,
+            .system
         )
         XCTAssertEqual(
             store.sharedTextEntryMode,

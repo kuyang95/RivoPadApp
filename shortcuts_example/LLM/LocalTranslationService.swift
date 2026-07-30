@@ -38,11 +38,16 @@ nonisolated enum TranslationTargetLanguage:
 
     static func appDefault(
         preferredLocalizations:
-            [String] =
-                Bundle.main
-                .preferredLocalizations
+            [String]? = nil
     ) -> Self {
-        let language = preferredLocalizations
+        let language =
+            (
+                preferredLocalizations
+                ?? [
+                    AppLanguage.current()
+                        .effectiveLanguageCode
+                ]
+            )
             .first?
             .split(separator: "-")
             .first?

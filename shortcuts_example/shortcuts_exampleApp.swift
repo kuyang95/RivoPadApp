@@ -572,6 +572,10 @@ struct shortcuts_exampleApp: App {
                     size: 16
                 )
         )
+        .environment(
+            \.locale,
+            appSettings.appLanguage.locale
+        )
     }
 
     private func openScannerFromLaunchArgumentsIfNeeded() {

@@ -82,6 +82,81 @@ nonisolated enum AppFontChoice:
     }
 }
 
+nonisolated enum AppLanguage:
+    String,
+    CaseIterable,
+    Codable,
+    Identifiable,
+    Sendable
+{
+    static let preferenceKey =
+        "settings.appLanguage.v1"
+
+    case system
+    case korean = "ko"
+    case english = "en"
+    case japanese = "ja"
+
+    var id: Self {
+        self
+    }
+
+    var title: String {
+        switch self {
+        case .system:
+            return AppLocalization.string(
+                "시스템 설정에 따름"
+            )
+        case .korean:
+            return AppLocalization.string(
+                "한국어"
+            )
+        case .english:
+            return AppLocalization.string(
+                "영어"
+            )
+        case .japanese:
+            return AppLocalization.string(
+                "일본어"
+            )
+        }
+    }
+
+    var localizationCode: String? {
+        self == .system ? nil : rawValue
+    }
+
+    var effectiveLanguageCode: String {
+        localizationCode
+            ?? Bundle.main
+            .preferredLocalizations
+            .first?
+            .split(separator: "-")
+            .first
+            .map(String.init)
+            ?? "en"
+    }
+
+    var locale: Locale {
+        Locale(
+            identifier:
+                effectiveLanguageCode
+        )
+    }
+
+    static func current(
+        defaults: UserDefaults = .standard
+    ) -> Self {
+        defaults
+            .string(
+                forKey:
+                    preferenceKey
+            )
+            .flatMap(Self.init)
+            ?? .system
+    }
+}
+
 nonisolated enum SharedTextEntryMode:
     String,
     CaseIterable,
@@ -172,6 +247,8 @@ final class AppSettingsStore:
             "settings.ocrAutoCorrection.v1"
         static let fontChoice =
             "settings.fontChoice.v1"
+        static let appLanguage =
+            AppLanguage.preferenceKey
         static let sharedTextEntryMode =
             "settings.sharedTextEntryMode.v1"
     }
@@ -265,6 +342,15 @@ final class AppSettingsStore:
         }
     }
 
+    @Published var appLanguage: AppLanguage {
+        didSet {
+            defaults.set(
+                appLanguage.rawValue,
+                forKey: Key.appLanguage
+            )
+        }
+    }
+
     @Published var sharedTextEntryMode:
         SharedTextEntryMode
     {
@@ -335,6 +421,12 @@ final class AppSettingsStore:
             )
             .flatMap(AppFontChoice.init)
             ?? .nanumSquareRound
+        appLanguage = defaults
+            .string(
+                forKey: Key.appLanguage
+            )
+            .flatMap(AppLanguage.init)
+            ?? .system
         sharedTextEntryMode = defaults
             .string(
                 forKey:
@@ -358,6 +450,7 @@ final class AppSettingsStore:
             true
         ocrAutoCorrectionEnabled = true
         fontChoice = .nanumSquareRound
+        appLanguage = .system
         sharedTextEntryMode = .voice
     }
 

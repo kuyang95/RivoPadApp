@@ -33,6 +33,38 @@ final class TranslationFeatureTests:
         )
     }
 
+    func testStoredExplicitAppLanguageIsAvailableToFeatures()
+    {
+        let suiteName =
+            "TranslationFeatureTests."
+            + UUID().uuidString
+        let defaults = UserDefaults(
+            suiteName: suiteName
+        )!
+        defer {
+            defaults.removePersistentDomain(
+                forName: suiteName
+            )
+        }
+        defaults.set(
+            AppLanguage.japanese.rawValue,
+            forKey:
+                AppLanguage.preferenceKey
+        )
+
+        XCTAssertEqual(
+            AppLanguage.current(
+                defaults: defaults
+            ),
+            .japanese
+        )
+        XCTAssertEqual(
+            AppLanguage.japanese
+                .effectiveLanguageCode,
+            "ja"
+        )
+    }
+
     func testTranslationInputValidation()
         throws
     {
