@@ -45,6 +45,7 @@ enum AppRoute: Hashable {
     )
     case voiceQuestion(question: String)
     case voiceAction
+    case documentLibrary
     case localDocument(fileURL: URL)
     case documentQuestion(document: String, question: String)
     case readerLibrary

@@ -197,6 +197,8 @@ struct shortcuts_exampleApp: App {
                                 rivoScreenRemoteControlCenter
                                     .deactivate(.voiceAction)
                             }
+                        case .documentLibrary:
+                            DocumentLibraryView()
                         case .localDocument(let fileURL):
                             LocalDocumentView(fileURL: fileURL)
                                 .onAppear {
@@ -528,14 +530,6 @@ struct shortcuts_exampleApp: App {
         _ destination:
             AppDeepLinkDestination
     ) {
-        if destination == .files {
-            path = NavigationPath()
-            Task { @MainActor in
-                await Task.yield()
-                appRouter.requestFileImport()
-            }
-            return
-        }
         let route: AppRoute
         switch destination {
         case .settings:
@@ -553,7 +547,7 @@ struct shortcuts_exampleApp: App {
         case .scanner:
             route = .documentScanning
         case .files:
-            return
+            route = .documentLibrary
         case .rivo:
             route = .rivoRemote
         case .visionLink:

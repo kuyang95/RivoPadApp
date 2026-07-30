@@ -430,12 +430,9 @@ final class VisionLinkLocalRemoteChatService:
                 mimeType: mimeType
             )
         case "xlsx", "xls", "hwp":
-            text = try await Self
-                .extractStructuredDocumentText(
-                    at: url,
-                    pathExtension:
-                        pathExtension
-                )
+            text = try await
+                LocalStructuredDocumentTextExtractor
+                .extract(at: url)
         default:
             throw VisionLinkRemoteChatError
                 .unsupportedDocument
@@ -509,78 +506,6 @@ final class VisionLinkLocalRemoteChatService:
             separator: "\n\n"
         )
         return text
-    }
-
-    nonisolated private static func
-        extractStructuredDocumentText(
-            at url: URL,
-            pathExtension: String
-        ) async throws -> String
-    {
-        try await Task.detached(
-            priority: .userInitiated
-        ) {
-            let maximumBytes: Int
-            switch pathExtension {
-            case "xlsx":
-                maximumBytes =
-                    XLSXTextExtractor
-                    .maximumWorkbookBytes
-            case "xls":
-                maximumBytes =
-                    LegacyXLSExtractor
-                    .maximumWorkbookBytes
-            case "hwp":
-                maximumBytes =
-                    HWP5TextExtractor
-                    .maximumDocumentBytes
-            default:
-                throw VisionLinkRemoteChatError
-                    .unsupportedDocument
-            }
-
-            let values = try url.resourceValues(
-                forKeys: [
-                    .fileSizeKey,
-                    .isRegularFileKey,
-                ]
-            )
-            guard values.isRegularFile != false
-            else {
-                throw VisionLinkRemoteChatError
-                    .unsupportedDocument
-            }
-            if let fileSize = values.fileSize,
-               fileSize > maximumBytes {
-                throw ChatAttachmentError
-                    .fileTooLarge(
-                        maximumMegabytes:
-                            maximumBytes
-                            / 1_024
-                            / 1_024
-                    )
-            }
-            let data = try Data(
-                contentsOf: url,
-                options: .mappedIfSafe
-            )
-
-            switch pathExtension {
-            case "xlsx":
-                return try XLSXTextExtractor
-                    .extract(from: data)
-            case "xls":
-                return try LegacyXLSExtractor
-                    .extract(from: data)
-            case "hwp":
-                return try HWP5TextExtractor
-                    .extract(from: data)
-            default:
-                throw VisionLinkRemoteChatError
-                    .unsupportedDocument
-            }
-        }
-        .value
     }
 
     private static let systemPrompt = """

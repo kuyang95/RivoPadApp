@@ -31,6 +31,9 @@ final class LocalDocumentViewModel: ObservableObject {
         errorDescription = nil
 
         do {
+            let pathExtension = fileURL
+                .pathExtension
+                .lowercased()
             let contentType = try fileURL.resourceValues(
                 forKeys: [.contentTypeKey]
             ).contentType
@@ -47,12 +50,28 @@ final class LocalDocumentViewModel: ObservableObject {
                 )
                 text = try LocalTextDecoder.decode(data)
                 status = "\(text.count.formatted())자"
+            } else if
+                LocalStructuredDocumentTextExtractor
+                .supportedExtensions
+                .contains(pathExtension)
+            {
+                status =
+                    AppLocalization.string(
+                        "문서 텍스트 추출 중…"
+                    )
+                text = try await
+                    LocalStructuredDocumentTextExtractor
+                    .extract(at: fileURL)
+                status =
+                    "\(text.count.formatted())자"
             } else {
                 throw CocoaError(
                     .fileReadUnsupportedScheme,
                     userInfo: [
                         NSLocalizedDescriptionKey:
-                            "이미지, PDF, TXT 파일만 지원합니다."
+                            AppLocalization.string(
+                                "PDF, TXT, XLSX, XLS와 HWP 문서만 지원합니다."
+                            )
                     ]
                 )
             }

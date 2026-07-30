@@ -1,6 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
-import UIKit
 
 struct HomeView: View {
     @EnvironmentObject var appRouter: AppRouter
@@ -79,7 +77,8 @@ struct HomeView: View {
                     )
 
                     Button {
-                        isFileImporterPresented = true
+                        appRouter.route =
+                            .documentLibrary
                     } label: {
                         Text("파일")
                             .font(.system(size: 56, weight: .bold))
@@ -90,7 +89,7 @@ struct HomeView: View {
                             .cornerRadius(28)
                     }
                     .accessibilityHint(
-                        "이미지, PDF, 텍스트 또는 EPUB 파일을 엽니다."
+                        "파일 하나를 열거나 허용한 폴더의 문서를 검색합니다."
                     )
 
                     Button {
@@ -122,12 +121,9 @@ struct HomeView: View {
         }
         .fileImporter(
             isPresented: $isFileImporterPresented,
-            allowedContentTypes: [
-                .image,
-                .pdf,
-                .plainText,
-                UTType(filenameExtension: "epub") ?? .data
-            ],
+            allowedContentTypes:
+                VisionCraftFileTypes
+                .openable,
             allowsMultipleSelection: false
         ) { result in
             handleFileImport(result)
@@ -254,42 +250,10 @@ struct HomeView: View {
                 guard let sourceURL = try result.get().first else {
                     return
                 }
-                let contentType = try sourceURL.resourceValues(
-                    forKeys: [.contentTypeKey]
-                ).contentType
-                    ?? UTType(
-                        filenameExtension: sourceURL.pathExtension
+                appRouter.route = try await
+                    LocalFileOpening.route(
+                        for: sourceURL
                     )
-
-                if sourceURL.pathExtension.lowercased() == "epub" {
-                    let bookURL = try await EPUBLibraryStore.shared
-                        .importBook(from: sourceURL)
-                    EPUBProgressStore.lastBookURL = bookURL
-                    appRouter.route = .epubReader(
-                        fileURL: bookURL
-                    )
-                } else if contentType?.conforms(to: .image) == true {
-                    let didAccess = sourceURL
-                        .startAccessingSecurityScopedResource()
-                    defer {
-                        if didAccess {
-                            sourceURL
-                                .stopAccessingSecurityScopedResource()
-                        }
-                    }
-                    let data = try Data(contentsOf: sourceURL)
-                    guard let image = UIImage(data: data) else {
-                        throw CocoaError(.fileReadCorruptFile)
-                    }
-                    appRouter.route = .OCRResult(image: image)
-                } else {
-                    let importedURL = try await
-                        LocalDocumentImportService.shared
-                        .importDocument(from: sourceURL)
-                    appRouter.route = .localDocument(
-                        fileURL: importedURL
-                    )
-                }
             } catch {
                 fileImportError = error.localizedDescription
             }
