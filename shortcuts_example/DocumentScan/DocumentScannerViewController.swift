@@ -3,6 +3,13 @@ import UIKit
 /// Keeps the existing SwiftUI bridge stable while routing every scan through
 /// Rivo's local AVFoundation + LCNet + UVDoc implementation.
 final class DocumentScannerViewController: UIViewController {
+    var allowsAutomaticStart = true {
+        didSet {
+            scanner.allowsAutomaticStart =
+                allowsAutomaticStart
+        }
+    }
+
     var onScanCompleted: ((UIImage) -> Void)? {
         didSet {
             scanner.onScanCompleted = onScanCompleted
@@ -27,6 +34,8 @@ final class DocumentScannerViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = .black
 
+        scanner.allowsAutomaticStart =
+            allowsAutomaticStart
         addChild(scanner)
         scanner.view.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scanner.view)
@@ -54,5 +63,31 @@ final class DocumentScannerViewController: UIViewController {
         }
         lastRemoteEventID = eventID
         scanner.performRemoteAction(action)
+    }
+
+    func resumeAfterReview() {
+        scanner.resumeAfterReview()
+    }
+
+    func acceptPageAndContinue(
+        capturedPageCount: Int
+    ) {
+        scanner.acceptPageAndContinue(
+            capturedPageCount:
+                capturedPageCount
+        )
+    }
+
+    func finishReview(
+        capturedPageCount: Int
+    ) {
+        scanner.finishReview(
+            capturedPageCount:
+                capturedPageCount
+        )
+    }
+
+    func startNewPageSession() {
+        scanner.startNewPageSession()
     }
 }

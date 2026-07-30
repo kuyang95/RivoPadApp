@@ -344,6 +344,57 @@ final class ScannerRegressionTests: XCTestCase {
         XCTAssertEqual(machine.state, .searching)
     }
 
+    func testAcceptedPageWaitsForRemovalBeforeNextCapture()
+    {
+        var machine =
+            reviewingScannerStateMachine()
+
+        XCTAssertEqual(
+            machine.handle(
+                .pageAccepted(
+                    capturedPageCount: 1,
+                    continueScanning: true
+                )
+            ),
+            [
+                .startCamera,
+                .clearDetectionOverlay,
+                .promptForPageRemoval
+            ]
+        )
+        XCTAssertEqual(
+            machine.state,
+            .awaitingPageRemoval(
+                capturedPageCount: 1
+            )
+        )
+        XCTAssertEqual(
+            machine.handle(.pageRemoved),
+            [.clearDetectionOverlay]
+        )
+        XCTAssertEqual(
+            machine.state,
+            .searching
+        )
+    }
+
+    func testFinishingAcceptedPagesReturnsScannerToIdle()
+    {
+        var machine =
+            reviewingScannerStateMachine()
+
+        XCTAssertEqual(
+            machine.handle(
+                .pageAccepted(
+                    capturedPageCount: 2,
+                    continueScanning: false
+                )
+            ),
+            []
+        )
+        XCTAssertEqual(machine.state, .idle)
+    }
+
     func testClockwiseRotationUsesTopLeftRowMajorCoordinates() throws {
         let source = try redChannelImage(
             width: 2,
@@ -1230,6 +1281,35 @@ final class ScannerRegressionTests: XCTestCase {
             sharpEnough: true,
             focusReady: true
         )
+    }
+
+    private func reviewingScannerStateMachine()
+        -> DocumentScannerStateMachine
+    {
+        var machine =
+            DocumentScannerStateMachine()
+        _ = machine.handle(.start)
+        _ = machine.handle(.cameraReady)
+        _ = machine.handle(
+            .manualCaptureRequested
+        )
+        guard case .lockingFocus(let ticket) =
+                machine.state else {
+            return machine
+        }
+        _ = machine.handle(
+            .focusLocked(ticket: ticket)
+        )
+        _ = machine.handle(
+            .photoCaptured(ticket: ticket)
+        )
+        _ = machine.handle(
+            .processingSucceeded(
+                ticket: ticket,
+                pageID: UUID()
+            )
+        )
+        return machine
     }
 
     private func redChannelImage(

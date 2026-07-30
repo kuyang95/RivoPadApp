@@ -1,15 +1,15 @@
 # 문서 스캐너 보류 작업
 
-최종 갱신: 2026-07-29
+최종 갱신: 2026-07-30
 
-이 문서는 문서 스캐너를 당분간 동결하고 다른 VisionCraft 기능을
-포팅하기 위한 재개 지점이다. 스캐너 작업을 다시 시작할 때는 이 목록을
-기준으로 범위를 정하고, 이미 끝난 분석과 최적화를 반복하지 않는다.
+이 문서는 문서 스캐너에서 코드로 완료한 범위와 M4 실기기에서 나중에
+일괄 확인할 항목을 분리한 작업표다. 이미 끝난 분석과 최적화는 반복하지
+않고, 남은 실기기 검증이 다른 VisionCraft 기능 포팅을 막지 않게 한다.
 
 ## 동결 기준점
 
 - 브랜치: `codex/local-first-foundation`
-- 기준 커밋: `addfb25` (`촬영 전처리를 단일 Metal 패스로 통합`)
+- 기준 브랜치: `codex/local-first-foundation`
 - 검증 기기: 11형 iPad Pro (M4), `iPad16,3`, iPadOS 26.3.1
 - 촬영 원본: 4032×3024 BGRA
 - 실기기·시뮬레이터 `ScannerRegressionTests`: 각각 29/29 통과
@@ -123,22 +123,29 @@ BGRA/Metal 경로는 전처리와 촬영 시 LCNet 합계를 약 66% 줄였고,
 
 ### SCAN-003: 다중 페이지와 촬영 결과 검토 화면
 
-상태: 기능 미완료
+상태: 코드 구현 완료, M4 일괄 검증 필요
 
-`DocumentScannerStateMachine`에는 `reviewing`,
-`awaitingPageRemoval`, `pageAccepted` 상태가 있지만 현재
-`DocumentScanRootView`는 한 장이 처리되면 즉시 OCR 결과 화면으로
-이동한다.
+완료:
 
-할 일:
+- 촬영 직후 보정 이미지 미리보기와 재촬영
+- 기존 한 장 OCR 경로 유지
+- 최대 20페이지 연속 촬영과 촬영한 문서 제거 대기
+- LCNet 미검출 3프레임 또는 명시적 버튼으로 다음 페이지 시작
+- 페이지별 90도 회전, 삭제, 드래그 순서 변경
+- 순서·회전을 보존한 다중 페이지 PDF 생성과 Files 내보내기
+- 생성한 PDF를 문서 뷰어/OCR로 바로 열기
+- 페이지마다 JPEG 캐시와 원자적 JSON manifest를 저장하고 다음 실행에서
+  검토 화면으로 복원
+- 완료한 PDF를 연 뒤 임시 페이지 정리, 취소 시 전체 임시 세션 정리
+- 버튼과 미리보기에 VoiceOver 이름·힌트 제공
+- 순서·회전·20페이지 제한·복원·손상 페이지 실패의 단위 테스트
 
-- 촬영 결과 미리보기
-- 재촬영, 90도 회전, 삭제
-- 여러 페이지 계속 촬영
-- 페이지 순서 변경
-- 완료 시 단일 이미지/OCR 또는 다중 페이지 PDF로 전달
-- 페이지 제거 감지와 중복 페이지 자동 촬영 방지 연결
-- 중간 페이지와 순서를 앱 종료/메모리 경고에 안전하게 보관
+남음:
+
+- M4에서 실제 문서 20페이지 촬영, 재정렬, 삭제와 PDF 열기
+- 자동 문서 제거 감지가 손·배경 변화에 너무 빨리 반응하지 않는지 확인
+- 앱 강제 종료 후 복원, 메모리 경고와 화면 잠금·복귀 확인
+- VoiceOver, Dynamic Type와 가로·세로 레이아웃 승인
 
 완료 조건:
 
@@ -180,16 +187,16 @@ BGRA/Metal 경로는 전처리와 촬영 시 LCNet 합계를 약 66% 줄였고,
 - 자동 촬영 켜기/끄기
 - 촬영음·음성 안내 정책
 - 나머지 설정 저장과 다음 실행 복원
-- `jpegQuality`는 설정에 정의되어 있으나 현재 결과 인코딩에 사용되지
-  않으므로 실제 저장/PDF 경로에 연결하거나 제거
+- `jpegQuality`는 설정에 정의되어 있으나 페이지 캐시는 현재 0.95로
+  고정되어 있으므로 설정에 연결하거나 제거
 
 ### SCAN-102: OCR·AI·내보내기 계약
 
-상태: 단일 이미지→OCR 연결만 존재
+상태: 단일 이미지와 다중 PDF→문서 OCR 연결 완료, AI 계약 일부 남음
 
 - OCR 원문과 영역 좌표가 회전·보정된 결과에 맞는지 검증
 - 스캔 결과에서 바로 AI 질문
-- 이미지, PDF, Files 저장과 공유
+- 이미지 직접 저장·공유
 - OCR 실패 시 이미지 결과는 유지하고 재시도 제공
 - 다중 페이지 OCR 순서와 페이지 구분 보존
 
@@ -309,6 +316,9 @@ UVDoc backend benchmark 인자:
 
 - 카메라·상태 연결:
   `shortcuts_example/DocumentScan/CustomScanner/LocalDocumentScannerViewController.swift`
+- 다중 페이지·PDF 세션:
+  `shortcuts_example/DocumentScan/ScanSession/DocumentScanSessionStore.swift`,
+  `DocumentScanSessionModel.swift`, `DocumentScanRootView.swift`
 - 상태 머신·설정:
   `shortcuts_example/DocumentScan/CustomScanner/DocumentScannerStateMachine.swift`
   및 `DocumentScannerDomain.swift`
@@ -327,4 +337,5 @@ UVDoc backend benchmark 인자:
 - 진단:
   `shortcuts_example/DocumentScan/CustomScanner/ScannerDiagnostics.swift`
 - 회귀 테스트:
-  `shortcuts_exampleTests/ScannerRegressionTests.swift`
+  `shortcuts_exampleTests/ScannerRegressionTests.swift`,
+  `DocumentScanSessionTests.swift`

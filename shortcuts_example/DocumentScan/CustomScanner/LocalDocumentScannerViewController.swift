@@ -56,6 +56,8 @@ extension LocalDocumentScannerError: LocalizedError {
 /// AVFoundation scanner that keeps VisionCraft's raw-sensor/top-left coordinate
 /// contract and uses only the bundled LCNet + UVDoc models.
 final class LocalDocumentScannerViewController: UIViewController {
+    var allowsAutomaticStart = true
+
     var onScanCompleted: ((UIImage) -> Void)?
     var onCancel: (() -> Void)?
 
@@ -122,6 +124,7 @@ final class LocalDocumentScannerViewController: UIViewController {
     private var sessionInterrupted = false
     private var interruptionStartedAt: TimeInterval?
     private var recoveryStartedAt: TimeInterval?
+    private var pageRemovalNoDocumentFrames = 0
 
     private let renderContext = CIContext(options: [
         .cacheIntermediates: false
@@ -215,6 +218,34 @@ final class LocalDocumentScannerViewController: UIViewController {
         return button
     }()
 
+    private lazy var nextPageButton: UIButton = {
+        var configuration =
+            UIButton.Configuration.filled()
+        configuration.title = "다음 페이지 준비"
+        configuration.baseBackgroundColor =
+            .systemBlue
+        configuration.baseForegroundColor =
+            .white
+        configuration.cornerStyle = .capsule
+        let button = UIButton(
+            configuration: configuration
+        )
+        button.addTarget(
+            self,
+            action:
+                #selector(didTapNextPageReady),
+            for: .touchUpInside
+        )
+        button.translatesAutoresizingMaskIntoConstraints =
+            false
+        button.accessibilityLabel =
+            "문서를 치웠습니다"
+        button.accessibilityHint =
+            "다음 페이지 촬영을 시작합니다."
+        button.isHidden = true
+        return button
+    }()
+
     private let activityIndicator: UIActivityIndicatorView = {
         let indicator = UIActivityIndicatorView(style: .large)
         indicator.color = .white
@@ -298,11 +329,15 @@ final class LocalDocumentScannerViewController: UIViewController {
 
         switch stateMachine.state {
         case .reviewing:
-            send(.resumeScanning)
+            break
         case .idle:
-            send(.start)
+            if allowsAutomaticStart {
+                send(.start)
+            }
         case .searching, .guiding, .stabilizing, .awaitingPageRemoval:
-            startCamera()
+            if allowsAutomaticStart {
+                startCamera()
+            }
         default:
             break
         }
@@ -323,7 +358,11 @@ final class LocalDocumentScannerViewController: UIViewController {
         previewLayer.addSublayer(overlayLayer)
 
         let controls = UIStackView(
-            arrangedSubviews: [cancelButton, shutterButton]
+            arrangedSubviews: [
+                cancelButton,
+                nextPageButton,
+                shutterButton
+            ]
         )
         controls.axis = .horizontal
         controls.alignment = .center
@@ -543,6 +582,7 @@ final class LocalDocumentScannerViewController: UIViewController {
         case .processPhoto(let ticket):
             processPhoto(ticket: ticket)
         case .promptForPageRemoval:
+            pageRemovalNoDocumentFrames = 0
             setStatus("다음 문서를 위해 촬영한 문서를 치워주세요.", announce: true)
         }
     }
@@ -559,6 +599,21 @@ final class LocalDocumentScannerViewController: UIViewController {
         }
         shutterButton.isEnabled =
             canCapture && isViewActive && !sessionInterrupted
+        let isAwaitingPageRemoval: Bool
+        if case .awaitingPageRemoval =
+            stateMachine.state {
+            isAwaitingPageRemoval = true
+        } else {
+            isAwaitingPageRemoval = false
+        }
+        shutterButton.isHidden =
+            isAwaitingPageRemoval
+        nextPageButton.isHidden =
+            !isAwaitingPageRemoval
+        nextPageButton.isEnabled =
+            isAwaitingPageRemoval
+                && isViewActive
+                && !sessionInterrupted
 
         if case .processing = stateMachine.state {
             processingOverlay.isHidden = false
@@ -958,6 +1013,13 @@ final class LocalDocumentScannerViewController: UIViewController {
                   acceptsAnalysisFrames else {
                 return
             }
+            if case .awaitingPageRemoval =
+                stateMachine.state {
+                handlePageRemovalDetection(
+                    detection
+                )
+                return
+            }
             if let recoveryStartedAt {
                 diagnostics.logDuration(
                     "cameraRecoveryToFirstInference",
@@ -1035,11 +1097,37 @@ final class LocalDocumentScannerViewController: UIViewController {
 
     private var acceptsAnalysisFrames: Bool {
         switch stateMachine.state {
-        case .searching, .guiding, .stabilizing:
+        case .searching,
+             .guiding,
+             .stabilizing,
+             .awaitingPageRemoval:
             return true
         default:
             return false
         }
+    }
+
+    private func handlePageRemovalDetection(
+        _ detection: DocumentDetection?
+    ) {
+        guard detection == nil else {
+            pageRemovalNoDocumentFrames = 0
+            clearOverlay()
+            setStatus(
+                "촬영한 문서를 치우면 다음 페이지를 시작합니다."
+            )
+            return
+        }
+        pageRemovalNoDocumentFrames += 1
+        guard pageRemovalNoDocumentFrames >= 3 else {
+            return
+        }
+        pageRemovalNoDocumentFrames = 0
+        send(.pageRemoved)
+        setStatus(
+            "다음 문서를 화면 안에 맞춰주세요.",
+            announce: true
+        )
     }
 
     private var cameraFocusReady: Bool {
@@ -1677,6 +1765,54 @@ final class LocalDocumentScannerViewController: UIViewController {
         }
     }
 
+    func resumeAfterReview() {
+        guard case .reviewing =
+                stateMachine.state else {
+            return
+        }
+        send(.resumeScanning)
+    }
+
+    func acceptPageAndContinue(
+        capturedPageCount: Int
+    ) {
+        guard case .reviewing =
+                stateMachine.state else {
+            return
+        }
+        send(
+            .pageAccepted(
+                capturedPageCount:
+                    capturedPageCount,
+                continueScanning: true
+            )
+        )
+    }
+
+    func finishReview(
+        capturedPageCount: Int
+    ) {
+        guard case .reviewing =
+                stateMachine.state else {
+            return
+        }
+        send(
+            .pageAccepted(
+                capturedPageCount:
+                    capturedPageCount,
+                continueScanning: false
+            )
+        )
+    }
+
+    func startNewPageSession() {
+        guard case .idle =
+                stateMachine.state else {
+            return
+        }
+        send(.start)
+    }
+
     @objc private func didTapShutter() {
         switch stateMachine.state {
         case .searching, .guiding, .stabilizing:
@@ -1699,6 +1835,19 @@ final class LocalDocumentScannerViewController: UIViewController {
         restoreContinuousFocus()
         send(.cancel)
         onCancel?()
+    }
+
+    @objc private func didTapNextPageReady() {
+        guard case .awaitingPageRemoval =
+                stateMachine.state else {
+            return
+        }
+        pageRemovalNoDocumentFrames = 0
+        send(.pageRemoved)
+        setStatus(
+            "다음 문서를 화면 안에 맞춰주세요.",
+            announce: true
+        )
     }
 }
 
