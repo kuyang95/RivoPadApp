@@ -26,6 +26,18 @@ final class EPUBReaderTests: XCTestCase {
         XCTAssertEqual(book.chapters.count, 2)
         XCTAssertEqual(book.chapters[0].title, "첫 번째 장")
         XCTAssertEqual(book.chapters[1].title, "두 번째 장")
+        XCTAssertEqual(
+            book.navigationItems.map(\.label),
+            ["첫 번째 장", "첫 문단", "두 번째 장"]
+        )
+        XCTAssertEqual(
+            book.navigationItems.map(\.depth),
+            [0, 1, 0]
+        )
+        XCTAssertEqual(
+            book.pageListItems.map(\.label),
+            ["1", "2"]
+        )
         XCTAssertTrue(
             book.chapters[0].text.contains(
                 "첫 문장 이어지는 내용"
@@ -41,6 +53,26 @@ final class EPUBReaderTests: XCTestCase {
             book.chapters[1]
                 .fragmentSegmentIndexes["offline"],
             1
+        )
+        XCTAssertEqual(
+            PublicationNavigationResolver.location(
+                for: book.pageListItems[0],
+                in: book
+            ),
+            PublicationNavigationLocation(
+                chapterIndex: 0,
+                segmentIndex: 1
+            )
+        )
+        XCTAssertEqual(
+            PublicationNavigationResolver.location(
+                for: book.pageListItems[1],
+                in: book
+            ),
+            PublicationNavigationLocation(
+                chapterIndex: 1,
+                segmentIndex: 1
+            )
         )
         XCTAssertEqual(
             book.mediaOverlayItems,
@@ -76,6 +108,46 @@ final class EPUBReaderTests: XCTestCase {
                     playOrder: 5
                 ),
             ]
+        )
+    }
+
+    func testParsesEPUB2NCXHierarchyAndPageTargets()
+        throws
+    {
+        let book = try EPUBBookParser.parse(
+            data: EPUBFixture.makeEPUB2WithNCX()
+        )
+
+        XCTAssertEqual(book.format, .epub)
+        XCTAssertEqual(
+            book.navigationItems.map(\.label),
+            ["첫 장", "첫 절"]
+        )
+        XCTAssertEqual(
+            book.navigationItems.map(\.depth),
+            [0, 1]
+        )
+        XCTAssertEqual(
+            book.navigationItems.map(\.playOrder),
+            [1, 2]
+        )
+        XCTAssertEqual(
+            book.pageListItems.map(\.label),
+            ["10"]
+        )
+        XCTAssertEqual(
+            book.pageListItems.map(\.playOrder),
+            [3]
+        )
+        XCTAssertEqual(
+            PublicationNavigationResolver.location(
+                for: book.pageListItems[0],
+                in: book
+            ),
+            PublicationNavigationLocation(
+                chapterIndex: 0,
+                segmentIndex: 1
+            )
         )
     }
 
@@ -1207,8 +1279,21 @@ private nonisolated enum EPUBFixture {
           <body>
             <nav epub:type="toc">
               <ol>
-                <li><a href="chapter1.xhtml">첫 번째 장</a></li>
+                <li>
+                  <a href="chapter1.xhtml">첫 번째 장</a>
+                  <ol>
+                    <li>
+                      <a href="chapter1.xhtml#first-text">첫 문단</a>
+                    </li>
+                  </ol>
+                </li>
                 <li><a href="chapter2.xhtml">두 번째 장</a></li>
+              </ol>
+            </nav>
+            <nav epub:type="page-list">
+              <ol>
+                <li><a href="chapter1.xhtml#page-1">1</a></li>
+                <li><a href="chapter2.xhtml#page-2">2</a></li>
               </ol>
             </nav>
           </body>
@@ -1216,7 +1301,9 @@ private nonisolated enum EPUBFixture {
         """
         let firstChapter = """
         <?xml version="1.0" encoding="UTF-8"?>
-        <html xmlns="http://www.w3.org/1999/xhtml">
+        <html
+          xmlns="http://www.w3.org/1999/xhtml"
+          xmlns:epub="http://www.idpf.org/2007/ops">
           <head>
             <title>내부 제목</title>
             <style>.hidden { display: none; }</style>
@@ -1224,17 +1311,27 @@ private nonisolated enum EPUBFixture {
           <body>
             <nav>숨은 메뉴</nav>
             <h1>본문의 첫 제목</h1>
-            <p>첫 문장&nbsp;이어지는 내용</p>
+            <span
+              id="page-1"
+              epub:type="pagebreak"
+              title="1"/>
+            <p id="first-text">첫 문장&nbsp;이어지는 내용</p>
             <script>표시하지 않음</script>
           </body>
         </html>
         """
         let secondChapter = """
         <?xml version="1.0" encoding="UTF-8"?>
-        <html xmlns="http://www.w3.org/1999/xhtml">
+        <html
+          xmlns="http://www.w3.org/1999/xhtml"
+          xmlns:epub="http://www.idpf.org/2007/ops">
           <head><title>둘째</title></head>
           <body>
             <h1>두 번째 장</h1>
+            <span
+              id="page-2"
+              epub:type="pagebreak"
+              title="2"/>
             <p id="offline">오프라인 독서를 위한 두 번째 본문입니다.</p>
           </body>
         </html>
@@ -1310,6 +1407,111 @@ private nonisolated enum EPUBFixture {
                     ]),
                     compressionMethod: 0
                 )
+            ]
+        )
+    }
+
+    static func makeEPUB2WithNCX() throws -> Data {
+        let container = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <container
+          version="1.0"
+          xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+          <rootfiles>
+            <rootfile
+              full-path="OPS/package.opf"
+              media-type="application/oebps-package+xml"/>
+          </rootfiles>
+        </container>
+        """
+        let package = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <package
+          version="2.0"
+          unique-identifier="book-id"
+          xmlns="http://www.idpf.org/2007/opf">
+          <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <dc:identifier id="book-id">rivo-epub2-fixture</dc:identifier>
+            <dc:title>EPUB 2 테스트</dc:title>
+            <dc:creator>Rivo</dc:creator>
+            <dc:language>ko</dc:language>
+          </metadata>
+          <manifest>
+            <item
+              id="ncx"
+              href="navigation.ncx"
+              media-type="application/x-dtbncx+xml"/>
+            <item
+              id="chapter"
+              href="chapter.xhtml"
+              media-type="application/xhtml+xml"/>
+          </manifest>
+          <spine toc="ncx">
+            <itemref idref="chapter"/>
+          </spine>
+        </package>
+        """
+        let navigation = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/">
+          <navMap>
+            <navPoint id="nav-1" playOrder="1">
+              <navLabel><text>첫 장</text></navLabel>
+              <content src="chapter.xhtml#heading"/>
+              <navPoint id="nav-2" playOrder="2">
+                <navLabel><text>첫 절</text></navLabel>
+                <content src="chapter.xhtml#body"/>
+              </navPoint>
+            </navPoint>
+          </navMap>
+          <pageList>
+            <pageTarget id="page-10" playOrder="3">
+              <navLabel><text>10</text></navLabel>
+              <content src="chapter.xhtml#page-10"/>
+            </pageTarget>
+          </pageList>
+        </ncx>
+        """
+        let chapter = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <html xmlns="http://www.w3.org/1999/xhtml">
+          <head><title>첫 장</title></head>
+          <body>
+            <h1 id="heading">첫 장</h1>
+            <span id="page-10"/>
+            <p id="body">EPUB 2 본문입니다.</p>
+          </body>
+        </html>
+        """
+        return try ZIPFixture.make(
+            entries: [
+                ZIPFixtureEntry(
+                    path: "mimetype",
+                    data: Data(
+                        "application/epub+zip".utf8
+                    ),
+                    compressionMethod: 0
+                ),
+                ZIPFixtureEntry(
+                    path: "META-INF/container.xml",
+                    data: Data(container.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path: "OPS/package.opf",
+                    data: Data(package.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path: "OPS/navigation.ncx",
+                    data: Data(navigation.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path: "OPS/chapter.xhtml",
+                    data: Data(chapter.utf8),
+                    compressionMethod: 8
+                ),
             ]
         )
     }

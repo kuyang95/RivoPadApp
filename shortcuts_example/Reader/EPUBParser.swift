@@ -137,6 +137,20 @@ nonisolated enum EPUBBookParser {
         let mediaOverlayID: String?
     }
 
+    private struct ParsedNavigation {
+        let titlesByPath: [String: String]
+        let tableOfContents:
+            [PublicationNavigationItem]
+        let pageList:
+            [PublicationNavigationItem]
+
+        static let empty = ParsedNavigation(
+            titlesByPath: [:],
+            tableOfContents: [],
+            pageList: []
+        )
+    }
+
     static func parse(data: Data) throws -> EPUBBook {
         let archive = try EPUBArchive(data: data)
         guard archive.contains("META-INF/container.xml") else {
@@ -182,7 +196,7 @@ nonisolated enum EPUBBookParser {
             throw EPUBParserError.readingOrderMissing
         }
 
-        let navigationTitles = try navigationTitleMap(
+        let navigation = try parsedNavigation(
             archive: archive,
             packagePath: packagePath,
             manifest: manifest,
@@ -206,9 +220,18 @@ nonisolated enum EPUBBookParser {
             guard !text.isEmpty else {
                 continue
             }
-            let title = navigationTitles[chapterPath]
+            let title =
+                navigation.titlesByPath[chapterPath]
                 ?? extractor.firstHeading
                 ?? "제 \(index + 1)장"
+            let capturedFragmentIndexes =
+                extractor.fragmentSegmentIndexes
+            let textMatchedFragmentIndexes =
+                fragmentSegmentIndexes(
+                    text: text,
+                    fragmentTexts:
+                        extractor.fragmentTexts
+                )
             chapters.append(
                 EPUBChapter(
                     id: item.id,
@@ -216,11 +239,13 @@ nonisolated enum EPUBBookParser {
                     href: chapterPath,
                     text: text,
                     fragmentSegmentIndexes:
-                        fragmentSegmentIndexes(
-                            text: text,
-                            fragmentTexts:
-                                extractor
-                                .fragmentTexts
+                        textMatchedFragmentIndexes
+                        .merging(
+                            capturedFragmentIndexes,
+                            uniquingKeysWith: {
+                                _, captured in
+                                captured
+                            }
                         )
                 )
             )
@@ -259,7 +284,11 @@ nonisolated enum EPUBBookParser {
             language: packageDelegate.language,
             chapters: chapters,
             mediaOverlayItems:
-                mediaOverlayItems
+                mediaOverlayItems,
+            navigationItems:
+                navigation.tableOfContents,
+            pageListItems:
+                navigation.pageList
         )
     }
 
@@ -352,12 +381,12 @@ nonisolated enum EPUBBookParser {
         return result
     }
 
-    private static func navigationTitleMap(
+    private static func parsedNavigation(
         archive: EPUBArchive,
         packagePath: String,
         manifest: [String: ManifestItem],
         navigationID: String?
-    ) throws -> [String: String] {
+    ) throws -> ParsedNavigation {
         if let navigationItem = manifest.values.first(where: {
             $0.properties.contains("nav")
         }) {
@@ -370,17 +399,12 @@ nonisolated enum EPUBBookParser {
                 archive.data(at: navigationPath),
                 delegate: delegate
             )
-            var titles: [String: String] = [:]
-            for link in delegate.links where !link.label.isEmpty {
-                let path = try resolve(
-                    href: link.href,
-                    relativeTo: navigationPath
-                )
-                if titles[path] == nil {
-                    titles[path] = link.label
-                }
-            }
-            return titles
+            return navigation(
+                tableOfContents:
+                    delegate.tableOfContents,
+                pageList: delegate.pageList,
+                relativeTo: navigationPath
+            )
         }
 
         let ncxItem = navigationID.flatMap { manifest[$0] }
@@ -389,7 +413,7 @@ nonisolated enum EPUBBookParser {
                     == "application/x-dtbncx+xml"
             })
         guard let ncxItem else {
-            return [:]
+            return .empty
         }
         let ncxPath = try resolve(
             href: ncxItem.href,
@@ -400,17 +424,65 @@ nonisolated enum EPUBBookParser {
             archive.data(at: ncxPath),
             delegate: delegate
         )
-        var titles: [String: String] = [:]
-        for link in delegate.links where !link.label.isEmpty {
-            let path = try resolve(
-                href: link.href,
-                relativeTo: ncxPath
-            )
-            if titles[path] == nil {
-                titles[path] = link.label
+        return navigation(
+            tableOfContents:
+                delegate.tableOfContents,
+            pageList: delegate.pageList,
+            relativeTo: ncxPath
+        )
+    }
+
+    private static func navigation(
+        tableOfContents:
+            [EPUBRawNavigationItem],
+        pageList: [EPUBRawNavigationItem],
+        relativeTo navigationPath: String
+    ) -> ParsedNavigation {
+        func resolveItems(
+            _ items: [EPUBRawNavigationItem]
+        ) -> [PublicationNavigationItem] {
+            items.map { item in
+                PublicationNavigationItem(
+                    id: item.id,
+                    label: item.label,
+                    href: item.href.flatMap {
+                        try? resolveNavigationHref(
+                            $0,
+                            relativeTo:
+                                navigationPath
+                        )
+                    },
+                    depth: item.depth,
+                    playOrder: item.playOrder
+                )
             }
         }
-        return titles
+
+        let toc = resolveItems(tableOfContents)
+        let pages = resolveItems(pageList)
+        var titles: [String: String] = [:]
+        for item in toc
+        where !item.label.isEmpty {
+            guard let href = item.href else {
+                continue
+            }
+            let path = href
+                .split(
+                    separator: "#",
+                    maxSplits: 1
+                )
+                .first
+                .map(String.init)
+                ?? href
+            if titles[path] == nil {
+                titles[path] = item.label
+            }
+        }
+        return ParsedNavigation(
+            titlesByPath: titles,
+            tableOfContents: toc,
+            pageList: pages
+        )
     }
 
     private static func parseXML(
@@ -494,6 +566,46 @@ nonisolated enum EPUBBookParser {
             ? hrefPath
             : "\(baseDirectory)/\(hrefPath)"
         return try EPUBArchive.normalizedPath(combined)
+    }
+
+    private static func resolveNavigationHref(
+        _ href: String,
+        relativeTo baseFilePath: String
+    ) throws -> String {
+        let trimmed = href.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !trimmed.isEmpty,
+              !trimmed.hasPrefix("/"),
+              !trimmed.hasPrefix("//"),
+              trimmed.range(
+                  of: #"^[A-Za-z][A-Za-z0-9+.-]*:"#,
+                  options: .regularExpression
+              ) == nil else {
+            throw EPUBParserError.packageInvalid
+        }
+        let parts = trimmed.split(
+            separator: "#",
+            maxSplits: 1,
+            omittingEmptySubsequences: false
+        )
+        let pathPart = parts.first
+            .map(String.init)
+            ?? ""
+        let resolvedPath: String
+        if pathPart.isEmpty {
+            resolvedPath = try EPUBArchive
+                .normalizedPath(baseFilePath)
+        } else {
+            resolvedPath = try resolve(
+                href: pathPart,
+                relativeTo: baseFilePath
+            )
+        }
+        guard parts.count > 1 else {
+            return resolvedPath
+        }
+        return resolvedPath + "#" + String(parts[1])
     }
 }
 
@@ -636,20 +748,57 @@ private nonisolated final class EPUBPackageXMLDelegate:
     }
 }
 
+private nonisolated struct EPUBRawNavigationItem:
+    Sendable
+{
+    let id: String
+    let label: String
+    let href: String?
+    let depth: Int
+    let playOrder: Int?
+}
+
 private nonisolated final class EPUBNavigationXMLDelegate:
     NSObject,
     XMLParserDelegate
 {
-    struct Link {
-        let href: String
-        let label: String
+    private struct Section {
+        let types: Set<String>
+        var items: [EPUBRawNavigationItem]
     }
 
-    var links: [Link] = []
+    private struct LinkCapture {
+        let elementDepth: Int
+        let itemDepth: Int
+        let id: String?
+        let href: String?
+        var label: String
+    }
+
+    var tableOfContents:
+        [EPUBRawNavigationItem] {
+        sections.first {
+            $0.types.contains("toc")
+        }?.items
+        ?? sections.first?.items
+        ?? []
+    }
+
+    var pageList:
+        [EPUBRawNavigationItem] {
+        sections.first {
+            $0.types.contains("page-list")
+        }?.items
+        ?? []
+    }
+
+    private var sections: [Section] = []
+    private var activeSectionIndex: Int?
     private var navigationDepth: Int?
     private var depth = 0
-    private var currentHref: String?
-    private var currentLabel = ""
+    private var listDepth = 0
+    private var listItemDepths: [Int] = []
+    private var linkCapture: LinkCapture?
 
     func parser(
         _ parser: XMLParser,
@@ -664,15 +813,44 @@ private nonisolated final class EPUBNavigationXMLDelegate:
             let type = attributeDict["type"]
                 ?? attributeDict["epub:type"]
                 ?? ""
-            if type.split(whereSeparator: \.isWhitespace)
-                .contains("toc") {
-                navigationDepth = depth
-            }
-        } else if name == "a",
-                  navigationDepth != nil,
-                  let href = attributeDict["href"] {
-            currentHref = href
-            currentLabel = ""
+            let types = Set(
+                type.lowercased()
+                    .split(whereSeparator: \.isWhitespace)
+                    .map(String.init)
+            )
+            sections.append(
+                Section(types: types, items: [])
+            )
+            activeSectionIndex =
+                sections.indices.last
+            navigationDepth = depth
+            listDepth = 0
+            listItemDepths = []
+            linkCapture = nil
+            return
+        }
+        guard activeSectionIndex != nil else {
+            return
+        }
+        if name == "ol" {
+            listDepth += 1
+        } else if name == "li" {
+            listItemDepths.append(depth)
+        } else if (name == "a" || name == "span"),
+                  linkCapture == nil,
+                  let itemElementDepth =
+                    listItemDepths.last,
+                  depth == itemElementDepth + 1 {
+            linkCapture = LinkCapture(
+                elementDepth: depth,
+                itemDepth: max(0, listDepth - 1),
+                id: attributeDict["id"],
+                href:
+                    name == "a"
+                    ? attributeDict["href"]
+                    : nil,
+                label: ""
+            )
         }
     }
 
@@ -680,8 +858,8 @@ private nonisolated final class EPUBNavigationXMLDelegate:
         _ parser: XMLParser,
         foundCharacters string: String
     ) {
-        if currentHref != nil {
-            currentLabel += string
+        if linkCapture != nil {
+            linkCapture?.label += string
         }
     }
 
@@ -692,16 +870,50 @@ private nonisolated final class EPUBNavigationXMLDelegate:
         qualifiedName qName: String?
     ) {
         let name = elementName.lowercased()
-        if name == "a", let href = currentHref {
-            let label = currentLabel
+        if let capture = linkCapture,
+           capture.elementDepth == depth {
+            let label = capture.label
                 .split(whereSeparator: \.isWhitespace)
                 .joined(separator: " ")
-            links.append(Link(href: href, label: label))
-            currentHref = nil
-            currentLabel = ""
+            if !label.isEmpty
+                || capture.href?.isEmpty == false {
+                let sectionIndex =
+                    activeSectionIndex!
+                let itemIndex =
+                    sections[sectionIndex]
+                    .items.count
+                let trimmedID = capture.id?
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                sections[sectionIndex]
+                    .items.append(
+                        EPUBRawNavigationItem(
+                            id:
+                                trimmedID?.isEmpty == false
+                                ? trimmedID!
+                                : "nav-\(sectionIndex)-\(itemIndex)",
+                            label: label,
+                            href: capture.href,
+                            depth: capture.itemDepth,
+                            playOrder: nil
+                        )
+                    )
+            }
+            linkCapture = nil
+        }
+        if name == "li",
+           listItemDepths.last == depth {
+            listItemDepths.removeLast()
+        } else if name == "ol" {
+            listDepth = max(0, listDepth - 1)
         }
         if name == "nav", navigationDepth == depth {
+            activeSectionIndex = nil
             navigationDepth = nil
+            listDepth = 0
+            listItemDepths = []
+            linkCapture = nil
         }
         depth -= 1
     }
@@ -711,15 +923,56 @@ private nonisolated final class EPUBNCXXMLDelegate:
     NSObject,
     XMLParserDelegate
 {
-    struct Link {
-        let href: String
-        let label: String
+    private enum ItemKind: Equatable {
+        case tableOfContents
+        case pageList
     }
 
-    var links: [Link] = []
-    private var isInsideNavPoint = false
-    private var isInsideLabelText = false
-    private var currentLabel = ""
+    private struct Capture {
+        let kind: ItemKind
+        let sequence: Int
+        let id: String
+        let depth: Int
+        let playOrder: Int?
+        var href: String?
+        var label: String
+    }
+
+    var tableOfContents:
+        [EPUBRawNavigationItem] {
+        completed
+            .filter {
+                $0.capture.kind
+                    == .tableOfContents
+            }
+            .sorted {
+                $0.capture.sequence
+                    < $1.capture.sequence
+            }
+            .map(\.item)
+    }
+
+    var pageList:
+        [EPUBRawNavigationItem] {
+        completed
+            .filter {
+                $0.capture.kind == .pageList
+            }
+            .sorted {
+                $0.capture.sequence
+                    < $1.capture.sequence
+            }
+            .map(\.item)
+    }
+
+    private var depth = 0
+    private var navMapDepth: Int?
+    private var pageListDepth: Int?
+    private var captures: [Capture] = []
+    private var completed:
+        [(capture: Capture, item: EPUBRawNavigationItem)] = []
+    private var labelTextDepth: Int?
+    private var nextSequence = 0
 
     func parser(
         _ parser: XMLParser,
@@ -728,24 +981,71 @@ private nonisolated final class EPUBNCXXMLDelegate:
         qualifiedName qName: String?,
         attributes attributeDict: [String: String] = [:]
     ) {
+        depth += 1
         let name = elementName.lowercased()
         switch name {
+        case "navmap":
+            navMapDepth = depth
+        case "pagelist":
+            pageListDepth = depth
         case "navpoint":
-            isInsideNavPoint = true
-            currentLabel = ""
-        case "text":
-            isInsideLabelText = isInsideNavPoint
-        case "content":
-            if isInsideNavPoint,
-               let href = attributeDict["src"] {
-                links.append(
-                    Link(
-                        href: href,
-                        label: currentLabel
-                            .split(whereSeparator: \.isWhitespace)
-                            .joined(separator: " ")
-                    )
+            guard navMapDepth != nil else {
+                return
+            }
+            captures.append(
+                Capture(
+                    kind: .tableOfContents,
+                    sequence: nextSequence,
+                    id:
+                        attributeDict["id"]
+                        ?? "nav-\(nextSequence)",
+                    depth:
+                        captures.filter {
+                            $0.kind
+                                == .tableOfContents
+                        }.count,
+                    playOrder:
+                        (
+                            attributeDict["playOrder"]
+                            ?? attributeDict["playorder"]
+                        ).flatMap(Int.init),
+                    href: nil,
+                    label: ""
                 )
+            )
+            nextSequence += 1
+        case "pagetarget":
+            guard pageListDepth != nil else {
+                return
+            }
+            captures.append(
+                Capture(
+                    kind: .pageList,
+                    sequence: nextSequence,
+                    id:
+                        attributeDict["id"]
+                        ?? "page-\(nextSequence)",
+                    depth: 0,
+                    playOrder:
+                        (
+                            attributeDict["playOrder"]
+                            ?? attributeDict["playorder"]
+                        ).flatMap(Int.init),
+                    href: nil,
+                    label: ""
+                )
+            )
+            nextSequence += 1
+        case "text":
+            if !captures.isEmpty {
+                labelTextDepth = depth
+            }
+        case "content":
+            if !captures.isEmpty,
+               captures[captures.count - 1]
+                   .href == nil {
+                captures[captures.count - 1]
+                    .href = attributeDict["src"]
             }
         default:
             break
@@ -756,8 +1056,10 @@ private nonisolated final class EPUBNCXXMLDelegate:
         _ parser: XMLParser,
         foundCharacters string: String
     ) {
-        if isInsideLabelText {
-            currentLabel += string
+        if labelTextDepth != nil,
+           !captures.isEmpty {
+            captures[captures.count - 1]
+                .label += string
         }
     }
 
@@ -767,15 +1069,56 @@ private nonisolated final class EPUBNCXXMLDelegate:
         namespaceURI: String?,
         qualifiedName qName: String?
     ) {
-        switch elementName.lowercased() {
+        let name = elementName.lowercased()
+        switch name {
         case "text":
-            isInsideLabelText = false
-        case "navpoint":
-            isInsideNavPoint = false
-            currentLabel = ""
+            if labelTextDepth == depth {
+                labelTextDepth = nil
+            }
+        case "navpoint", "pagetarget":
+            guard let capture = captures.last,
+                  (
+                      name == "navpoint"
+                          && capture.kind
+                              == .tableOfContents
+                      || name == "pagetarget"
+                          && capture.kind
+                              == .pageList
+                  ) else {
+                break
+            }
+            captures.removeLast()
+            let label = capture.label
+                .split(whereSeparator: \.isWhitespace)
+                .joined(separator: " ")
+            if !label.isEmpty
+                || capture.href?.isEmpty == false {
+                completed.append(
+                    (
+                        capture,
+                        EPUBRawNavigationItem(
+                            id: capture.id,
+                            label: label,
+                            href: capture.href,
+                            depth: capture.depth,
+                            playOrder:
+                                capture.playOrder
+                        )
+                    )
+                )
+            }
+        case "navmap":
+            if navMapDepth == depth {
+                navMapDepth = nil
+            }
+        case "pagelist":
+            if pageListDepth == depth {
+                pageListDepth = nil
+            }
         default:
             break
         }
+        depth -= 1
     }
 }
 
@@ -803,6 +1146,8 @@ nonisolated final class EPUBHTMLTextDelegate:
     private(set) var firstHeading: String?
     private(set) var fragmentTexts:
         [String: String] = [:]
+    private var fragmentUTF16Offsets:
+        [String: Int] = [:]
     private var elementDepth = 0
     private var fragmentCaptures:
         [FragmentCapture] = []
@@ -825,6 +1170,45 @@ nonisolated final class EPUBHTMLTextDelegate:
             .joined(separator: "\n\n")
     }
 
+    var fragmentSegmentIndexes:
+        [String: Int] {
+        let segments = normalizedLines(in: buffer)
+        guard !segments.isEmpty else {
+            return [:]
+        }
+        let source = buffer as NSString
+        var indexes: [String: Int] = [:]
+        for (fragmentID, rawOffset)
+            in fragmentUTF16Offsets {
+            let offset = min(
+                max(0, rawOffset),
+                source.length
+            )
+            let prefix = source.substring(to: offset)
+            let rawLines = prefix.components(
+                separatedBy: .newlines
+            )
+            let normalizedPrefixLines =
+                rawLines.map(Self.normalizeLine)
+            let completedOrCurrentCount =
+                normalizedPrefixLines
+                    .filter { !$0.isEmpty }
+                    .count
+            let isInsideCurrentSegment =
+                normalizedPrefixLines.last?
+                .isEmpty == false
+            let proposedIndex =
+                isInsideCurrentSegment
+                ? completedOrCurrentCount - 1
+                : completedOrCurrentCount
+            indexes[fragmentID] = min(
+                max(0, proposedIndex),
+                segments.count - 1
+            )
+        }
+        return indexes
+    }
+
     func parser(
         _ parser: XMLParser,
         didStartElement elementName: String,
@@ -842,12 +1226,20 @@ nonisolated final class EPUBHTMLTextDelegate:
             skippedDepth = 1
             return
         }
+        if Self.blockElements.contains(name) {
+            appendLineBreak()
+        }
         if let fragmentID =
                 attributeDict["id"]?
                 .trimmingCharacters(
                     in: .whitespacesAndNewlines
                 ),
            !fragmentID.isEmpty {
+            if fragmentUTF16Offsets[fragmentID]
+                == nil {
+                fragmentUTF16Offsets[fragmentID] =
+                    buffer.utf16.count
+            }
             fragmentCaptures.append(
                 FragmentCapture(
                     id: fragmentID,
@@ -855,9 +1247,6 @@ nonisolated final class EPUBHTMLTextDelegate:
                     text: ""
                 )
             )
-        }
-        if Self.blockElements.contains(name) {
-            appendLineBreak()
         }
         if [
             "h1", "h2", "h3", "hd", "doctitle",
@@ -936,5 +1325,26 @@ nonisolated final class EPUBHTMLTextDelegate:
             return
         }
         buffer += "\n"
+    }
+
+    private func normalizedLines(
+        in value: String
+    ) -> [String] {
+        value
+            .replacingOccurrences(
+                of: "\u{00A0}",
+                with: " "
+            )
+            .components(separatedBy: .newlines)
+            .map(Self.normalizeLine)
+            .filter { !$0.isEmpty }
+    }
+
+    private static func normalizeLine(
+        _ value: String
+    ) -> String {
+        value
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
     }
 }
