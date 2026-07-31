@@ -268,9 +268,11 @@ private struct HelpManualView: View {
                 placement: .primaryAction
             ) {
                 Button(
-                    allSectionsExpanded
-                        ? "모두 접기"
-                        : "모두 펼치기",
+                    AppLocalization.string(
+                        allSectionsExpanded
+                            ? "모두 접기"
+                            : "모두 펼치기"
+                    ),
                     systemImage:
                         allSectionsExpanded
                         ? "rectangle.compress.vertical"

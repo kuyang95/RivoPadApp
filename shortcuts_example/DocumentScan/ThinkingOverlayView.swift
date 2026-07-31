@@ -19,7 +19,11 @@ struct ThinkingOverlayView: View {
 
             VStack(spacing: 28) {
 
-                Text(title)
+                Text(
+                    AppLocalization.string(
+                        title
+                    )
+                )
                     .font(.system(size: 30, weight: .semibold))
                     .foregroundColor(.white)
 

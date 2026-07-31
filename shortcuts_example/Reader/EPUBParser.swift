@@ -257,7 +257,10 @@ nonisolated enum EPUBBookParser {
                     ? extractor.firstHeading
                     : fallback?.firstHeading
                 )
-                ?? "제 \(index + 1)장"
+                ?? AppLocalization.format(
+                    "제 %lld장",
+                    Int64(index + 1)
+                )
             let capturedFragmentIndexes =
                 didParse
                 ? extractor.fragmentSegmentIndexes
@@ -321,7 +324,12 @@ nonisolated enum EPUBBookParser {
             identifier: identifier?.isEmpty == false
                 ? identifier!
                 : title ?? "EPUB",
-            title: title?.isEmpty == false ? title! : "제목 없는 EPUB",
+            title:
+                title?.isEmpty == false
+                ? title!
+                : AppLocalization.string(
+                    "제목 없는 EPUB"
+                ),
             creator: packageDelegate.creator,
             language: packageDelegate.language,
             chapters: chapters,

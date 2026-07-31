@@ -235,3 +235,13 @@ Android VisionCraft의 `ButtonEventManager`는 모드별 고정 키 매핑이며
   무음 캡처한다. iPadOS 일반 앱에는 해당 권한이 없으므로 3은 명시적
   실시간 카메라 OCR, 9는 명시적 카메라 촬영 뒤 M4 로컬 설명으로
   대체한다.
+- 현재 배포 대상 iOS 26.2에는 다른 앱을 무음 캡처할 공개 경로가 없다.
+  기존 ReplayKit 방송 확장 API는 폐기 예정이며 새 포팅 기반으로 사용하지
+  않는다. iOS 27 이상으로 배포 대상을 올릴 때는 ScreenCaptureKit의
+  사용자 시작형 전체 화면 공유를 별도 권한·개인정보 UX와 함께 검토한다.
+  이 경로도 사용자의 시스템 선택기 조작 없이 몰래 시작할 수 있는
+  Android 접근성 서비스 대체는 아니다.
+- Apple 근거:
+  [Capturing screen content on iOS](https://developer.apple.com/documentation/screencapturekit/capturing-screen-content-on-ios),
+  [RPSystemBroadcastPickerView](https://developer.apple.com/documentation/replaykit/rpsystembroadcastpickerview),
+  [RPBroadcastSampleHandler](https://developer.apple.com/documentation/replaykit/rpbroadcastsamplehandler)

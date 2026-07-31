@@ -264,7 +264,9 @@ struct LocalDocumentView: View {
             if viewModel.isLoading {
                 ProgressView(
                     viewModel.status.isEmpty
-                        ? "문서를 여는 중"
+                        ? AppLocalization.string(
+                            "문서를 여는 중"
+                        )
                         : viewModel.status
                 )
             } else if let error = viewModel.errorDescription {
@@ -304,7 +306,11 @@ struct LocalDocumentView: View {
                 .disabled(viewModel.text.isEmpty)
 
                 Button(
-                    isEditing ? "읽기 보기" : "편집",
+                    AppLocalization.string(
+                        isEditing
+                            ? "읽기 보기"
+                            : "편집"
+                    ),
                     systemImage:
                         isEditing
                         ? "text.alignleft"
@@ -1065,7 +1071,11 @@ struct LocalDocumentView: View {
                 )
         }
         .buttonStyle(.bordered)
-        .accessibilityLabel(title)
+        .accessibilityLabel(
+            AppLocalization.string(
+                title
+            )
+        )
     }
 
     private var navigationBar: some View {

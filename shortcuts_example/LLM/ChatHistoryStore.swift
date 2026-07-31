@@ -537,7 +537,11 @@ nonisolated enum ChatTranscriptBuilder {
             let trimmed = message.text.trimmingCharacters(
                 in: .whitespacesAndNewlines
             )
-            let label = message.role == .user ? "사용자" : "도우미"
+            let label = AppLocalization.string(
+                message.role == .user
+                    ? "사용자"
+                    : "도우미"
+            )
             let line = "\(label): \(trimmed)"
             guard selected.isEmpty
                     || usedCharacters + line.count + 1

@@ -544,6 +544,101 @@ final class AppLocalizationTests:
         )
     }
 
+    func testSharedInboxAndReaderFallbackStringsFollowInAppLanguage()
+    {
+        let defaults = UserDefaults.standard
+        let previous =
+            defaults.string(
+                forKey:
+                    AppLanguage
+                    .preferenceKey
+            )
+        defer {
+            if let previous {
+                defaults.set(
+                    previous,
+                    forKey:
+                        AppLanguage
+                        .preferenceKey
+                )
+            } else {
+                defaults.removeObject(
+                    forKey:
+                        AppLanguage
+                        .preferenceKey
+                )
+            }
+        }
+
+        defaults.set(
+            AppLanguage.english.rawValue,
+            forKey:
+                AppLanguage.preferenceKey
+        )
+        XCTAssertEqual(
+            SharedInboxStoreError
+                .appGroupUnavailable
+                .localizedDescription,
+            "The shared inbox could not be opened."
+        )
+        XCTAssertEqual(
+            SharedInboxStoreError
+                .payloadTooLarge
+                .localizedDescription,
+            "The shared file exceeds the 100MB limit."
+        )
+        XCTAssertEqual(
+            AppLocalization.format(
+                "제 %lld장",
+                4
+            ),
+            "Chapter 4"
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "제목 없는 EPUB"
+            ),
+            "Untitled EPUB"
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "오디오를 열 수 없어 로컬 음성으로 읽습니다."
+            ),
+            "The audio could not be opened, so the book will be read with an on-device voice."
+        )
+
+        defaults.set(
+            AppLanguage.japanese.rawValue,
+            forKey:
+                AppLanguage.preferenceKey
+        )
+        XCTAssertEqual(
+            SharedInboxStoreError
+                .missingPayload
+                .localizedDescription,
+            "共有ファイルが見つかりませんでした。"
+        )
+        XCTAssertEqual(
+            AppLocalization.format(
+                "제 %lld장",
+                7
+            ),
+            "第7章"
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "가져온 책.epub"
+            ),
+            "読み込んだ本.epub"
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "도우미"
+            ),
+            "アシスタント"
+        )
+    }
+
     func testDocumentDynamicStringsFollowInAppLanguage()
     {
         let defaults = UserDefaults.standard

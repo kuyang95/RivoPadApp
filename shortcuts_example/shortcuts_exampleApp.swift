@@ -580,7 +580,9 @@ struct shortcuts_exampleApp: App {
             } message: {
                 Text(
                     sharedInboxError
-                        ?? "알 수 없는 오류입니다."
+                        ?? AppLocalization.string(
+                            "알 수 없는 오류입니다."
+                        )
                 )
             }
             

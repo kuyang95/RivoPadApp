@@ -252,7 +252,9 @@ actor EPUBLibraryStore {
             withIntermediateDirectories: true
         )
         let fileName = sourceURL.lastPathComponent.isEmpty
-            ? "가져온 책.epub"
+            ? AppLocalization.string(
+                "가져온 책.epub"
+            )
             : sourceURL.lastPathComponent
         let destinationURL = bookDirectory
             .appendingPathComponent(fileName)

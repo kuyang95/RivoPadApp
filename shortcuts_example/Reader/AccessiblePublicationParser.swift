@@ -140,7 +140,9 @@ nonisolated enum AccessiblePublicationParser {
         let title = ncc.metadata.title?
             .nonEmptyTrimmed
             ?? chapters.first?.title
-            ?? "제목 없는 DAISY 2.02"
+            ?? AppLocalization.string(
+                "제목 없는 DAISY 2.02"
+            )
         return EPUBBook(
             format: .daisy202,
             identifier:
@@ -287,7 +289,9 @@ nonisolated enum AccessiblePublicationParser {
         let title = packageDelegate.title?
             .nonEmptyTrimmed
             ?? chapters.first?.title
-            ?? "제목 없는 DAISY 3"
+            ?? AppLocalization.string(
+                "제목 없는 DAISY 3"
+            )
         return EPUBBook(
             format: .daisy3,
             identifier:
@@ -371,7 +375,10 @@ nonisolated enum AccessiblePublicationParser {
                         ?? extractor.firstHeading
                         ?? fallback?
                             .firstHeading
-                        ?? "제 \(index + 1)장",
+                        ?? AppLocalization.format(
+                            "제 %lld장",
+                            Int64(index + 1)
+                        ),
                     href: path,
                     text: text,
                     sourceMarkup:

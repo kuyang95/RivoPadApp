@@ -48,15 +48,25 @@ enum SharedInboxStoreError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .appGroupUnavailable:
-            return "공유 수신함을 열 수 없습니다."
+            return AppLocalization.string(
+                "공유 수신함을 열 수 없습니다."
+            )
         case .emptyText:
-            return "공유된 텍스트가 비어 있습니다."
+            return AppLocalization.string(
+                "공유된 텍스트가 비어 있습니다."
+            )
         case .payloadTooLarge:
-            return "공유 파일이 100MB 제한을 초과했습니다."
+            return AppLocalization.string(
+                "공유 파일이 100MB 제한을 초과했습니다."
+            )
         case .invalidItem:
-            return "공유 항목 정보가 올바르지 않습니다."
+            return AppLocalization.string(
+                "공유 항목 정보가 올바르지 않습니다."
+            )
         case .missingPayload:
-            return "공유 파일을 찾지 못했습니다."
+            return AppLocalization.string(
+                "공유 파일을 찾지 못했습니다."
+            )
         }
     }
 }

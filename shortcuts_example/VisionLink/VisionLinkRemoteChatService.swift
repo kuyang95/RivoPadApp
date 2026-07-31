@@ -666,9 +666,11 @@ nonisolated enum VisionLinkChatPromptBuilder {
         var selected: [String] = []
         var used = 0
         for message in messages.reversed() {
-            let label = message.role == .user
-                ? "사용자"
-                : "도우미"
+            let label = AppLocalization.string(
+                message.role == .user
+                    ? "사용자"
+                    : "도우미"
+            )
             let line = "\(label): \(message.content)"
             if selected.isEmpty,
                line.count > maximumCharacters {

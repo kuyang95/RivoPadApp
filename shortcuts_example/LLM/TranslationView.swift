@@ -338,8 +338,13 @@ struct TranslationView: View {
             )
             .accessibilityLabel(
                 viewModel.result.isEmpty
-                    ? "번역 결과 없음"
-                    : "번역 결과: \(viewModel.result)"
+                    ? AppLocalization.string(
+                        "번역 결과 없음"
+                    )
+                    : AppLocalization.format(
+                        "번역 결과: %@",
+                        viewModel.result
+                    )
             )
         }
         .frame(

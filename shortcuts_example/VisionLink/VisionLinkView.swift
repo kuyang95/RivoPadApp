@@ -85,9 +85,11 @@ struct VisionLinkView: View {
     private var dataTransferSection: some View {
         Section("데이터 채널") {
             Label(
-                manager.isDataChannelReady
-                    ? "파일·텍스트 수신 준비됨"
-                    : "상대 기기의 데이터 채널 대기 중",
+                AppLocalization.string(
+                    manager.isDataChannelReady
+                        ? "파일·텍스트 수신 준비됨"
+                        : "상대 기기의 데이터 채널 대기 중"
+                ),
                 systemImage:
                     manager.isDataChannelReady
                     ? "arrow.down.circle.fill"

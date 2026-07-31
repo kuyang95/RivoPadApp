@@ -1428,7 +1428,9 @@ final class EPUBMediaOverlayPlaybackController:
                 self.isLoading = false
                 self.loadTask = nil
                 self.errorDescription =
-                    "오디오를 열 수 없어 로컬 음성으로 읽습니다."
+                    AppLocalization.string(
+                        "오디오를 열 수 없어 로컬 음성으로 읽습니다."
+                    )
                 self.startSpeech(
                     stepIndex: stepIndex,
                     fromUTF16:

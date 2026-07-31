@@ -273,14 +273,18 @@ struct LLMContentView: View {
                             )
                     )
                     .accessibilityLabel(
-                        stt.isRecording
-                            ? "음성 입력 종료"
-                            : "음성으로 질문"
+                        AppLocalization.string(
+                            stt.isRecording
+                                ? "음성 입력 종료"
+                                : "음성으로 질문"
+                        )
                     )
                     .accessibilityHint(
-                        stt.isRecording
-                            ? "인식을 마치고 질문을 전송합니다."
-                            : "온디바이스 한국어 음성 인식을 시작합니다."
+                        AppLocalization.string(
+                            stt.isRecording
+                                ? "인식을 마치고 질문을 전송합니다."
+                                : "온디바이스 한국어 음성 인식을 시작합니다."
+                        )
                     )
 
                     TextField(
@@ -331,7 +335,9 @@ struct LLMContentView: View {
                     ProgressView().progressViewStyle(.circular)
                     Text(
                         vm.isLoadingModel
-                            ? "로컬 모델을 불러오는 중"
+                            ? AppLocalization.string(
+                                "로컬 모델을 불러오는 중"
+                            )
                             : vm.isPreparingAttachment
                             ? (
                                 vm.attachmentStatusDescription
@@ -339,7 +345,9 @@ struct LLMContentView: View {
                                     "첨부 준비 중…"
                                 )
                             )
-                            : "분석 중…"
+                            : AppLocalization.string(
+                                "분석 중…"
+                            )
                     )
                         .font(.headline)
                 }
@@ -779,8 +787,12 @@ struct LLMContentView: View {
                 speechControlButton(
                     title:
                         answerSpeech.isSpeaking
-                            ? "답변 읽기 정지"
-                            : "답변 읽기",
+                            ? AppLocalization.string(
+                                "답변 읽기 정지"
+                            )
+                            : AppLocalization.string(
+                                "답변 읽기"
+                            ),
                     systemImage:
                         answerSpeech.isSpeaking
                             ? "stop.fill"

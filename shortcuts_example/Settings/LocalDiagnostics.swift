@@ -572,7 +572,9 @@ struct LocalDiagnosticsView: View {
             switch result {
             case .success:
                 statusMessage =
-                    "진단 보고서를 저장했습니다."
+                    AppLocalization.string(
+                        "진단 보고서를 저장했습니다."
+                    )
                 errorMessage = nil
             case .failure(let error):
                 statusMessage = nil

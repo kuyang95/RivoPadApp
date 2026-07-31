@@ -225,9 +225,11 @@ struct ReaderLibraryView: View {
             .padding(.vertical, 7)
         }
         .accessibilityHint(
-            isLastBook(book)
-                ? "마지막으로 읽던 위치부터 계속합니다."
-                : "저장된 읽기 위치부터 책을 엽니다."
+            AppLocalization.string(
+                isLastBook(book)
+                    ? "마지막으로 읽던 위치부터 계속합니다."
+                    : "저장된 읽기 위치부터 책을 엽니다."
+            )
         )
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) {

@@ -626,7 +626,10 @@ struct EPUBReaderView: View {
             }
         }
         .navigationTitle(
-            viewModel.book?.title ?? "독서"
+            viewModel.book?.title
+                ?? AppLocalization.string(
+                    "독서"
+                )
         )
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -1051,8 +1054,12 @@ struct EPUBReaderView: View {
 
                     Button(
                         mediaOverlayPlayer.isPlaying
-                            ? "일시정지"
-                            : "재생",
+                            ? AppLocalization.string(
+                                "일시정지"
+                            )
+                            : AppLocalization.string(
+                                "재생"
+                            ),
                         systemImage:
                             mediaOverlayPlayer.isPlaying
                             ? "pause.fill"
@@ -1281,10 +1288,12 @@ struct EPUBReaderView: View {
                     }
 
                     Section(
-                        book.navigationItems
-                            .isEmpty
-                        ? "목차"
-                        : "읽기 순서"
+                        AppLocalization.string(
+                            book.navigationItems
+                                .isEmpty
+                                ? "목차"
+                                : "읽기 순서"
+                        )
                     ) {
                         ForEach(
                             Array(
@@ -1354,7 +1363,9 @@ struct EPUBReaderView: View {
             HStack {
                 Text(
                     item.label.isEmpty
-                        ? "이름 없는 항목"
+                        ? AppLocalization.string(
+                            "이름 없는 항목"
+                        )
                         : item.label
                 )
                 .padding(
@@ -1383,9 +1394,11 @@ struct EPUBReaderView: View {
         }
         .disabled(location == nil)
         .accessibilityHint(
-            location == nil
-                ? "이 목차 위치는 현재 본문과 연결되지 않았습니다."
-                : "해당 본문 위치로 이동합니다."
+            AppLocalization.string(
+                location == nil
+                    ? "이 목차 위치는 현재 본문과 연결되지 않았습니다."
+                    : "해당 본문 위치로 이동합니다."
+            )
         )
     }
 

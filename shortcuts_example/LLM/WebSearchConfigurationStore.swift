@@ -135,7 +135,10 @@ nonisolated enum WebSearchCredentialError:
                     status,
                     nil
                 ) as String?
-                ?? "상태 \(status)"
+                ?? AppLocalization.format(
+                    "상태 %lld",
+                    Int64(status)
+                )
             return AppLocalization.format(
                 "웹 검색 보안 저장소 오류: %@",
                 message

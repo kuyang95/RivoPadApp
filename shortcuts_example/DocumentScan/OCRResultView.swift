@@ -153,7 +153,13 @@ extension OCRResultView {
                                 CircularProgressViewStyle(tint: .white)
                             )
                     } else {
-                        Text(vm.sttManager.isRecording ? "녹음중..." : "AI 질문")
+                        Text(
+                            AppLocalization.string(
+                                vm.sttManager.isRecording
+                                    ? "녹음중..."
+                                    : "AI 질문"
+                            )
+                        )
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 14)
@@ -163,9 +169,15 @@ extension OCRResultView {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("AI 질문")
             .accessibilityValue(
-                vm.llmService.isLoading
-                ? "모델 로딩 중"
-                : (vm.sttManager.isRecording ? "녹음 중" : "준비됨")
+                AppLocalization.string(
+                    vm.llmService.isLoading
+                        ? "모델 로딩 중"
+                        : (
+                            vm.sttManager.isRecording
+                                ? "녹음 중"
+                                : "준비됨"
+                        )
+                )
             )
             .accessibilityHint("이중 탭하면 문서에 대해 질문할 수 있습니다")
 
@@ -184,7 +196,13 @@ extension OCRResultView {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("음성")
-            .accessibilityValue(isTTSEnabled ? "켜짐" : "꺼짐")
+            .accessibilityValue(
+                AppLocalization.string(
+                    isTTSEnabled
+                        ? "켜짐"
+                        : "꺼짐"
+                )
+            )
             .accessibilityHint("이중 탭하면 음성 안내를 전환합니다")
 
             Button {
@@ -197,7 +215,13 @@ extension OCRResultView {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("이미지 미리보기")
-            .accessibilityValue(isPreviewImageEnabled ? "켜짐" : "꺼짐")
+            .accessibilityValue(
+                AppLocalization.string(
+                    isPreviewImageEnabled
+                        ? "켜짐"
+                        : "꺼짐"
+                )
+            )
             .accessibilityHint("이중 탭하면 이미지 미리보기를 전환합니다")
 
             Button {
@@ -210,7 +234,13 @@ extension OCRResultView {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("OCR 박스")
-            .accessibilityValue(showBoxes ? "켜짐" : "꺼짐")
+            .accessibilityValue(
+                AppLocalization.string(
+                    showBoxes
+                        ? "켜짐"
+                        : "꺼짐"
+                )
+            )
             .accessibilityHint("이중 탭하면 텍스트 박스 표시를 전환합니다")
 
             Button {
@@ -460,7 +490,17 @@ extension OCRResultView {
                    .frame(height: 40)
                    .frame(minWidth: 80)
 
-               Text("\(title) \(isOn ? "켬" : "끔")")
+               Text(
+                   AppLocalization.string(
+                       title
+                   )
+                   + " "
+                   + AppLocalization.string(
+                       isOn
+                           ? "켜짐"
+                           : "꺼짐"
+                   )
+               )
                    .font(.system(size: 15, weight: .semibold))
                    .foregroundColor(.white)
                    .padding(.horizontal, 14)

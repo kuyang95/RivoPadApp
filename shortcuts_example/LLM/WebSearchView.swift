@@ -207,10 +207,12 @@ struct WebSearchView: View {
 
             if !configuration.isEnabled {
                 Label(
-                    configuration
-                        .hasAPIKey
-                        ? "설정에서 온라인 웹 검색을 켜 주세요."
-                        : "설정에서 개인 Brave Search API 키를 저장해 주세요.",
+                    AppLocalization.string(
+                        configuration
+                            .hasAPIKey
+                            ? "설정에서 온라인 웹 검색을 켜 주세요."
+                            : "설정에서 개인 Brave Search API 키를 저장해 주세요."
+                    ),
                     systemImage:
                         "exclamationmark.triangle"
                 )

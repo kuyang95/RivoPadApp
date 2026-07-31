@@ -79,9 +79,17 @@ struct CameraToolsView: View {
                 .frame(width: 72)
 
             VStack(alignment: .leading, spacing: 8) {
-                Text(title)
+                Text(
+                    AppLocalization.string(
+                        title
+                    )
+                )
                     .font(.system(size: 30, weight: .bold))
-                Text(description)
+                Text(
+                    AppLocalization.string(
+                        description
+                    )
+                )
                     .font(.title3)
                     .multilineTextAlignment(.leading)
                     .opacity(0.9)

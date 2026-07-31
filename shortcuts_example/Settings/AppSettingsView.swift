@@ -84,7 +84,9 @@ struct AppSettingsView: View {
             ) {
                 webSearch.setEnabled(true)
                 webSearchStatus =
-                    "온라인 웹 검색을 켰습니다."
+                    AppLocalization.string(
+                        "온라인 웹 검색을 켰습니다."
+                    )
                 webSearchError = nil
             }
             Button(
@@ -454,9 +456,11 @@ struct AppSettingsView: View {
             LabeledContent(
                 "키 상태",
                 value:
-                    webSearch.hasAPIKey
-                    ? "Keychain에 저장됨"
-                    : "저장되지 않음"
+                    AppLocalization.string(
+                        webSearch.hasAPIKey
+                            ? "Keychain에 저장됨"
+                            : "저장되지 않음"
+                    )
             )
 
             Toggle(
@@ -475,14 +479,18 @@ struct AppSettingsView: View {
                                         false
                                     )
                                 webSearchStatus =
-                                    "온라인 웹 검색을 껐습니다."
+                                    AppLocalization.string(
+                                        "온라인 웹 검색을 껐습니다."
+                                    )
                             } else if webSearch
                                 .hasAPIKey {
                                 showsWebSearchConsent =
                                     true
                             } else {
                                 webSearchError =
-                                    "먼저 개인 Brave Search API 키를 저장해 주세요."
+                                    AppLocalization.string(
+                                        "먼저 개인 Brave Search API 키를 저장해 주세요."
+                                    )
                             }
                         }
                     )
@@ -633,7 +641,9 @@ struct AppSettingsView: View {
             )
             webSearchAPIKey = ""
             webSearchStatus =
-                "API 키를 Keychain에 저장했습니다."
+                AppLocalization.string(
+                    "API 키를 Keychain에 저장했습니다."
+                )
             webSearchError = nil
         } catch {
             webSearchStatus = nil
@@ -647,7 +657,9 @@ struct AppSettingsView: View {
             try webSearch.removeAPIKey()
             webSearchAPIKey = ""
             webSearchStatus =
-                "저장된 API 키를 삭제하고 웹 검색을 껐습니다."
+                AppLocalization.string(
+                    "저장된 API 키를 삭제하고 웹 검색을 껐습니다."
+                )
             webSearchError = nil
         } catch {
             webSearchStatus = nil
@@ -819,9 +831,11 @@ private struct AppFontSelectionView:
                     != nil
             )
             .accessibilityValue(
-                isSelected
-                    ? "선택됨"
-                    : ""
+                AppLocalization.string(
+                    isSelected
+                        ? "선택됨"
+                        : ""
+                )
             )
 
             if let license =

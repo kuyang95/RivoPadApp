@@ -185,6 +185,7 @@
 @section iPad Alternatives
 @text Bring content from another app through the Share Extension, selected-text action, Files picker, or a screenshot you provide.
 @text The silent global screen capture from Android R1 commands is unavailable. Command 3 opens live camera OCR, and command 9 captures with the camera and runs M4 local image description.
+@text On iPadOS 27 or later, full-display sharing that the user explicitly starts from the ScreenCaptureKit system picker can be considered as a future alternative. It is outside the current iPadOS 26.2 scope and cannot be started secretly by the app.
 @text Use widgets, Siri, Shortcuts, and the in-app Rivo quick menu for quick launch.
 @text For system accessibility control, use iPad Accessibility Shortcut or a Rivo HID or Switch Control firmware alternative.
 @text App updates come through the App Store, TestFlight, or MDM instead of Android APK installation.
