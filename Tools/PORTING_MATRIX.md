@@ -33,6 +33,16 @@
 | 다른 앱 사진·문서·텍스트 수신 | ✅ | Share Extension → App Group 배치 수신함 → 사진 OCR·EPUB 독서·PDF/TXT/XLSX/XLS/HWP/HWPX 문서·URL 본문·일반 텍스트의 음성 질문/AI 채팅 선택 라우팅, 20개·100MB/250MB 제한·부분 성공·7일 정리 완료; 실제 공유 시트 🧪 |
 | 선택 텍스트 처리 | ✅ | Action Extension → App Group 수신함 → 설정한 음성 질문/AI 채팅 공유 문맥 완료, 실제 앱별 선택 메뉴 확인 🧪 |
 
+### 소스에만 남은 개발 실험
+
+- Android `SupertonicTtsTestActivity`는 매니페스트에 등록되어 있지만 홈,
+  설정, 도움말과 다른 화면 어디에서도 실행하지 않는 개발용 실험 화면이다.
+  약 139MB의 Supertonic 3 모델과 sherpa-onnx 래퍼를 제품 앱에 추가하는
+  일은 현재 사용자 기능 포팅에서 제외한다. iOS arm64 지원 경로는
+  [sherpa-onnx 공식 Supertonic 문서](https://k2-fsa.github.io/sherpa/onnx/tts/supertonic.html)에
+  있으므로, Android에서 실제 진입 기능으로 채택될 때 별도 제품 작업으로
+  재평가한다.
+
 ## 2. 카메라·돋보기·라이브 OCR
 
 | 기능 | iPad 상태 | 남은 차이 |

@@ -430,6 +430,70 @@ final class EPUBReaderTests: XCTestCase {
         )
     }
 
+    func testSMILKeepsFirstTextReferenceInParallel()
+        throws
+    {
+        let smil = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <smil>
+          <body>
+            <par id="duplicate-text">
+              <text src="first.xhtml#first"/>
+              <text src="second.xhtml#second"/>
+              <audio src="audio.mp3" clipBegin="0s" clipEnd="1s"/>
+            </par>
+          </body>
+        </smil>
+        """
+        let archive = try EPUBArchive(
+            data:
+                ZIPFixture.make(
+                    entries: [
+                        ZIPFixtureEntry(
+                            path: "overlay.smil",
+                            data: Data(smil.utf8),
+                            compressionMethod: 0
+                        ),
+                        ZIPFixtureEntry(
+                            path: "first.xhtml",
+                            data: Data(),
+                            compressionMethod: 0
+                        ),
+                        ZIPFixtureEntry(
+                            path: "second.xhtml",
+                            data: Data(),
+                            compressionMethod: 0
+                        ),
+                        ZIPFixtureEntry(
+                            path: "audio.mp3",
+                            data: Data([0]),
+                            compressionMethod: 0
+                        ),
+                    ]
+                )
+        )
+
+        let result =
+            EPUBMediaOverlayParser.parseResult(
+                archive: archive,
+                paths: ["overlay.smil"]
+            )
+
+        XCTAssertEqual(
+            result.referencedTextPaths,
+            ["first.xhtml"]
+        )
+        XCTAssertEqual(
+            result.items.first?.textPath,
+            "first.xhtml"
+        )
+        XCTAssertEqual(
+            result.items.first?
+                .textFragmentID,
+            "first"
+        )
+    }
+
     func testReadAloudSequenceInterleavesTTSAndAudio()
     {
         let chapter = EPUBChapter(

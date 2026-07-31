@@ -304,6 +304,7 @@ private nonisolated final class SMILXMLDelegate:
     struct RawParallel {
         let id: String
         let playOrder: Int?
+        var hasTextElement: Bool
         var textSource: String?
         var audios: [RawAudio]
     }
@@ -337,23 +338,30 @@ private nonisolated final class SMILXMLDelegate:
                         ]
                         ?? ""
                     ),
+                    hasTextElement: false,
                     textSource: nil,
                     audios: []
                 )
             )
         case "text":
-            guard !parallels.isEmpty,
-                  let source =
-                    attributeDict["src"],
-                  !source.isEmpty else {
+            guard !parallels.isEmpty else {
                 return
             }
-            parallels[
-                parallels.index(
-                    before:
-                        parallels.endIndex
-                )
-            ].textSource = source
+            let index = parallels.index(
+                before:
+                    parallels.endIndex
+            )
+            guard !parallels[index]
+                    .hasTextElement else {
+                return
+            }
+            parallels[index].hasTextElement = true
+            if let source =
+                    attributeDict["src"],
+               !source.isEmpty {
+                parallels[index].textSource =
+                    source
+            }
         case "audio":
             guard !parallels.isEmpty,
                   let source =
