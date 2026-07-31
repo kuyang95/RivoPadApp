@@ -28,6 +28,9 @@
 - 단계별 시간·메모리·화각 진단
 - 앱에서 고른 한국어·영어·일본어에 맞춘 촬영·프레이밍·오류·검토·
   다중 페이지·VoiceOver 문구
+- 어느 화면에서도 생성되지 않던 초기 수동 AVFoundation 스캐너를
+  제거하고 모든 문서 촬영을 LCNet 검출·UVDoc 곡면 보정이 연결된
+  `LocalDocumentScannerViewController` 경로로 단일화
 
 ## 현재 성능 기준
 

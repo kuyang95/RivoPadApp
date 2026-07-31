@@ -18,6 +18,9 @@ iPadOS가 허용하는 앱 외부 진입점을 VisionCraft 기능에 연결한�
 - 실제 기능이 없던 Xcode 템플릿 App Intent 확장과 가짜 메시지 성공을
   반환하던 SiriKit 메시지·UI 확장 타깃, 전용 scheme을 제거하고 실제
   App Intent가 있는 본 앱 타깃만 유지
+- 저장 호출이 없어 항상 빈 목록만 반환하던 초기 Visual Intelligence
+  `OCREntity` 예제를 제거하고, 이미지 입력은 실제 로컬 OCR을 수행하는
+  `OCRIntent` 한 경로로 통합
 - App Shortcut 요청을 App Group envelope에 저장한 뒤 앱의
   `NavigationStack` 또는 Files 선택기로 한 번만 라우팅
 - 앱 최초 실행과 활성 복귀 양쪽에서 대기 중인 envelope 소비
