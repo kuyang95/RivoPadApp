@@ -39,6 +39,7 @@
 @section Local Translation
 @text On the AI Chat translation screen, select Korean, English, or Japanese and translate with the M4 local AI.
 @text Enter or paste the source text, then copy the result or have the iPad read it aloud.
+@text On OCR results from a camera capture, photo file, shared image, or scan, tap Translate to pass the corrected recognition text to on-device translation and immediately translate it into the app language.
 @section Webpage Questions
 @text On the AI Chat webpage screen, enter or paste an address to extract its title and body and ask questions about them.
 @text The network is used only to download the webpage. AI processing of the extracted body runs on the M4 local model.

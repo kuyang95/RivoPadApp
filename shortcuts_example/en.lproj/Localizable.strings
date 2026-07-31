@@ -1338,3 +1338,4 @@
 "클립보드가 비어 있습니다." = "The clipboard is empty.";
 "클립보드 텍스트" = "Clipboard Text";
 "문서를 열 수 없습니다." = "The document could not be opened.";
+"추출한 텍스트를 M4 로컬 AI 번역 화면에서 바로 번역합니다." = "Immediately translate the extracted text with on-device M4 AI.";

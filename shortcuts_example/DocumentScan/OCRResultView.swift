@@ -6,6 +6,8 @@ struct OCRResultView: View {
 
     let image: UIImage
 
+    @EnvironmentObject private var appRouter:
+        AppRouter
     @StateObject private var vm = OCRResultViewModel()
 
     @State private var showBoxes: Bool = false
@@ -112,6 +114,24 @@ extension OCRResultView {
 extension OCRResultView {
 
     private var topBar: some View {
+        ScrollView(
+            .horizontal,
+            showsIndicators: false
+        ) {
+            topBarActions
+        }
+        .background(
+            LinearGradient(
+                colors: [Color.black.opacity(0.4), Color.clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+    }
+
+    private var topBarActions:
+        some View
+    {
         HStack(spacing: 10) {
 
             Button {
@@ -180,6 +200,36 @@ extension OCRResultView {
                 )
             )
             .accessibilityHint("이중 탭하면 문서에 대해 질문할 수 있습니다")
+
+            Button {
+                openTranslation()
+            } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.black.opacity(0.65))
+                        .frame(height: 40)
+
+                    Text(
+                        AppLocalization.string(
+                            "번역"
+                        )
+                    )
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("번역")
+            .accessibilityHint(
+                "추출한 텍스트를 M4 로컬 AI 번역 화면에서 바로 번역합니다."
+            )
+            .disabled(
+                vm.isExtracting
+                    || vm.isGeneratingAI
+                    || vm.sttManager
+                    .isRecording
+            )
 
             Button {
                 isTTSEnabled.toggle()
@@ -265,13 +315,37 @@ extension OCRResultView {
         .padding(.horizontal, 16)
         .padding(.top, 8)
         .frame(maxWidth: .infinity, alignment: .trailing)
-        .background(
-            LinearGradient(
-                colors: [Color.black.opacity(0.4), Color.clear],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+    }
+
+    private func openTranslation() {
+        guard let source =
+                OCRTranslationSource.make(
+                    from: vm.extractedText
+                ) else {
+            return
+        }
+        ttsWorkItem?.cancel()
+        previewHoldWorkItem?.cancel()
+        TTSManager.shared.stop()
+        appRouter.route = .translation(
+            initialText: source,
+            automaticallyStarts: true
         )
+    }
+}
+
+nonisolated enum OCRTranslationSource {
+    static func make(
+        from text: String
+    ) -> String? {
+        guard !text
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .isEmpty else {
+            return nil
+        }
+        return text
     }
 }
 
