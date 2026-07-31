@@ -7,14 +7,24 @@ struct WebQuestionView: View {
     @StateObject private var viewModel:
         WebQuestionViewModel
     @State private var didAutoLoad = false
+    @State private var didRouteSharedContent =
+        false
 
     private let autoLoad: Bool
+    private let
+        automaticallyStartsSharedVoiceInput:
+            Bool?
 
     init(
         initialURL: String? = nil,
-        autoLoad: Bool = false
+        autoLoad: Bool = false,
+        automaticallyStartsSharedVoiceInput:
+            Bool? = nil
     ) {
         self.autoLoad = autoLoad
+        self
+            .automaticallyStartsSharedVoiceInput =
+            automaticallyStartsSharedVoiceInput
         _viewModel = StateObject(
             wrappedValue:
                 WebQuestionViewModel(
@@ -94,9 +104,46 @@ struct WebQuestionView: View {
         ) { _, _ in
             viewModel.urlDidChange()
         }
+        .onChange(
+            of: viewModel.content
+        ) { _, content in
+            routeSharedContentIfNeeded(
+                content
+            )
+        }
         .onDisappear {
             viewModel.cancel()
         }
+    }
+
+    private func routeSharedContentIfNeeded(
+        _ content: WebPageContent?
+    ) {
+        guard !didRouteSharedContent,
+              let content,
+              let automaticallyStartsSharedVoiceInput,
+              let plan =
+                SharedTextEntryPlan.make(
+                    rawText:
+                        SharedWebContext
+                        .make(
+                            content: content
+                        ),
+                    mode:
+                        automaticallyStartsSharedVoiceInput
+                        ? .voice
+                        : .chat
+                ) else {
+            return
+        }
+        didRouteSharedContent = true
+        appRouter.route =
+            .sharedTextQuestion(
+                text: plan.text,
+                automaticallyStartsVoiceInput:
+                    plan
+                    .automaticallyStartsVoiceInput
+            )
     }
 
     private var urlSection: some View {

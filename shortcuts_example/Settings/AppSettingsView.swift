@@ -118,7 +118,7 @@ struct AppSettingsView: View {
     {
         Section {
             Picker(
-                "공유 텍스트 열기",
+                "공유 항목 열기",
                 selection:
                     $settings
                     .sharedTextEntryMode
@@ -135,7 +135,7 @@ struct AppSettingsView: View {
             Text("다른 앱에서 공유")
         } footer: {
             Text(
-                "음성 질문은 공유 내용을 문맥으로 준비한 뒤 바로 듣기를 시작합니다. AI 채팅은 문맥을 첨부한 새 대화에서 질문을 기다립니다."
+                "음성 질문은 공유한 텍스트, 웹페이지, 사진과 지원 문서를 준비한 뒤 바로 듣기를 시작합니다. AI 채팅은 같은 자료를 첨부한 새 대화에서 질문을 기다립니다."
             )
         }
     }

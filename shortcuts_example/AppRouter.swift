@@ -32,6 +32,11 @@ enum AppRoute: Hashable {
         initialURL: String?,
         autoLoad: Bool
     )
+    case sharedWebQuestion(
+        initialURL: String,
+        automaticallyStartsVoiceInput:
+            Bool
+    )
     case webSearch(
         initialQuery: String?,
         autoSearch: Bool,
@@ -49,6 +54,12 @@ enum AppRoute: Hashable {
     case voiceQuestion(question: String)
     case sharedTextQuestion(
         text: String,
+        automaticallyStartsVoiceInput:
+            Bool
+    )
+    case sharedAttachmentQuestion(
+        attachment:
+            StoredChatFileAttachment,
         automaticallyStartsVoiceInput:
             Bool
     )

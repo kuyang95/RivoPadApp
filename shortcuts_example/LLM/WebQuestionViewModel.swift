@@ -1,6 +1,20 @@
 import Combine
 import Foundation
 
+nonisolated enum SharedWebContext {
+    static func make(
+        content: WebPageContent
+    ) -> String {
+        """
+        웹페이지 제목: \(content.title)
+        원문 주소: \(content.sourceURL.absoluteString)
+
+        웹페이지 본문:
+        \(content.text)
+        """
+    }
+}
+
 @MainActor
 final class WebQuestionViewModel:
     ObservableObject

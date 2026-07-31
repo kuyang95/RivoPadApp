@@ -220,6 +220,29 @@ nonisolated struct SharedTextEntryPlan:
     }
 }
 
+nonisolated struct SharedAttachmentEntryPlan:
+    Equatable,
+    Sendable
+{
+    let attachment:
+        StoredChatFileAttachment
+    let automaticallyStartsVoiceInput:
+        Bool
+
+    static func make(
+        attachment:
+            StoredChatFileAttachment,
+        mode: SharedTextEntryMode
+    ) -> Self {
+        Self(
+            attachment: attachment,
+            automaticallyStartsVoiceInput:
+                mode
+                .automaticallyStartsVoiceInput
+        )
+    }
+}
+
 @MainActor
 final class AppSettingsStore:
     ObservableObject

@@ -99,6 +99,17 @@ struct shortcuts_exampleApp: App {
                                 autoLoad:
                                     autoLoad
                             )
+                        case .sharedWebQuestion(
+                            let initialURL,
+                            let automaticallyStartsVoiceInput
+                        ):
+                            WebQuestionView(
+                                initialURL:
+                                    initialURL,
+                                autoLoad: true,
+                                automaticallyStartsSharedVoiceInput:
+                                    automaticallyStartsVoiceInput
+                            )
                         case .webSearch(
                             let initialQuery,
                             let autoSearch,
@@ -197,6 +208,31 @@ struct shortcuts_exampleApp: App {
                             .onDisappear {
                                 rivoScreenRemoteControlCenter
                                     .deactivate(.localAIChat)
+                            }
+                        case .sharedAttachmentQuestion(
+                            let attachment,
+                            let automaticallyStartsVoiceInput
+                        ):
+                            LLMContentView(
+                                intent:
+                                    .sharedAttachmentQuestion(
+                                        attachment:
+                                            attachment,
+                                        automaticallyStartsVoiceInput:
+                                            automaticallyStartsVoiceInput
+                                    )
+                            )
+                            .onAppear {
+                                rivoScreenRemoteControlCenter
+                                    .activate(
+                                        .localAIChat
+                                    )
+                            }
+                            .onDisappear {
+                                rivoScreenRemoteControlCenter
+                                    .deactivate(
+                                        .localAIChat
+                                    )
                             }
                         case .voiceAction:
                             LocalVoiceActionView(
@@ -774,10 +810,13 @@ struct shortcuts_exampleApp: App {
                     .firstWebURL(
                         in: text
                     ) {
-                return .webQuestion(
+                return .sharedWebQuestion(
                     initialURL:
                         url.absoluteString,
-                    autoLoad: true
+                    automaticallyStartsVoiceInput:
+                        appSettings
+                        .sharedTextEntryMode
+                        .automaticallyStartsVoiceInput
                 )
             }
             guard let plan =
@@ -799,13 +838,31 @@ struct shortcuts_exampleApp: App {
         case .image:
             let url = try SharedInboxStore
                 .shared.payloadURL(for: item)
-            let data = try Data(contentsOf: url)
-            guard let image = UIImage(data: data) else {
-                throw CocoaError(
-                    .fileReadCorruptFile
+            let contentType =
+                UTType(
+                    item.typeIdentifier
+                        ?? ""
                 )
-            }
-            return .OCRResult(image: image)
+                ?? UTType(
+                    filenameExtension:
+                        url.pathExtension
+                )
+            let attachment =
+                try await
+                ChatAttachmentStore.shared
+                .importImage(
+                    from: url,
+                    mimeType:
+                        contentType?
+                        .preferredMIMEType
+                        ?? "image/jpeg"
+                )
+            return sharedAttachmentRoute(
+                attachment,
+                mode:
+                    appSettings
+                    .sharedTextEntryMode
+            )
         case .file:
             let url = try SharedInboxStore
                 .shared.payloadURL(for: item)
@@ -818,16 +875,12 @@ struct shortcuts_exampleApp: App {
                 )
             if contentType?
                 .conforms(to: .image) == true {
-                let data = try Data(
-                    contentsOf: url
-                )
-                guard let image =
-                        UIImage(data: data) else {
-                    throw CocoaError(
-                        .fileReadCorruptFile
+                return try await
+                    sharedQuestionRoute(
+                        for: url,
+                        contentType:
+                            contentType
                     )
-                }
-                return .OCRResult(image: image)
             }
             if url.pathExtension
                 .lowercased() == "epub" {
@@ -840,6 +893,108 @@ struct shortcuts_exampleApp: App {
                     fileURL: bookURL
                 )
             }
+            return try await
+                sharedQuestionRoute(
+                    for: url,
+                    contentType:
+                        contentType
+                )
+        }
+    }
+
+    private func sharedQuestionRoute(
+        for url: URL,
+        contentType: UTType?
+    ) async throws -> AppRoute {
+        let mode =
+            appSettings
+            .sharedTextEntryMode
+        let pathExtension =
+            url.pathExtension
+            .lowercased()
+
+        if contentType?
+            .conforms(to: .image) == true {
+            let attachment =
+                try await
+                ChatAttachmentStore.shared
+                .importImage(
+                    from: url,
+                    mimeType:
+                        contentType?
+                        .preferredMIMEType
+                        ?? "image/jpeg"
+                )
+            return sharedAttachmentRoute(
+                attachment,
+                mode: mode
+            )
+        }
+
+        if pathExtension == "txt"
+            || pathExtension == "text"
+            || contentType?
+                .conforms(
+                    to: .plainText
+                ) == true {
+            let text = try await
+                ChatAttachmentStore.shared
+                .readTextDocument(
+                    from: url
+                )
+            guard let plan =
+                    SharedTextEntryPlan.make(
+                        rawText: text,
+                        mode: mode
+                    ) else {
+                throw SharedInboxStoreError
+                    .emptyText
+            }
+            return .sharedTextQuestion(
+                text: plan.text,
+                automaticallyStartsVoiceInput:
+                    plan
+                    .automaticallyStartsVoiceInput
+            )
+        }
+
+        if pathExtension == "pdf"
+            || contentType?
+                .conforms(to: .pdf) == true {
+            let attachment =
+                try await
+                ChatAttachmentStore.shared
+                .importPDF(from: url)
+            return sharedAttachmentRoute(
+                attachment,
+                mode: mode
+            )
+        }
+
+        let attachment:
+            StoredChatFileAttachment
+        switch pathExtension {
+        case "xlsx":
+            attachment = try await
+                ChatAttachmentStore.shared
+                .importSpreadsheet(
+                    from: url
+                )
+        case "xls":
+            attachment = try await
+                ChatAttachmentStore.shared
+                .importLegacySpreadsheet(
+                    from: url
+                )
+        case "hwp":
+            attachment = try await
+                ChatAttachmentStore.shared
+                .importHWP(from: url)
+        case "hwpx":
+            attachment = try await
+                ChatAttachmentStore.shared
+                .importHWPX(from: url)
+        default:
             let importedURL = try await
                 LocalDocumentImportService.shared
                 .importDocument(from: url)
@@ -847,6 +1002,30 @@ struct shortcuts_exampleApp: App {
                 fileURL: importedURL
             )
         }
+        return sharedAttachmentRoute(
+            attachment,
+            mode: mode
+        )
+    }
+
+    private func sharedAttachmentRoute(
+        _ attachment:
+            StoredChatFileAttachment,
+        mode: SharedTextEntryMode
+    ) -> AppRoute {
+        let plan =
+            SharedAttachmentEntryPlan
+            .make(
+                attachment: attachment,
+                mode: mode
+            )
+        return .sharedAttachmentQuestion(
+            attachment:
+                plan.attachment,
+            automaticallyStartsVoiceInput:
+                plan
+                .automaticallyStartsVoiceInput
+        )
     }
 
     static func shouldOpenScanner(

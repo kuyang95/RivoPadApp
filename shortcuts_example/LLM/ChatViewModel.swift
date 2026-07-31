@@ -103,7 +103,9 @@ final class ChatViewModel: ObservableObject {
             ChatAttachmentStore = .shared,
         storedConversationID: UUID = UUID(),
         persistsHistory: Bool = false,
-        replayCharacterLimit: Int? = nil
+        replayCharacterLimit: Int? = nil,
+        initialFileAttachment:
+            StoredChatFileAttachment? = nil
     ) {
         self.llm = llm
         self.historyStore = historyStore
@@ -111,6 +113,8 @@ final class ChatViewModel: ObservableObject {
             attachmentStore
         self.storedConversationID = storedConversationID
         self.persistsHistory = persistsHistory
+        self.fileAttachment =
+            initialFileAttachment
         self.conversationID = LLMConversationID(
             storedConversationID
         )
@@ -126,6 +130,18 @@ final class ChatViewModel: ObservableObject {
         let now = Date()
         self.conversationCreatedAt = now
         self.conversationUpdatedAt = now
+        if let initialFileAttachment {
+            conversationTitle =
+                initialFileAttachment.name
+            attachmentSummary =
+                ChatAttachmentSummary(
+                    fileName:
+                        initialFileAttachment
+                        .name,
+                    textContextCount: 0
+                )
+            needsContextReplay = true
+        }
     }
 
     // MARK: - System Prompts (모드별로 다르게)
@@ -206,6 +222,19 @@ final class ChatViewModel: ObservableObject {
             await restoreConversation()
         }
 
+        if case .sharedAttachmentQuestion =
+            intent {
+            guard await
+                    prepareInitialFileAttachment()
+            else {
+                return
+            }
+            // The share inbox removes its temporary copy after routing.
+            // Persist ownership before model activation so a model-load
+            // failure cannot orphan the imported original.
+            await persistConversation()
+        }
+
         guard await loadModel(for: intent) else {
             return
         }
@@ -221,6 +250,11 @@ final class ChatViewModel: ObservableObject {
             _
         ):
             await attachSharedText(text)
+        case .sharedAttachmentQuestion:
+            attachmentStatusDescription =
+                AppLocalization.string(
+                    "공유 파일을 준비했습니다."
+                )
         case .imageAnalysis,
              .capturedImageAnalysis,
              .documentQA,
@@ -246,7 +280,8 @@ final class ChatViewModel: ObservableObject {
                 loadedKind = .vision
             case .textChat,
                  .voiceQuestion,
-                 .sharedTextQuestion:
+                 .sharedTextQuestion,
+                 .sharedAttachmentQuestion:
                 if fileAttachment?.kind
                     == .image {
                     try await llm.activateModel(
@@ -289,7 +324,8 @@ final class ChatViewModel: ObservableObject {
         switch intent {
         case .textChat,
              .voiceQuestion,
-             .sharedTextQuestion:
+             .sharedTextQuestion,
+             .sharedAttachmentQuestion:
             return
 
         case .imageAnalysis(let imageURL, let question):
@@ -398,6 +434,56 @@ final class ChatViewModel: ObservableObject {
         startImageAnalysis(
             question: question
         )
+    }
+
+    private func prepareInitialFileAttachment()
+        async -> Bool
+    {
+        guard let attachment =
+                fileAttachment,
+              await attachmentStore
+                .existingURL(
+                    for: attachment
+                ) != nil else {
+            fileAttachment = nil
+            refreshAttachmentSummary()
+            attachmentErrorDescription =
+                ChatAttachmentError
+                .storedFileMissing
+                .localizedDescription
+            return false
+        }
+
+        if attachment.kind == .image {
+            do {
+                let image = try await
+                    attachmentStore
+                    .loadImage(
+                        for: attachment
+                    )
+                let images =
+                    toCIImages([image])
+                guard !images.isEmpty else {
+                    throw ChatAttachmentError
+                        .invalidImage
+                }
+                pinnedCIImages = images
+            } catch {
+                await attachmentStore
+                    .delete(attachment)
+                fileAttachment = nil
+                refreshAttachmentSummary()
+                attachmentErrorDescription =
+                    userMessage(for: error)
+                return false
+            }
+        } else {
+            pinnedCIImages = []
+        }
+
+        refreshAttachmentSummary()
+        needsContextReplay = true
+        return true
     }
 
     private func restoreConversation() async {

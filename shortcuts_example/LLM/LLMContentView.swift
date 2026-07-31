@@ -12,6 +12,12 @@ enum ChatIntentInput: Equatable {
         automaticallyStartsVoiceInput:
             Bool
     )
+    case sharedAttachmentQuestion(
+        attachment:
+            StoredChatFileAttachment,
+        automaticallyStartsVoiceInput:
+            Bool
+    )
     case imageAnalysis(imageURL: URL, question: String)
     case capturedImageAnalysis(
         image: UIImage,
@@ -27,6 +33,44 @@ enum ChatIntentInput: Equatable {
         question: String,
         speaksResponse: Bool
     )
+}
+
+private extension ChatIntentInput {
+    var initialFileAttachment:
+        StoredChatFileAttachment?
+    {
+        guard case .sharedAttachmentQuestion(
+            let attachment,
+            _
+        ) = self else {
+            return nil
+        }
+        return attachment
+    }
+
+    var automaticallyStartsSharedVoiceInput:
+        Bool
+    {
+        switch self {
+        case .sharedTextQuestion(
+            _,
+            let automaticallyStarts
+        ),
+             .sharedAttachmentQuestion(
+                _,
+                let automaticallyStarts
+             ):
+            return automaticallyStarts
+        case .textChat,
+             .voiceQuestion,
+             .imageAnalysis,
+             .capturedImageAnalysis,
+             .documentQA,
+             .webPageQA,
+             .webSearchQA:
+            return false
+        }
+    }
 }
 
 struct LLMContentView: View {
@@ -66,6 +110,9 @@ struct LLMContentView: View {
         case .sharedTextQuestion:
             storedConversationID = UUID()
             persistsHistory = true
+        case .sharedAttachmentQuestion:
+            storedConversationID = UUID()
+            persistsHistory = true
         case .imageAnalysis,
              .capturedImageAnalysis,
              .documentQA,
@@ -78,7 +125,11 @@ struct LLMContentView: View {
             wrappedValue: ChatViewModel(
                 llm: service,
                 storedConversationID: storedConversationID,
-                persistsHistory: persistsHistory
+                persistsHistory:
+                    persistsHistory,
+                initialFileAttachment:
+                    intent
+                    .initialFileAttachment
             )
         )
         _shouldSpeakNextResponse = State(
@@ -116,6 +167,7 @@ struct LLMContentView: View {
         case .textChat,
              .voiceQuestion,
              .sharedTextQuestion,
+             .sharedAttachmentQuestion,
              .documentQA,
              .webPageQA,
              .webSearchQA:
@@ -447,11 +499,8 @@ struct LLMContentView: View {
             guard !didStart else { return }
             didStart = true
             await vm.prepare(for: intent)
-            if case .sharedTextQuestion(
-                _,
-                let automaticallyStartsVoiceInput
-            ) = intent,
-            automaticallyStartsVoiceInput,
+            if intent
+                .automaticallyStartsSharedVoiceInput,
             vm.attachmentSummary != nil {
                 await Task.yield()
                 _ = startVoiceInput()
@@ -671,6 +720,10 @@ struct LLMContentView: View {
         case .sharedTextQuestion:
             return AppLocalization.string(
                 "공유 텍스트 질문"
+            )
+        case .sharedAttachmentQuestion:
+            return AppLocalization.string(
+                "공유 파일 질문"
             )
         case .imageAnalysis,
              .capturedImageAnalysis:

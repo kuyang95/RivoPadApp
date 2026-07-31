@@ -41,6 +41,7 @@ nonisolated struct StoredChatTextContext:
 nonisolated struct StoredChatFileAttachment:
     Codable,
     Equatable,
+    Hashable,
     Sendable
 {
     let name: String

@@ -79,9 +79,13 @@
 "앱 설정 초기화" = "Reset App Settings";
 "음성 질문" = "Voice Question";
 "공유 텍스트 열기" = "Open Shared Text In";
+"공유 항목 열기" = "Open Shared Items In";
 "다른 앱에서 공유" = "Shared from Other Apps";
 "음성 질문은 공유 내용을 문맥으로 준비한 뒤 바로 듣기를 시작합니다. AI 채팅은 문맥을 첨부한 새 대화에서 질문을 기다립니다." = "Voice Question prepares the shared content as context and starts listening. AI Chat attaches it to a new chat and waits for your question.";
+"음성 질문은 공유한 텍스트, 웹페이지, 사진과 지원 문서를 준비한 뒤 바로 듣기를 시작합니다. AI 채팅은 같은 자료를 첨부한 새 대화에서 질문을 기다립니다." = "Voice Question prepares shared text, webpages, photos, and supported documents, then starts listening. AI Chat opens a new conversation with the same material attached and waits for your question.";
 "공유 텍스트 질문" = "Shared Text Question";
+"공유 파일 질문" = "Shared File Question";
+"공유 파일을 준비했습니다." = "The shared file is ready.";
 "공유 텍스트를 준비하는 중…" = "Preparing shared text…";
 "공유 텍스트" = "Shared Text";
 "공유 수신함" = "Shared Inbox";

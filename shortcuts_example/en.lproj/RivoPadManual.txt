@@ -153,8 +153,9 @@
 @section Sharing and Selected Text
 @text From another app’s share menu, send photos, PDF, EPUB, TXT, XLSX, XLS, HWP, or HWPX documents, text, or a URL to VisionCraft.
 @text Share up to 20 items at once. Each file can be up to 100 MB and the combined files up to 250 MB. If some items fail, successfully saved items remain in the inbox.
-@text A shared URL is read automatically on the webpage question screen. Ordinary shared text opens as context in the local AI screen selected in Settings.
-@text If Shared Text Opens In is set to Voice Question, the app prepares the shared content as context and immediately starts listening. If it is set to AI Chat, a new conversation waits for a question with the context attached.
+@text A shared URL is extracted on the protected webpage-reading screen and then passed as context to the local AI screen selected in Settings.
+@text If Open Shared Items In is set to Voice Question, the app locally prepares shared text, webpages, photos, PDF, TXT, XLSX, XLS, HWP, or HWPX content and immediately starts listening. If it is set to AI Chat, a new conversation waits for a question with the same material attached.
+@text Shared photo, PDF, XLSX, XLS, HWP, and HWPX originals are copied into the local conversation store before the inbox copy is removed, so follow-up questions and conversation history can keep using them. TXT becomes extracted context, and EPUB opens in the reader.
 @text From the action menu for selected text, ask VisionCraft immediately or save the selection for later.
 @text Shared items are stored in a local App Group inbox and consumed only once. When several items are present, open or delete them in order from the inbox list.
 @text Unopened valid shared items are removed from the device after 7 days, and incomplete temporary items after 24 hours.
