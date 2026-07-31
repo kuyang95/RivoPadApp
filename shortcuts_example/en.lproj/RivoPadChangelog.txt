@@ -40,6 +40,7 @@
 @text Added the Korean, English, and Japanese app language foundation and localized Home, Settings, Help, sharing, and widgets.
 @text Accelerated rotation, resizing, and color correction for manual captures without detected document corners through the Metal path.
 @text Added scanner retake, continuous capture, rotation, deletion, reordering, session restoration, and multipage PDF saving.
+@text Added Rivo controls for retaking, adding, and finishing captured pages, plus selecting, rotating, opening, and saving multipage scans as PDF.
 @text Added M4 local translation among Korean, English, and Japanese with paste, copy, read, and stop.
 @text Added safe extraction of a shared or pasted webpage body for source-backed questions to the M4 local AI.
 @text Added optional web search that retrieves sources from Brave LLM Context while generating the answer on the M4, with Keychain key storage and privacy consent.

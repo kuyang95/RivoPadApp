@@ -804,6 +804,7 @@
 "촬영 결과" = "Capture Results";
 "촬영한 페이지를 모두 삭제할까요?" = "Delete all captured pages?";
 "페이지 %lld" = "Page %lld";
+"페이지 %lld를 오른쪽으로 90도 회전했습니다." = "Rotated page %lld 90° clockwise.";
 "페이지 삭제 후 닫기" = "Delete Pages and Close";
 "페이지 추가" = "Add Page";
 "페이지 추가를 눌러 문서를 촬영하세요." = "Tap Add Page to capture a document.";

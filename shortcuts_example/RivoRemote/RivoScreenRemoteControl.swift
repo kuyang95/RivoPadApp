@@ -54,6 +54,11 @@ nonisolated enum RivoDocumentScannerRemoteAction:
 {
     case close
     case capture
+    case previousPage
+    case rotatePage
+    case nextPage
+    case addPage
+    case openDocument
 }
 
 nonisolated enum RivoPublicationReaderRemoteAction:
@@ -309,10 +314,30 @@ nonisolated enum RivoScreenRemoteMapper {
             return nil
         case .documentScanner:
             switch button {
+            case .two:
+                return .documentScanner(
+                    .previousPage
+                )
             case .four:
                 return .documentScanner(.close)
+            case .five:
+                return .documentScanner(
+                    .rotatePage
+                )
             case .seven:
                 return .documentScanner(.capture)
+            case .eight:
+                return .documentScanner(
+                    .nextPage
+                )
+            case .nine:
+                return .documentScanner(
+                    .addPage
+                )
+            case .zero:
+                return .documentScanner(
+                    .openDocument
+                )
             default:
                 return nil
             }

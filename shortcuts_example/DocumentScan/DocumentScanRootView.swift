@@ -26,6 +26,10 @@ struct DocumentScanRootView: View {
         UIImage?
     @State private var scannerCommand:
         DocumentScannerCommand?
+    @State private var cameraRemoteEvent:
+        RivoScreenRemoteEvent?
+    @State private var selectedPageID:
+        UUID?
     @State private var exportDocument:
         ScannedPDFFileDocument?
     @State private var isExporting = false
@@ -48,13 +52,17 @@ struct DocumentScanRootView: View {
                     ? .camera
                     : .pageReview
         )
+        _selectedPageID = State(
+            initialValue:
+                session.pages.first?.id
+        )
     }
 
     var body: some View {
         ZStack {
             DocumentScannerController(
                 remoteEvent:
-                    remoteControl.latestEvent,
+                    cameraRemoteEvent,
                 command: scannerCommand,
                 isActive:
                     phase == .camera,
@@ -149,6 +157,15 @@ struct DocumentScanRootView: View {
             if let description {
                 errorMessage = description
             }
+        }
+        .onChange(
+            of: remoteControl.latestEvent
+        ) { _, event in
+            handleRemoteEvent(event)
+        }
+        .onChange(of: session.pages) {
+            _, _ in
+            normalizeSelectedPage()
         }
     }
 
@@ -299,27 +316,59 @@ struct DocumentScanRootView: View {
                     maxHeight: .infinity
                 )
             } else {
-                List {
-                    ForEach(
-                        Array(
-                            session.pages
-                                .enumerated()
-                        ),
-                        id: \.element.id
-                    ) { index, page in
-                        pageRow(
-                            page,
-                            number: index + 1
+                ScrollViewReader { proxy in
+                    List {
+                        ForEach(
+                            Array(
+                                session.pages
+                                    .enumerated()
+                            ),
+                            id: \.element.id
+                        ) { index, page in
+                            pageRow(
+                                page,
+                                number: index + 1
+                            )
+                            .id(page.id)
+                            .listRowBackground(
+                                selectedPageID
+                                    == page.id
+                                    ? Color
+                                        .accentColor
+                                        .opacity(0.14)
+                                    : Color.clear
+                            )
+                            .accessibilityAddTraits(
+                                selectedPageID
+                                    == page.id
+                                    ? .isSelected
+                                    : []
+                            )
+                        }
+                        .onMove(
+                            perform:
+                                session.move
+                        )
+                        .onDelete(
+                            perform:
+                                session.remove
                         )
                     }
-                    .onMove(
-                        perform: session.move
-                    )
-                    .onDelete(
-                        perform: session.remove
-                    )
+                    .listStyle(.plain)
+                    .onChange(
+                        of: selectedPageID
+                    ) { _, pageID in
+                        guard let pageID else {
+                            return
+                        }
+                        withAnimation {
+                            proxy.scrollTo(
+                                pageID,
+                                anchor: .center
+                            )
+                        }
+                    }
                 }
-                .listStyle(.plain)
             }
 
             Divider()
@@ -502,6 +551,212 @@ struct DocumentScanRootView: View {
             )
     }
 
+    private func handleRemoteEvent(
+        _ event: RivoScreenRemoteEvent?
+    ) {
+        guard let event,
+              case .documentScanner(
+                let action
+              ) = event.action else {
+            return
+        }
+
+        switch phase {
+        case .camera:
+            cameraRemoteEvent = event
+        case .capturedPageReview:
+            handleCapturedPageRemoteAction(
+                action
+            )
+        case .pageReview:
+            handlePageReviewRemoteAction(
+                action
+            )
+        }
+    }
+
+    private func handleCapturedPageRemoteAction(
+        _ action:
+            RivoDocumentScannerRemoteAction
+    ) {
+        guard !isPreparingDocument,
+              !showsDiscardConfirmation else {
+            return
+        }
+        switch action {
+        case .close:
+            announceRemoteFeedback(
+                AppLocalization.string(
+                    "재촬영"
+                )
+            )
+            retakePage()
+        case .capture:
+            announceRemoteFeedback(
+                AppLocalization.string(
+                    "검토 완료"
+                )
+            )
+            saveAndFinish()
+        case .addPage:
+            announceRemoteFeedback(
+                AppLocalization.string(
+                    "페이지 추가"
+                )
+            )
+            saveAndContinue()
+        case .openDocument:
+            guard session.pages.isEmpty else {
+                return
+            }
+            announceRemoteFeedback(
+                AppLocalization.string(
+                    "한 장 OCR"
+                )
+            )
+            openSinglePageOCR()
+        case .previousPage,
+             .rotatePage,
+             .nextPage:
+            break
+        }
+    }
+
+    private func handlePageReviewRemoteAction(
+        _ action:
+            RivoDocumentScannerRemoteAction
+    ) {
+        guard !isPreparingDocument,
+              !isExporting,
+              !showsDiscardConfirmation else {
+            return
+        }
+        switch action {
+        case .close:
+            requestClose()
+        case .capture:
+            announceRemoteFeedback(
+                AppLocalization.string(
+                    "PDF로 저장"
+                )
+            )
+            exportPDF()
+        case .previousPage:
+            moveRemotePageSelection(by: -1)
+        case .rotatePage:
+            rotateRemoteSelectedPage()
+        case .nextPage:
+            moveRemotePageSelection(by: 1)
+        case .addPage:
+            announceRemoteFeedback(
+                AppLocalization.string(
+                    "페이지 추가"
+                )
+            )
+            startAnotherPage()
+        case .openDocument:
+            announceRemoteFeedback(
+                AppLocalization.string(
+                    "문서로 열기"
+                )
+            )
+            openScannedDocument()
+        }
+    }
+
+    private func moveRemotePageSelection(
+        by offset: Int
+    ) {
+        guard !session.pages.isEmpty else {
+            return
+        }
+        let currentIndex =
+            selectedPageID.flatMap { pageID in
+                session.pages.firstIndex(
+                    where: {
+                        $0.id == pageID
+                    }
+                )
+            } ?? 0
+        let targetIndex = min(
+            max(
+                currentIndex + offset,
+                0
+            ),
+            session.pages.count - 1
+        )
+        selectedPageID =
+            session.pages[targetIndex].id
+        announceRemotePage(
+            at: targetIndex
+        )
+    }
+
+    private func rotateRemoteSelectedPage() {
+        normalizeSelectedPage()
+        guard let selectedPageID,
+              let index =
+                session.pages.firstIndex(
+                    where: {
+                        $0.id
+                            == selectedPageID
+                    }
+                ) else {
+            return
+        }
+        session.rotate(
+            session.pages[index]
+        )
+        announceRemoteFeedback(
+            AppLocalization.format(
+                "페이지 %lld를 오른쪽으로 90도 회전했습니다.",
+                index + 1
+            )
+        )
+    }
+
+    private func normalizeSelectedPage() {
+        guard !session.pages.isEmpty else {
+            selectedPageID = nil
+            return
+        }
+        guard let selectedPageID,
+              session.pages.contains(
+                where: {
+                    $0.id
+                        == selectedPageID
+                }
+              ) else {
+            self.selectedPageID =
+                session.pages.first?.id
+            return
+        }
+    }
+
+    private func announceRemotePage(
+        at index: Int
+    ) {
+        announceRemoteFeedback(
+            AppLocalization.format(
+                "%@, %lld/%lld",
+                AppLocalization.string(
+                    "페이지"
+                ),
+                index + 1,
+                session.pages.count
+            )
+        )
+    }
+
+    private func announceRemoteFeedback(
+        _ message: String
+    ) {
+        UIAccessibility.post(
+            notification: .announcement,
+            argument: message
+        )
+    }
+
     private func reviewCapturedPage(
         _ image: UIImage
     ) {
@@ -529,6 +784,8 @@ struct DocumentScanRootView: View {
               ) else {
             return
         }
+        selectedPageID =
+            session.pages.last?.id
         self.pendingImage = nil
         scannerCommand =
             .acceptAndContinue(
@@ -546,6 +803,8 @@ struct DocumentScanRootView: View {
               ) else {
             return
         }
+        selectedPageID =
+            session.pages.last?.id
         self.pendingImage = nil
         scannerCommand = .finish(
             id: UUID(),

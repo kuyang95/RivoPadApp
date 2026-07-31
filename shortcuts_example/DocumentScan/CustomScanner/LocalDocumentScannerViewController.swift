@@ -1935,6 +1935,12 @@ final class LocalDocumentScannerViewController: UIViewController {
             didTapCancel()
         case .capture:
             didTapShutter()
+        case .previousPage,
+             .rotatePage,
+             .nextPage,
+             .addPage,
+             .openDocument:
+            break
         }
     }
 

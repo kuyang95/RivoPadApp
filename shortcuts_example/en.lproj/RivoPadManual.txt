@@ -86,6 +86,7 @@
 @text If numbers, URLs, or line breaks change, or the result grows or shrinks excessively, the original text is kept. Vision OCR remains immediately available when AI is busy or model correction fails.
 @text Live camera OCR does not run Qwen3-VL correction on every frame, avoiding extra latency and heat.
 @text Capture up to 20 pages in sequence, then retake, rotate, delete, and reorder them before saving a multipage PDF.
+@text With Rivo, use 4 to close and 7 to capture on the camera screen. On capture results, use 4 to retake, 9 to add a page, 7 to finish review, and 0 for single-page OCR on the first page. In page review, use 2/8 for previous/next, 5 to rotate, 9 to add a page, 0 to open as a document, and 7 to save a PDF.
 @text An unfinished capture session can be restored the next time the app opens.
 
 @chapter Documents and Reading

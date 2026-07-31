@@ -1079,6 +1079,41 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         )
     }
 
+    func testDocumentScannerMapperExposesReviewControls() {
+        let expected:
+            [(RivoButton, RivoDocumentScannerRemoteAction)] = [
+                (.two, .previousPage),
+                (.four, .close),
+                (.five, .rotatePage),
+                (.seven, .capture),
+                (.eight, .nextPage),
+                (.nine, .addPage),
+                (.zero, .openDocument)
+            ]
+
+        for (button, action) in expected {
+            XCTAssertEqual(
+                RivoScreenRemoteMapper.action(
+                    for: self.button(
+                        button,
+                        action: .pressed
+                    ),
+                    on: .documentScanner
+                ),
+                .documentScanner(action)
+            )
+        }
+        XCTAssertNil(
+            RivoScreenRemoteMapper.action(
+                for: button(
+                    .five,
+                    action: .released
+                ),
+                on: .documentScanner
+            )
+        )
+    }
+
     func testMagnifierDisplayModeRoutesAndroidDisplayKeys() {
         let screenControl =
             RivoScreenRemoteControlCenter()
