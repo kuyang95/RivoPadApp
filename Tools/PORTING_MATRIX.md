@@ -42,6 +42,31 @@
   [sherpa-onnx 공식 Supertonic 문서](https://k2-fsa.github.io/sherpa/onnx/tts/supertonic.html)에
   있으므로, Android에서 실제 진입 기능으로 채택될 때 별도 제품 작업으로
   재평가한다.
+- `SignageReader2`, `ScreenfulReader2`, `ReadingModeAdapter2`는 세 클래스
+  사이의 생성 코드만 있고 `MyService`, Activity, Compose 화면에서 호출되지
+  않는다. 접근성 오버레이용 단일 줄·화면 단위 리더의 중단된 구현이며,
+  실제 문서 화면의 가로 한 줄 읽기·페이지 이동·글자/색상 조절은 iPad
+  `LocalDocumentView`에 포팅되어 있다.
+- `WebViewReaderActivity`는 매니페스트 선언과 자기 내부 참조만 있고
+  VisionCraft 화면이나 서비스의 실행 호출이 없다. 같은 텍스트 보기 기능은
+  현재 Android `TextEditorViewerScreen`과 iPad `LocalDocumentView`가
+  담당하므로 별도 화면을 복제하지 않는다.
+- `DocScanModeSelectActivity`는 호출자 없는 단일 페이지 스캐너 전달
+  Activity다. iPad는 홈·위젯·단축어가 모두 실제 LCNet/UVDoc 스캐너로 직접
+  진입하므로 이 중간 화면을 만들지 않는다.
+- `TalkBackToggleActivity`도 매니페스트와 자기 소스 외 호출자가 없는
+  예전 no-display 전달 Activity다. 활성화되더라도 Android 접근성 서비스로
+  `TALKBACK_TOGGLE`을 보내는 기능이므로 공개 iPadOS API에서는 동일 구현할
+  수 없다.
+- Android `MenuBar2`는 구형 미사용 코드가 아니라 `MyService`가 실제
+  생성하는 전역 접근성 오버레이다. iPad에서는 다른 앱 위 오버레이가
+  불가능하므로 앱 내부 Rivo 빠른 메뉴의 펼침/접힘·16색·화면별 항목으로
+  대체했다.
+- `SCREENVIEW_AUTOSCROLL`과 `TEXTVIEW_AUTOSCROLL` 메뉴 선택 핸들러는
+  Android `MenuBar2`에서도 비어 있다. 나머지 화면 자동 스크롤 동작은
+  `RVMagnifierByTouch`/`RVMagnifierByConfig`가 다른 앱에 스와이프를
+  주입하는 전역 화면 확대 모드이므로 iPad의 카메라 돋보기 기능이 아니라
+  아래 전역 접근성 서비스의 동일 구현 불가 항목으로 분류한다.
 
 ## 2. 카메라·돋보기·라이브 OCR
 
@@ -275,6 +300,9 @@ iPad 앱에서는 동일 구현하지 않으며, 제품 범위와 대체 경로�
     사용자 기능과 분리하고, iOS arm64 재평가 조건과 모델 비용을 기록 ✅
 64. Android 텍스트 뷰어의 `클립보드 열기`를 파일 화면의 명시적 사용자
     동작으로 포팅하고 파일 없는 메모리 문서의 편집·TTS·AI·내보내기 연결 ✅
+65. 호출 그래프로 구형 읽기 오버레이·WebView 리더·스캔 전달·TalkBack
+    전달 Activity를 소스 전용으로 분리하고, 실제 `MenuBar2`와 전역 화면
+    자동 스크롤은 iPadOS 대체/불가 범위로 바로잡음 ✅
 
 ## 일괄 실기기 검증 원칙
 
