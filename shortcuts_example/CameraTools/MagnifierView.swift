@@ -29,7 +29,12 @@ struct MagnifierView: UIViewControllerRepresentable {
                 appRouter.route = .capturedImageAnalysis(
                     image: image,
                     question:
-                        "사진에 보이는 장면과 물체, 글자, 사람의 행동을 한국어로 자세히 설명해 줘. 확실히 보이지 않는 내용은 추측하지 마."
+                        LocalImageDescriptionPrompt
+                        .defaultQuestion(
+                            language:
+                                AppLanguage
+                                .current()
+                        )
                 )
             }
         case .liveTextReader:
@@ -54,5 +59,15 @@ struct MagnifierView: UIViewControllerRepresentable {
             action,
             eventID: event.id
         )
+    }
+}
+
+nonisolated enum LocalImageDescriptionPrompt {
+    static func defaultQuestion(
+        language: AppLanguage
+    ) -> String {
+        """
+        사진에 보이는 장면과 물체, 글자, 사람의 행동을 \(language.localAIResponseLanguageName)로 자세히 설명해 줘. 확실히 보이지 않는 내용은 추측하지 마.
+        """
     }
 }

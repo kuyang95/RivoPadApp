@@ -26,6 +26,7 @@ struct OCRResultView: View {
     @State private var ttsWorkItem: DispatchWorkItem?
 
     @State private var touchQuadrant: TouchQuadrant?
+    @State private var hasRequestedOCR = false
 
     var body: some View {
         ZStack {
@@ -50,7 +51,8 @@ struct OCRResultView: View {
             }
         }
         .safeAreaInset(edge: .top) {
-            if !vm.extractedText.isEmpty {
+            if hasRequestedOCR,
+               !vm.isExtracting {
                 topBar
             }
         }
@@ -62,6 +64,7 @@ struct OCRResultView: View {
             }
         )
         .onAppear {
+            hasRequestedOCR = true
 
             if vm.extractedText.isEmpty {
 
@@ -135,6 +138,35 @@ extension OCRResultView {
         HStack(spacing: 10) {
 
             Button {
+                openImageDescription()
+            } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.black.opacity(0.65))
+                        .frame(height: 40)
+
+                    Text(
+                        AppLocalization.string(
+                            "이미지 설명"
+                        )
+                    )
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("이미지 설명")
+            .accessibilityHint(
+                "원본 사진을 M4 로컬 AI로 설명하고 같은 사진에 후속 질문을 합니다."
+            )
+            .disabled(
+                vm.isGeneratingAI
+                    || vm.sttManager
+                    .isRecording
+            )
+
+            Button {
                 if vm.llmService.isLoading {
                     TTSManager.shared.stop()
                     TTSManager.shared.speakFeedback(
@@ -200,6 +232,12 @@ extension OCRResultView {
                 )
             )
             .accessibilityHint("이중 탭하면 문서에 대해 질문할 수 있습니다")
+            .disabled(
+                !hasExtractedText
+                    || vm.isGeneratingAI
+                    || vm.sttManager
+                    .isRecording
+            )
 
             Button {
                 openTranslation()
@@ -225,7 +263,8 @@ extension OCRResultView {
                 "추출한 텍스트를 M4 로컬 AI 번역 화면에서 바로 번역합니다."
             )
             .disabled(
-                vm.isExtracting
+                !hasExtractedText
+                    || vm.isExtracting
                     || vm.isGeneratingAI
                     || vm.sttManager
                     .isRecording
@@ -311,6 +350,7 @@ extension OCRResultView {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("복사")
             .accessibilityHint("이중 탭하면 추출한 텍스트를 클립보드에 복사합니다")
+            .disabled(!hasExtractedText)
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
@@ -331,6 +371,33 @@ extension OCRResultView {
             initialText: source,
             automaticallyStarts: true
         )
+    }
+
+    private var hasExtractedText:
+        Bool
+    {
+        !vm.extractedText
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .isEmpty
+    }
+
+    private func openImageDescription() {
+        ttsWorkItem?.cancel()
+        previewHoldWorkItem?.cancel()
+        TTSManager.shared.stop()
+        appRouter.route =
+            .capturedImageAnalysis(
+                image: image,
+                question:
+                    LocalImageDescriptionPrompt
+                    .defaultQuestion(
+                        language:
+                            AppLanguage
+                            .current()
+                    )
+            )
     }
 }
 

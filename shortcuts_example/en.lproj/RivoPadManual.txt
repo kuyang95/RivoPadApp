@@ -75,6 +75,7 @@
 @text Monitor heat and battery use during long sessions.
 @section Image Description
 @text Select Image Description on the Home Camera card and take a photo. The M4 local vision model describes the scene, objects, text, and people’s actions in the selected response language.
+@text You can also select Describe Image from OCR results opened from a Camera OCR capture, photo file, photo shared from another app, or scan. It analyzes the complete original photo and works even when the photo contains no text.
 @text The captured image is not automatically saved to a temporary file or Photos; it is passed directly from memory to the analysis screen.
 @text When the description is complete, the response is read automatically, and you can ask follow-up questions about the same photo in the input field.
 @section Custom Document Scanner

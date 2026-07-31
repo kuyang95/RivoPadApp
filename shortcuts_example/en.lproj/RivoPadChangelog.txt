@@ -13,6 +13,7 @@
 @text Added PDF and TXT document viewing and EPUB, DAISY, and SMIL reading.
 @text Added an Android-style clipboard document that opens copied text directly from Files for editing, speech, AI questions, and TXT or PDF export.
 @text Added immediate M4 on-device translation of corrected OCR results from camera captures, photos, shared images, and scans.
+@text Added direct M4 local image description and follow-up questions using the original photo from photo files, shared images, Camera OCR, and scan results, including photos with no recognized text.
 @text Added single-line landscape document reading and TTS navigation with spoken-sentence highlighting, previous, repeat, and next.
 @text Added a complete EPUB and DAISY library, recently read sorting, SHA-256 duplicate prevention, and book deletion that preserves the original.
 @text Added a combined EPUB and DAISY audio and local-speech timeline with time and percentage displays and an arbitrary-position slider.

@@ -1339,3 +1339,4 @@
 "클립보드 텍스트" = "Clipboard Text";
 "문서를 열 수 없습니다." = "The document could not be opened.";
 "추출한 텍스트를 M4 로컬 AI 번역 화면에서 바로 번역합니다." = "Immediately translate the extracted text with on-device M4 AI.";
+"원본 사진을 M4 로컬 AI로 설명하고 같은 사진에 후속 질문을 합니다." = "Describe the original photo with on-device M4 AI and ask follow-up questions about the same photo.";
