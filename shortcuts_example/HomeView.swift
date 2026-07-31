@@ -24,9 +24,20 @@ struct HomeView: View {
                     } label: {
                         Text("AI 채팅")
                             .font(.system(size: 56, weight: .bold))
+                            .multilineTextAlignment(
+                                .center
+                            )
+                            .padding(
+                                .horizontal,
+                                12
+                            )
                             .foregroundColor(.white)
                             .frame(maxWidth: 520)
-                            .frame(height: 120)
+                            .frame(minHeight: 120)
+                            .padding(
+                                .vertical,
+                                20
+                            )
                             .background(Color.indigo)
                             .cornerRadius(28)
                     }
@@ -39,9 +50,20 @@ struct HomeView: View {
                     } label: {
                         Text("독서")
                             .font(.system(size: 56, weight: .bold))
+                            .multilineTextAlignment(
+                                .center
+                            )
+                            .padding(
+                                .horizontal,
+                                12
+                            )
                             .foregroundColor(.white)
                             .frame(maxWidth: 520)
-                            .frame(height: 120)
+                            .frame(minHeight: 120)
+                            .padding(
+                                .vertical,
+                                20
+                            )
                             .background(Color.green)
                             .cornerRadius(28)
                     }
@@ -54,9 +76,20 @@ struct HomeView: View {
                     } label: {
                         Text("카메라")
                             .font(.system(size: 56, weight: .bold))
+                            .multilineTextAlignment(
+                                .center
+                            )
+                            .padding(
+                                .horizontal,
+                                12
+                            )
                             .foregroundColor(.white)
                             .frame(maxWidth: 520)
-                            .frame(height: 120)
+                            .frame(minHeight: 120)
+                            .padding(
+                                .vertical,
+                                20
+                            )
                             .background(Color.black)
                             .cornerRadius(28)
                     }
@@ -69,9 +102,20 @@ struct HomeView: View {
                     } label: {
                         Text("VisionLink")
                             .font(.system(size: 56, weight: .bold))
+                            .multilineTextAlignment(
+                                .center
+                            )
+                            .padding(
+                                .horizontal,
+                                12
+                            )
                             .foregroundColor(.white)
                             .frame(maxWidth: 520)
-                            .frame(height: 120)
+                            .frame(minHeight: 120)
+                            .padding(
+                                .vertical,
+                                20
+                            )
                             .background(Color.teal)
                             .cornerRadius(28)
                     }
@@ -85,9 +129,20 @@ struct HomeView: View {
                     } label: {
                         Text("파일")
                             .font(.system(size: 56, weight: .bold))
+                            .multilineTextAlignment(
+                                .center
+                            )
+                            .padding(
+                                .horizontal,
+                                12
+                            )
                             .foregroundColor(.white)
                             .frame(maxWidth: 520)
-                            .frame(height: 120)
+                            .frame(minHeight: 120)
+                            .padding(
+                                .vertical,
+                                20
+                            )
                             .background(Color.black)
                             .cornerRadius(28)
                     }
@@ -110,7 +165,11 @@ struct HomeView: View {
                         )
                         .foregroundColor(.white)
                         .frame(maxWidth: 520)
-                        .frame(height: 88)
+                        .frame(minHeight: 88)
+                        .padding(
+                            .vertical,
+                            12
+                        )
                         .background(Color.gray)
                         .cornerRadius(24)
                     }
@@ -188,8 +247,9 @@ struct HomeView: View {
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 20)
+            .padding(.vertical, 12)
             .frame(maxWidth: 520)
-            .frame(height: 68)
+            .frame(minHeight: 68)
             .background(Color.secondary.opacity(0.09))
             .clipShape(
                 RoundedRectangle(
@@ -243,7 +303,7 @@ struct HomeView: View {
                             .foregroundStyle(
                                 .secondary
                             )
-                            .lineLimit(1)
+                            .lineLimit(2)
                     }
                 }
                 Spacer()
@@ -251,6 +311,9 @@ struct HomeView: View {
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundStyle(.indigo)
+                    .multilineTextAlignment(
+                        .trailing
+                    )
                 Image(
                     systemName:
                         "chevron.right"
@@ -258,8 +321,9 @@ struct HomeView: View {
                 .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 20)
+            .padding(.vertical, 12)
             .frame(maxWidth: 520)
-            .frame(height: 88)
+            .frame(minHeight: 88)
             .background(
                 Color.indigo
                     .opacity(0.08)
