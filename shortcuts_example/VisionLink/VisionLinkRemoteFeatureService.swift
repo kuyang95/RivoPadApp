@@ -12,6 +12,69 @@ nonisolated enum VisionLinkRemoteFeatureUpdate:
     case failed(String)
 }
 
+nonisolated enum VisionLinkReceivedImageLoader {
+    static func load(
+        at url: URL,
+        maximumEdge: Int
+    ) async throws -> CGImage {
+        try await Task.detached(
+            priority: .userInitiated
+        ) {
+            try downsampledImage(
+                at: url,
+                maximumEdge: maximumEdge
+            )
+        }
+        .value
+    }
+
+    private static func downsampledImage(
+        at url: URL,
+        maximumEdge: Int
+    ) throws -> CGImage {
+        guard maximumEdge > 0 else {
+            throw VisionLinkRemoteFeatureError
+                .invalidImage
+        }
+        let sourceOptions: [CFString: Any] = [
+            kCGImageSourceShouldCache: false,
+        ]
+        guard let source =
+                CGImageSourceCreateWithURL(
+                    url as CFURL,
+                    sourceOptions as CFDictionary
+                ),
+              CGImageSourceGetCount(source) > 0,
+              CGImageSourceGetType(source) != nil else {
+            throw VisionLinkRemoteFeatureError
+                .invalidImage
+        }
+        let thumbnailOptions:
+            [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways:
+                    true,
+                kCGImageSourceCreateThumbnailWithTransform:
+                    true,
+                kCGImageSourceThumbnailMaxPixelSize:
+                    maximumEdge,
+                kCGImageSourceShouldCacheImmediately:
+                    true,
+            ]
+        guard let image =
+                CGImageSourceCreateThumbnailAtIndex(
+                    source,
+                    0,
+                    thumbnailOptions as CFDictionary
+                ),
+              image.width > 0,
+              image.height > 0 else {
+            throw VisionLinkRemoteFeatureError
+                .invalidImage
+        }
+        return image
+    }
+}
+
 @MainActor
 protocol VisionLinkRemoteFeatureServing: AnyObject {
     func recognizeImage(at url: URL) async throws
@@ -150,10 +213,11 @@ final class VisionLinkLocalRemoteFeatureService:
     func recognizeImage(
         at url: URL
     ) async throws -> String {
-        let cgImage = try await Self.loadImage(
-            at: url,
-            maximumEdge: 2_048
-        )
+        let cgImage =
+            try await VisionLinkReceivedImageLoader.load(
+                at: url,
+                maximumEdge: 2_048
+            )
         try Task.checkCancellation()
         return try await ocrService
             .recognizeAndCorrect(
@@ -171,10 +235,11 @@ final class VisionLinkLocalRemoteFeatureService:
         at url: URL
     ) async throws -> String {
         try ensureLocalAIAvailable()
-        let cgImage = try await Self.loadImage(
-            at: url,
-            maximumEdge: 2_048
-        )
+        let cgImage =
+            try await VisionLinkReceivedImageLoader.load(
+                at: url,
+                maximumEdge: 2_048
+            )
         let conversationID = LLMConversationID()
         return try await collectVisionResponse(
             conversationID: conversationID,
@@ -295,54 +360,6 @@ final class VisionLinkLocalRemoteFeatureService:
             throw VisionLinkRemoteFeatureError.emptyResult
         }
         return trimmed
-    }
-
-    nonisolated private static func downsampledImage(
-        at url: URL,
-        maximumEdge: Int
-    ) throws -> CGImage {
-        let sourceOptions: [CFString: Any] = [
-            kCGImageSourceShouldCache: false,
-        ]
-        guard let source = CGImageSourceCreateWithURL(
-            url as CFURL,
-            sourceOptions as CFDictionary
-        ) else {
-            throw VisionLinkRemoteFeatureError.invalidImage
-        }
-        let thumbnailOptions: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways:
-                true,
-            kCGImageSourceCreateThumbnailWithTransform:
-                true,
-            kCGImageSourceThumbnailMaxPixelSize:
-                maximumEdge,
-            kCGImageSourceShouldCacheImmediately: true,
-        ]
-        guard let image =
-                CGImageSourceCreateThumbnailAtIndex(
-                    source,
-                    0,
-                    thumbnailOptions as CFDictionary
-                ) else {
-            throw VisionLinkRemoteFeatureError.invalidImage
-        }
-        return image
-    }
-
-    nonisolated private static func loadImage(
-        at url: URL,
-        maximumEdge: Int
-    ) async throws -> CGImage {
-        try await Task.detached(
-            priority: .userInitiated
-        ) {
-            try downsampledImage(
-                at: url,
-                maximumEdge: maximumEdge
-            )
-        }
-        .value
     }
 }
 

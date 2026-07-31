@@ -1,11 +1,127 @@
 import Foundation
+import ImageIO
 @testable import shortcuts_example
+import UIKit
+import UniformTypeIdentifiers
 import XCTest
 
 @MainActor
 final class VisionLinkRemoteFeatureTests:
     XCTestCase
 {
+    func testReceivedImageLoaderAppliesExifOrientationAndBoundsSize()
+        async throws
+    {
+        let url = FileManager.default
+            .temporaryDirectory
+            .appendingPathComponent(
+                "VisionLinkRotated-"
+                    + UUID().uuidString
+                    + ".jpg"
+            )
+        defer {
+            try? FileManager.default.removeItem(
+                at: url
+            )
+        }
+        let sourceImage =
+            UIGraphicsImageRenderer(
+                size: CGSize(
+                    width: 20,
+                    height: 40
+                )
+            )
+            .image { context in
+                UIColor.systemRed.setFill()
+                context.fill(
+                    CGRect(
+                        x: 0,
+                        y: 0,
+                        width: 20,
+                        height: 20
+                    )
+                )
+                UIColor.systemBlue.setFill()
+                context.fill(
+                    CGRect(
+                        x: 0,
+                        y: 20,
+                        width: 20,
+                        height: 20
+                    )
+                )
+            }
+        let cgImage = try XCTUnwrap(
+            sourceImage.cgImage
+        )
+        let destination = try XCTUnwrap(
+            CGImageDestinationCreateWithURL(
+                url as CFURL,
+                UTType.jpeg.identifier as CFString,
+                1,
+                nil
+            )
+        )
+        CGImageDestinationAddImage(
+            destination,
+            cgImage,
+            [
+                kCGImagePropertyOrientation: 6,
+                kCGImageDestinationLossyCompressionQuality:
+                    1,
+            ] as CFDictionary
+        )
+        XCTAssertTrue(
+            CGImageDestinationFinalize(
+                destination
+            )
+        )
+
+        let loaded =
+            try await VisionLinkReceivedImageLoader
+            .load(
+                at: url,
+                maximumEdge: 24
+            )
+
+        XCTAssertGreaterThan(
+            loaded.width,
+            loaded.height
+        )
+        XCTAssertLessThanOrEqual(
+            max(loaded.width, loaded.height),
+            24
+        )
+    }
+
+    func testReceivedImageLoaderRejectsInvalidImage()
+        async
+    {
+        let url = makeTemporaryFile()
+        defer {
+            try? FileManager.default.removeItem(
+                at: url
+            )
+        }
+
+        do {
+            _ = try await
+                VisionLinkReceivedImageLoader.load(
+                    at: url,
+                    maximumEdge: 2_048
+                )
+            XCTFail(
+                "Invalid image data must be rejected"
+            )
+        } catch {
+            XCTAssertEqual(
+                error
+                    as? VisionLinkRemoteFeatureError,
+                .invalidImage
+            )
+        }
+    }
+
     func testOCRProgressResultAndTemporaryCleanup()
         async throws
     {

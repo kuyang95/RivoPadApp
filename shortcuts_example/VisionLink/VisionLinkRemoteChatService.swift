@@ -1,6 +1,5 @@
 import CoreImage
 import Foundation
-import ImageIO
 import PDFKit
 import UIKit
 
@@ -551,44 +550,10 @@ final class VisionLinkLocalRemoteChatService:
         at url: URL,
         maximumEdge: Int
     ) async throws -> CGImage {
-        try await Task.detached(
-            priority: .userInitiated
-        ) {
-            let options: [CFString: Any] = [
-                kCGImageSourceShouldCache: false,
-            ]
-            guard let source =
-                    CGImageSourceCreateWithURL(
-                        url as CFURL,
-                        options as CFDictionary
-                    ) else {
-                throw VisionLinkRemoteFeatureError
-                    .invalidImage
-            }
-            let thumbnailOptions:
-                [CFString: Any] = [
-                    kCGImageSourceCreateThumbnailFromImageAlways:
-                        true,
-                    kCGImageSourceCreateThumbnailWithTransform:
-                        true,
-                    kCGImageSourceThumbnailMaxPixelSize:
-                        maximumEdge,
-                    kCGImageSourceShouldCacheImmediately:
-                        true,
-                ]
-            guard let image =
-                    CGImageSourceCreateThumbnailAtIndex(
-                        source,
-                        0,
-                        thumbnailOptions
-                            as CFDictionary
-                    ) else {
-                throw VisionLinkRemoteFeatureError
-                    .invalidImage
-            }
-            return image
-        }
-        .value
+        try await VisionLinkReceivedImageLoader.load(
+            at: url,
+            maximumEdge: maximumEdge
+        )
     }
 }
 

@@ -147,6 +147,7 @@
 @text Received clipboard text never overwrites the system clipboard automatically. You can copy it or open it in the text viewer for large text, editing, TTS, and Rivo document controls.
 @section Remote Features
 @text Remote image OCR, image description, image translation, and text translation run through local processors on the M4.
+@text Remotely received photos apply EXIF orientation and are limited to a 2,048-pixel longest edge before use in OCR, image descriptions, and chat attachments.
 @text Remote AI chat supports conversation IDs and context from images, TXT, PDF, XLSX, Excel 97–2003 XLS, HWP 5.x, and HWPX attachments.
 @text Remote HWP, XLS, and XLSX apply the local parser’s 20 MB, encryption, corruption, and decompression limits and append only extracted text to the conversation.
 @text Remote video live reading does not repeat OCR sentences similar to recent results.
