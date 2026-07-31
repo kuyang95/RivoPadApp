@@ -177,8 +177,19 @@ final class VisionLinkManager: ObservableObject {
     private var connectionTask: Task<Void, Never>?
     private var receiveTask: Task<Void, Never>?
     private var countdownTask: Task<Void, Never>?
+    private var mediaWatchdogTask:
+        Task<Void, Never>?
+    private var connectionRecoveryTask:
+        Task<Void, Never>?
     private var webSocket: URLSessionWebSocketTask?
     private var socketGeneration = 0
+    private var mediaWatchdog =
+        VisionLinkMediaWatchdog()
+    private var lastMediaWatchdogTimeout:
+        VisionLinkMediaWatchdog.Timeout?
+    private var isApplicationActive = true
+    private var allowsAutomaticRecovery = true
+    private var needsConnectionRecovery = false
     private var currentIceServers: [VisionLinkIceServer] = []
     private var currentRelayPolicy =
         VisionLinkContract.p2pPreferred
@@ -262,6 +273,8 @@ final class VisionLinkManager: ObservableObject {
         connectionTask?.cancel()
         receiveTask?.cancel()
         countdownTask?.cancel()
+        mediaWatchdogTask?.cancel()
+        connectionRecoveryTask?.cancel()
         remoteFeatureTask?.cancel()
         liveReadingOCRTask?.cancel()
         liveReadingScheduleTask?.cancel()
@@ -272,6 +285,7 @@ final class VisionLinkManager: ObservableObject {
     }
 
     func activate() {
+        allowsAutomaticRecovery = true
         guard connectionTask == nil,
               webSocket == nil else {
             return
@@ -280,14 +294,20 @@ final class VisionLinkManager: ObservableObject {
     }
 
     func retry() {
+        allowsAutomaticRecovery = true
         launchConnection(forceNewSession: false)
     }
 
     func createNewCode() {
+        allowsAutomaticRecovery = true
         launchConnection(forceNewSession: true)
     }
 
     func disconnect() {
+        allowsAutomaticRecovery = false
+        needsConnectionRecovery = false
+        cancelConnectionRecovery()
+        stopMediaWatchdog()
         connectionTask?.cancel()
         connectionTask = nil
         cancelSocket(reason: "user-disconnect")
@@ -297,7 +317,42 @@ final class VisionLinkManager: ObservableObject {
         state = .disconnected
     }
 
+    func setApplicationActive(
+        _ isActive: Bool
+    ) {
+        guard isApplicationActive != isActive else {
+            return
+        }
+        isApplicationActive = isActive
+        if !isActive {
+            mediaWatchdogTask?.cancel()
+            mediaWatchdogTask = nil
+            cancelConnectionRecovery()
+            return
+        }
+
+        restartMediaWatchdogForVisibleState()
+        guard allowsAutomaticRecovery,
+              hasStoredPair,
+              connectionTask == nil,
+              (
+                webSocket == nil
+                || needsConnectionRecovery
+              ),
+              state != .inactive else {
+            return
+        }
+        scheduleConnectionRecovery(
+            after: 0,
+            reason: "app-became-active"
+        )
+    }
+
     func unregisterAndCreateNewCode() {
+        allowsAutomaticRecovery = true
+        needsConnectionRecovery = false
+        cancelConnectionRecovery()
+        stopMediaWatchdog()
         connectionTask?.cancel()
         connectionTask = Task { [weak self] in
             guard let self else {
@@ -349,6 +404,10 @@ final class VisionLinkManager: ObservableObject {
     private func launchConnection(
         forceNewSession: Bool
     ) {
+        allowsAutomaticRecovery = true
+        needsConnectionRecovery = false
+        cancelConnectionRecovery()
+        stopMediaWatchdog()
         connectionTask?.cancel()
         cancelSocket(reason: "new-connection")
         stopCountdown()
@@ -485,6 +544,8 @@ final class VisionLinkManager: ObservableObject {
             throw VisionLinkProtocolError.invalidWebSocketURL
         }
         cancelSocket(reason: "replace-socket")
+        cancelConnectionRecovery()
+        needsConnectionRecovery = false
         socketGeneration &+= 1
         let generation = socketGeneration
         let socket = webSocketSession.webSocketTask(
@@ -554,11 +615,16 @@ final class VisionLinkManager: ObservableObject {
                 return
             }
             webSocket = nil
-            state = .failed(
-                AppLocalization.format(
-                    "VisionLink 신호 연결 끊김: %@",
-                    Self.userMessage(for: error)
-                )
+            needsConnectionRecovery = true
+            let message = AppLocalization.format(
+                "VisionLink 신호 연결 끊김: %@",
+                Self.userMessage(for: error)
+            )
+            state = .failed(message)
+            appendEvent(message)
+            scheduleConnectionRecovery(
+                after: 0,
+                reason: "signaling-disconnected"
             )
         }
     }
@@ -579,6 +645,7 @@ final class VisionLinkManager: ObservableObject {
             let name = normalizedPeerName(peerName)
             self.peerName = name
             state = .companionConnected(name)
+            startOfferWatchdog()
 
         case .pairCreated(_, let cameraName):
             confirmPairing()
@@ -591,6 +658,7 @@ final class VisionLinkManager: ObservableObject {
 
         case .offer(let offer):
             confirmPairing()
+            stopMediaWatchdog()
             state = .mediaOfferReceived
             webRTCReceiver.handleOffer(
                 offer,
@@ -599,6 +667,9 @@ final class VisionLinkManager: ObservableObject {
             )
 
         case .peerLeft, .hangup:
+            needsConnectionRecovery = false
+            stopMediaWatchdog()
+            cancelConnectionRecovery()
             resetMedia()
             state = .disconnected
 
@@ -609,6 +680,8 @@ final class VisionLinkManager: ObservableObject {
                 try? credentialStore.clear()
                 hasStoredPair = false
             }
+            stopMediaWatchdog()
+            cancelConnectionRecovery()
             cancelSocket(reason: "pair-deleted")
             state = .disconnected
 
@@ -632,16 +705,198 @@ final class VisionLinkManager: ObservableObject {
     }
 
     func markFirstVideoFrameRendered() {
+        recordVideoFrame()
+    }
+
+    private func recordVideoFrame() {
         guard remoteVideoTrack != nil,
-              state != .videoReceiving else {
+              isCameraShareActive else {
+            return
+        }
+        let isFirstFrame =
+            mediaWatchdog.receiveFrame(
+                at: Self.systemUptime
+            )
+        scheduleMediaWatchdog()
+        guard isFirstFrame
+                || state != .videoReceiving else {
             return
         }
         state = .videoReceiving
-        appendEvent(
-            AppLocalization.string(
+        let event: String
+        if lastMediaWatchdogTimeout
+            == .stalledFrame {
+            event = AppLocalization.string(
+                "원격 영상 프레임 수신 재개"
+            )
+        } else {
+            event = AppLocalization.string(
                 "원격 영상 첫 화면 표시"
             )
+        }
+        lastMediaWatchdogTimeout = nil
+        appendEvent(
+            event
         )
+    }
+
+    private func startOfferWatchdog() {
+        lastMediaWatchdogTimeout = nil
+        mediaWatchdog.waitForOffer(
+            at: Self.systemUptime
+        )
+        scheduleMediaWatchdog()
+    }
+
+    private func startFirstFrameWatchdog() {
+        lastMediaWatchdogTimeout = nil
+        mediaWatchdog.waitForFirstFrame(
+            at: Self.systemUptime
+        )
+        scheduleMediaWatchdog()
+    }
+
+    private func stopMediaWatchdog() {
+        mediaWatchdogTask?.cancel()
+        mediaWatchdogTask = nil
+        mediaWatchdog.stop()
+        lastMediaWatchdogTimeout = nil
+    }
+
+    private func scheduleMediaWatchdog() {
+        mediaWatchdogTask?.cancel()
+        mediaWatchdogTask = nil
+        guard isApplicationActive,
+              let delay =
+                mediaWatchdog.remainingTime(
+                    at: Self.systemUptime
+                ) else {
+            return
+        }
+        let nanoseconds = UInt64(
+            min(
+                max(delay, 0)
+                    * 1_000_000_000,
+                Double(UInt64.max)
+            )
+        )
+        mediaWatchdogTask = Task {
+            try? await Task.sleep(
+                nanoseconds: nanoseconds
+            )
+            guard !Task.isCancelled else {
+                return
+            }
+            mediaWatchdogTask = nil
+            handleMediaWatchdogDeadline()
+        }
+    }
+
+    private func handleMediaWatchdogDeadline() {
+        guard isApplicationActive else {
+            return
+        }
+        guard let timeout =
+                mediaWatchdog.consumeTimeout(
+                    at: Self.systemUptime
+                ) else {
+            scheduleMediaWatchdog()
+            return
+        }
+        lastMediaWatchdogTimeout = timeout
+        let message: String
+        switch timeout {
+        case .offer:
+            message = AppLocalization.string(
+                "상대 기기가 8초 안에 영상 연결을 시작하지 않았습니다."
+            )
+        case .firstFrame:
+            message = AppLocalization.string(
+                "연결 후 5초 안에 첫 영상 프레임을 받지 못했습니다."
+            )
+        case .stalledFrame:
+            message = AppLocalization.string(
+                "원격 영상 프레임이 5초 넘게 멈췄습니다."
+            )
+        }
+        state = .failed(message)
+        appendEvent(message)
+    }
+
+    private func restartMediaWatchdogForVisibleState() {
+        guard allowsAutomaticRecovery else {
+            return
+        }
+        switch mediaWatchdog.phase {
+        case .waitingForOffer:
+            startOfferWatchdog()
+        case .waitingForFirstFrame:
+            startFirstFrameWatchdog()
+        case .receiving:
+            guard remoteVideoTrack != nil,
+                  isCameraShareActive else {
+                stopMediaWatchdog()
+                return
+            }
+            _ = mediaWatchdog.receiveFrame(
+                at: Self.systemUptime
+            )
+            scheduleMediaWatchdog()
+        case .idle:
+            break
+        }
+    }
+
+    private func scheduleConnectionRecovery(
+        after delay: TimeInterval,
+        reason: String
+    ) {
+        guard isApplicationActive,
+              allowsAutomaticRecovery,
+              hasStoredPair else {
+            return
+        }
+        cancelConnectionRecovery()
+        let nanoseconds = UInt64(
+            min(
+                max(delay, 0)
+                    * 1_000_000_000,
+                Double(UInt64.max)
+            )
+        )
+        connectionRecoveryTask = Task {
+            if nanoseconds > 0 {
+                try? await Task.sleep(
+                    nanoseconds: nanoseconds
+                )
+            }
+            guard !Task.isCancelled,
+                  isApplicationActive,
+                  allowsAutomaticRecovery,
+                  hasStoredPair else {
+                return
+            }
+            connectionRecoveryTask = nil
+            appendEvent(
+                AppLocalization.format(
+                    "VisionLink 연결 자동 복구 시작 · %@",
+                    reason
+                )
+            )
+            launchConnection(
+                forceNewSession: false
+            )
+        }
+    }
+
+    private func cancelConnectionRecovery() {
+        connectionRecoveryTask?.cancel()
+        connectionRecoveryTask = nil
+    }
+
+    private static var systemUptime:
+        TimeInterval {
+        ProcessInfo.processInfo.systemUptime
     }
 
     private func confirmPairing() {
@@ -750,6 +1005,7 @@ final class VisionLinkManager: ObservableObject {
     }
 
     private func resetMedia() {
+        stopMediaWatchdog()
         invalidateRemoteFeatureWork(
             reason: "media-reset"
         )
@@ -1619,10 +1875,17 @@ extension VisionLinkManager:
     ) {
         switch mediaState {
         case .connecting:
+            stopMediaWatchdog()
             state = .mediaConnecting
         case .connected:
+            needsConnectionRecovery = false
+            cancelConnectionRecovery()
             if state != .videoReceiving {
                 state = .mediaConnected
+            }
+            if remoteVideoTrack != nil,
+               isCameraShareActive {
+                startFirstFrameWatchdog()
             }
             appendEvent(
                 AppLocalization.string(
@@ -1630,13 +1893,21 @@ extension VisionLinkManager:
                 )
             )
         case .disconnected:
+            needsConnectionRecovery = true
+            stopMediaWatchdog()
             state = .disconnected
             appendEvent(
                 AppLocalization.string(
                     "WebRTC 미디어 연결 끊김"
                 )
             )
+            scheduleConnectionRecovery(
+                after: 5,
+                reason: "webrtc-disconnected"
+            )
         case .failed:
+            needsConnectionRecovery = true
+            stopMediaWatchdog()
             remoteVideoTrack = nil
             state = .failed(
                 AppLocalization.string(
@@ -1648,6 +1919,10 @@ extension VisionLinkManager:
                     "WebRTC 미디어 연결 실패"
                 )
             )
+            scheduleConnectionRecovery(
+                after: 0,
+                reason: "webrtc-failed"
+            )
         }
     }
 
@@ -1656,11 +1931,19 @@ extension VisionLinkManager:
         didReceive videoTrack: RTCVideoTrack
     ) {
         remoteVideoTrack = videoTrack
+        isCameraShareActive = true
+        startFirstFrameWatchdog()
         appendEvent(
             AppLocalization.string(
                 "원격 비디오 트랙 수신"
             )
         )
+    }
+
+    func webRTCReceiverDidReceiveVideoFrame(
+        _ receiver: VisionLinkWebRTCReceiver
+    ) {
+        recordVideoFrame()
     }
 
     func webRTCReceiver(
@@ -1685,6 +1968,7 @@ extension VisionLinkManager:
                 reason: "data-channel-closed"
             )
             isCameraShareActive = false
+            stopMediaWatchdog()
             incomingTransfer = nil
             appendEvent(
                 AppLocalization.string(
@@ -1701,7 +1985,13 @@ extension VisionLinkManager:
         switch dataEvent {
         case .cameraShareChanged(let active):
             isCameraShareActive = active
-            if !active {
+            if active {
+                if remoteVideoTrack != nil,
+                   state != .videoReceiving {
+                    startFirstFrameWatchdog()
+                }
+            } else {
+                stopMediaWatchdog()
                 stopRemoteLiveReading(
                     reason:
                         "camera-share-stopped"
@@ -1790,9 +2080,15 @@ extension VisionLinkManager:
         _ receiver: VisionLinkWebRTCReceiver,
         didFail message: String
     ) {
+        needsConnectionRecovery = true
+        stopMediaWatchdog()
         remoteVideoTrack = nil
         state = .failed(message)
         appendEvent(message)
+        scheduleConnectionRecovery(
+            after: 0,
+            reason: "webrtc-error"
+        )
     }
 
     func webRTCReceiver(

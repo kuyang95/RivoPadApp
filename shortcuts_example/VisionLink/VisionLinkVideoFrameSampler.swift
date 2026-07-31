@@ -12,6 +12,8 @@ nonisolated final class
     typealias ResultHandler =
         @MainActor @Sendable
             (Result<CGImage, Error>) -> Void
+    typealias FrameHandler =
+        @MainActor @Sendable () -> Void
 
     private let lock = NSLock()
     private let conversionQueue =
@@ -21,12 +23,21 @@ nonisolated final class
             qos: .userInitiated
         )
     private let handler: ResultHandler
+    private let frameHandler: FrameHandler
     private var frameRequested = false
     private var generation = 0
+    private var lastHeartbeatNanoseconds:
+        UInt64 = 0
+
+    private static let heartbeatIntervalNanoseconds:
+        UInt64 = 1_000_000_000
 
     init(
+        frameHandler:
+            @escaping FrameHandler,
         handler: @escaping ResultHandler
     ) {
+        self.frameHandler = frameHandler
         self.handler = handler
         super.init()
     }
@@ -41,6 +52,7 @@ nonisolated final class
         lock.lock()
         frameRequested = false
         generation &+= 1
+        lastHeartbeatNanoseconds = 0
         lock.unlock()
     }
 
@@ -53,14 +65,35 @@ nonisolated final class
             return
         }
 
+        let now =
+            DispatchTime.now()
+            .uptimeNanoseconds
         lock.lock()
-        guard frameRequested else {
-            lock.unlock()
-            return
+        let shouldReportHeartbeat =
+            lastHeartbeatNanoseconds == 0
+            || now &- lastHeartbeatNanoseconds
+                >= Self
+                .heartbeatIntervalNanoseconds
+        if shouldReportHeartbeat {
+            lastHeartbeatNanoseconds = now
         }
-        frameRequested = false
+        let shouldConvertFrame =
+            frameRequested
+        if shouldConvertFrame {
+            frameRequested = false
+        }
         let requestedGeneration = generation
         lock.unlock()
+
+        if shouldReportHeartbeat {
+            Task { @MainActor in
+                frameHandler()
+            }
+        }
+
+        guard shouldConvertFrame else {
+            return
+        }
 
         conversionQueue.async { [weak self] in
             guard let self else {

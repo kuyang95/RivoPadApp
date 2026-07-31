@@ -1242,3 +1242,8 @@
 "받은 텍스트가 비어 있습니다." = "The received text is empty.";
 "받은 텍스트를 여는 중" = "Opening received text";
 "텍스트뷰로 열기" = "Open in Text Viewer";
+"VisionLink 연결 자동 복구 시작 · %@" = "Starting automatic VisionLink recovery · %@";
+"상대 기기가 8초 안에 영상 연결을 시작하지 않았습니다." = "The other device did not start the video connection within 8 seconds.";
+"연결 후 5초 안에 첫 영상 프레임을 받지 못했습니다." = "No first video frame was received within 5 seconds after connecting.";
+"원격 영상 프레임이 5초 넘게 멈췄습니다." = "The remote video frame has been stalled for more than 5 seconds.";
+"원격 영상 프레임 수신 재개" = "Remote video frame reception resumed";

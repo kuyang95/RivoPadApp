@@ -476,6 +476,10 @@ struct shortcuts_exampleApp: App {
                             .isCommandModeActive
             )
             .task {
+                visionLinkManager
+                    .setApplicationActive(
+                        scenePhase == .active
+                    )
                 openScannerFromLaunchArgumentsIfNeeded()
                 shortcutRouter.consumeLastIfNeeded()
                 consumeSharedInboxIfNeeded()
@@ -486,6 +490,10 @@ struct shortcuts_exampleApp: App {
             }
           //  .onAppear { router.consumeLastIfNeeded() }
             .onChange(of: scenePhase) { _, phase in
+                visionLinkManager
+                    .setApplicationActive(
+                        phase == .active
+                    )
                 if phase == .active {
                    //  UIApplication.shared.isIdleTimerDisabled = true
                     shortcutRouter.consumeLastIfNeeded()

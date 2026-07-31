@@ -38,6 +38,10 @@ protocol VisionLinkWebRTCReceiverDelegate: AnyObject {
         didReceive videoTrack: RTCVideoTrack
     )
 
+    func webRTCReceiverDidReceiveVideoFrame(
+        _ receiver: VisionLinkWebRTCReceiver
+    )
+
     func webRTCReceiver(
         _ receiver: VisionLinkWebRTCReceiver,
         didReceiveLiveReadingFrame image:
@@ -85,26 +89,36 @@ final class VisionLinkWebRTCReceiver: NSObject {
         VisionLinkDataReceiver?
     private var dataReceiveTask: Task<Void, Never>?
     private lazy var liveReadingFrameSampler =
-        VisionLinkVideoFrameSampler {
-            [weak self] result in
-            guard let self else {
-                return
+        VisionLinkVideoFrameSampler(
+            frameHandler: { [weak self] in
+                guard let self else {
+                    return
+                }
+                self.delegate?
+                    .webRTCReceiverDidReceiveVideoFrame(
+                        self
+                    )
+            },
+            handler: { [weak self] result in
+                guard let self else {
+                    return
+                }
+                switch result {
+                case .success(let image):
+                    self.delegate?.webRTCReceiver(
+                        self,
+                        didReceiveLiveReadingFrame:
+                            image
+                    )
+                case .failure(let error):
+                    self.delegate?.webRTCReceiver(
+                        self,
+                        didFailLiveReadingFrame:
+                            error.localizedDescription
+                    )
+                }
             }
-            switch result {
-            case .success(let image):
-                self.delegate?.webRTCReceiver(
-                    self,
-                    didReceiveLiveReadingFrame:
-                        image
-                )
-            case .failure(let error):
-                self.delegate?.webRTCReceiver(
-                    self,
-                    didFailLiveReadingFrame:
-                        error.localizedDescription
-                )
-            }
-        }
+        )
 
     override init() {
         _ = Self.didInitializeSSL
@@ -256,6 +270,7 @@ final class VisionLinkWebRTCReceiver: NSObject {
         liveReadingFrameSampler.cancelRequest()
         remoteVideoTrack = nil
         pendingRemoteCandidates = []
+        peerConnection?.delegate = nil
         peerConnection?.close()
         peerConnection = nil
     }

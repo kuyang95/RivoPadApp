@@ -134,6 +134,89 @@ final class VisionLinkModelTests: XCTestCase {
     }
 }
 
+final class VisionLinkMediaWatchdogTests:
+    XCTestCase
+{
+    func testOfferTimeoutMatchesAndroidWindow() {
+        var watchdog =
+            VisionLinkMediaWatchdog()
+
+        watchdog.waitForOffer(at: 10)
+
+        XCTAssertEqual(
+            watchdog.remainingTime(at: 12),
+            6
+        )
+        XCTAssertNil(
+            watchdog.consumeTimeout(
+                at: 17.999
+            )
+        )
+        XCTAssertEqual(
+            watchdog.consumeTimeout(at: 18),
+            .offer
+        )
+        XCTAssertNil(
+            watchdog.remainingTime(at: 18)
+        )
+    }
+
+    func testFirstFrameTimeoutMatchesAndroidWindow() {
+        var watchdog =
+            VisionLinkMediaWatchdog()
+
+        watchdog.waitForFirstFrame(at: 20)
+
+        XCTAssertNil(
+            watchdog.consumeTimeout(
+                at: 24.999
+            )
+        )
+        XCTAssertEqual(
+            watchdog.consumeTimeout(at: 25),
+            .firstFrame
+        )
+    }
+
+    func testFrameHeartbeatStartsAndRefreshesStallWindow() {
+        var watchdog =
+            VisionLinkMediaWatchdog()
+        watchdog.waitForFirstFrame(at: 0)
+
+        XCTAssertTrue(
+            watchdog.receiveFrame(at: 1)
+        )
+        XCTAssertFalse(
+            watchdog.receiveFrame(at: 4)
+        )
+        XCTAssertNil(
+            watchdog.consumeTimeout(
+                at: 8.999
+            )
+        )
+        XCTAssertEqual(
+            watchdog.consumeTimeout(at: 9),
+            .stalledFrame
+        )
+    }
+
+    func testStoppingWatchdogClearsDeadline() {
+        var watchdog =
+            VisionLinkMediaWatchdog()
+        watchdog.waitForOffer(at: 0)
+
+        watchdog.stop()
+
+        XCTAssertEqual(
+            watchdog.phase,
+            .idle
+        )
+        XCTAssertNil(
+            watchdog.consumeTimeout(at: 100)
+        )
+    }
+}
+
 final class VisionLinkReceivedTextStoreTests:
     XCTestCase
 {
