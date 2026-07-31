@@ -15,6 +15,8 @@
   위치로 보존하고 실제 페이지 이전·다음과 목록 선택에 사용
 - Android와 같은 EPUB → DAISY 2.02 → DAISY 3 탐지 우선순위
 - DAISY 2.02 NCC 메타데이터·계층 목차와 malformed HTML 대체 파싱
+- 표준 제목 태그 없이 `span`·`div` 링크를 목차 항목으로 사용하는 구형
+  NCC를 직전 제목 단계의 하위 항목으로 보존
 - NCC, `master.smil`, 전체 SMIL 순서의 DAISY 2.02 대체 탐색
 - DAISY 3 OPF manifest/spine, NCX 계층 목차·페이지 목록 파싱
 - DAISY DTBook의 제목·문장·페이지 요소와 fragment 위치 추출

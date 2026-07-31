@@ -962,10 +962,30 @@ private nonisolated final class NCCXMLDelegate:
         }
     }
 
+    private final class LooseBlock {
+        let elementName: String
+        let id: String
+        let depth: Int
+        var label = ""
+        var href: String?
+
+        init(
+            elementName: String,
+            id: String,
+            depth: Int
+        ) {
+            self.elementName = elementName
+            self.id = id
+            self.depth = depth
+        }
+    }
+
     private let sourcePath: String
     private var title = ""
     private var isInsideTitle = false
     private var heading: Heading?
+    private var looseBlocks: [LooseBlock] = []
+    private var lastHeadingLevel = 0
     private var metadata: [String: String] = [:]
     private var navigation:
         [PublicationNavigationItem] = []
@@ -997,6 +1017,7 @@ private nonisolated final class NCCXMLDelegate:
            let level = name.last?
             .wholeNumberValue,
            (1 ... 6).contains(level) {
+            lastHeadingLevel = level
             heading = Heading(
                 id:
                     attributeDict["id"]
@@ -1004,10 +1025,31 @@ private nonisolated final class NCCXMLDelegate:
                 level: level
             )
             counter += 1
+        } else if (name == "span"
+                    || name == "div"),
+                  heading == nil {
+            looseBlocks.append(
+                LooseBlock(
+                    elementName: name,
+                    id:
+                        attributeDict["id"]
+                        ?? "ncc-\(counter)",
+                    depth:
+                        max(lastHeadingLevel, 0)
+                )
+            )
+            counter += 1
         } else if name == "a",
-                  heading != nil {
-            heading?.href =
-                attributeDict["href"]
+                  let href =
+                    attributeDict["href"] {
+            if heading != nil {
+                heading?.href = href
+            } else {
+                for block in looseBlocks
+                where block.href == nil {
+                    block.href = href
+                }
+            }
         }
     }
 
@@ -1019,6 +1061,11 @@ private nonisolated final class NCCXMLDelegate:
             title += string
         }
         heading?.label += string
+        if heading == nil {
+            for block in looseBlocks {
+                block.label += string
+            }
+        }
     }
 
     func parser(
@@ -1031,16 +1078,46 @@ private nonisolated final class NCCXMLDelegate:
         if name == "title" {
             isInsideTitle = false
         }
-        guard name.count == 2,
-              name.first == "h",
-              let heading else {
+        if name.count == 2,
+           name.first == "h",
+           let heading {
+            appendNavigationItem(
+                id: heading.id,
+                label: heading.label,
+                href: heading.href,
+                depth: max(
+                    heading.level - 1,
+                    0
+                )
+            )
+            self.heading = nil
             return
         }
-        let label = heading.label
+
+        guard let block = looseBlocks.last,
+              block.elementName == name else {
+            return
+        }
+        _ = looseBlocks.popLast()
+        appendNavigationItem(
+            id: block.id,
+            label: block.label,
+            href: block.href,
+            depth: block.depth
+        )
+    }
+
+    private func appendNavigationItem(
+        id: String,
+        label rawLabel: String,
+        href: String?,
+        depth: Int
+    ) {
+        let label = rawLabel
             .split(whereSeparator: \.isWhitespace)
             .joined(separator: " ")
         if !label.isEmpty,
-           let href = heading.href,
+           let href,
            let resolved =
             AccessiblePublicationParser
             .resolveReference(
@@ -1049,18 +1126,14 @@ private nonisolated final class NCCXMLDelegate:
             ) {
             navigation.append(
                 PublicationNavigationItem(
-                    id: heading.id,
+                    id: id,
                     label: label,
                     href: resolved,
-                    depth: max(
-                        heading.level - 1,
-                        0
-                    ),
+                    depth: depth,
                     playOrder: nil
                 )
             )
         }
-        self.heading = nil
     }
 
     func result() -> NCCParseResult {

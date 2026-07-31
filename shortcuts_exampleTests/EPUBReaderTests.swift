@@ -1241,6 +1241,41 @@ final class EPUBReaderTests: XCTestCase {
         )
     }
 
+    func testParsesDaisy202LooseNCCNavigationBlocks()
+        throws
+    {
+        let book = try AccessiblePublicationParser
+            .parse(
+                data:
+                    DaisyFixture
+                    .makeDaisy202WithLooseNavigation()
+            )
+
+        XCTAssertEqual(book.format, .daisy202)
+        XCTAssertEqual(
+            book.navigationItems.map(\.label),
+            [
+                "첫 장",
+                "첫 페이지",
+                "보충 설명",
+            ]
+        )
+        XCTAssertEqual(
+            book.navigationItems.map(\.depth),
+            [0, 1, 1]
+        )
+        XCTAssertEqual(
+            book.navigationItems.compactMap(
+                \.href
+            ),
+            [
+                "Book/smil/part1.smil#nav-1",
+                "Book/smil/part1.smil#nav-2",
+                "Book/smil/part1.smil#nav-3",
+            ]
+        )
+    }
+
     func testParsesDaisy3PackageNCXAndDTBook()
         throws
     {
@@ -2057,6 +2092,73 @@ private nonisolated enum DaisyFixture {
                         0x49, 0x44, 0x33, 0x04,
                     ]),
                     compressionMethod: 0
+                ),
+            ]
+        )
+    }
+
+    static func makeDaisy202WithLooseNavigation()
+        throws -> Data
+    {
+        let ncc = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <html xmlns="http://www.w3.org/1999/xhtml">
+          <head>
+            <title>느슨한 NCC 목차</title>
+            <meta name="dc:identifier" content="rivo-daisy-loose-ncc"/>
+            <meta name="dc:language" content="ko"/>
+          </head>
+          <body>
+            <h1 id="n1">
+              <a href="smil/part1.smil#nav-1">첫 장</a>
+            </h1>
+            <span id="n2">
+              <a href="smil/part1.smil#nav-2">첫 페이지</a>
+            </span>
+            <div id="n3">
+              <a href="smil/part1.smil#nav-3">보충 설명</a>
+            </div>
+          </body>
+        </html>
+        """
+        let smil = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <smil>
+          <body>
+            <seq>
+              <par id="par-1">
+                <text src="../text/chapter.html#s1"/>
+              </par>
+            </seq>
+          </body>
+        </smil>
+        """
+        let chapter = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <html xmlns="http://www.w3.org/1999/xhtml">
+          <head><title>첫 장</title></head>
+          <body>
+            <p id="s1">느슨한 NCC 본문입니다.</p>
+          </body>
+        </html>
+        """
+        return try ZIPFixture.make(
+            entries: [
+                ZIPFixtureEntry(
+                    path: "Book/ncc.html",
+                    data: Data(ncc.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path: "Book/smil/part1.smil",
+                    data: Data(smil.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path:
+                        "Book/text/chapter.html",
+                    data: Data(chapter.utf8),
+                    compressionMethod: 8
                 ),
             ]
         )
