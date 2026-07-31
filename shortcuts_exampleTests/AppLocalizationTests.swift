@@ -420,6 +420,11 @@ final class AppLocalizationTests:
             "Paragraph"
         )
         XCTAssertEqual(
+            EPUBReadAloudNavigationUnit
+                .line.displayName,
+            "Line"
+        )
+        XCTAssertEqual(
             EPUBReadAloudPlaybackMode
                 .textToSpeech.displayName,
             "On-Device Speech"
@@ -442,6 +447,11 @@ final class AppLocalizationTests:
             EPUBReadAloudNavigationUnit
                 .chapter.displayName,
             "章"
+        )
+        XCTAssertEqual(
+            EPUBReadAloudNavigationUnit
+                .line.displayName,
+            "行"
         )
         XCTAssertEqual(
             AccessiblePublicationParserError

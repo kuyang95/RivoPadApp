@@ -614,7 +614,7 @@ final class EPUBReaderTests: XCTestCase {
         XCTAssertEqual(
             EPUBReadAloudNavigationUnit
                 .word.next(),
-            .sentence
+            .line
         )
         XCTAssertEqual(
             EPUBReadAloudNavigationUnit
@@ -628,8 +628,40 @@ final class EPUBReaderTests: XCTestCase {
         )
         XCTAssertEqual(
             EPUBReadAloudNavigationUnit
-                .sentence.shifted(by: 9),
+                .line.shifted(by: 9),
             .word
+        )
+    }
+
+    func testReadAloudLineNavigationUsesAndroidSentenceBoundaries()
+        throws
+    {
+        let text =
+            "첫 줄입니다.\n둘째 줄입니다! 마지막 줄입니다."
+        let ranges =
+            EPUBReadAloudTextNavigator.ranges(
+                in: text,
+                unit: .line
+            )
+        let lines = try ranges.map {
+            range -> String in
+            let swiftRange = try XCTUnwrap(
+                Range(range, in: text)
+            )
+            return String(text[swiftRange])
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+        }
+
+        XCTAssertEqual(
+            lines,
+            [
+                "첫 줄입니다.",
+                "둘째 줄입니다!",
+                "마지막 줄입니다.",
+            ]
         )
     }
 

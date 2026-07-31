@@ -10,6 +10,7 @@
 @text Added single-line landscape document reading and TTS navigation with spoken-sentence highlighting, previous, repeat, and next.
 @text Added a complete EPUB and DAISY library, recently read sorting, SHA-256 duplicate prevention, and book deletion that preserves the original.
 @text Added a combined EPUB and DAISY audio and local-speech timeline with time and percentage displays and an arbitrary-position slider.
+@text Matched EPUB and DAISY navigation to Android’s Word, Line, Paragraph, Page, and Chapter order.
 @text Added hierarchical tables of contents and printed page lists from EPUB 2 NCX and EPUB 3 nav, including precise movement to empty pagebreak markers.
 @text Added an original publication layout that preserves EPUB and DAISY images, tables, lists, emphasis, footnotes, internal links, local CSS, and fonts while blocking scripts and external network access.
 @text Improved safe text fallback for XHTML that violates XML rules, isolation of damaged navigation files, and compatibility with common named HTML entities.

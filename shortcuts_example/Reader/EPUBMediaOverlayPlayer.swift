@@ -285,7 +285,7 @@ nonisolated enum EPUBReadAloudNavigationUnit:
     Sendable
 {
     case word
-    case sentence
+    case line
     case paragraph
     case page
     case chapter
@@ -296,9 +296,9 @@ nonisolated enum EPUBReadAloudNavigationUnit:
             return AppLocalization.string(
                 "단어"
             )
-        case .sentence:
+        case .line:
             return AppLocalization.string(
-                "문장"
+                "줄"
             )
         case .paragraph:
             return AppLocalization.string(
@@ -342,7 +342,7 @@ nonisolated enum EPUBReadAloudTextNavigator {
                 pattern: #"\S+"#,
                 in: text
             )
-        case .sentence:
+        case .line:
             var result: [NSRange] = []
             text.enumerateSubstrings(
                 in: text.startIndex ..< text.endIndex,
@@ -427,7 +427,7 @@ nonisolated enum EPUBReadAloudTextNavigator {
         let start = firstContent.location
         let sentenceRanges = ranges(
             in: text,
-            unit: .sentence
+            unit: .line
         )
         let sentenceEnd =
             sentenceRanges.first {
@@ -1000,7 +1000,7 @@ final class EPUBMediaOverlayPlaybackController:
         }
         let direction = delta < 0 ? -1 : 1
         switch navigationUnit {
-        case .word, .sentence:
+        case .word, .line:
             return inlineNavigationTarget(
                 unit: navigationUnit,
                 direction: direction
