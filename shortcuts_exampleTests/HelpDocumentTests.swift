@@ -149,10 +149,14 @@ final class HelpDocumentTests: XCTestCase {
         throws
     {
         let manual =
-            try HelpContentLibrary.manual()
+            try HelpContentLibrary.manual(
+                language: .korean
+            )
         let notes =
             try HelpContentLibrary
-            .releaseNotes()
+            .releaseNotes(
+                language: .korean
+            )
 
         XCTAssertEqual(manual.version, "1.0")
         XCTAssertGreaterThanOrEqual(
@@ -174,6 +178,105 @@ final class HelpDocumentTests: XCTestCase {
                     "App Shortcut 10개"
                 )
             } == true
+        )
+    }
+
+    func testBundledHelpDocumentsFollowAppLanguageAndStructure()
+        throws
+    {
+        let korean = try HelpContentLibrary
+            .manual(language: .korean)
+        let english = try HelpContentLibrary
+            .manual(language: .english)
+        let japanese = try HelpContentLibrary
+            .manual(language: .japanese)
+
+        XCTAssertEqual(
+            english.title,
+            "VisionCraft iPad User Guide"
+        )
+        XCTAssertEqual(
+            japanese.title,
+            "VisionCraft iPadユーザーガイド"
+        )
+        let structure: (HelpManualDocument)
+            -> [[[Int]]] = {
+                document in
+                document.chapters.map {
+                    chapter in
+                    chapter.sections.map {
+                        section in
+                        [
+                            section.texts.count,
+                            section.subsections
+                                .reduce(0) {
+                                    $0
+                                    + $1.texts.count
+                                }
+                        ]
+                    }
+                }
+            }
+        XCTAssertEqual(
+            structure(english),
+            structure(korean)
+        )
+        XCTAssertEqual(
+            structure(japanese),
+            structure(korean)
+        )
+
+        let koreanNotes = try
+            HelpContentLibrary.releaseNotes(
+                language: .korean
+            )
+        let englishNotes = try
+            HelpContentLibrary.releaseNotes(
+                language: .english
+            )
+        let japaneseNotes = try
+            HelpContentLibrary.releaseNotes(
+                language: .japanese
+            )
+        XCTAssertEqual(
+            englishNotes.map(\.version),
+            koreanNotes.map(\.version)
+        )
+        XCTAssertEqual(
+            japaneseNotes.map(\.version),
+            koreanNotes.map(\.version)
+        )
+        XCTAssertEqual(
+            englishNotes.map {
+                $0.texts.count
+            },
+            koreanNotes.map {
+                $0.texts.count
+            }
+        )
+        XCTAssertEqual(
+            japaneseNotes.map {
+                $0.texts.count
+            },
+            koreanNotes.map {
+                $0.texts.count
+            }
+        )
+        XCTAssertTrue(
+            englishNotes.first?
+                .texts.contains {
+                    $0.contains(
+                        "10 App Shortcuts"
+                    )
+                } == true
+        )
+        XCTAssertTrue(
+            japaneseNotes.first?
+                .texts.contains {
+                    $0.contains(
+                        "10個のApp Shortcut"
+                    )
+                } == true
         )
     }
 }

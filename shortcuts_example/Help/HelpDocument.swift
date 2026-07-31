@@ -79,13 +79,24 @@ nonisolated enum HelpDocumentError:
     var errorDescription: String? {
         switch self {
         case .missingResource(let name):
-            return "\(name) 도움말 파일을 찾지 못했습니다."
+            return AppLocalization.format(
+                "%@ 도움말 파일을 찾지 못했습니다.",
+                name
+            )
         case .missingValue(let directive):
-            return "\(directive) 항목의 내용이 비어 있습니다."
+            return AppLocalization.format(
+                "%@ 항목의 내용이 비어 있습니다.",
+                directive
+            )
         case .misplacedDirective(let directive):
-            return "\(directive) 항목의 위치가 올바르지 않습니다."
+            return AppLocalization.format(
+                "%@ 항목의 위치가 올바르지 않습니다.",
+                directive
+            )
         case .emptyDocument:
-            return "도움말 내용이 비어 있습니다."
+            return AppLocalization.string(
+                "도움말 내용이 비어 있습니다."
+            )
         }
     }
 }
@@ -462,37 +473,60 @@ nonisolated enum HelpDocumentParser {
 
 nonisolated enum HelpContentLibrary {
     static func manual(
-        bundle: Bundle = .main
+        bundle: Bundle = .main,
+        language: AppLanguage =
+            .current()
     ) throws -> HelpManualDocument {
         try HelpDocumentParser.parseManual(
             resourceText(
                 named: "RivoPadManual",
-                bundle: bundle
+                bundle: bundle,
+                language: language
             )
         )
     }
 
     static func releaseNotes(
-        bundle: Bundle = .main
+        bundle: Bundle = .main,
+        language: AppLanguage =
+            .current()
     ) throws -> [HelpReleaseNote] {
         try HelpDocumentParser
             .parseReleaseNotes(
                 resourceText(
                     named:
                         "RivoPadChangelog",
-                    bundle: bundle
+                    bundle: bundle,
+                    language: language
                 )
             )
     }
 
     private static func resourceText(
         named name: String,
-        bundle: Bundle
+        bundle: Bundle,
+        language: AppLanguage
     ) throws -> String {
-        guard let url = bundle.url(
+        let localization =
+            language
+                .effectiveLanguageCode
+        let localizedURL =
+            bundle.path(
+                forResource: localization,
+                ofType: "lproj"
+            )
+            .flatMap(Bundle.init(path:))?
+            .url(
+                forResource: name,
+                withExtension: "txt"
+            )
+        let fallbackURL = bundle.url(
             forResource: name,
             withExtension: "txt"
-        ) else {
+        )
+        guard let url =
+                localizedURL ?? fallbackURL
+        else {
             throw HelpDocumentError
                 .missingResource(name)
         }

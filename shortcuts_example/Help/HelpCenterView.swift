@@ -7,7 +7,11 @@ struct HelpCenterView: View {
         [HelpReleaseNote]
     private let loadError: String?
 
-    init(bundle: Bundle = .main) {
+    init(
+        bundle: Bundle = .main,
+        language: AppLanguage =
+            .current()
+    ) {
         var loadedManual:
             HelpManualDocument?
         var loadedReleaseNotes:
@@ -16,10 +20,16 @@ struct HelpCenterView: View {
         do {
             loadedManual =
                 try HelpContentLibrary
-                .manual(bundle: bundle)
+                .manual(
+                    bundle: bundle,
+                    language: language
+                )
             loadedReleaseNotes =
                 try HelpContentLibrary
-                .releaseNotes(bundle: bundle)
+                .releaseNotes(
+                    bundle: bundle,
+                    language: language
+                )
         } catch {
             loadedError =
                 error.localizedDescription

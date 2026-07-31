@@ -1,0 +1,66 @@
+@title VisionCraft iPad Release Notes
+
+@version 1.0
+@date July 31, 2026
+@text Rebuilt the main Android VisionCraft screens as a local-first iPad app.
+@text Added M4 MLX local AI chat, conversation history, image, PDF, and text questions, and voice commands.
+@text Added a custom document scanner, Magnifier, Live Text Reading, and Android-compatible color filters.
+@text Added storage and restoration of the camera’s last Android-compatible color combination, inversion, and threshold when entering Rivo screen control mode.
+@text Added PDF and TXT document viewing and EPUB, DAISY, and SMIL reading.
+@text Added single-line landscape document reading and TTS navigation with spoken-sentence highlighting, previous, repeat, and next.
+@text Added a complete EPUB and DAISY library, recently read sorting, SHA-256 duplicate prevention, and book deletion that preserves the original.
+@text Added a combined EPUB and DAISY audio and local-speech timeline with time and percentage displays and an arbitrary-position slider.
+@text Added hierarchical tables of contents and printed page lists from EPUB 2 NCX and EPUB 3 nav, including precise movement to empty pagebreak markers.
+@text Added an original publication layout that preserves EPUB and DAISY images, tables, lists, emphasis, footnotes, internal links, local CSS, and fonts while blocking scripts and external network access.
+@text Improved safe text fallback for XHTML that violates XML rules, isolation of damaged navigation files, and compatibility with common named HTML entities.
+@text Added server-free extraction of section order, paragraphs, table cells, tabs, and line breaks from public HWPX OWPML packages and connected it to document viewing, AI chat, and VisionLink.
+@text Added a batch inbox for sharing up to 20 photos and supported documents, partial-success feedback, and automatic cleanup after 7 days or 24 hours.
+@text Added saving of the currently filtered camera frame to Photos with add-only access or to Files.
+@text Added Android-compatible first-result stabilization, small-text quality checks, a 30-second scene anchor, and text-free reset duplicate suppression to Live OCR.
+@text Added Rivo BLE connection and screen-specific controls, plus VisionLink file, video, and remote AI features.
+@text Improved Rivo CoreBluetooth scanning and connection with iPadOS background state restoration.
+@text Added a Share Extension, selected-text Action, Rivo status widget, and 10 App Shortcuts.
+@text Added a Control Center and Lock Screen Quick Launch control that opens one of nine VisionCraft features.
+@text Translated the titles, descriptions, parameters, errors, and Siri phrases of the existing App Intents and 10 App Shortcuts into English and Japanese, and hid nonfunctional template actions.
+@text Added unified settings for sound effects, speech, TTS speed, scanner, documents, reader, and app font.
+@text Added an app font catalog that downloads one of nine Korean, English, or Japanese server fonts only when selected, verifies its size and SHA-256, and restores it offline.
+@text Added local diagnostics that export M4 resource status and iPadOS MetricKit data to JSON only when requested, without automatic Crashlytics or Analytics uploads.
+@text Added on-device recording of today’s completed, failed, and cancelled M4 local AI requests, generated volume, and processing time, displayed with “No daily limit” on the Home card and small widget.
+@text Completed immediate English and Japanese localization for EPUB and DAISY library, contents, search, viewing, playback, and damaged-file errors.
+@text Localized camera tools, Magnifier, Live OCR, photo saving, custom scanner capture guidance, errors, multipage review, and VoiceOver text into English and Japanese.
+@text Localized PDF and TXT viewing, editing, export, sentence TTS, line and page navigation, 16-color themes, and Rivo document feedback into English and Japanese.
+@text Localized VisionLink pairing, signaling, WebRTC, files, clipboard, remote AI, live reading, diagnostics, and errors into English and Japanese.
+@text Added opening VisionLink clipboard text in the general document viewer for large text, editing, TTS, and Rivo controls.
+@text Added timeouts for VisionLink video connection, first frame, and stalled frames, plus automatic recovery of signaling and WebRTC with the saved pair while the app is active.
+@text Added free-space checks and orphaned temporary-file cleanup before VisionLink receiving, with received files retained in Files until confirmed deletion.
+@text Localized Rivo BLE scanning, automatic reconnection, restoration, GATT/UART, time sync, connection diagnostics, buttons, quick menu, and command mode guidance into English and Japanese.
+@text Added immediate switching among System Settings, Korean, English, and Japanese app languages and linked the choice to default local translation and web search language.
+@text Added an iPad-specific user guide and documented iPadOS constraints and alternatives for Android features.
+@text Translated the full user guide and release notes into English and Japanese and made them load immediately according to the in-app language choice.
+@text Added the Korean, English, and Japanese app language foundation and localized Home, Settings, Help, sharing, and widgets.
+@text Accelerated rotation, resizing, and color correction for manual captures without detected document corners through the Metal path.
+@text Added scanner retake, continuous capture, rotation, deletion, reordering, session restoration, and multipage PDF saving.
+@text Added M4 local translation among Korean, English, and Japanese with paste, copy, read, and stop.
+@text Added safe extraction of a shared or pasted webpage body for source-backed questions to the M4 local AI.
+@text Added optional web search that retrieves sources from Brave LLM Context while generating the answer on the M4, with Keychain key storage and privacy consent.
+@text Added sentence-by-sentence AI response playback controlled by the screen and Rivo 4/5/6/R3 for previous, repeat, next, read all, and stop.
+@text Added conversation title editing, title and message search, confirmed delete all, and M4 memory-tier restoration of long conversation context.
+@text Added PDF, TXT, clipboard, and photo attachments in AI chat, including source storage, restoration, replacement cleanup, and Summary, List Information, and Next Actions quick questions.
+@text Added question-relevant local context selection for long attachments and safe multi-sheet XLSX cell extraction with archive limits.
+@text Added local extraction of Excel 97–2003 OLE/BIFF8 XLS and compressed HWP 5.x, with encryption, corruption, decompression-bomb defense, and original-file preservation.
+@text Added local extraction of XLSX, Excel 97–2003 XLS, and HWP 5.x as attachment context in VisionLink remote AI chat.
+@text Added remembered user-authorized Files folders for searching PDF, TXT, XLSX, XLS, and HWP and opening structured documents in the general document viewer.
+@text Added M4 Qwen3-VL OCR typo correction that compares a still image with Vision OCR, plus a setting and safeguards against changed numbers, URLs, line breaks, and excessive length changes.
+@text Added separate local settings for document auto-capture and UVDoc curved-page correction while preserving manual capture and perspective-correction fallback.
+
+@version 0.9
+@date July 29, 2026
+@text Implemented LCNet document corner detection, seven-frame stability, auto-capture, and focus lock.
+@text Connected Metal perspective, rotation, resizing, and color processing with UVDoc curved-page correction.
+@text Reduced capture preprocessing and LCNet input generation to one Metal path and recorded diagnostic baselines.
+
+@version 0.8
+@date July 28, 2026
+@text Implemented the VisionLink data channel, streaming file reception up to 1 GB, SHA-256 verification, and cancellation.
+@text Added remote OCR, image description, translation, AI chat, and video live reading.
+@text Added EPUB and DAISY parsing, contents, search, page navigation, and mixed audio and TTS playback.

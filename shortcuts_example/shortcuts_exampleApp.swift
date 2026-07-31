@@ -58,7 +58,11 @@ struct shortcuts_exampleApp: App {
                         case .settings:
                             AppSettingsView()
                         case .help:
-                            HelpCenterView()
+                            HelpCenterView(
+                                language:
+                                    appSettings
+                                    .appLanguage
+                            )
                         case .chatHistory:
                             ChatHistoryView()
                         case .localChat(let conversationID):

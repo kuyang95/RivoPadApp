@@ -96,6 +96,10 @@
 "공유 항목을 열고 처리한 뒤 수신함에서 삭제합니다." = "Open and process this item, then remove it from the inbox.";
 "알 수 없는 오류입니다." = "An unknown error occurred.";
 "·" = "·";
+"%@ 도움말 파일을 찾지 못했습니다." = "Couldn’t find the %@ help file.";
+"%@ 항목의 내용이 비어 있습니다." = "The %@ entry is empty.";
+"%@ 항목의 위치가 올바르지 않습니다." = "The %@ entry is in an invalid position.";
+"도움말 내용이 비어 있습니다." = "The help content is empty.";
 "공유 텍스트 문맥을 준비했습니다." = "Shared text context is ready.";
 "느리게" = "Slow";
 "보통" = "Normal";

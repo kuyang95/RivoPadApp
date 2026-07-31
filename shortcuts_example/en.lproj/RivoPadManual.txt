@@ -1,0 +1,200 @@
+@title VisionCraft iPad User Guide
+@version 1.0
+@date July 31, 2026
+
+@chapter Getting Started
+@section Supported Devices and Local Processing
+@text This app provides the main VisionCraft features on Apple silicon iPads with a local-first design.
+@text AI chat and image descriptions use an MLX model on the M4, while OCR and document processing run on the iPad whenever possible.
+@text A network connection may be needed when preparing a model for the first time or connecting to a VisionLink server.
+@section Permissions
+@text Camera access is required for the camera, document scanning, and live text reading.
+@text Voice questions require microphone and speech recognition access.
+@text Connecting a Rivo requires Bluetooth access.
+@text To change a permission you previously denied, open Settings from the Home screen and select Open VisionCraft Permission Settings.
+
+@chapter AI and Voice
+@section AI Chat
+@text Select AI Chat on the Home screen to open an earlier conversation or start a new local conversation.
+@text You can import images, PDFs, and text documents from Files or the share menu and ask questions about them.
+@text A response appears as it is generated, and conversation history is stored inside the app.
+@text In the conversation list, you can search titles or message contents, then swipe or touch and hold an item to rename or delete it.
+@text Delete All runs only after confirmation, and deleted conversations cannot be recovered.
+@text When you reopen a long conversation, only the most recent history that fits the M4 memory tier is restored as AI context. All earlier messages remain visible and stored.
+@text The speech controls below a response can read the entire answer sentence by sentence, move to the previous sentence, repeat the current sentence, move to the next sentence, or stop.
+@text On the local AI screen, Rivo 4, 5, and 6 move to the previous sentence, repeat the current sentence, and move to the next sentence. R3 reads or stops the entire response.
+@text Starting a new response, voice input, or another screen automatically stops speech from the previous response.
+@text Above the conversation input, you can attach PDF, TXT, XLSX, XLS, HWP, or HWPX documents, clipboard text, or a photo to the current conversation.
+@text TXT and clipboard contexts accumulate. A newly attached source file replaces the previous photo, PDF, XLSX, XLS, HWP, or HWPX source. Attachment state and source references are restored with conversation history.
+@text PDFs up to 14 MB and 100 pages are processed locally with PDFKit or Vision OCR. Photos up to 32 MB are resized to at most 2,048 pixels for the M4 vision model.
+@text XLSX files up to 20 MB are processed locally for strings, numbers, Boolean values, and cached formula results across multiple sheets. Encrypted, damaged, or excessively expanded archives are rejected.
+@text Excel 97–2003 XLS files up to 20 MB are processed locally for OLE/BIFF8 shared strings, numbers, Boolean values, and cached formula results. Encrypted files and older BIFF formats are not opened.
+@text HWP files up to 20 MB are decompressed locally from HWP 5.x body sections to extract paragraph text. Password-protected, distribution, DRM, and certificate-encrypted documents are not opened, and scripts or embedded objects are not executed.
+@text HWPX files up to 20 MB are processed locally from the public OWPML package, preserving section reading order, paragraphs, table cells, tabs, and line breaks. Scripts, external links, and embedded objects are not executed, and malformed XML or excessively compressed documents are rejected.
+@text Extracted context from TXT, PDF, XLSX, XLS, HWP, and HWPX is retained up to 1 MB. Longer content is marked as omitted, while the original file copied into the app is preserved.
+@text Long attachments are divided into sections of about 820 characters, and the portions related to each question are selected again within the M4 context limit. Summary questions sample the beginning, middle, and end of a document.
+@text When attachments change, the app switches safely between text and vision models while preserving the stored source.
+@text Select the Summary, List Information, or Next Actions quick question to ask immediately using the current conversation and attachments.
+@text This product was developed with reference to Hancom’s publicly available documentation for Hangul document files (.hwp).
+@section Local Translation
+@text On the AI Chat translation screen, select Korean, English, or Japanese and translate with the M4 local AI.
+@text Enter or paste the source text, then copy the result or have the iPad read it aloud.
+@section Webpage Questions
+@text On the AI Chat webpage screen, enter or paste an address to extract its title and body and ask questions about them.
+@text The network is used only to download the webpage. AI processing of the extracted body runs on the M4 local model.
+@text Up to 24,000 characters of long pages are used. A dynamic site is read once more in a private WebKit view only when its static body is short.
+@text On the answer screen, you can review the source title and final URL and open the original page in Safari.
+@section Optional Web Search
+@text For questions that require current information, such as recent news, prices, or schedules, use Web Search on the AI Chat screen to find sources.
+@text In Settings, save your personal Brave Search API key in Keychain, accept the privacy notice, and enable online web search.
+@text Only the query and API key are sent to Brave LLM Context to retrieve relevant excerpts by source. The final answer is generated by the M4 local model.
+@text Brave may retain query logs for up to 90 days for billing, outage response, and abuse prevention. Pricing and terms may change.
+@text Search sources and answers are not stored in conversation history or cached. Match the source numbers in an answer with the source list above it to open the originals.
+@section Voice Commands
+@text Start a voice command from the Rivo quick menu or another supported entry point.
+@text In-app commands such as “open scanner,” “open camera,” “open reader,” and “open files” are handled by local rules.
+@text General questions go to the local AI, while translation requests go to the dedicated local translation screen.
+@text When web search is enabled, a search request automatically continues through source retrieval, an M4 local answer, and TTS.
+@section Sound and Speech
+@text In Settings, you can change sound effects, automatic spoken guidance, and the default speech rate.
+@text Turning off automatic spoken guidance does not stop document, OCR, or reader speech that you start manually.
+
+@chapter Camera and Document Scanning
+@section Magnifier
+@text Open Magnifier from Camera on the Home screen.
+@text It supports front and rear cameras, pinch to zoom, tap to focus, torch, and monochrome, inverted, and high-contrast color filters.
+@text The 16-color combination, inversion, and threshold used in Rivo L2 screen control mode are stored on the device and restored the next time that mode opens. Preview brightness does not change system brightness and is not saved.
+@text You can continue from a captured camera image to OCR results.
+@text Save Photo stores the currently filtered and zoomed frame in Photos or Files. Only add-only Photos permission is requested.
+@section Live Text Reading
+@text The app periodically recognizes text in front of the camera and automatically reads new sentences.
+@text A short first recognition is confirmed twice, and text that is too small waits until the camera is closer.
+@text Similar recently read sentences and partial recognition of the same document are not repeated for up to 30 seconds. Three consecutive text-free scenes reset the scene.
+@text Monitor heat and battery use during long sessions.
+@section Image Description
+@text Open Image Description from Camera on the Home screen and take a photo. The M4 local vision model describes the scene, objects, text, and people’s actions in the selected response language.
+@text The captured image is not automatically saved to a temporary file or Photos; it is passed directly from memory to the analysis screen.
+@text When the description is complete, the response is read automatically, and you can ask follow-up questions about the same photo in the input field.
+@section Custom Document Scanner
+@text VisionCraft uses its own AVFoundation camera instead of Apple’s system document scanner.
+@text It checks document corners, orientation, motion, and sharpness and captures automatically when the conditions are met.
+@text After capture, it applies perspective correction, curved-page correction, size normalization, and optional color enhancement.
+@text If automatic document capture is off in Settings, corner and stability guidance remain active, but capture occurs only from the on-screen button or Rivo 7.
+@text If automatic curved-page correction is off, UVDoc model preparation and inference are skipped while LCNet corner detection and perspective correction remain active.
+@text Turning off automatic document color correction preserves corner, perspective, and curved-page correction.
+@text If OCR typo correction is enabled, M4 Qwen3-VL locally compares Vision OCR text from a single photo or an image-only PDF page against the actual image.
+@text If numbers, URLs, or line breaks change, or the result grows or shrinks excessively, the original text is kept. Vision OCR remains immediately available when AI is busy or model correction fails.
+@text Live camera OCR does not run Qwen3-VL correction on every frame, avoiding extra latency and heat.
+@text Capture up to 20 pages in sequence, then retake, rotate, delete, and reorder them before saving a multipage PDF.
+@text An unfinished capture session can be restored the next time the app opens.
+
+@chapter Documents and Reading
+@section PDF and Text
+@text From Files on the Home screen, choose one image, EPUB, PDF, TXT, XLSX, XLS, HWP, or HWPX file, or authorize a folder to search.
+@text Authorized folder access is stored as a security-scoped bookmark. PDF, TXT, XLSX, XLS, HWP, and HWPX files can be searched by name and relative folder path and are shown by most recent modification date.
+@text Under iPadOS policy, storage outside folders you approve cannot be searched. Removing folder access does not delete original files.
+@text PDFs and text open in a large-text document screen with reading, editing, copying, and AI questions.
+@text XLSX, Excel 97–2003 XLS, HWP 5.x, and HWPX use safely extracted local text for document viewing, TTS, copying, editing, and AI questions.
+@text If single-line landscape reading is enabled in document settings, portrait orientation keeps normal wrapping while landscape orientation shows the current logical line without wrapping and lets you move horizontally.
+@text Sentence speech tools play continuously from the currently visible line and highlight the spoken sentence. You can move to the previous sentence, repeat the current sentence, stop, or move to the next sentence.
+@text Move by line or page, jump to the beginning or end, and export as TXT or a multipage PDF.
+@text In Settings, change the default text size, line spacing, 16 color combinations, and line separators.
+@text In AI Chat, attach XLSX, Excel 97–2003 XLS, HWP 5.x, or HWPX to ask about cells across sheets or paragraphs in Hangul documents.
+@section EPUB and DAISY
+@text You can import and read EPUB, DAISY 2.02, and DAISY 3 books.
+@text All imported books are kept in the library by most recently read. The app stores each book’s chapter and paragraph position and provides a hierarchical table of contents, printed page lists for EPUB and DAISY, and full-text search.
+@text Books with the same contents open the existing managed copy even if the filename differs. Deleting a book from the library does not delete the original in Files.
+@text Enable Original Publication Layout in viewing settings to preserve in-book images, tables, lists, emphasis, footnotes, internal links, local CSS, and fonts. Content scripts and external network requests are blocked.
+@text Links outside the book open in Safari after confirmation. For exact search results and spoken-word highlighting, turn off Original Publication Layout and use the accessible text layout.
+@text XHTML chapters with minor XML violations safely fall back to text with hidden scripts and styles removed. A damaged navigation file does not prevent readable content from opening.
+@text The playback slider at the bottom of the reader shows the combined duration of audio and local speech and can move to any position.
+@text When SMIL audio is available, the corresponding segment is played. If audio is absent or fails, reading continues with local iPad TTS.
+@text In Settings, change the default theme, font scale, line spacing, and playback speed.
+
+@chapter Rivo Remote
+@section Connection
+@text Select the Rivo connection status at the top of the Home screen to view scanning, automatic connection to a saved device, and diagnostics.
+@text Rivo Three and Mini families are identified primarily by service UUID and secondarily by known device names.
+@text If iPadOS removes the app in the background, ongoing scanning and connection can be restored within the permitted CoreBluetooth scope. Restoration is unavailable after you force-quit from the app switcher.
+@text After a disconnection, retries use exponential backoff while preserving the saved preferred device.
+@section Control Inside VisionCraft
+@text Rivo buttons control the in-app quick menu, AI voice input, Magnifier, Live Reading, Scanner, Documents, and EPUB or DAISY screens.
+@text Pressing R1 outside a feature screen enters command mode. 2 immediately translates the clipboard with the M4 local AI and reads the result; 3 opens live camera text reading; 4 opens Camera Magnifier; and 9 opens captured-image description.
+@text Press R1 twice to hear a guide to all command keys. After opening Camera, use R1 with 5, 6, 7, star, 0, and hash to switch cameras, control the torch, capture, and zoom.
+@text Available buttons differ by screen, and unsupported modes show an explanation of the iPad limitation.
+@text The remote clock is synchronized in the Android-compatible format immediately after connection and during an active session.
+
+@chapter VisionLink
+@section Connection and Receiving
+@text On the VisionLink screen, use a pairing code to connect another device. Credentials are stored in Keychain.
+@text WebRTC video and a data channel can receive images, general files, clipboard text, and camera status.
+@text When video startup or the first frame is late, or frames stall, the status explains the cause. If signaling or media disconnects while the app is active, the saved pair is restored automatically.
+@text Large files stream to disk, with size and SHA-256 verification and transfer cancellation.
+@text Received general files are not deleted automatically. They remain in Files under On My iPad, VisionCraft, VisionLink. Deleting the latest file from the VisionLink screen also deletes it from Files.
+@text Before receiving, the app checks whether 64 MB of free space can remain. On reconnection, it removes unfinished partial files and feature temporary files older than 24 hours.
+@text Received clipboard text never overwrites the system clipboard automatically. You can copy it or open it in the text viewer for large text, editing, TTS, and Rivo document controls.
+@section Remote Features
+@text Remote image OCR, image description, image translation, and text translation run through local processors on the M4.
+@text Remote AI chat supports conversation IDs and context from images, TXT, PDF, XLSX, Excel 97–2003 XLS, HWP 5.x, and HWPX attachments.
+@text Remote HWP, XLS, and XLSX apply the local parser’s 20 MB, encryption, corruption, and decompression limits and append only extracted text to the conversation.
+@text Remote video live reading does not repeat OCR sentences similar to recent results.
+
+@chapter Other Apps and iPadOS Integration
+@section Sharing and Selected Text
+@text From another app’s share menu, send photos, PDF, EPUB, TXT, XLSX, XLS, HWP, or HWPX documents, text, or a URL to VisionCraft.
+@text Share up to 20 items at once. Each file can be up to 100 MB and the combined files up to 250 MB. If some items fail, successfully saved items remain in the inbox.
+@text A shared URL is read automatically on the webpage question screen. Ordinary shared text opens as context in the local AI screen selected in Settings.
+@text If Shared Text Opens In is set to Voice Question, the app prepares the shared content as context and immediately starts listening. If it is set to AI Chat, a new conversation waits for a question with the context attached.
+@text From the action menu for selected text, ask VisionCraft immediately or save the selection for later.
+@text Shared items are stored in a local App Group inbox and consumed only once. When several items are present, open or delete them in order from the inbox list.
+@text Unopened valid shared items are removed from the device after 7 days, and incomplete temporary items after 24 hours.
+@section Widgets, Siri, and Shortcuts
+@text The small widget shows the latest Rivo connection snapshot, while the medium widget provides AI, Scan, Camera, and Reader shortcuts.
+@text When editing the small VisionCraft Quick Launch widget, choose New AI Chat, AI Chat History, Document Scan, Live Text Reading, Camera Magnifier, Voice Command, Open Document, Reader, or Camera Tools.
+@text Add several Quick Launch widgets to create separate Home screen buttons for frequently used features.
+@text Add a VisionCraft Quick Launch control to Control Center or the Lock Screen and select one of the same nine features.
+@text The Today’s M4 Local AI Activity small widget and Home card store only on this iPad the local-date counts for completed, failed, and cancelled requests, generated characters, and processing time. The local model has no daily limit, and selecting the widget opens a new AI chat.
+@text Siri and Shortcuts show shortcuts for Settings, AI, Reader, Camera, Scan, Magnifier, Live Reading, Files, Rivo, and VisionLink.
+@text When the iPad and Siri language is English or Japanese, App Intent names, parameters, and Siri phrases appear in that language.
+@text Steps that require user confirmation, including Camera, Files, and permissions, are never skipped automatically.
+
+@chapter Settings and Accessibility
+@section Unified Settings
+@text From Settings on the Home screen, manage sound effects, automatic spoken guidance, TTS speed, scan auto-capture, UVDoc curve and color correction, OCR typo correction, app language and font, and document and reader defaults.
+@text The personal API key, network consent, and enablement for optional web search are also managed in Settings.
+@text Reset Settings restores viewing and speech defaults only; it does not delete conversations, documents, or books.
+@text Choose System Settings, Korean, English, or Japanese as the app language. It immediately applies to screens and the default language for local translation and web search. System permission text and extension languages follow the VisionCraft app language in iPad Settings.
+@text App Font offers the system font, the default NanumSquareRound, and additional fonts for the current app language. Additional fonts download from the VisionCraft server only when selected.
+@text Downloaded fonts are retained in the app after file size and SHA-256 verification, so they work offline after the next launch. Select View License on an item to review its terms.
+@section Diagnostics and Privacy
+@text In Diagnostics & Privacy, review app and iPadOS versions, M4 memory, storage and thermal status, and the number of MetricKit payloads supplied by iPadOS.
+@text VisionCraft never sends Crashlytics, Analytics, or performance data to a server automatically. When support needs it, select Export Diagnostics Report and save the JSON file yourself.
+@text The app does not add conversations, photos, OCR or document contents, API keys, or your custom device name to a report. Review the file before sharing it.
+@section VoiceOver and Large Text
+@text All major buttons provide a functional name and hint and work with iPad VoiceOver and large text.
+@text Configure system VoiceOver, Zoom, color filters, and Accessibility Shortcut directly in iPad Settings.
+
+@chapter Differences from Android
+@section Actions Unavailable to a Regular iPad App
+@text VisionCraft cannot arbitrarily tap or swipe buttons in another app or move its accessibility focus.
+@text It cannot keep a Remote Ribbon over other apps or operate Home, Back, Recents, or Notification Center for you.
+@text VisionCraft cannot directly change system VoiceOver, brightness, rotation lock, or display color filters.
+@text Android features for TalkBack settings, rotation lock, global magnification, menus, and muting other apps cannot provide the same system behavior on iPadOS.
+@text The iPad AI uses an M4 local model, so there is no server quota like the Android Gemini daily usage widget. Instead, the Home screen and widget show today’s local processing activity and “No daily limit.”
+@text The app cannot receive permanently after it is fully terminated or remain running from boot.
+@section iPad Alternatives
+@text Bring content from another app through the Share Extension, selected-text action, Files picker, or a screenshot you provide.
+@text The silent global screen capture from Android R1 commands is unavailable. Command 3 opens live camera OCR, and command 9 captures with the camera and runs M4 local image description.
+@text Use widgets, Siri, Shortcuts, and the in-app Rivo quick menu for quick launch.
+@text For system accessibility control, use iPad Accessibility Shortcut or a Rivo HID or Switch Control firmware alternative.
+@text App updates come through the App Store, TestFlight, or MDM instead of Android APK installation.
+
+@chapter Troubleshooting
+@section When a Feature Does Not Open
+@text From Settings on the Home screen, select Open VisionCraft Permission Settings and check Camera, Add Photos, Microphone, Speech Recognition, and Bluetooth access.
+@text The first time you use Siri or a deep link, iPadOS may ask whether to open it in VisionCraft.
+@text While a model is preparing, keep the app in the foreground and check available storage and network status.
+@section When a Connection Fails
+@text For Rivo, check power and pairing, select Retry Now on the Rivo screen, and review Connection Diagnostics.
+@text For VisionLink, check the pairing code, matching server environment, Wi-Fi changes, and the sending state of the other device.
+@text If the issue repeats, record the reproduction time together with the diagnostics shown on screen.
