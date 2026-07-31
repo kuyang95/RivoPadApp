@@ -75,7 +75,7 @@ final class LocalDocumentViewModel: ObservableObject {
                     userInfo: [
                         NSLocalizedDescriptionKey:
                             AppLocalization.string(
-                                "PDF, TXT, XLSX, XLS와 HWP 문서만 지원합니다."
+                                "PDF, TXT, XLSX, XLS, HWP와 HWPX 문서만 지원합니다."
                             )
                     ]
                 )

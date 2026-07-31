@@ -141,6 +141,13 @@ final class AppLocalizationTests:
         )
         XCTAssertEqual(
             AppLocalization.string(
+                "선택한 HWPX 문서를 읽을 수 없습니다.",
+                bundle: japanese
+            ),
+            "選択したHWPX文書を読み込めません。"
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
                 "가로 화면 한 줄 읽기",
                 bundle: japanese
             ),

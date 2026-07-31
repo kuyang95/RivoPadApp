@@ -53,7 +53,7 @@ nonisolated enum AuthorizedDocumentLibraryError:
             )
         case .unsupportedDocument:
             return AppLocalization.string(
-                "PDF, TXT, XLSX, XLS와 HWP 문서만 검색할 수 있습니다."
+                "PDF, TXT, XLSX, XLS, HWP와 HWPX 문서만 검색할 수 있습니다."
             )
         case .resultLimitExceeded(
             let maximum
@@ -74,6 +74,7 @@ nonisolated enum AuthorizedDocumentSearch {
             "xlsx",
             "xls",
             "hwp",
+            "hwpx",
         ]
     static let maximumResults = 5_000
     static let maximumDepth = 64

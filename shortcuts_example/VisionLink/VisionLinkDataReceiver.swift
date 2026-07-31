@@ -1672,6 +1672,7 @@ actor VisionLinkDataReceiver {
             "pdf",
             "txt",
             "hwp",
+            "hwpx",
             "xls",
             "xlsx",
         ].contains(pathExtension) else {

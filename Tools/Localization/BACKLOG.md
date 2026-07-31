@@ -22,7 +22,7 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 - 제어 센터·잠금 화면의 구성 가능한 VisionCraft 빠른 실행 컨트롤
   이름·설명과 아홉 기능 선택 값
 - 카메라·마이크·동작·음성 인식·Bluetooth 권한 설명
-- PDF·TXT·XLS·XLSX·HWP 문서 보기·편집·복사·내보내기, 줄·페이지
+- PDF·TXT·XLS·XLSX·HWP·HWPX 문서 보기·편집·복사·내보내기, 줄·페이지
   탐색, 문장 TTS, 16색 테마와 Rivo 문서 조작 피드백
 - 영어·일본어 핵심 번들과 동적 format 인수의 자동 테스트
 - 로컬 번역 화면의 대상 언어·입력·진행·결과·오류·VoiceOver 문구

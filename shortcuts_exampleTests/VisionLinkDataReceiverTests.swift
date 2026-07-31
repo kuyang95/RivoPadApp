@@ -1076,6 +1076,11 @@ final class VisionLinkDataReceiverTests:
                 mimeType:
                     "application/x-hwp"
             ),
+            (
+                name: "document.hwpx",
+                mimeType:
+                    "application/hwp+zip"
+            ),
         ]
 
         for (index, document) in

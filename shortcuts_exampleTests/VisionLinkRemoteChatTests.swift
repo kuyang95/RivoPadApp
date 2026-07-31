@@ -291,6 +291,11 @@ final class VisionLinkRemoteChatTests:
                 mimeType:
                     "application/x-hwp"
             ),
+            (
+                name: "document.hwpx",
+                mimeType:
+                    "application/hwp+zip"
+            ),
         ]
         var temporaryURLs: [URL] = []
         var updates: [VisionLinkRemoteChatUpdate] =
@@ -329,7 +334,7 @@ final class VisionLinkRemoteChatTests:
 
         XCTAssertEqual(
             service.extractionCalls,
-            3
+            4
         )
         XCTAssertEqual(
             updates,

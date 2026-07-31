@@ -44,6 +44,13 @@ final class AuthorizedDocumentLibraryTests:
                 )
         )
         try write(
+            "개방형 문서",
+            to: nested
+                .appendingPathComponent(
+                    "문서.HWPX"
+                )
+        )
+        try write(
             "사진",
             to: fixture.root
                 .appendingPathComponent(
@@ -124,6 +131,7 @@ final class AuthorizedDocumentLibraryTests:
                 "보고서.pdf",
                 "업무/2026/매출.XLSX",
                 "업무/2026/문서.hwp",
+                "업무/2026/문서.HWPX",
             ]
         )
         XCTAssertFalse(result.isTruncated)

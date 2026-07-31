@@ -102,6 +102,8 @@ nonisolated enum ChatAttachmentError:
     case encryptedHWP
     case hwpLimitExceeded
     case unsupportedHWPVersion
+    case invalidHWPX
+    case hwpxLimitExceeded
     case documentHasNoText
     case fileTooLarge(maximumMegabytes: Int)
     case contextTooLarge(maximumKilobytes: Int)
@@ -115,7 +117,7 @@ nonisolated enum ChatAttachmentError:
             )
         case .unsupportedDocument:
             return AppLocalization.string(
-                "PDF, TXT, XLSX, XLS와 HWP 문서만 첨부할 수 있습니다."
+                "PDF, TXT, XLSX, XLS, HWP와 HWPX 문서만 첨부할 수 있습니다."
             )
         case .invalidImage:
             return AppLocalization.string(
@@ -155,7 +157,15 @@ nonisolated enum ChatAttachmentError:
             )
         case .unsupportedHWPVersion:
             return AppLocalization.string(
-                "HWP 5.x 문서만 지원합니다. HWPX 또는 HWP 5.x로 다시 저장해 주세요."
+                "이 구형 HWP 문서는 지원하지 않습니다. HWP 5.x 또는 HWPX로 다시 저장해 주세요."
+            )
+        case .invalidHWPX:
+            return AppLocalization.string(
+                "선택한 HWPX 문서를 읽을 수 없습니다."
+            )
+        case .hwpxLimitExceeded:
+            return AppLocalization.string(
+                "HWPX 문서가 구역 수 또는 압축 해제 제한을 초과했습니다."
             )
         case .documentHasNoText:
             return AppLocalization.string(
@@ -895,6 +905,9 @@ actor ChatAttachmentStore {
     static let maximumHWPBytes =
         HWP5TextExtractor
         .maximumDocumentBytes
+    static let maximumHWPXBytes =
+        HWPXTextExtractor
+        .maximumDocumentBytes
     static let maximumPDFPages = 100
 
     private let fileManager: FileManager
@@ -1179,6 +1192,53 @@ actor ChatAttachmentStore {
                 kind: .document,
                 mimeType:
                     "application/x-hwp",
+                storedName: storedName,
+                extractedText: extracted
+            )
+        } catch {
+            try? fileManager.removeItem(
+                at: destination
+            )
+            throw error
+        }
+    }
+
+    func importHWPX(
+        from sourceURL: URL
+    ) throws -> StoredChatFileAttachment {
+        let data = try readSecurityScopedData(
+            at: sourceURL,
+            maximumBytes:
+                Self.maximumHWPXBytes
+        )
+        let extracted =
+            try HWPXTextExtractor.extract(
+                from: data
+            )
+        let displayName = displayName(
+            sourceURL.lastPathComponent,
+            fallback:
+                AppLocalization.string(
+                    "첨부 문서.hwpx"
+                )
+        )
+        let storedName = newStoredName(
+            sourceName: displayName,
+            fallbackExtension: "hwpx"
+        )
+        let destination = try destinationURL(
+            storedName: storedName
+        )
+        do {
+            try data.write(
+                to: destination,
+                options: .atomic
+            )
+            return StoredChatFileAttachment(
+                name: displayName,
+                kind: .document,
+                mimeType:
+                    "application/hwp+zip",
                 storedName: storedName,
                 extractedText: extracted
             )

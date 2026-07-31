@@ -16,6 +16,9 @@ nonisolated enum VisionCraftFileTypes {
     static let hwp =
         UTType(filenameExtension: "hwp")
         ?? .data
+    static let hwpx =
+        UTType(filenameExtension: "hwpx")
+        ?? .data
 
     static let openable: [UTType] = [
         .image,
@@ -25,6 +28,7 @@ nonisolated enum VisionCraftFileTypes {
         xlsx,
         xls,
         hwp,
+        hwpx,
     ]
 }
 

@@ -416,6 +416,7 @@
 "PDF·TXT 문서, 클립보드 텍스트 또는 사진을 현재 대화의 문맥으로 사용합니다." = "Use a PDF or TXT document, clipboard text, or a photo as context for this conversation.";
 "PDF·TXT·XLSX 문서, 클립보드 텍스트 또는 사진을 현재 대화의 문맥으로 사용합니다." = "Use a PDF, TXT, or XLSX document, clipboard text, or a photo as context for this conversation.";
 "PDF·TXT·XLSX·XLS·HWP 문서, 클립보드 텍스트 또는 사진을 현재 대화의 문맥으로 사용합니다." = "Use a PDF, TXT, XLSX, XLS, or HWP document, clipboard text, or a photo as context for this conversation.";
+"PDF·TXT·XLSX·XLS·HWP·HWPX 문서, 클립보드 텍스트 또는 사진을 현재 대화의 문맥으로 사용합니다." = "Use a PDF, TXT, XLSX, XLS, HWP, or HWPX document, clipboard text, or a photo as context for this conversation.";
 "대화 첨부" = "Conversation Attachment";
 "대화 첨부: %@" = "Conversation attachment: %@";
 "첨부 사진" = "Attached Photo";
@@ -423,6 +424,7 @@
 "첨부 스프레드시트.xlsx" = "Attached Spreadsheet.xlsx";
 "첨부 스프레드시트.xls" = "Attached Spreadsheet.xls";
 "첨부 문서.hwp" = "Attached Document.hwp";
+"첨부 문서.hwpx" = "Attached Document.hwpx";
 "첨부 문맥" = "Attached Context";
 "텍스트 문맥 1개" = "1 text context";
 "텍스트 문맥 %lld개" = "%lld text contexts";
@@ -438,6 +440,7 @@
 "PDF와 TXT 문서만 첨부할 수 있습니다." = "Only PDF and TXT documents can be attached.";
 "PDF, TXT와 XLSX 문서만 첨부할 수 있습니다." = "Only PDF, TXT, and XLSX documents can be attached.";
 "PDF, TXT, XLSX, XLS와 HWP 문서만 첨부할 수 있습니다." = "Only PDF, TXT, XLSX, XLS, and HWP documents can be attached.";
+"PDF, TXT, XLSX, XLS, HWP와 HWPX 문서만 첨부할 수 있습니다." = "Only PDF, TXT, XLSX, XLS, HWP, and HWPX documents can be attached.";
 "선택한 사진을 읽을 수 없습니다." = "The selected photo could not be read.";
 "선택한 PDF를 열 수 없습니다." = "The selected PDF could not be opened.";
 "선택한 XLSX 문서를 읽을 수 없습니다." = "The selected XLSX document could not be read.";
@@ -449,14 +452,20 @@
 "암호·배포용·DRM 보안 HWP 문서는 로컬에서 열 수 없습니다. 보호를 해제한 복사본을 첨부해 주세요." = "Password-protected, distribution, or DRM-protected HWP documents cannot be opened locally. Attach an unprotected copy.";
 "HWP 문서가 구역 수 또는 압축 해제 제한을 초과했습니다." = "The HWP document exceeds the section or decompression limit.";
 "HWP 5.x 문서만 지원합니다. HWPX 또는 HWP 5.x로 다시 저장해 주세요." = "Only HWP 5.x documents are supported. Save the document as HWPX or HWP 5.x.";
+"이 구형 HWP 문서는 지원하지 않습니다. HWP 5.x 또는 HWPX로 다시 저장해 주세요." = "This older HWP document is not supported. Save it as HWP 5.x or HWPX.";
+"선택한 HWPX 문서를 읽을 수 없습니다." = "The selected HWPX document could not be read.";
+"HWPX 문서가 구역 수 또는 압축 해제 제한을 초과했습니다." = "The HWPX document exceeds the section or expanded archive limit.";
+"\n\n[HWPX 내용 일부 생략]" = "\n\n[Some HWPX content omitted]";
 "문서에서 질문에 사용할 텍스트를 찾지 못했습니다." = "No text that can be used for questions was found in the document.";
 "파일 하나를 열거나 허용한 폴더의 문서를 검색합니다." = "Open one file or search documents in an authorized folder.";
 "문서 텍스트 추출 중…" = "Extracting document text…";
 "PDF, TXT, XLSX, XLS와 HWP 문서만 지원합니다." = "Only PDF, TXT, XLSX, XLS, and HWP documents are supported.";
+"PDF, TXT, XLSX, XLS, HWP와 HWPX 문서만 지원합니다." = "Only PDF, TXT, XLSX, XLS, HWP, and HWPX documents are supported.";
 "먼저 검색할 폴더를 선택해 주세요." = "Choose a folder to search first.";
 "저장된 폴더 권한을 다시 사용할 수 없습니다. 폴더를 다시 선택해 주세요." = "The saved folder permission can no longer be used. Choose the folder again.";
 "선택한 문서가 허용된 폴더 밖에 있거나 더 이상 존재하지 않습니다." = "The selected document is outside the authorized folder or no longer exists.";
 "PDF, TXT, XLSX, XLS와 HWP 문서만 검색할 수 있습니다." = "Only PDF, TXT, XLSX, XLS, and HWP documents can be searched.";
+"PDF, TXT, XLSX, XLS, HWP와 HWPX 문서만 검색할 수 있습니다." = "Only PDF, TXT, XLSX, XLS, HWP, and HWPX documents can be searched.";
 "문서가 너무 많아 최근 %lld개만 표시합니다." = "There are too many documents, so only the most recent %lld are shown.";
 "파일 하나 선택" = "Choose One File";
 "Files에서 파일 하나를 바로 선택해 엽니다." = "Choose and open one file directly from Files.";
@@ -833,6 +842,7 @@
 "AI 대화 파일 첨부 수신 · %@" = "AI chat file received · %@";
 "PDF 문서를 열 수 없습니다." = "The PDF document could not be opened.";
 "PDF, TXT, XLSX, XLS와 HWP 문서만 원격 대화에 첨부할 수 있습니다." = "Only PDF, TXT, XLSX, XLS, and HWP documents can be attached to a remote chat.";
+"PDF, TXT, XLSX, XLS, HWP와 HWPX 문서만 원격 대화에 첨부할 수 있습니다." = "Only PDF, TXT, XLSX, XLS, HWP, and HWPX documents can be attached to a remote chat.";
 "VisionLink ICE 후보 적용 실패: %@" = "Couldn’t apply the VisionLink ICE candidate: %@";
 "VisionLink 기기 대기 중" = "Waiting for a VisionLink device";
 "VisionLink 대화" = "VisionLink Conversation";

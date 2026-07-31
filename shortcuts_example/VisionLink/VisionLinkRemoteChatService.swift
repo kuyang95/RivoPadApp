@@ -263,6 +263,7 @@ struct VisionLinkRemoteChatProcessor {
                     "xlsx",
                     "xls",
                     "hwp",
+                    "hwpx",
                 ].contains(pathExtension) {
                     let text = try await service
                         .extractDocumentText(
@@ -431,7 +432,8 @@ final class VisionLinkLocalRemoteChatService:
                 at: url,
                 mimeType: mimeType
             )
-        case "xlsx", "xls", "hwp":
+        case "xlsx", "xls", "hwp",
+             "hwpx":
             text = try await
                 LocalStructuredDocumentTextExtractor
                 .extract(at: url)
@@ -721,7 +723,7 @@ nonisolated enum VisionLinkRemoteChatError:
         switch self {
         case .unsupportedDocument:
             return AppLocalization.string(
-                "PDF, TXT, XLSX, XLS와 HWP 문서만 원격 대화에 첨부할 수 있습니다."
+                "PDF, TXT, XLSX, XLS, HWP와 HWPX 문서만 원격 대화에 첨부할 수 있습니다."
             )
         case .invalidPDF:
             return AppLocalization.string(

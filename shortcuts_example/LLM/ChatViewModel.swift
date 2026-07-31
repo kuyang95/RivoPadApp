@@ -671,6 +671,14 @@ final class ChatViewModel: ObservableObject {
                 try await replaceFileAttachment(
                     attachment
                 )
+            } else if pathExtension
+                        == "hwpx" {
+                let attachment =
+                    try await attachmentStore
+                    .importHWPX(from: url)
+                try await replaceFileAttachment(
+                    attachment
+                )
             } else if pathExtension == "txt"
                         || pathExtension == "text" {
                 let text = try await

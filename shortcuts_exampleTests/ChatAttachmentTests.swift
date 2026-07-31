@@ -400,6 +400,173 @@ final class ChatAttachmentTests:
         )
     }
 
+    func testHWPXExtractsPackageOrderAndStoresOriginal()
+        async throws
+    {
+        let fixture = try makeFixture()
+        defer {
+            try? FileManager.default
+                .removeItem(
+                    at: fixture.root
+                )
+        }
+        let source = fixture.root
+            .appendingPathComponent(
+                "open-format.hwpx"
+            )
+        try makeHWPXData().write(
+            to: source
+        )
+
+        let attachment =
+            try await fixture.attachmentStore
+            .importHWPX(from: source)
+
+        XCTAssertEqual(
+            attachment.mimeType,
+            "application/hwp+zip"
+        )
+        let text = try XCTUnwrap(
+            attachment.extractedText
+        )
+        XCTAssertTrue(
+            text.contains(
+                "먼저 읽는 구역\t탭\n줄바꿈-연결"
+            )
+        )
+        XCTAssertTrue(
+            text.contains(
+                "나중 구역"
+            )
+        )
+        XCTAssertTrue(
+            text.contains(
+                "표의 첫 셀"
+            )
+        )
+        XCTAssertLessThan(
+            try XCTUnwrap(
+                text.range(
+                    of: "먼저 읽는 구역"
+                )?.lowerBound
+            ),
+            try XCTUnwrap(
+                text.range(
+                    of: "나중 구역"
+                )?.lowerBound
+            )
+        )
+        let storedURL =
+            await fixture.attachmentStore
+            .existingURL(for: attachment)
+        XCTAssertNotNil(storedURL)
+    }
+
+    func testVisionLinkLocallyExtractsHWPX()
+        async throws
+    {
+        let fixture = try makeFixture()
+        defer {
+            try? FileManager.default
+                .removeItem(
+                    at: fixture.root
+                )
+        }
+        let source = fixture.root
+            .appendingPathComponent(
+                "remote.hwpx"
+            )
+        try makeHWPXData().write(
+            to: source
+        )
+
+        let text = try await
+            VisionLinkLocalRemoteChatService
+            .shared
+            .extractDocumentText(
+                at: source,
+                mimeType:
+                    "application/hwp+zip"
+            )
+
+        XCTAssertTrue(
+            text.contains(
+                "먼저 읽는 구역"
+            )
+        )
+        XCTAssertTrue(
+            text.contains(
+                "표의 첫 셀"
+            )
+        )
+    }
+
+    func testHWPXRejectsWrongMIMEAndMalformedSection()
+        throws
+    {
+        XCTAssertThrowsError(
+            try HWPXTextExtractor.extract(
+                from:
+                    makeZIPData(
+                        entries: [
+                            "mimetype":
+                                "application/zip",
+                            "Contents/section0.xml":
+                                "<section/>",
+                        ]
+                    )
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? ChatAttachmentError,
+                .invalidHWPX
+            )
+        }
+
+        XCTAssertThrowsError(
+            try HWPXTextExtractor.extract(
+                from:
+                    makeZIPData(
+                        entries: [
+                            "mimetype":
+                                "application/hwp+zip",
+                            "Contents/section0.xml":
+                                "<hs:sec><hp:p>",
+                        ]
+                    )
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? ChatAttachmentError,
+                .invalidHWPX
+            )
+        }
+
+        XCTAssertThrowsError(
+            try HWPXTextExtractor.extract(
+                from:
+                    makeZIPData(
+                        entries: [
+                            "mimetype":
+                                "application/hwp+zip",
+                            "Contents/section0.xml":
+                                """
+                                <!DOCTYPE sec [
+                                  <!ENTITY payload "hidden">
+                                ]>
+                                <sec><p><t>&payload;</t></p></sec>
+                                """,
+                        ]
+                    )
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? ChatAttachmentError,
+                .invalidHWPX
+            )
+        }
+    }
+
     func testXLSXRejectsMissingWorkbookParts()
         throws
     {
@@ -700,6 +867,67 @@ final class ChatAttachmentTests:
                         </row>
                       </sheetData>
                     </worksheet>
+                    """,
+            ]
+        )
+    }
+
+    private func makeHWPXData()
+        throws -> Data
+    {
+        try makeZIPData(
+            entries: [
+                "mimetype":
+                    "application/hwp+zip",
+                "Contents/content.hpf":
+                    """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <opf:package
+                      xmlns:opf="http://www.idpf.org/2007/opf/">
+                      <opf:manifest>
+                        <opf:item id="section0"
+                          href="Contents/section0.xml"
+                          media-type="application/xml"/>
+                        <opf:item id="section1"
+                          href="section1.xml"
+                          media-type="application/xml"/>
+                      </opf:manifest>
+                      <opf:spine>
+                        <opf:itemref idref="section1"/>
+                        <opf:itemref idref="section0"/>
+                      </opf:spine>
+                    </opf:package>
+                    """,
+                "Contents/section0.xml":
+                    """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <hs:sec
+                      xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"
+                      xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">
+                      <hp:p><hp:run><hp:t>나중 구역</hp:t></hp:run></hp:p>
+                      <hp:tbl>
+                        <hp:tr>
+                          <hp:tc>
+                            <hp:subList>
+                              <hp:p><hp:run><hp:t>표의 첫 셀</hp:t></hp:run></hp:p>
+                          </hp:subList>
+                          </hp:tc>
+                        </hp:tr>
+                      </hp:tbl>
+                    </hs:sec>
+                    """,
+                "Contents/section1.xml":
+                    """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <hs:sec
+                      xmlns:hs="http://www.owpml.org/owpml/2021/section"
+                      xmlns:hp="http://www.owpml.org/owpml/2021/paragraph">
+                      <hp:p>
+                        <hp:run>
+                          <hp:t>먼저 읽는 구역<hp:tab/>탭<hp:lineBreak/>줄바꿈<hp:hypen/>연결</hp:t>
+                        </hp:run>
+                      </hp:p>
+                    </hs:sec>
                     """,
             ]
         )

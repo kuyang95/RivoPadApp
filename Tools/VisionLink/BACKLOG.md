@@ -40,10 +40,10 @@
 - 원격 대화 ID를 로컬 대화 기록 UUID에 영구 연결
 - 첫 요청 전체 문맥과 이후 최신 질문·답변을 로컬 대화 기록에 저장
 - 최대 64KB 클립보드 문맥 첨부와 누적 256KB 안전 제한
-- 최대 25MB 이미지·TXT·PDF·HWP·XLS·XLSX 대화 첨부 수신과
+- 최대 25MB 이미지·TXT·PDF·HWP·HWPX·XLS·XLSX 대화 첨부 수신과
   교체·임시 파일 정리
 - 이미지 첨부는 M4 로컬 VLM, PDF는 내장 텍스트·Vision OCR 뒤 로컬 LLM 사용
-- XLSX·Excel 97-2003 BIFF8 XLS·HWP 5.x 원격 첨부를 안전한 로컬
+- XLSX·Excel 97-2003 BIFF8 XLS·HWP 5.x·HWPX 원격 첨부를 안전한 로컬
   파서로 추출해 대화 문맥에 누적
 - `chat-attachment-ready`·`chat-attachment-error` 회신
 - OCR·번역·이미지 분석·AI 대화·첨부를 하나의 직렬 큐에서 처리
@@ -105,7 +105,7 @@
 - [ ] 텍스트가 있는 PDF와 스캔 PDF를 각각 첨부하면 로컬 답변이 돌아온다.
 - [ ] TXT 첨부가 문맥으로 누적되고 다음 질문에서 사용된다.
 - [ ] 새 이미지·PDF 첨부가 기존 첨부를 교체하고 오래된 파일이 남지 않는다.
-- [ ] HWP 5.x·Excel 97-2003 XLS·XLSX 첨부 뒤 질문하면 추출한 본문과
+- [ ] HWP 5.x·HWPX·Excel 97-2003 XLS·XLSX 첨부 뒤 질문하면 추출한 본문과
   셀 내용을 참고한 답변이 돌아온다.
 - [ ] 암호화·손상·20MB 초과 HWP/XLS/XLSX는 상대 기기에 구체적인 오류가
   표시되고 임시 파일이 남지 않는다.
@@ -157,6 +157,7 @@
 - [x] `ai-chat` 메시지 문맥과 로컬 MLX 답변 회신
 - [x] 클립보드·이미지·TXT·PDF 대화 첨부
 - [x] HWP 5.x·BIFF8 XLS·XLSX 대화 첨부 텍스트 추출
+- [x] HWPX OWPML 패키지 대화 첨부 텍스트 추출
 - [x] 원격 영상 프레임의 1.2초 간격 OCR과 최근 결과 중복 억제
 - [x] `visioncraft-feature`, `visioncraft-chat-attachment`,
   `chat-context-attachment`, `feature-request` 연결

@@ -19,9 +19,9 @@
 | --- | --- | --- |
 | 새 AI 대화, 스트리밍 답변 | ✅ | M4 로컬 MLX 모델 사용 |
 | 대화 기록 저장·열기·삭제 | ✅ | Android 제목 수정, 제목·메시지 검색, 개수, 확인형 전체 삭제, 사용자 제목 보존과 M4 등급별 최근 문맥 복원 완료; 긴 대화 실기기 🧪 |
-| 대화 안 문서·클립보드·사진 첨부 | ✅ | TXT·클립보드 누적, PDFKit/Vision·XLSX·BIFF8 XLS·HWP 5.x 로컬 추출, 사진 비전 모델, 원본 교체·저장·복원·정리와 안전 제한 완료; 실제 파일 조합 🧪 |
+| 대화 안 문서·클립보드·사진 첨부 | ✅ | TXT·클립보드 누적, PDFKit/Vision·XLSX·BIFF8 XLS·HWP 5.x·HWPX 로컬 추출, 사진 비전 모델, 원본 교체·저장·복원·정리와 안전 제한 완료; 실제 파일 조합 🧪 |
 | 이미지 질문·설명 | ✅ | 파일·사진 첨부와 카메라 직접 촬영→M4 로컬 설명·자동 TTS 완료, 다양한 장면 실기기 🧪 |
-| PDF·텍스트 문서 질문 | ✅ | 질문별 관련 청크 선택과 PDF·TXT·XLSX·BIFF8 XLS·HWP 5.x 완료; 실제 복합 문서 🧪 |
+| PDF·텍스트 문서 질문 | ✅ | 질문별 관련 청크 선택과 PDF·TXT·XLSX·BIFF8 XLS·HWP 5.x·HWPX 완료; 실제 복합 문서 🧪 |
 | OCR 결과 AI 교정·질문 | ✅ | 정지 이미지와 Vision OCR 원문을 M4 Qwen3-VL로 함께 교정하고 숫자·URL·줄바꿈·길이 변조를 차단; 한 장·스캔 PDF·채팅 PDF·App Intent·VisionLink 연결 완료, 실제 문서 품질 🧪 |
 | 번역 | ✅ | 한국어·영어·일본어 대상 선택, 명시적 붙여넣기, M4 로컬 스트리밍·복사·읽기·중지 완료; 실제 번역 품질 🧪 |
 | URL 본문 추출·질문 | ✅ | HTTP(S)·redirect·2MB·10/15초 제한, HTML 정리, 짧은 동적 페이지 WebKit fallback, 공유 URL, 출처 보존과 비신뢰 prompt 경계 완료; 실제 사이트 조합 🧪 |
@@ -80,7 +80,7 @@
 | 가로 한 줄 읽기 | ✅ | 설정 저장, 가로 방향에서 현재 논리 줄 좌우 스크롤; 실제 회전·긴 줄·VoiceOver 🧪 |
 | TXT/PDF 저장 | ✅ | UTF-8 TXT와 여러 페이지 PDF를 Files로 내보내기 |
 | XLS/XLSX 읽기 | ✅ | 문서 뷰어·AI·VisionLink에서 XLSX ZIP/XML과 Excel 97-2003 OLE/BIFF8 로컬 추출·암호화/손상 방어 완료; BIFF8 이전은 명시적 미지원 |
-| HWP 읽기 | ✅ | 문서 뷰어·AI·VisionLink에서 HWP 5.x OLE·raw DEFLATE·문단 텍스트 로컬 추출과 보안 플래그 거절 완료; HWP 3.x·HWPX는 별도 형식 |
+| HWP/HWPX 읽기 | ✅ | HWP 5.x OLE·raw DEFLATE·보안 플래그 거절과 HWPX OWPML ZIP의 구역 순서·문단·표 셀 로컬 추출을 문서 뷰어·AI·VisionLink에 연결; 실제 파일 🧪 |
 | 사용자가 선택한 폴더 검색 | ✅ | 보안 범위 북마크·재귀 검색·이름/경로 검색·최근 수정 정렬·권한 삭제 완료; Files 공급자 조합 🧪 |
 | 기기 전체 저장소 자동 검색 | 🚫 | 앱 샌드박스 밖 재귀 검색 불가 |
 
@@ -120,7 +120,7 @@
 | 원격 이미지 OCR | ✅ | Vision + 2048px 제한 디코딩, 실송신 확인 🧪 |
 | 원격 이미지 설명·번역 | ✅ | M4 로컬 MLX·OCR 사용, 한국어 번역 결과 실송신 확인 🧪 |
 | 원격 텍스트 번역 | ✅ | 32KB 입력·256KB 결과 제한, 로컬 MLX 사용 |
-| 원격 AI 채팅·첨부 문맥 | ✅ | 로컬 MLX·대화 ID·클립보드·이미지·TXT·PDF·XLSX·BIFF8 XLS·HWP 5.x 완료; 실제 Android 송신 조합 🧪 |
+| 원격 AI 채팅·첨부 문맥 | ✅ | 로컬 MLX·대화 ID·클립보드·이미지·TXT·PDF·XLSX·BIFF8 XLS·HWP 5.x·HWPX 완료; 실제 Android 송신 조합 🧪 |
 | 원격 영상 실시간 읽기 | ✅ | 1.2초 프레임 OCR·최근 5개 유사 결과 억제 완료, 실제 Android 송신기 확인 🧪 |
 | 화면을 끈 뒤 영구 수신·부팅 상주 | 🚫 | iPadOS 백그라운드 정책상 동일 구현 불가 |
 
@@ -218,6 +218,7 @@ iPad 앱에서는 동일 구현하지 않으며, 제품 범위와 대체 경로�
 35. 구성 가능한 제어 센터·잠금 화면 VisionCraft 빠른 실행 컨트롤 ✅
 36. EPUB·DAISY 원본 XHTML·로컬 리소스의 안전한 선택형 표현 ✅
 37. 비정형 XHTML·손상 목차 격리와 HTML named entity 호환성 ✅
+38. HWPX OWPML 로컬 텍스트 추출과 문서·AI·VisionLink 연결 ✅
 
 ## 일괄 실기기 검증 원칙
 
