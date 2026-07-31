@@ -15,7 +15,9 @@ iPadOS가 허용하는 앱 외부 진입점을 VisionCraft 기능에 연결한�
 - 기존 AI·이미지·OCR·음성·스캔 Intent와 10개 바로가기의 제목·설명·
   매개변수·요약·결과·오류를 영어·일본어로 번역하고, 현지어 Siri
   호출 문구에서 앱 이름 토큰을 유지
-- 동작이 없는 Xcode 템플릿 App Intent를 검색과 단축어 목록에서 숨김
+- 실제 기능이 없던 Xcode 템플릿 App Intent 확장과 가짜 메시지 성공을
+  반환하던 SiriKit 메시지·UI 확장 타깃, 전용 scheme을 제거하고 실제
+  App Intent가 있는 본 앱 타깃만 유지
 - App Shortcut 요청을 App Group envelope에 저장한 뒤 앱의
   `NavigationStack` 또는 Files 선택기로 한 번만 라우팅
 - 앱 최초 실행과 활성 복귀 양쪽에서 대기 중인 envelope 소비
@@ -80,8 +82,6 @@ iPadOS가 허용하는 앱 외부 진입점을 VisionCraft 기능에 연결한�
 ## 다음 구현
 
 - 실제 사용자 발화에서 자주 생기는 한국어 표현을 수집해 phrase 보강
-- 기존 템플릿 기반 SiriKit 메시지 확장 타깃의 사용 여부를 확정하고,
-  사용하지 않으면 별도 정리 묶음에서 제거
 
 ## iPadOS 제약
 

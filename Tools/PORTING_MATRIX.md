@@ -244,6 +244,9 @@ iPad 앱에서는 동일 구현하지 않으며, 제품 범위와 대체 경로�
     글꼴 등록과 문서 OCR 접근성 컨테이너를 iOS 26 API 기준으로 보강 ✅
 55. 스캐너 카메라 회전 각도 API, 촬영 pixel buffer의 명시적 actor 전달,
     Metal uniform의 bitwise 메모리 계약을 Swift 6 기준으로 보강 ✅
+56. 실제 기능 없이 가짜 메시지 성공을 반환하던 Xcode SiriKit 메시지·UI
+    템플릿과 숨겨진 빈 App Intent 확장 타깃을 제거하고 본 앱의 실제
+    App Intent 진입점만 유지 ✅
 
 ## 일괄 실기기 검증 원칙
 
