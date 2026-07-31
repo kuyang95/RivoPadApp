@@ -93,7 +93,9 @@
 - [ ] 받은 클립보드 글은 자동 덮어쓰기 없이 복사 버튼으로 반영된다.
 - [ ] 받은 클립보드 글을 텍스트뷰로 열어 큰 글자·편집·TTS와 Rivo
       문서 조작을 사용할 수 있다.
-- [ ] 카메라 공유 시작·종료 상태가 데이터 채널 구역에 표시된다.
+- [ ] 카메라 공유 준비·수신·종료와 바로 읽기·종료 상태가 데이터 채널
+      구역에 표시되고, 바로 읽기 종료 직후 카메라 종료가 와도 3초간
+      바로 읽기 종료 안내가 유지된다.
 - [ ] Android에서 사진 OCR을 요청하면 `recognizing` 뒤 인식문이 돌아온다.
 - [ ] Android에서 이미지 분석을 요청하면 M4 로컬 VLM 설명이 돌아온다.
 - [ ] Android에서 이미지 번역을 요청하면 OCR 뒤 `translating`과 번역문이 돌아온다.
@@ -166,6 +168,8 @@
 - [x] `visioncraft-feature`, `visioncraft-chat-attachment`,
   `chat-context-attachment`, `feature-request` 연결
 - [x] `live-reading-start`·`live-reading-stop`·상태·결과·오류 연결
+- [x] 카메라 준비·수신·중지와 바로 읽기·중지의 연결 작업 상태 분리,
+  바로 읽기 종료 상태의 3초 우선 보존
 
 ## 원격 기능 구현 메모
 

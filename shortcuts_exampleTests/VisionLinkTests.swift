@@ -217,6 +217,72 @@ final class VisionLinkMediaWatchdogTests:
     }
 }
 
+final class VisionLinkConnectedActivityTrackerTests:
+    XCTestCase
+{
+    func testCameraShareTracksPreparingReceivingAndStopped()
+    {
+        var tracker =
+            VisionLinkConnectedActivityTracker()
+
+        tracker.videoPreparing()
+        XCTAssertEqual(
+            tracker.activity,
+            .videoPreparing
+        )
+
+        tracker.videoFrameReceived(
+            isLiveReadingActive: false
+        )
+        XCTAssertEqual(
+            tracker.activity,
+            .cameraReceiving
+        )
+
+        tracker.cameraShareStopped(at: 10)
+        XCTAssertEqual(
+            tracker.activity,
+            .cameraStopped
+        )
+    }
+
+    func testLiveReadingStopSurvivesImmediateCameraStop()
+    {
+        var tracker =
+            VisionLinkConnectedActivityTracker()
+
+        tracker.liveReadingStarted()
+        XCTAssertEqual(
+            tracker.activity,
+            .liveReading
+        )
+
+        tracker.liveReadingStopped(at: 20)
+        tracker.cameraShareStopped(at: 23)
+        XCTAssertEqual(
+            tracker.activity,
+            .liveReadingStopped
+        )
+    }
+
+    func testExpiredLiveReadingStopDoesNotMaskCameraStop()
+    {
+        var tracker =
+            VisionLinkConnectedActivityTracker()
+
+        tracker.liveReadingStopped(at: 20)
+        tracker.cameraShareStopped(at: 23.001)
+
+        XCTAssertEqual(
+            tracker.activity,
+            .cameraStopped
+        )
+
+        tracker.clear()
+        XCTAssertNil(tracker.activity)
+    }
+}
+
 final class VisionLinkReceivedTextStoreTests:
     XCTestCase
 {

@@ -937,6 +937,17 @@
 "상대 기기 연결 끊김" = "Companion device disconnected";
 "상대 기기 연결 종료" = "Companion device ended the connection";
 "상대 기기와 서버에 저장된 연결 정보가 삭제됩니다." = "Connection information stored on the companion device and server will be deleted.";
+"카메라 화면 공유 중" = "Camera sharing in progress";
+"카메라 화면 공유 중지됨" = "Camera sharing stopped";
+"카메라 화면 준비 중" = "Preparing camera view";
+"카메라 화면에서 글자를 인식하고 있습니다." = "Recognizing text in the camera view.";
+"첫 화면이 도착할 때까지 잠시 기다려주세요." = "Please wait for the first frame to arrive.";
+"VisionLink 카메라 영상을 수신하고 있습니다." = "Receiving live video from the VisionLink camera.";
+"VisionLink가 바로 읽기를 중지했습니다." = "VisionLink stopped live reading.";
+"VisionLink가 카메라 화면 공유를 중지했습니다." = "VisionLink stopped sharing the camera.";
+"바로 읽기 처리 중" = "Live reading in progress";
+"바로 읽기 중지됨" = "Live reading stopped";
+"VisionLink 연결됨" = "VisionLink Connected";
 "상대 카메라 공유 시작" = "Companion camera sharing started";
 "상대 카메라 공유 종료" = "Companion camera sharing ended";
 "상태 %lld" = "Status %lld";

@@ -21,7 +21,8 @@ struct VisionLinkView: View {
         List {
             statusSection
 
-            if manager.remoteVideoTrack != nil {
+            if manager.remoteVideoTrack != nil,
+               manager.isCameraShareActive {
                 videoSection
             }
 
@@ -101,12 +102,36 @@ struct VisionLinkView: View {
                     : Color.secondary
             )
 
-            if manager.isCameraShareActive {
-                Label(
-                    "상대 카메라 공유 중",
-                    systemImage: "camera.fill"
+            if let activity =
+                manager.connectedActivity {
+                HStack(spacing: 12) {
+                    if activity.isWorking {
+                        ProgressView()
+                    } else {
+                        Image(
+                            systemName:
+                                "pause.circle.fill"
+                        )
+                        .foregroundStyle(
+                            Color.secondary
+                        )
+                    }
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(activity.title)
+                            .font(.headline)
+                        Text(activity.detail)
+                            .font(.caption)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                    }
+                }
+                .accessibilityElement(
+                    children: .combine
                 )
-                .foregroundStyle(.green)
             }
 
             if let status =
@@ -470,6 +495,7 @@ struct VisionLinkView: View {
                  .mediaOfferReceived,
                  .mediaConnecting,
                  .mediaConnected,
+                 .mediaIdle,
                  .videoReceiving:
                 Button(
                     "신호 연결 끊기",
@@ -620,6 +646,8 @@ struct VisionLinkView: View {
             return "arrow.triangle.2.circlepath"
         case .mediaConnected:
             return "video.badge.clock"
+        case .mediaIdle:
+            return "checkmark.circle"
         case .videoReceiving:
             return "checkmark.circle.fill"
         case .failed, .codeExpired:
@@ -633,7 +661,9 @@ struct VisionLinkView: View {
 
     private var statusColor: Color {
         switch manager.state {
-        case .mediaConnected, .videoReceiving:
+        case .mediaConnected,
+             .mediaIdle,
+             .videoReceiving:
             return .green
         case .waitingForCompanion,
              .companionConnected,

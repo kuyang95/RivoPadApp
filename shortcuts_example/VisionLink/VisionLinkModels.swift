@@ -377,6 +377,138 @@ nonisolated enum VisionLinkPairDeletionPolicy {
     }
 }
 
+nonisolated enum VisionLinkConnectedActivity:
+    Equatable,
+    Sendable
+{
+    case videoPreparing
+    case cameraReceiving
+    case cameraStopped
+    case liveReading
+    case liveReadingStopped
+
+    var title: String {
+        switch self {
+        case .videoPreparing:
+            return AppLocalization.string(
+                "카메라 화면 준비 중"
+            )
+        case .cameraReceiving:
+            return AppLocalization.string(
+                "카메라 화면 공유 중"
+            )
+        case .cameraStopped:
+            return AppLocalization.string(
+                "카메라 화면 공유 중지됨"
+            )
+        case .liveReading:
+            return AppLocalization.string(
+                "바로 읽기 처리 중"
+            )
+        case .liveReadingStopped:
+            return AppLocalization.string(
+                "바로 읽기 중지됨"
+            )
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .videoPreparing:
+            return AppLocalization.string(
+                "첫 화면이 도착할 때까지 잠시 기다려주세요."
+            )
+        case .cameraReceiving:
+            return AppLocalization.string(
+                "VisionLink 카메라 영상을 수신하고 있습니다."
+            )
+        case .cameraStopped:
+            return AppLocalization.string(
+                "VisionLink가 카메라 화면 공유를 중지했습니다."
+            )
+        case .liveReading:
+            return AppLocalization.string(
+                "카메라 화면에서 글자를 인식하고 있습니다."
+            )
+        case .liveReadingStopped:
+            return AppLocalization.string(
+                "VisionLink가 바로 읽기를 중지했습니다."
+            )
+        }
+    }
+
+    var isWorking: Bool {
+        switch self {
+        case .videoPreparing,
+             .cameraReceiving,
+             .liveReading:
+            return true
+        case .cameraStopped,
+             .liveReadingStopped:
+            return false
+        }
+    }
+}
+
+nonisolated struct VisionLinkConnectedActivityTracker:
+    Equatable,
+    Sendable
+{
+    static let liveReadingStopGrace:
+        TimeInterval = 3
+
+    private(set) var activity:
+        VisionLinkConnectedActivity?
+    private var liveReadingStoppedUntil:
+        TimeInterval?
+
+    mutating func videoPreparing() {
+        liveReadingStoppedUntil = nil
+        activity = .videoPreparing
+    }
+
+    mutating func videoFrameReceived(
+        isLiveReadingActive: Bool
+    ) {
+        liveReadingStoppedUntil = nil
+        activity = isLiveReadingActive
+            ? .liveReading
+            : .cameraReceiving
+    }
+
+    mutating func liveReadingStarted() {
+        liveReadingStoppedUntil = nil
+        activity = .liveReading
+    }
+
+    mutating func liveReadingStopped(
+        at uptime: TimeInterval
+    ) {
+        liveReadingStoppedUntil =
+            uptime + Self.liveReadingStopGrace
+        activity = .liveReadingStopped
+    }
+
+    mutating func cameraShareStopped(
+        at uptime: TimeInterval
+    ) {
+        let preservesLiveReadingStop =
+            uptime <= (
+                liveReadingStoppedUntil
+                ?? -.infinity
+            )
+        liveReadingStoppedUntil = nil
+        if !preservesLiveReadingStop {
+            activity = .cameraStopped
+        }
+    }
+
+    mutating func clear() {
+        liveReadingStoppedUntil = nil
+        activity = nil
+    }
+}
+
 nonisolated enum VisionLinkJSON {
     static func decodeSession(
         _ data: Data

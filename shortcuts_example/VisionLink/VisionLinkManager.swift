@@ -15,6 +15,7 @@ nonisolated enum VisionLinkConnectionState:
     case mediaOfferReceived
     case mediaConnecting
     case mediaConnected
+    case mediaIdle
     case videoReceiving
     case disconnected
     case codeExpired
@@ -56,6 +57,10 @@ nonisolated enum VisionLinkConnectionState:
             return AppLocalization.string(
                 "영상 연결됨 · 첫 화면 대기 중"
             )
+        case .mediaIdle:
+            return AppLocalization.string(
+                "VisionLink 연결됨"
+            )
         case .videoReceiving:
             return AppLocalization.string(
                 "원격 영상 수신 중"
@@ -89,6 +94,7 @@ nonisolated enum VisionLinkConnectionState:
              .mediaOfferReceived,
              .mediaConnecting,
              .mediaConnected,
+             .mediaIdle,
              .videoReceiving:
             return true
         default:
@@ -148,6 +154,8 @@ final class VisionLinkManager: ObservableObject {
         false
     @Published private(set) var isCameraShareActive =
         false
+    @Published private(set) var connectedActivity:
+        VisionLinkConnectedActivity?
     @Published private(set) var incomingTransfer:
         VisionLinkTransferProgress?
     @Published private(set) var lastReceivedFile:
@@ -207,6 +215,8 @@ final class VisionLinkManager: ObservableObject {
     private var liveReadingScheduleTask:
         Task<Void, Never>?
     private var liveReadingOperationID: UUID?
+    private var connectedActivityTracker =
+        VisionLinkConnectedActivityTracker()
 
     init(
         server: any VisionLinkServerServing =
@@ -682,12 +692,14 @@ final class VisionLinkManager: ObservableObject {
             if let roomID {
                 self.roomID = roomID
             }
+            clearConnectedActivity()
             state = .waitingForCompanion
 
         case .peerJoined(_, _, _, let peerName):
             confirmPairing()
             let name = normalizedPeerName(peerName)
             self.peerName = name
+            clearConnectedActivity()
             state = .companionConnected(name)
             startOfferWatchdog()
 
@@ -695,14 +707,19 @@ final class VisionLinkManager: ObservableObject {
             confirmPairing()
             let name = normalizedPeerName(cameraName)
             peerName = name
+            clearConnectedActivity()
             state = .companionConnected(name)
 
         case .peerWaiting:
+            clearConnectedActivity()
             state = .waitingForCompanion
 
         case .offer(let offer):
             confirmPairing()
             stopMediaWatchdog()
+            updateConnectedActivity {
+                $0.videoPreparing()
+            }
             state = .mediaOfferReceived
             webRTCReceiver.handleOffer(
                 offer,
@@ -777,6 +794,17 @@ final class VisionLinkManager: ObservableObject {
                 at: Self.systemUptime
             )
         scheduleMediaWatchdog()
+        if isFirstFrame
+            || connectedActivity == .videoPreparing {
+            let isLiveReadingActive =
+                liveReadingSessionID != nil
+            updateConnectedActivity {
+                $0.videoFrameReceived(
+                    isLiveReadingActive:
+                        isLiveReadingActive
+                )
+            }
+        }
         guard isFirstFrame
                 || state != .videoReceiving else {
             return
@@ -958,6 +986,28 @@ final class VisionLinkManager: ObservableObject {
         ProcessInfo.processInfo.systemUptime
     }
 
+    private func updateConnectedActivity(
+        _ update: (
+            inout VisionLinkConnectedActivityTracker
+        ) -> Void
+    ) {
+        let previous =
+            connectedActivityTracker.activity
+        update(&connectedActivityTracker)
+        guard previous
+                != connectedActivityTracker.activity else {
+            return
+        }
+        connectedActivity =
+            connectedActivityTracker.activity
+    }
+
+    private func clearConnectedActivity() {
+        updateConnectedActivity {
+            $0.clear()
+        }
+    }
+
     private func confirmPairing() {
         stopCountdown()
         pairingCode = nil
@@ -1073,6 +1123,7 @@ final class VisionLinkManager: ObservableObject {
         isDataChannelReady = false
         isCameraShareActive = false
         incomingTransfer = nil
+        clearConnectedActivity()
     }
 
     private func startRemoteLiveReading(
@@ -1084,6 +1135,9 @@ final class VisionLinkManager: ObservableObject {
         liveReadingSessionID = sessionID
         liveReadingSequence = 0
         liveReadingTextFilter.reset()
+        updateConnectedActivity {
+            $0.liveReadingStarted()
+        }
         _ = webRTCReceiver
             .sendLiveReadingStatus(
                 sessionID: sessionID,
@@ -1110,15 +1164,16 @@ final class VisionLinkManager: ObservableObject {
             .requestLiveReadingFrame()
     }
 
+    @discardableResult
     private func stopRemoteLiveReading(
         reason: String,
         requestedSessionID: String? = nil,
         sendStoppedStatus: Bool = false
-    ) {
+    ) -> Bool {
         if let requestedSessionID,
            requestedSessionID
             != liveReadingSessionID {
-            return
+            return false
         }
         let previousSessionID =
             liveReadingSessionID
@@ -1134,7 +1189,7 @@ final class VisionLinkManager: ObservableObject {
             .cancelLiveReadingFrameRequest()
 
         guard let previousSessionID else {
-            return
+            return false
         }
         if sendStoppedStatus {
             _ = webRTCReceiver
@@ -1165,6 +1220,7 @@ final class VisionLinkManager: ObservableObject {
                 reason
             )
         )
+        return true
     }
 
     private func processLiveReadingFrame(
@@ -1935,12 +1991,17 @@ extension VisionLinkManager:
         switch mediaState {
         case .connecting:
             stopMediaWatchdog()
+            updateConnectedActivity {
+                $0.videoPreparing()
+            }
             state = .mediaConnecting
         case .connected:
             needsConnectionRecovery = false
             cancelConnectionRecovery()
             if state != .videoReceiving {
-                state = .mediaConnected
+                state = isCameraShareActive
+                    ? .mediaConnected
+                    : .mediaIdle
             }
             if remoteVideoTrack != nil,
                isCameraShareActive {
@@ -1954,6 +2015,7 @@ extension VisionLinkManager:
         case .disconnected:
             needsConnectionRecovery = true
             stopMediaWatchdog()
+            clearConnectedActivity()
             state = .disconnected
             appendEvent(
                 AppLocalization.string(
@@ -1968,6 +2030,7 @@ extension VisionLinkManager:
             needsConnectionRecovery = true
             stopMediaWatchdog()
             remoteVideoTrack = nil
+            clearConnectedActivity()
             state = .failed(
                 AppLocalization.string(
                     "VisionLink 영상 연결에 실패했습니다."
@@ -1991,6 +2054,9 @@ extension VisionLinkManager:
     ) {
         remoteVideoTrack = videoTrack
         isCameraShareActive = true
+        updateConnectedActivity {
+            $0.videoPreparing()
+        }
         startFirstFrameWatchdog()
         appendEvent(
             AppLocalization.string(
@@ -2016,6 +2082,10 @@ extension VisionLinkManager:
         isDataChannelReady = dataChannelReady
         if dataChannelReady {
             dataTransferMessage = nil
+            if !isCameraShareActive,
+               state.isSignalingConnected {
+                state = .mediaIdle
+            }
             appendEvent(
                 AppLocalization.string(
                     "VisionLink 데이터 채널 연결됨"
@@ -2029,6 +2099,10 @@ extension VisionLinkManager:
             isCameraShareActive = false
             stopMediaWatchdog()
             incomingTransfer = nil
+            clearConnectedActivity()
+            if state.isSignalingConnected {
+                state = .mediaIdle
+            }
             appendEvent(
                 AppLocalization.string(
                     "VisionLink 데이터 채널 연결 끊김"
@@ -2045,6 +2119,10 @@ extension VisionLinkManager:
         case .cameraShareChanged(let active):
             isCameraShareActive = active
             if active {
+                updateConnectedActivity {
+                    $0.videoPreparing()
+                }
+                state = .mediaConnected
                 if remoteVideoTrack != nil,
                    state != .videoReceiving {
                     startFirstFrameWatchdog()
@@ -2055,6 +2133,12 @@ extension VisionLinkManager:
                     reason:
                         "camera-share-stopped"
                 )
+                updateConnectedActivity {
+                    $0.cameraShareStopped(
+                        at: Self.systemUptime
+                    )
+                }
+                state = .mediaIdle
             }
             appendEvent(
                 active
@@ -2122,12 +2206,20 @@ extension VisionLinkManager:
         case .liveReadingStopped(
             let sessionID
         ):
-            stopRemoteLiveReading(
+            let stopped =
+                stopRemoteLiveReading(
                 reason: "peer-requested",
                 requestedSessionID:
                     sessionID,
                 sendStoppedStatus: true
             )
+            if stopped {
+                updateConnectedActivity {
+                    $0.liveReadingStopped(
+                        at: Self.systemUptime
+                    )
+                }
+            }
         case .failed(let message):
             incomingTransfer = nil
             dataTransferMessage = message
@@ -2142,6 +2234,7 @@ extension VisionLinkManager:
         needsConnectionRecovery = true
         stopMediaWatchdog()
         remoteVideoTrack = nil
+        clearConnectedActivity()
         state = .failed(message)
         appendEvent(message)
         scheduleConnectionRecovery(
