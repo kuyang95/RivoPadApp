@@ -391,6 +391,43 @@ final class EPUBReaderTests: XCTestCase {
                     chapters: book.chapters
                 )
         )
+
+        var invalidFragmentItems =
+            book.mediaOverlayItems
+        invalidFragmentItems[0] =
+            EPUBMediaOverlayItem(
+                id:
+                    invalidFragmentItems[0].id,
+                smilPath:
+                    invalidFragmentItems[0]
+                    .smilPath,
+                textPath:
+                    invalidFragmentItems[0]
+                    .textPath,
+                textFragmentID:
+                    "missing-fragment",
+                audioPath:
+                    invalidFragmentItems[0]
+                    .audioPath,
+                clipBeginSeconds:
+                    invalidFragmentItems[0]
+                    .clipBeginSeconds,
+                clipEndSeconds:
+                    invalidFragmentItems[0]
+                    .clipEndSeconds,
+                playOrder:
+                    invalidFragmentItems[0]
+                    .playOrder
+            )
+        XCTAssertNil(
+            EPUBMediaOverlayLocationResolver
+                .location(
+                    for: 0,
+                    items: invalidFragmentItems,
+                    chapters: book.chapters
+                ),
+            "존재하지 않는 SMIL fragment를 장의 첫 문단에 연결하면 안 됩니다."
+        )
     }
 
     func testReadAloudSequenceInterleavesTTSAndAudio()

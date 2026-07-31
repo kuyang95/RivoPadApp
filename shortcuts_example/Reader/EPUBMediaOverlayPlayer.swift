@@ -44,10 +44,21 @@ nonisolated enum EPUBMediaOverlayLocationResolver {
                 ) else {
             return nil
         }
-        let segmentIndex = item.textFragmentID.flatMap {
-            chapters[chapterIndex]
-                .fragmentSegmentIndexes[$0]
-        } ?? 0
+        let segmentIndex: Int
+        if let fragmentID =
+                item.textFragmentID,
+           !fragmentID.isEmpty {
+            guard let resolvedIndex =
+                    chapters[chapterIndex]
+                    .fragmentSegmentIndexes[
+                        fragmentID
+                    ] else {
+                return nil
+            }
+            segmentIndex = resolvedIndex
+        } else {
+            segmentIndex = 0
+        }
         return EPUBMediaOverlayLocation(
             itemIndex: itemIndex,
             chapterIndex: chapterIndex,
