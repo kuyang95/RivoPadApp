@@ -665,6 +665,116 @@ final class EPUBReaderTests: XCTestCase {
         )
     }
 
+    func testReaderSheetsPauseAndResumeOnlyPriorPlayback()
+    {
+        var coordinator =
+            EPUBReaderSheetPlaybackCoordinator()
+
+        XCTAssertEqual(
+            coordinator.presentationChanged(
+                isPresented: true,
+                isPlaying: true
+            ),
+            .pause
+        )
+        XCTAssertTrue(
+            coordinator.resumesAfterSheet
+        )
+        XCTAssertEqual(
+            coordinator.presentationChanged(
+                isPresented: true,
+                isPlaying: false
+            ),
+            .none
+        )
+        XCTAssertEqual(
+            coordinator.presentationChanged(
+                isPresented: false,
+                isPlaying: false
+            ),
+            .resume
+        )
+        XCTAssertFalse(
+            coordinator.resumesAfterSheet
+        )
+        XCTAssertEqual(
+            coordinator.presentationChanged(
+                isPresented: false,
+                isPlaying: false
+            ),
+            .none
+        )
+
+        var pausedCoordinator =
+            EPUBReaderSheetPlaybackCoordinator()
+        XCTAssertEqual(
+            pausedCoordinator
+                .presentationChanged(
+                    isPresented: true,
+                    isPlaying: false
+                ),
+            .none
+        )
+        XCTAssertEqual(
+            pausedCoordinator
+                .presentationChanged(
+                    isPresented: false,
+                    isPlaying: false
+                ),
+            .none
+        )
+    }
+
+    func testReaderAutoplayMatchesAndroidTimingAndGuards()
+    {
+        XCTAssertEqual(
+            EPUBReaderAutoplayPolicy
+                .delayNanoseconds(
+                    isVoiceOverRunning: false
+                ),
+            500_000_000
+        )
+        XCTAssertEqual(
+            EPUBReaderAutoplayPolicy
+                .delayNanoseconds(
+                    isVoiceOverRunning: true
+                ),
+            2_000_000_000
+        )
+        XCTAssertTrue(
+            EPUBReaderAutoplayPolicy
+                .shouldStart(
+                    canPlay: true,
+                    isPlaying: false,
+                    isSheetPresented: false
+                )
+        )
+        XCTAssertFalse(
+            EPUBReaderAutoplayPolicy
+                .shouldStart(
+                    canPlay: true,
+                    isPlaying: false,
+                    isSheetPresented: true
+                )
+        )
+        XCTAssertFalse(
+            EPUBReaderAutoplayPolicy
+                .shouldStart(
+                    canPlay: true,
+                    isPlaying: true,
+                    isSheetPresented: false
+                )
+        )
+        XCTAssertFalse(
+            EPUBReaderAutoplayPolicy
+                .shouldStart(
+                    canPlay: false,
+                    isPlaying: false,
+                    isSheetPresented: false
+                )
+        )
+    }
+
     func testReadAloudSpeechChunksAtSentenceBoundaries()
         throws
     {

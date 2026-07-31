@@ -110,6 +110,7 @@
 @text XHTML chapters with minor XML violations safely fall back to text with hidden scripts and styles removed. A damaged navigation file does not prevent readable content from opening.
 @text The playback slider at the bottom of the reader shows the combined duration of audio and local speech and can move to any position.
 @text When SMIL audio is available, the corresponding segment is played. If audio is absent or fails, reading continues with local iPad TTS.
+@text A book starts reading automatically after a short delay. Opening contents, text search, or appearance pauses reading; closing it resumes only when reading was active beforehand.
 @text Reading navigation follows Android’s Word, Line, Paragraph, Page, and Chapter order. Use Rivo 2/8 to change the unit and 4/6 to move to the previous or next position.
 @text In Settings, change the default theme, font scale, line spacing, and playback speed.
 

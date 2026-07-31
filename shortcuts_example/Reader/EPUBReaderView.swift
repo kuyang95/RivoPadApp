@@ -1,5 +1,6 @@
 import Combine
 import SwiftUI
+import UIKit
 
 nonisolated struct EPUBSearchResult:
     Identifiable,
@@ -44,6 +45,61 @@ nonisolated enum EPUBTextSegmenter {
                     text: text
                 )
             }
+    }
+}
+
+nonisolated enum EPUBReaderSheetPlaybackAction:
+    Equatable,
+    Sendable
+{
+    case none
+    case pause
+    case resume
+}
+
+nonisolated struct EPUBReaderSheetPlaybackCoordinator:
+    Equatable,
+    Sendable
+{
+    private(set) var resumesAfterSheet =
+        false
+
+    mutating func presentationChanged(
+        isPresented: Bool,
+        isPlaying: Bool
+    ) -> EPUBReaderSheetPlaybackAction {
+        if isPresented {
+            guard isPlaying else {
+                return .none
+            }
+            resumesAfterSheet = true
+            return .pause
+        }
+        guard resumesAfterSheet else {
+            return .none
+        }
+        resumesAfterSheet = false
+        return .resume
+    }
+}
+
+nonisolated enum EPUBReaderAutoplayPolicy {
+    static func delayNanoseconds(
+        isVoiceOverRunning: Bool
+    ) -> UInt64 {
+        isVoiceOverRunning
+            ? 2_000_000_000
+            : 500_000_000
+    }
+
+    static func shouldStart(
+        canPlay: Bool,
+        isPlaying: Bool,
+        isSheetPresented: Bool
+    ) -> Bool {
+        canPlay
+            && !isPlaying
+            && !isSheetPresented
     }
 }
 
@@ -577,6 +633,10 @@ struct EPUBReaderView: View {
         false
     @State private var pendingExternalURL:
         URL?
+    @State private var sheetPlaybackCoordinator =
+        EPUBReaderSheetPlaybackCoordinator()
+    @State private var didTriggerAutoplay =
+        false
 
     @AppStorage("reader.epub.theme")
     private var themeID = EPUBReaderTheme.light.rawValue
@@ -668,6 +728,7 @@ struct EPUBReaderView: View {
                 mediaOverlayPlayer.setRate(
                     speechRate
                 )
+                await startAutoplayIfNeeded()
             }
         }
         .onChange(
@@ -689,6 +750,13 @@ struct EPUBReaderView: View {
             of: remoteControl.latestEvent
         ) { _, event in
             handleRemoteEvent(event)
+        }
+        .onChange(
+            of: isReaderSheetPresented
+        ) { _, isPresented in
+            handleReaderSheetPresentation(
+                isPresented
+            )
         }
         .onDisappear {
             viewModel.flushProgress()
@@ -1232,6 +1300,73 @@ struct EPUBReaderView: View {
             toTimelineSeconds: target,
             autoplay: shouldResume
         )
+    }
+
+    private var isReaderSheetPresented:
+        Bool
+    {
+        isContentsPresented
+            || isSearchPresented
+            || isSettingsPresented
+    }
+
+    private func handleReaderSheetPresentation(
+        _ isPresented: Bool
+    ) {
+        let action =
+            sheetPlaybackCoordinator
+            .presentationChanged(
+                isPresented: isPresented,
+                isPlaying:
+                    mediaOverlayPlayer
+                    .isPlaying
+            )
+        switch action {
+        case .none:
+            break
+        case .pause:
+            mediaOverlayPlayer.pause()
+        case .resume:
+            if !mediaOverlayPlayer.isPlaying {
+                mediaOverlayPlayer
+                    .togglePlayback()
+            }
+        }
+    }
+
+    @MainActor
+    private func startAutoplayIfNeeded()
+        async
+    {
+        guard !didTriggerAutoplay else {
+            return
+        }
+        didTriggerAutoplay = true
+        let delay =
+            EPUBReaderAutoplayPolicy
+            .delayNanoseconds(
+                isVoiceOverRunning:
+                    UIAccessibility
+                    .isVoiceOverRunning
+            )
+        try? await Task.sleep(
+            nanoseconds: delay
+        )
+        guard !Task.isCancelled,
+              EPUBReaderAutoplayPolicy
+              .shouldStart(
+                  canPlay:
+                      mediaOverlayPlayer
+                      .canPlay,
+                  isPlaying:
+                      mediaOverlayPlayer
+                      .isPlaying,
+                  isSheetPresented:
+                      isReaderSheetPresented
+              ) else {
+            return
+        }
+        mediaOverlayPlayer.togglePlayback()
     }
 
     private var guardLastChapterReached: Bool {
