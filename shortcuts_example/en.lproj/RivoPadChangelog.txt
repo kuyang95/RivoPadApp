@@ -20,6 +20,7 @@
 @text Added Android-compatible first-result stabilization, small-text quality checks, a 30-second scene anchor, and text-free reset duplicate suppression to Live OCR.
 @text Added Rivo BLE connection and screen-specific controls, plus VisionLink file, video, and remote AI features.
 @text Added Android Remote Ribbon expansion and collapse plus 16 color combinations as settings for the in-app Rivo Quick Menu.
+@text Matched the Rivo L1 menu during EPUB and DAISY reading to Android’s reader-specific playback, navigation, contents, search, and appearance menu.
 @text Improved Rivo CoreBluetooth scanning and connection with iPadOS background state restoration.
 @text Added a Share Extension, selected-text Action, Rivo status widget, and 10 App Shortcuts.
 @text Added a Control Center and Lock Screen Quick Launch control that opens one of nine VisionCraft features.

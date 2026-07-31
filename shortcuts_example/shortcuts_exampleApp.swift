@@ -511,6 +511,14 @@ struct shortcuts_exampleApp: App {
                     consumeSharedInboxIfNeeded()
                 }
             }
+            .onChange(
+                of:
+                    rivoScreenRemoteControlCenter
+                    .activeScreen
+            ) { _, screen in
+                rivoRemoteControlCenter
+                    .updateActiveScreen(screen)
+            }
             .onChange(of: shortcutRouter.intentEvent) { _, dest in
                 guard let dest else { return }
 
@@ -848,6 +856,19 @@ struct shortcuts_exampleApp: App {
             TTSManager.shared.stop()
         case .home:
             path = NavigationPath()
+        case .back:
+            if !path.isEmpty {
+                path.removeLast()
+            }
+        case .screen(
+            let screen,
+            let action
+        ):
+            _ = rivoScreenRemoteControlCenter
+                .send(
+                    action,
+                    to: screen
+                )
         case .navigate(let destination):
             let route: AppRoute
             switch destination {

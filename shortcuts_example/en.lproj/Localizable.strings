@@ -588,6 +588,12 @@
 "목차" = "Table of Contents";
 "보기 설정" = "Appearance";
 "본문 검색" = "Search Text";
+"독서 닫기" = "Close Reader";
+"재생 또는 일시정지" = "Play or Pause";
+"이전 위치" = "Previous Position";
+"다음 위치" = "Next Position";
+"이전 탐색 단위" = "Previous Navigation Unit";
+"다음 탐색 단위" = "Next Navigation Unit";
 "음성" = "Speech";
 "이 목차 위치는 현재 본문과 연결되지 않았습니다." = "This table-of-contents location is not linked to the current text.";
 "이전 %@" = "Previous %@";
@@ -1039,6 +1045,7 @@
 "%@ 연결을 시작합니다." = "Connecting to %@.";
 "%@ 연결이 끊겼습니다." = "%@ disconnected.";
 "%@ 열기" = "Open %@";
+"%@ 실행" = "Run %@";
 "%@ 특성 검색에 실패했습니다." = "Failed to discover %@ characteristics.";
 "%@, %lld/%lld" = "%@, %lld/%lld";
 "%@으로 식별" = "Identified by %@";

@@ -758,6 +758,74 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         XCTAssertFalse(controlCenter.isMenuPresented)
     }
 
+    func testQuickMenuMatchesAndroidReaderMenu() {
+        let controlCenter =
+            RivoRemoteControlCenter()
+        controlCenter.updateActiveScreen(
+            .publicationReader
+        )
+
+        XCTAssertEqual(
+            controlCenter.items.map(\.title),
+            [
+                "독서 닫기",
+                "재생 또는 일시정지",
+                "이전 위치",
+                "다음 위치",
+                "이전 탐색 단위",
+                "다음 탐색 단위",
+                "목차",
+                "본문 검색",
+                "보기 설정",
+            ]
+        )
+
+        _ = controlCenter.receive(
+            button(.l1, action: .pressed)
+        )
+        controlCenter.focusItem(at: 7)
+
+        XCTAssertEqual(
+            controlCenter.receive(
+                button(.five, action: .pressed)
+            ),
+            .screen(
+                .publicationReader,
+                .publicationReader(.showSearch)
+            )
+        )
+        XCTAssertFalse(
+            controlCenter.isMenuPresented
+        )
+    }
+
+    func testQuickMenuScreenChangeResetsSelection() {
+        let controlCenter =
+            RivoRemoteControlCenter()
+        controlCenter.focusItem(at: 5)
+
+        controlCenter.updateActiveScreen(
+            .publicationReader
+        )
+
+        XCTAssertEqual(
+            controlCenter.selectedIndex,
+            0
+        )
+        XCTAssertEqual(
+            controlCenter.items.first?.id,
+            "reader.back"
+        )
+
+        controlCenter.updateActiveScreen(nil)
+
+        XCTAssertEqual(
+            controlCenter.items.first?.id,
+            RivoQuickDestination
+                .aiChat.rawValue
+        )
+    }
+
     func testQuickMenuTouchFocusMovesWithoutActivation() {
         let controlCenter =
             RivoRemoteControlCenter()
@@ -1329,6 +1397,36 @@ final class RivoRemoteControlCenterTests: XCTestCase {
             .publicationReader(.next)
         )
         XCTAssertNotEqual(first?.id, second?.id)
+    }
+
+    func testScreenControlCenterSendsReaderMenuActions()
+    {
+        let screenControl =
+            RivoScreenRemoteControlCenter()
+        screenControl.activate(
+            .publicationReader
+        )
+
+        XCTAssertTrue(
+            screenControl.send(
+                .publicationReader(
+                    .showContents
+                ),
+                to: .publicationReader
+            )
+        )
+        XCTAssertEqual(
+            screenControl.latestEvent?.action,
+            .publicationReader(
+                .showContents
+            )
+        )
+        XCTAssertFalse(
+            screenControl.send(
+                .magnifier(.capture),
+                to: .publicationReader
+            )
+        )
     }
 
     func testAIChatConsumesVoiceSequenceBeforeGlobalNavigation() {

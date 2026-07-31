@@ -70,6 +70,9 @@ nonisolated enum RivoPublicationReaderRemoteAction:
     case next
     case previousNavigationUnit
     case nextNavigationUnit
+    case showContents
+    case showSearch
+    case showSettings
 }
 
 nonisolated enum RivoLocalDocumentRemoteAction:
@@ -659,6 +662,27 @@ final class RivoScreenRemoteControlCenter:
     }
 
     @discardableResult
+    func send(
+        _ action: RivoScreenRemoteAction,
+        to screen: RivoRemoteScreen
+    ) -> Bool {
+        guard activeScreen == screen,
+              Self.isCompatible(
+                  action,
+                  with: screen
+              ) else {
+            return false
+        }
+        nextEventID &+= 1
+        latestEvent = RivoScreenRemoteEvent(
+            id: nextEventID,
+            screen: screen,
+            action: action
+        )
+        return true
+    }
+
+    @discardableResult
     func receivePriorityInput(
         _ input: RivoRemoteInput
     ) -> Bool {
@@ -675,5 +699,44 @@ final class RivoScreenRemoteControlCenter:
             return false
         }
         return receive(input)
+    }
+
+    private static func isCompatible(
+        _ action: RivoScreenRemoteAction,
+        with screen: RivoRemoteScreen
+    ) -> Bool {
+        switch (screen, action) {
+        case (
+            .magnifier,
+            .magnifier
+        ),
+        (
+            .liveTextReader,
+            .magnifier
+        ),
+        (
+            .documentScanner,
+            .documentScanner
+        ),
+        (
+            .publicationReader,
+            .publicationReader
+        ),
+        (
+            .localDocumentReader,
+            .localDocumentReader
+        ),
+        (
+            .localAIChat,
+            .localAIChat
+        ),
+        (
+            .voiceAction,
+            .voiceAction
+        ):
+            return true
+        default:
+            return false
+        }
     }
 }

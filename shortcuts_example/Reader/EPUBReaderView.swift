@@ -639,7 +639,10 @@ struct EPUBReaderView: View {
                 }
                 .disabled(viewModel.book == nil)
 
-                Button("검색", systemImage: "magnifyingglass") {
+                Button(
+                    "본문 검색",
+                    systemImage: "magnifyingglass"
+                ) {
                     isSearchPresented = true
                 }
                 .disabled(viewModel.book == nil)
@@ -1744,6 +1747,12 @@ struct EPUBReaderView: View {
         case .nextNavigationUnit:
             mediaOverlayPlayer
                 .cycleNavigationUnit(by: 1)
+        case .showContents:
+            isContentsPresented = true
+        case .showSearch:
+            isSearchPresented = true
+        case .showSettings:
+            isSettingsPresented = true
         }
     }
 

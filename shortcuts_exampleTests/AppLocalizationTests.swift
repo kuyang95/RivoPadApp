@@ -898,6 +898,17 @@ final class AppLocalizationTests:
                 .items[2].title,
             "Camera Magnifier"
         )
+        let englishReaderControl =
+            RivoRemoteControlCenter()
+        englishReaderControl
+            .updateActiveScreen(
+                .publicationReader
+            )
+        XCTAssertEqual(
+            englishReaderControl
+                .items[7].title,
+            "Search Text"
+        )
 
         defaults.set(
             AppLanguage.japanese.rawValue,
@@ -928,6 +939,13 @@ final class AppLocalizationTests:
         )
         let controlCenter =
             RivoRemoteControlCenter()
+        controlCenter.updateActiveScreen(
+            .publicationReader
+        )
+        XCTAssertEqual(
+            controlCenter.items[8].title,
+            "表示設定"
+        )
         controlCenter.dismissCommandMode()
         XCTAssertEqual(
             controlCenter.feedback,

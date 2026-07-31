@@ -18,8 +18,13 @@ nonisolated enum RivoQuickDestination:
 
 nonisolated enum RivoRemoteCommand: Equatable, Sendable {
     case navigate(RivoQuickDestination)
+    case screen(
+        RivoRemoteScreen,
+        RivoScreenRemoteAction
+    )
     case startVoiceAction
     case home
+    case back
     case stopSpeech
 }
 
@@ -36,13 +41,10 @@ nonisolated struct RivoQuickMenuItem:
     Equatable,
     Sendable
 {
-    let destination: RivoQuickDestination
+    let id: String
     let title: String
     let systemImage: String
-
-    var id: RivoQuickDestination {
-        destination
-    }
+    let command: RivoRemoteCommand
 }
 
 @MainActor
@@ -52,58 +54,182 @@ final class RivoRemoteControlCenter: ObservableObject {
         isCommandModeActive = false
     @Published private(set) var selectedIndex = 0
     @Published private(set) var feedback = ""
+    @Published private(set) var activeScreen:
+        RivoRemoteScreen?
 
     var items: [RivoQuickMenuItem] {
+        if activeScreen == .publicationReader {
+            return publicationReaderItems
+        }
+        return globalItems
+    }
+
+    private var globalItems: [RivoQuickMenuItem] {
         [
             RivoQuickMenuItem(
-                destination: .aiChat,
+                id: RivoQuickDestination.aiChat.rawValue,
                 title:
                     AppLocalization.string(
                         "AI 채팅"
                     ),
-                systemImage: "bubble.left.and.bubble.right"
+                systemImage:
+                    "bubble.left.and.bubble.right",
+                command: .navigate(.aiChat)
             ),
             RivoQuickMenuItem(
-                destination: .reader,
+                id: RivoQuickDestination.reader.rawValue,
                 title:
                     AppLocalization.string(
                         "독서"
                     ),
-                systemImage: "book"
+                systemImage: "book",
+                command: .navigate(.reader)
             ),
             RivoQuickMenuItem(
-                destination: .magnifier,
+                id:
+                    RivoQuickDestination
+                    .magnifier.rawValue,
                 title:
                     AppLocalization.string(
                         "카메라 돋보기"
                     ),
-                systemImage: "plus.magnifyingglass"
+                systemImage:
+                    "plus.magnifyingglass",
+                command: .navigate(.magnifier)
             ),
             RivoQuickMenuItem(
-                destination: .liveTextReader,
+                id:
+                    RivoQuickDestination
+                    .liveTextReader.rawValue,
                 title:
                     AppLocalization.string(
                         "실시간 텍스트 읽기"
                     ),
-                systemImage: "text.viewfinder"
+                systemImage: "text.viewfinder",
+                command:
+                    .navigate(.liveTextReader)
             ),
             RivoQuickMenuItem(
-                destination: .scanner,
+                id: RivoQuickDestination.scanner.rawValue,
                 title:
                     AppLocalization.string(
                         "문서 스캔"
                     ),
-                systemImage: "doc.viewfinder"
+                systemImage: "doc.viewfinder",
+                command: .navigate(.scanner)
             ),
             RivoQuickMenuItem(
-                destination: .remoteSettings,
+                id:
+                    RivoQuickDestination
+                    .remoteSettings.rawValue,
                 title:
                     AppLocalization.string(
                         "리모컨 연결"
                     ),
-                systemImage: "dot.radiowaves.left.and.right"
+                systemImage:
+                    "dot.radiowaves.left.and.right",
+                command:
+                    .navigate(.remoteSettings)
             )
         ]
+    }
+
+    private var publicationReaderItems:
+        [RivoQuickMenuItem]
+    {
+        [
+            RivoQuickMenuItem(
+                id: "reader.back",
+                title:
+                    AppLocalization.string(
+                        "독서 닫기"
+                    ),
+                systemImage: "chevron.backward",
+                command: .back
+            ),
+            publicationReaderItem(
+                id: "reader.playPause",
+                title: "재생 또는 일시정지",
+                systemImage: "playpause",
+                action: .togglePlayback
+            ),
+            publicationReaderItem(
+                id: "reader.previous",
+                title: "이전 위치",
+                systemImage: "backward.end",
+                action: .previous
+            ),
+            publicationReaderItem(
+                id: "reader.next",
+                title: "다음 위치",
+                systemImage: "forward.end",
+                action: .next
+            ),
+            publicationReaderItem(
+                id: "reader.previousUnit",
+                title: "이전 탐색 단위",
+                systemImage: "minus.circle",
+                action: .previousNavigationUnit
+            ),
+            publicationReaderItem(
+                id: "reader.nextUnit",
+                title: "다음 탐색 단위",
+                systemImage: "plus.circle",
+                action: .nextNavigationUnit
+            ),
+            publicationReaderItem(
+                id: "reader.contents",
+                title: "목차",
+                systemImage: "list.bullet",
+                action: .showContents
+            ),
+            publicationReaderItem(
+                id: "reader.search",
+                title: "본문 검색",
+                systemImage: "magnifyingglass",
+                action: .showSearch
+            ),
+            publicationReaderItem(
+                id: "reader.settings",
+                title: "보기 설정",
+                systemImage: "textformat.size",
+                action: .showSettings
+            ),
+        ]
+    }
+
+    private func publicationReaderItem(
+        id: String,
+        title: String,
+        systemImage: String,
+        action: RivoPublicationReaderRemoteAction
+    ) -> RivoQuickMenuItem {
+        RivoQuickMenuItem(
+            id: id,
+            title:
+                AppLocalization.string(
+                    title
+                ),
+            systemImage: systemImage,
+            command: .screen(
+                .publicationReader,
+                .publicationReader(action)
+            )
+        )
+    }
+
+    func updateActiveScreen(
+        _ screen: RivoRemoteScreen?
+    ) {
+        guard activeScreen != screen else {
+            return
+        }
+        activeScreen = screen
+        selectedIndex = 0
+        if isMenuPresented {
+            feedback = selectedItemAnnouncement
+            announceFeedback()
+        }
     }
 
     func receive(
@@ -382,10 +508,10 @@ final class RivoRemoteControlCenter: ObservableObject {
         isMenuPresented = false
         isCommandModeActive = false
         feedback = AppLocalization.format(
-            "%@ 열기",
+            "%@ 실행",
             item.title
         )
-        return .navigate(item.destination)
+        return item.command
     }
 
     private func enterCommandMode(
@@ -558,15 +684,20 @@ struct RivoQuickMenuOverlay: View {
 
                 if settings
                     .rivoQuickMenuExpanded {
-                    ForEach(
-                        indexedItems,
-                        id: \.element.id
-                    ) { index, item in
-                        expandedMenuRow(
-                            item,
-                            at: index
-                        )
+                    ScrollView {
+                        LazyVStack(spacing: 14) {
+                            ForEach(
+                                indexedItems,
+                                id: \.element.id
+                            ) { index, item in
+                                expandedMenuRow(
+                                    item,
+                                    at: index
+                                )
+                            }
+                        }
                     }
+                    .frame(maxHeight: 560)
                 } else {
                     HStack(spacing: 8) {
                         ForEach(
@@ -651,7 +782,7 @@ struct RivoQuickMenuOverlay: View {
                     : foregroundColor
             )
             .padding(.horizontal, 18)
-            .frame(height: 62)
+            .frame(minHeight: 62)
             .frame(maxWidth: .infinity)
             .background(
                 isSelected
