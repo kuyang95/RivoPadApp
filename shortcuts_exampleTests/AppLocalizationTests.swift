@@ -537,6 +537,95 @@ final class AppLocalizationTests:
         )
     }
 
+    func testDocumentDynamicStringsFollowInAppLanguage()
+    {
+        let defaults = UserDefaults.standard
+        let previous =
+            defaults.string(
+                forKey:
+                    AppLanguage
+                    .preferenceKey
+            )
+        defer {
+            if let previous {
+                defaults.set(
+                    previous,
+                    forKey:
+                        AppLanguage
+                        .preferenceKey
+                )
+            } else {
+                defaults.removeObject(
+                    forKey:
+                        AppLanguage
+                        .preferenceKey
+                )
+            }
+        }
+
+        defaults.set(
+            AppLanguage.english.rawValue,
+            forKey:
+                AppLanguage.preferenceKey
+        )
+        XCTAssertEqual(
+            LocalDocumentNavigationUnit
+                .line.displayName,
+            "Line"
+        )
+        XCTAssertEqual(
+            LocalDocumentColorTheme
+                .all[0].displayName,
+            "White on Black"
+        )
+        XCTAssertEqual(
+            LocalDocumentImportError
+                .fileTooLarge(
+                    maximumMegabytes: 250
+                )
+                .localizedDescription,
+            "Files must be 250 MB or smaller."
+        )
+        XCTAssertEqual(
+            AppLocalization.format(
+                "문서 줄 위치 %lld / %lld",
+                3,
+                9
+            ),
+            "Document line 3 of 9"
+        )
+
+        defaults.set(
+            AppLanguage.japanese.rawValue,
+            forKey:
+                AppLanguage.preferenceKey
+        )
+        XCTAssertEqual(
+            LocalDocumentNavigationUnit
+                .page.displayName,
+            "ページ"
+        )
+        XCTAssertEqual(
+            LocalDocumentColorTheme
+                .all[1].displayName,
+            "白地に黒"
+        )
+        XCTAssertEqual(
+            LocalDocumentImportError
+                .textDecodingFailed
+                .localizedDescription,
+            "対応していないテキストエンコーディングです。"
+        )
+        XCTAssertEqual(
+            AppLocalization.format(
+                "%lld페이지 · %lld자",
+                2,
+                1_234
+            ),
+            "2ページ・1,234文字"
+        )
+    }
+
     private func localizedBundle(
         language: String
     ) throws -> Bundle {

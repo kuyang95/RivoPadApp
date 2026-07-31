@@ -20,6 +20,8 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 - Rivo 위젯의 표시 이름, 연결 상태, 바로가기와 VoiceOver 안내
 - 구성 가능한 VisionCraft 빠른 실행 위젯의 아홉 기능 이름·설명·힌트
 - 카메라·마이크·동작·음성 인식·Bluetooth 권한 설명
+- PDF·TXT·XLS·XLSX·HWP 문서 보기·편집·복사·내보내기, 줄·페이지
+  탐색, 문장 TTS, 16색 테마와 Rivo 문서 조작 피드백
 - 영어·일본어 핵심 번들과 동적 format 인수의 자동 테스트
 - 로컬 번역 화면의 대상 언어·입력·진행·결과·오류·VoiceOver 문구
 - 웹페이지 주소·추출·출처·질문·네트워크·WebKit fallback 오류 문구
@@ -44,7 +46,6 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 ## 다음 번역 묶음
 
 - AI 대화 본문·이미지 질문·음성 입력의 나머지 화면
-- PDF/TXT 문서 뷰어와 내보내기
 - VisionLink 연결·수신·원격 기능과 Rivo 연결 관리·진단 화면
 - App Intent의 title, description, parameter와 Siri phrase
 - 기능별 나머지 로컬 진단 로그, 파일명과 오류 문구
@@ -68,6 +69,8 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 - [ ] 각 언어에서 카메라·마이크·음성 인식·Bluetooth 권한 설명을 확인한다.
 - [ ] 영어·일본어에서 돋보기·실시간 OCR·문서 스캐너를 열어 버튼,
       촬영 안내, 오류, 다중 페이지 검토와 VoiceOver 문구를 확인한다.
+- [ ] 영어·일본어에서 PDF·TXT 문서를 열어 원본/텍스트 전환,
+      편집·내보내기, 문장 TTS·줄/페이지 탐색과 16색 이름을 확인한다.
 - [ ] 공유 시트, 선택 텍스트 동작과 홈 위젯의 이름이 앱 언어와 일치한다.
 - [ ] VoiceOver가 번역된 레이블과 동적 Rivo 상태를 자연스럽게 읽는다.
 

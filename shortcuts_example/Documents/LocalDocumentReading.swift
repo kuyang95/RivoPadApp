@@ -176,6 +176,10 @@ nonisolated struct LocalDocumentColorTheme:
     let backgroundHex: Int
     let foregroundHex: Int
 
+    var displayName: String {
+        AppLocalization.string(name)
+    }
+
     static let all: [Self] = [
         Self(
             name: "검정 바탕 흰색",
@@ -329,9 +333,13 @@ nonisolated enum LocalDocumentNavigationUnit:
     var displayName: String {
         switch self {
         case .line:
-            return "줄"
+            return AppLocalization.string(
+                "줄"
+            )
         case .page:
-            return "페이지"
+            return AppLocalization.string(
+                "페이지"
+            )
         }
     }
 

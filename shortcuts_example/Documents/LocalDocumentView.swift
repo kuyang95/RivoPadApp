@@ -49,7 +49,10 @@ final class LocalDocumentViewModel: ObservableObject {
                     options: .mappedIfSafe
                 )
                 text = try LocalTextDecoder.decode(data)
-                status = "\(text.count.formatted())자"
+                status = AppLocalization.format(
+                    "본문 %lld자",
+                    text.count
+                )
             } else if
                 LocalStructuredDocumentTextExtractor
                 .supportedExtensions
@@ -62,8 +65,10 @@ final class LocalDocumentViewModel: ObservableObject {
                 text = try await
                     LocalStructuredDocumentTextExtractor
                     .extract(at: fileURL)
-                status =
-                    "\(text.count.formatted())자"
+                status = AppLocalization.format(
+                    "본문 %lld자",
+                    text.count
+                )
             } else {
                 throw CocoaError(
                     .fileReadUnsupportedScheme,
@@ -88,7 +93,9 @@ final class LocalDocumentViewModel: ObservableObject {
                 .fileReadCorruptFile,
                 userInfo: [
                     NSLocalizedDescriptionKey:
-                        "PDF 파일을 열 수 없습니다."
+                        AppLocalization.string(
+                            "PDF 파일을 열 수 없습니다."
+                        )
                 ]
             )
         }
@@ -99,7 +106,11 @@ final class LocalDocumentViewModel: ObservableObject {
 
         for pageIndex in 0 ..< document.pageCount {
             try Task.checkCancellation()
-            status = "PDF \(pageIndex + 1)/\(document.pageCount)페이지 처리 중"
+            status = AppLocalization.format(
+                "PDF %lld/%lld페이지 처리 중",
+                pageIndex + 1,
+                document.pageCount
+            )
 
             guard let page = document.page(at: pageIndex) else {
                 continue
@@ -139,7 +150,11 @@ final class LocalDocumentViewModel: ObservableObject {
         guard !text.isEmpty else {
             throw DocumentTextExtractor.ExtractError.noText
         }
-        status = "\(document.pageCount)페이지 · \(text.count.formatted())자"
+        status = AppLocalization.format(
+            "%lld페이지 · %lld자",
+            document.pageCount,
+            text.count
+        )
     }
 
     private func recognizeText(from image: UIImage) async throws -> String {
@@ -189,6 +204,10 @@ struct LocalDocumentView: View {
         case text = "텍스트"
 
         var id: Self { self }
+
+        var displayName: String {
+            AppLocalization.string(rawValue)
+        }
     }
 
     @EnvironmentObject private var appRouter: AppRouter
@@ -269,12 +288,18 @@ struct LocalDocumentView: View {
 
                 Button("정지", systemImage: "speaker.slash") {
                     speechController.stop()
-                    feedback = "문서 읽기를 중지했습니다."
+                    feedback =
+                        AppLocalization.string(
+                            "문서 읽기를 중지했습니다."
+                        )
                 }
 
                 Button("복사", systemImage: "doc.on.doc") {
                     UIPasteboard.general.string = viewModel.text
-                    feedback = "문서 텍스트를 복사했습니다."
+                    feedback =
+                        AppLocalization.string(
+                            "문서 텍스트를 복사했습니다."
+                        )
                 }
                 .disabled(viewModel.text.isEmpty)
 
@@ -382,12 +407,17 @@ struct LocalDocumentView: View {
             case .success:
                 feedback =
                     exportContentType == .pdf
-                    ? "PDF를 저장했습니다."
-                    : "TXT를 저장했습니다."
+                    ? AppLocalization.string(
+                        "PDF를 저장했습니다."
+                    )
+                    : AppLocalization.string(
+                        "TXT를 저장했습니다."
+                    )
             case .failure(let error):
-                feedback =
-                    "저장하지 못했습니다: "
-                    + error.localizedDescription
+                feedback = AppLocalization.format(
+                    "저장하지 못했습니다: %@",
+                    error.localizedDescription
+                )
             }
             exportFile = nil
         }
@@ -399,7 +429,8 @@ struct LocalDocumentView: View {
             if viewModel.pdfDocument != nil {
                 Picker("문서 보기", selection: $displayMode) {
                     ForEach(DisplayMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
+                        Text(mode.displayName)
+                            .tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -537,7 +568,8 @@ struct LocalDocumentView: View {
                         }
                         .accessibilityLabel(
                             line.text.isEmpty
-                                ? "빈 줄"
+                                ? AppLocalization
+                                    .string("빈 줄")
                                 : line.text
                         )
                         .accessibilityValue(
@@ -701,8 +733,13 @@ struct LocalDocumentView: View {
                 .id(line.id)
                 .accessibilityLabel(
                     line.text.isEmpty
-                        ? "한 줄 읽기, 빈 줄"
-                        : "한 줄 읽기, \(line.text)"
+                        ? AppLocalization.string(
+                            "한 줄 읽기, 빈 줄"
+                        )
+                        : AppLocalization.format(
+                            "한 줄 읽기, %@",
+                            line.text
+                        )
                 )
                 .accessibilityValue(
                     speechAccessibilityValue(
@@ -921,7 +958,9 @@ struct LocalDocumentView: View {
                 Text(
                     speechController
                         .currentPositionDescription
-                        ?? "현재 줄에서 시작"
+                        ?? AppLocalization.string(
+                            "현재 줄에서 시작"
+                        )
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -929,7 +968,10 @@ struct LocalDocumentView: View {
 
             HStack(spacing: 12) {
                 documentSpeechButton(
-                    title: "이전 문장",
+                    title:
+                        AppLocalization.string(
+                            "이전 문장"
+                        ),
                     systemImage:
                         "backward.end.fill"
                 ) {
@@ -944,7 +986,9 @@ struct LocalDocumentView: View {
 
                 documentSpeechButton(
                     title:
-                        "현재 문장 다시 읽기",
+                        AppLocalization.string(
+                            "현재 문장 다시 읽기"
+                        ),
                     systemImage:
                         "arrow.counterclockwise"
                 ) {
@@ -961,8 +1005,12 @@ struct LocalDocumentView: View {
                     title:
                         speechController
                             .isSpeaking
-                            ? "문서 읽기 정지"
-                            : "문서 읽기",
+                            ? AppLocalization.string(
+                                "문서 읽기 정지"
+                            )
+                            : AppLocalization.string(
+                                "문서 읽기"
+                            ),
                     systemImage:
                         speechController
                             .isSpeaking
@@ -979,7 +1027,10 @@ struct LocalDocumentView: View {
                 }
 
                 documentSpeechButton(
-                    title: "다음 문장",
+                    title:
+                        AppLocalization.string(
+                            "다음 문장"
+                        ),
                     systemImage:
                         "forward.end.fill"
                 ) {
@@ -1048,8 +1099,11 @@ struct LocalDocumentView: View {
                     navigationUnit.next()
             }
             .accessibilityLabel(
-                "탐색 단위 "
-                + navigationUnit.displayName
+                AppLocalization.format(
+                    "탐색 단위 %@",
+                    navigationUnit
+                        .displayName
+                )
             )
             .accessibilityHint(
                 "두 번 탭하면 줄과 페이지 탐색이 바뀝니다."
@@ -1083,9 +1137,20 @@ struct LocalDocumentView: View {
             )
             .font(.caption.monospacedDigit())
             .accessibilityLabel(
-                "문서 줄 위치 "
-                + "\(min(currentLineIndex + 1, max(documentLines.count, 1)))"
-                + " / \(max(documentLines.count, 1))"
+                AppLocalization.format(
+                    "문서 줄 위치 %lld / %lld",
+                    min(
+                        currentLineIndex + 1,
+                        max(
+                            documentLines.count,
+                            1
+                        )
+                    ),
+                    max(
+                        documentLines.count,
+                        1
+                    )
+                )
             )
         }
         .buttonStyle(.bordered)
@@ -1143,7 +1208,9 @@ struct LocalDocumentView: View {
                             ),
                             id: \.offset
                         ) { index, theme in
-                            Text(theme.name)
+                            Text(
+                                theme.displayName
+                            )
                                 .tag(index)
                         }
                     }
@@ -1286,12 +1353,15 @@ struct LocalDocumentView: View {
             startingAtLine:
                 currentLineIndex
         ) else {
-            feedback =
+            feedback = AppLocalization.string(
                 "읽을 문서 텍스트가 없습니다."
+            )
             return
         }
-        feedback =
-            "\(currentLineIndex + 1)번째 줄부터 문장 읽기를 시작했습니다."
+        feedback = AppLocalization.format(
+            "%lld번째 줄부터 문장 읽기를 시작했습니다.",
+            currentLineIndex + 1
+        )
     }
 
     private var documentTheme:
@@ -1430,13 +1500,19 @@ struct LocalDocumentView: View {
                  .defaultFont,
                  .increaseFont:
                 announceRemoteFeedback(
-                    "글자 크기 \(updated.fontLevel)"
+                    AppLocalization.format(
+                        "글자 크기 %lld",
+                        updated.fontLevel
+                    )
                 )
             case .decreaseLineHeight,
                  .defaultLineHeight,
                  .increaseLineHeight:
                 announceRemoteFeedback(
-                    "줄 간격 \(updated.lineHeightLevel)"
+                    AppLocalization.format(
+                        "줄 간격 %lld",
+                        updated.lineHeightLevel
+                    )
                 )
             case .previousColor,
                  .originalColor,
@@ -1447,7 +1523,10 @@ struct LocalDocumentView: View {
                         updated.colorIndex
                     ]
                 announceRemoteFeedback(
-                    "색상 \(theme.name)"
+                    AppLocalization.format(
+                        "색상 %@",
+                        theme.displayName
+                    )
                 )
             default:
                 break
@@ -1459,40 +1538,68 @@ struct LocalDocumentView: View {
         case .enterTextMode(let showGuide):
             announceRemoteFeedback(
                 showGuide
-                    ? "문서 조작 모드. 1 처음, 2 이전 줄, 3 이전 페이지, 4 5 6 글자 크기, 7 끝, 8 다음 줄, 9 다음 페이지, 별표 0 샵 줄 간격"
-                    : "문서 조작 모드"
+                    ? AppLocalization.string(
+                        "문서 조작 모드. 1 처음, 2 이전 줄, 3 이전 페이지, 4 5 6 글자 크기, 7 끝, 8 다음 줄, 9 다음 페이지, 별표 0 샵 줄 간격"
+                    )
+                    : AppLocalization.string(
+                        "문서 조작 모드"
+                    )
             )
         case .enterDisplayMode(let showGuide):
             announceRemoteFeedback(
                 showGuide
-                    ? "색상 조작 모드. 4 이전 색상, 5 원본 색상, 6 다음 색상, R2 반전, L3 문서 조작"
-                    : "색상 조작 모드"
+                    ? AppLocalization.string(
+                        "색상 조작 모드. 4 이전 색상, 5 원본 색상, 6 다음 색상, R2 반전, L3 문서 조작"
+                    )
+                    : AppLocalization.string(
+                        "색상 조작 모드"
+                    )
             )
         case .beginning:
             moveToDocumentBoundary(isEnd: false)
-            announceRemoteFeedback("문서 처음")
+            announceRemoteFeedback(
+                AppLocalization.string(
+                    "문서 처음"
+                )
+            )
         case .previousLine:
             moveText(by: -1, unit: .line)
             announceRemoteFeedback(
-                "이전 줄, \(currentLineIndex + 1)번째 줄"
+                AppLocalization.format(
+                    "이전 줄, %lld번째 줄",
+                    currentLineIndex + 1
+                )
             )
         case .previousPage:
             moveText(by: -1, unit: .page)
             announceRemoteFeedback(
-                "이전 페이지, \(currentLineIndex + 1)번째 줄"
+                AppLocalization.format(
+                    "이전 페이지, %lld번째 줄",
+                    currentLineIndex + 1
+                )
             )
         case .end:
             moveToDocumentBoundary(isEnd: true)
-            announceRemoteFeedback("문서 끝")
+            announceRemoteFeedback(
+                AppLocalization.string(
+                    "문서 끝"
+                )
+            )
         case .nextLine:
             moveText(by: 1, unit: .line)
             announceRemoteFeedback(
-                "다음 줄, \(currentLineIndex + 1)번째 줄"
+                AppLocalization.format(
+                    "다음 줄, %lld번째 줄",
+                    currentLineIndex + 1
+                )
             )
         case .nextPage:
             moveText(by: 1, unit: .page)
             announceRemoteFeedback(
-                "다음 페이지, \(currentLineIndex + 1)번째 줄"
+                AppLocalization.format(
+                    "다음 페이지, %lld번째 줄",
+                    currentLineIndex + 1
+                )
             )
         case .toggleReading:
             toggleDocumentReadingFromRemote()
@@ -1505,7 +1612,9 @@ struct LocalDocumentView: View {
         if speechController.isSpeaking {
             speechController.stop()
             announceRemoteFeedback(
-                "문서 읽기를 중지했습니다."
+                AppLocalization.string(
+                    "문서 읽기를 중지했습니다."
+                )
             )
             return
         }
@@ -1515,12 +1624,16 @@ struct LocalDocumentView: View {
                 currentLineIndex
         ) else {
             announceRemoteFeedback(
-                "읽을 문서 텍스트가 없습니다."
+                AppLocalization.string(
+                    "읽을 문서 텍스트가 없습니다."
+                )
             )
             return
         }
-        feedback =
-            "\(currentLineIndex + 1)번째 줄부터 문장 읽기를 시작했습니다."
+        feedback = AppLocalization.format(
+            "%lld번째 줄부터 문장 읽기를 시작했습니다.",
+            currentLineIndex + 1
+        )
     }
 
     private func announceRemoteFeedback(

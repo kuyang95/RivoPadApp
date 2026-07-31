@@ -7,9 +7,14 @@ nonisolated enum LocalDocumentImportError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .fileTooLarge(let maximumMegabytes):
-            return "파일은 \(maximumMegabytes)MB 이하만 열 수 있습니다."
+            return AppLocalization.format(
+                "파일은 %lldMB 이하만 열 수 있습니다.",
+                maximumMegabytes
+            )
         case .textDecodingFailed:
-            return "지원되는 텍스트 인코딩이 아닙니다."
+            return AppLocalization.string(
+                "지원되는 텍스트 인코딩이 아닙니다."
+            )
         }
     }
 }
@@ -93,7 +98,9 @@ actor LocalDocumentImportService {
         )
 
         let fileName = sourceURL.lastPathComponent.isEmpty
-            ? "가져온 문서"
+            ? AppLocalization.string(
+                "가져온 문서"
+            )
             : sourceURL.lastPathComponent
         let destinationURL = itemDirectory
             .appendingPathComponent(fileName)
