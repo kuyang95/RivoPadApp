@@ -217,7 +217,7 @@ iPad 앱에서는 동일 구현하지 않으며, 제품 범위와 대체 경로�
 한 영역을 완성할 때까지 다른 기능을 멈추지 않고, 사용자 확인이 필요한
 항목은 각 백로그에 쌓은 뒤 다음 구현으로 이동한다.
 
-1. VisionLink 데이터 채널·일반 파일·클립보드
+1. VisionLink 데이터 채널·일반 파일·클립보드 ✅
 2. VisionLink 원격 OCR·이미지 분석·번역 ✅
 3. VisionLink 원격 AI 채팅·실시간 읽기 ✅
 4. EPUB 독서 연속성·목차·검색 ✅
@@ -324,6 +324,10 @@ iPad 앱에서는 동일 구현하지 않으며, 제품 범위와 대체 경로�
 72. Android 1.2.6의 VisionLink JPEG EXIF 회전 보정을 iPad 원격 OCR·
     이미지 설명·대화 첨부가 함께 쓰는 크기 제한 ImageIO 디코더로
     단일화하고 회전 메타데이터·손상 이미지 회귀 테스트 추가 ✅
+73. Android 매니페스트의 17개 Activity·1개 Service·18개 Receiver·
+    1개 Provider와 Compose·접근성 호출 그래프를 다시 대조하고,
+    87개 구현·3개 실기기 검증·14개 공개 API 불가 항목의 근거를
+    `Tools/PORTING_COMPLETION_AUDIT.md`에 고정 ✅
 
 ## 일괄 실기기 검증 원칙
 
