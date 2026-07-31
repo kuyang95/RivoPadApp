@@ -45,6 +45,24 @@ nonisolated struct RivoQuickMenuItem:
     let title: String
     let systemImage: String
     let command: RivoRemoteCommand
+    let increaseCommand: RivoRemoteCommand?
+    let decreaseCommand: RivoRemoteCommand?
+
+    init(
+        id: String,
+        title: String,
+        systemImage: String,
+        command: RivoRemoteCommand,
+        increaseCommand: RivoRemoteCommand? = nil,
+        decreaseCommand: RivoRemoteCommand? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.systemImage = systemImage
+        self.command = command
+        self.increaseCommand = increaseCommand
+        self.decreaseCommand = decreaseCommand
+    }
 }
 
 @MainActor
@@ -58,10 +76,22 @@ final class RivoRemoteControlCenter: ObservableObject {
         RivoRemoteScreen?
 
     var items: [RivoQuickMenuItem] {
-        if activeScreen == .publicationReader {
+        switch activeScreen {
+        case .publicationReader:
             return publicationReaderItems
+        case .magnifier:
+            return magnifierItems(
+                isLiveTextReader: false
+            )
+        case .liveTextReader:
+            return magnifierItems(
+                isLiveTextReader: true
+            )
+        case .localDocumentReader:
+            return localDocumentReaderItems
+        default:
+            return globalItems
         }
-        return globalItems
     }
 
     private var globalItems: [RivoQuickMenuItem] {
@@ -218,6 +248,250 @@ final class RivoRemoteControlCenter: ObservableObject {
         )
     }
 
+    private func magnifierItems(
+        isLiveTextReader: Bool
+    ) -> [RivoQuickMenuItem] {
+        [
+            RivoQuickMenuItem(
+                id: "camera.back",
+                title:
+                    AppLocalization.string(
+                        "닫기"
+                    ),
+                systemImage: "chevron.backward",
+                command: magnifierCommand(.close)
+            ),
+            RivoQuickMenuItem(
+                id: "camera.capture",
+                title:
+                    AppLocalization.string(
+                        isLiveTextReader
+                            ? "읽기 일시정지 또는 재개"
+                            : "사진 저장"
+                    ),
+                systemImage:
+                    isLiveTextReader
+                    ? "playpause"
+                    : "text.viewfinder",
+                command: magnifierCommand(.capture)
+            ),
+            adjustableMagnifierItem(
+                id: "camera.zoom",
+                title: "확대 배율",
+                systemImage: "plus.magnifyingglass",
+                defaultAction: .resetZoom,
+                increaseAction: .increaseZoom,
+                decreaseAction: .decreaseZoom
+            ),
+            adjustableMagnifierItem(
+                id: "camera.color",
+                title: "색상 조합",
+                systemImage: "camera.filters",
+                defaultAction: .originalColor,
+                increaseAction: .nextColor,
+                decreaseAction: .previousColor
+            ),
+            adjustableMagnifierItem(
+                id: "camera.threshold",
+                title: "임계값",
+                systemImage:
+                    "circle.lefthalf.filled",
+                defaultAction: .resetThreshold,
+                increaseAction:
+                    .increaseThreshold,
+                decreaseAction:
+                    .decreaseThreshold
+            ),
+            adjustableMagnifierItem(
+                id: "camera.brightness",
+                title: "미리보기 밝기",
+                systemImage: "sun.max",
+                defaultAction: .resetBrightness,
+                increaseAction:
+                    .increaseBrightness,
+                decreaseAction:
+                    .decreaseBrightness
+            ),
+            magnifierItem(
+                id: "camera.invert",
+                title: "반전",
+                systemImage:
+                    "circle.lefthalf.filled.inverse",
+                action: .invertColor
+            ),
+            magnifierItem(
+                id: "camera.switch",
+                title: "카메라 전환",
+                systemImage:
+                    "arrow.triangle.2.circlepath.camera",
+                action: .switchCamera
+            ),
+            magnifierItem(
+                id: "camera.torch",
+                title: "토치",
+                systemImage: "flashlight.on.fill",
+                action: .toggleTorch
+            ),
+            magnifierItem(
+                id: "camera.focus",
+                title: "카메라 초점",
+                systemImage:
+                    "camera.metering.center.weighted",
+                action: .focus
+            ),
+        ]
+    }
+
+    private var localDocumentReaderItems:
+        [RivoQuickMenuItem]
+    {
+        [
+            RivoQuickMenuItem(
+                id: "document.back",
+                title:
+                    AppLocalization.string(
+                        "닫기"
+                    ),
+                systemImage: "chevron.backward",
+                command: .back
+            ),
+            localDocumentReaderItem(
+                id: "document.originalColor",
+                title: "원본 색상",
+                systemImage: "arrow.counterclockwise",
+                action: .originalColor
+            ),
+            adjustableLocalDocumentReaderItem(
+                id: "document.color",
+                title: "색상 대비",
+                systemImage:
+                    "circle.lefthalf.filled",
+                defaultAction: .invertColor,
+                increaseAction: .nextColor,
+                decreaseAction: .previousColor
+            ),
+            adjustableLocalDocumentReaderItem(
+                id: "document.font",
+                title: "글자 크기",
+                systemImage: "textformat.size",
+                defaultAction: .defaultFont,
+                increaseAction: .increaseFont,
+                decreaseAction: .decreaseFont
+            ),
+            adjustableLocalDocumentReaderItem(
+                id: "document.lineHeight",
+                title: "줄 간격",
+                systemImage:
+                    "text.line.first.and.arrowtriangle.forward",
+                defaultAction:
+                    .defaultLineHeight,
+                increaseAction:
+                    .increaseLineHeight,
+                decreaseAction:
+                    .decreaseLineHeight
+            ),
+        ]
+    }
+
+    private func magnifierItem(
+        id: String,
+        title: String,
+        systemImage: String,
+        action: RivoMagnifierRemoteAction
+    ) -> RivoQuickMenuItem {
+        RivoQuickMenuItem(
+            id: id,
+            title: AppLocalization.string(title),
+            systemImage: systemImage,
+            command: magnifierCommand(action)
+        )
+    }
+
+    private func adjustableMagnifierItem(
+        id: String,
+        title: String,
+        systemImage: String,
+        defaultAction: RivoMagnifierRemoteAction,
+        increaseAction: RivoMagnifierRemoteAction,
+        decreaseAction: RivoMagnifierRemoteAction
+    ) -> RivoQuickMenuItem {
+        RivoQuickMenuItem(
+            id: id,
+            title: AppLocalization.string(title),
+            systemImage: systemImage,
+            command:
+                magnifierCommand(defaultAction),
+            increaseCommand:
+                magnifierCommand(increaseAction),
+            decreaseCommand:
+                magnifierCommand(decreaseAction)
+        )
+    }
+
+    private func magnifierCommand(
+        _ action: RivoMagnifierRemoteAction
+    ) -> RivoRemoteCommand {
+        .screen(
+            activeScreen == .liveTextReader
+                ? .liveTextReader
+                : .magnifier,
+            .magnifier(action)
+        )
+    }
+
+    private func localDocumentReaderItem(
+        id: String,
+        title: String,
+        systemImage: String,
+        action: RivoLocalDocumentRemoteAction
+    ) -> RivoQuickMenuItem {
+        RivoQuickMenuItem(
+            id: id,
+            title: AppLocalization.string(title),
+            systemImage: systemImage,
+            command: localDocumentCommand(action)
+        )
+    }
+
+    private func adjustableLocalDocumentReaderItem(
+        id: String,
+        title: String,
+        systemImage: String,
+        defaultAction:
+            RivoLocalDocumentRemoteAction,
+        increaseAction:
+            RivoLocalDocumentRemoteAction,
+        decreaseAction:
+            RivoLocalDocumentRemoteAction
+    ) -> RivoQuickMenuItem {
+        RivoQuickMenuItem(
+            id: id,
+            title: AppLocalization.string(title),
+            systemImage: systemImage,
+            command:
+                localDocumentCommand(
+                    defaultAction
+                ),
+            increaseCommand:
+                localDocumentCommand(
+                    increaseAction
+                ),
+            decreaseCommand:
+                localDocumentCommand(
+                    decreaseAction
+                )
+        )
+    }
+
+    private func localDocumentCommand(
+        _ action: RivoLocalDocumentRemoteAction
+    ) -> RivoRemoteCommand {
+        .screen(
+            .localDocumentReader,
+            .localDocumentReader(action)
+        )
+    }
+
     func updateActiveScreen(
         _ screen: RivoRemoteScreen?
     ) {
@@ -364,12 +638,22 @@ final class RivoRemoteControlCenter: ObservableObject {
                 selectedIndex = 0
                 announceSelection()
                 command = nil
-            case .two, .four:
+            case .two:
+                command =
+                    activateAdjustment(
+                        increase: true
+                    )
+            case .four:
                 moveSelection(by: -1)
                 command = nil
-            case .six, .eight:
+            case .six:
                 moveSelection(by: 1)
                 command = nil
+            case .eight:
+                command =
+                    activateAdjustment(
+                        increase: false
+                    )
             case .seven:
                 selectedIndex = max(items.count - 1, 0)
                 announceSelection()
@@ -512,6 +796,36 @@ final class RivoRemoteControlCenter: ObservableObject {
             item.title
         )
         return item.command
+    }
+
+    private func activateAdjustment(
+        increase: Bool
+    ) -> RivoRemoteCommand? {
+        guard items.indices.contains(
+            selectedIndex
+        ) else {
+            return nil
+        }
+        let item = items[selectedIndex]
+        let command = increase
+            ? item.increaseCommand
+            : item.decreaseCommand
+        guard let command else {
+            feedback = AppLocalization.format(
+                "%@은 조절 항목이 아닙니다.",
+                item.title
+            )
+            announceFeedback()
+            return nil
+        }
+        feedback = AppLocalization.format(
+            increase
+                ? "%@ 증가"
+                : "%@ 감소",
+            item.title
+        )
+        announceFeedback()
+        return command
     }
 
     private func enterCommandMode(
@@ -715,7 +1029,7 @@ struct RivoQuickMenuOverlay: View {
 
                 Text(
                     AppLocalization.string(
-                        "L1 메뉴 · 2/4 이전 · 6/8 다음 · 5 선택 · 0 홈 · 별표 닫기"
+                        "L1 메뉴 · 4/6 이동 · 2/8 조절 · 5 선택 · 0 홈 · 별표 닫기"
                     )
                 )
                 .font(.footnote)

@@ -1312,3 +1312,15 @@
 "외부 링크 열기" = "Open External Link";
 "책 밖의 웹사이트를 Safari에서 열까요?\n%@" = "Open this website outside the book in Safari?\n%@";
 "Safari에서 열기" = "Open in Safari";
+"읽기 일시정지 또는 재개" = "Pause or Resume Reading";
+"임계값" = "Threshold";
+"미리보기 밝기" = "Preview Brightness";
+"카메라 전환" = "Switch Camera";
+"카메라 초점" = "Camera Focus";
+"색상 대비" = "Color Contrast";
+"%@은 조절 항목이 아닙니다." = "%@ Is Not Adjustable.";
+"%@ 증가" = "Increase %@";
+"%@ 감소" = "Decrease %@";
+"L1 메뉴 · 4/6 이동 · 2/8 조절 · 5 선택 · 0 홈 · 별표 닫기" = "L1 Menu · 4/6 Move · 2/8 Adjust · 5 Select · 0 Home · Star Close";
+"4/6: 메뉴 이동 · 2/8: 선택 항목 조절 · 5: 선택 또는 기본값" = "4/6: Move in Menu · 2/8: Adjust Selected Item · 5: Select or Default";
+"돋보기 R1 카메라 모드: 4 닫기 · 5 전환 · 6 토치 · 7 사진 저장 · R2 초점" = "Magnifier R1 Camera Mode: 4 Close · 5 Switch · 6 Torch · 7 Save Photo · R2 Focus";

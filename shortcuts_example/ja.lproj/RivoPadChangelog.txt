@@ -21,6 +21,7 @@
 @text Rivo BLE接続と画面別操作、VisionLinkのファイル・映像・リモートAI機能を追加しました。
 @text Android Remote Ribbonの展開・折りたたみと16色の組み合わせを、アプリ内Rivoクイックメニューの設定として追加しました。
 @text EPUB・DAISY読書中のRivo L1メニューを、Androidと同じ再生・移動・目次・検索・表示設定の読書専用メニューに合わせました。
+@text Rivo L1メニューの4/6移動、2/8調整、5初期値の操作をAndroidと合わせ、カメラ・リアルタイム読み上げ・TXT/PDF専用の調整メニューを追加しました。
 @text EPUB・DAISYを開いたときに自動で読み上げ、目次・検索・表示設定中は一時停止してから再開するAndroidの動作に合わせました。
 @text EPUB・DAISYの再生中は表示中のスクロール位置を分離し、スクロールしても保存位置や次の再生位置が置き換わらないAndroidの動作に合わせました。
 @text RivoのCoreBluetooth検索と接続をiPadOSのバックグラウンド状態復元へ対応させました。

@@ -799,6 +799,181 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         )
     }
 
+    func testQuickMenuMatchesAndroidTextViewAdjustments() {
+        let controlCenter =
+            RivoRemoteControlCenter()
+        controlCenter.updateActiveScreen(
+            .localDocumentReader
+        )
+
+        XCTAssertEqual(
+            controlCenter.items.map(\.title),
+            [
+                "닫기",
+                "원본 색상",
+                "색상 대비",
+                "글자 크기",
+                "줄 간격",
+            ]
+        )
+
+        _ = controlCenter.receive(
+            button(.l1, action: .pressed)
+        )
+        controlCenter.focusItem(at: 3)
+
+        XCTAssertEqual(
+            controlCenter.receive(
+                button(.two, action: .pressed)
+            ),
+            .screen(
+                .localDocumentReader,
+                .localDocumentReader(
+                    .increaseFont
+                )
+            )
+        )
+        XCTAssertTrue(
+            controlCenter.isMenuPresented
+        )
+        XCTAssertEqual(
+            controlCenter.receive(
+                button(.eight, action: .pressed)
+            ),
+            .screen(
+                .localDocumentReader,
+                .localDocumentReader(
+                    .decreaseFont
+                )
+            )
+        )
+        XCTAssertEqual(
+            controlCenter.receive(
+                button(.five, action: .pressed)
+            ),
+            .screen(
+                .localDocumentReader,
+                .localDocumentReader(
+                    .defaultFont
+                )
+            )
+        )
+        XCTAssertFalse(
+            controlCenter.isMenuPresented
+        )
+    }
+
+    func testQuickMenuExposesMagnifierAdjustments() {
+        let controlCenter =
+            RivoRemoteControlCenter()
+        controlCenter.updateActiveScreen(
+            .magnifier
+        )
+
+        XCTAssertEqual(
+            controlCenter.items.map(\.id),
+            [
+                "camera.back",
+                "camera.capture",
+                "camera.zoom",
+                "camera.color",
+                "camera.threshold",
+                "camera.brightness",
+                "camera.invert",
+                "camera.switch",
+                "camera.torch",
+                "camera.focus",
+            ]
+        )
+        XCTAssertEqual(
+            controlCenter.items[1].title,
+            "사진 저장"
+        )
+
+        _ = controlCenter.receive(
+            button(.l1, action: .pressed)
+        )
+        controlCenter.focusItem(at: 2)
+        XCTAssertEqual(
+            controlCenter.receive(
+                button(.two, action: .pressed)
+            ),
+            .screen(
+                .magnifier,
+                .magnifier(.increaseZoom)
+            )
+        )
+        XCTAssertEqual(
+            controlCenter.receive(
+                button(.eight, action: .pressed)
+            ),
+            .screen(
+                .magnifier,
+                .magnifier(.decreaseZoom)
+            )
+        )
+        XCTAssertEqual(
+            controlCenter.receive(
+                button(.five, action: .pressed)
+            ),
+            .screen(
+                .magnifier,
+                .magnifier(.resetZoom)
+            )
+        )
+
+        controlCenter.updateActiveScreen(
+            .liveTextReader
+        )
+        XCTAssertEqual(
+            controlCenter.items[1].title,
+            "읽기 일시정지 또는 재개"
+        )
+        XCTAssertEqual(
+            controlCenter.items[1].command,
+            .screen(
+                .liveTextReader,
+                .magnifier(.capture)
+            )
+        )
+    }
+
+    func testQuickMenuUsesAndroidFourSixNavigation() {
+        let controlCenter =
+            RivoRemoteControlCenter()
+
+        _ = controlCenter.receive(
+            button(.l1, action: .pressed)
+        )
+        XCTAssertNil(
+            controlCenter.receive(
+                button(.two, action: .pressed)
+            )
+        )
+        XCTAssertEqual(
+            controlCenter.selectedIndex,
+            0
+        )
+        XCTAssertNil(
+            controlCenter.receive(
+                button(.six, action: .pressed)
+            )
+        )
+        XCTAssertEqual(
+            controlCenter.selectedIndex,
+            1
+        )
+        XCTAssertNil(
+            controlCenter.receive(
+                button(.four, action: .pressed)
+            )
+        )
+        XCTAssertEqual(
+            controlCenter.selectedIndex,
+            0
+        )
+    }
+
     func testQuickMenuScreenChangeResetsSelection() {
         let controlCenter =
             RivoRemoteControlCenter()

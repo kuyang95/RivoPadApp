@@ -21,6 +21,7 @@
 @text Added Rivo BLE connection and screen-specific controls, plus VisionLink file, video, and remote AI features.
 @text Added Android Remote Ribbon expansion and collapse plus 16 color combinations as settings for the in-app Rivo Quick Menu.
 @text Matched the Rivo L1 menu during EPUB and DAISY reading to Android’s reader-specific playback, navigation, contents, search, and appearance menu.
+@text Matched Android’s Rivo L1 menu controls for 4/6 movement, 2/8 adjustment, and 5 default selection, and added adjustable Camera, Live Reading, and TXT/PDF menus.
 @text Matched Android’s EPUB and DAISY behavior by starting reading automatically and pausing for contents, search, or appearance before resuming.
 @text Matched Android by keeping the visible scroll position separate during EPUB and DAISY playback so scrolling does not replace saved progress or the next playback position.
 @text Improved Rivo CoreBluetooth scanning and connection with iPadOS background state restoration.

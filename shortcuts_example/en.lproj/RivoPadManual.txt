@@ -123,6 +123,7 @@
 @section Control Inside VisionCraft
 @text Rivo buttons control the in-app quick menu, AI voice input, Magnifier, Live Reading, Scanner, Documents, and EPUB or DAISY screens.
 @text In Settings under In-App Quick Menu, choose between a vertical list of every item and a horizontal previous-current-next view, and select one of the same 16 high-contrast color combinations as Android. These settings apply only inside VisionCraft, not over other apps.
+@text In the Quick Menu, use 4/6 to move between items, 2/8 to adjust the selected value, and 5 to run it or apply its default, matching Android. Camera and Live Reading expose photo saving or reading pause, zoom, color, threshold, brightness, inversion, camera switching, flashlight, and focus; TXT/PDF exposes color, text size, and line spacing.
 @text While reading EPUB or DAISY, press L1 to open the reader-specific menu for closing the reader, play or pause, previous or next, navigation units, contents, text search, and appearance.
 @text Pressing R1 outside a feature screen enters command mode. 2 immediately translates the clipboard with the M4 local AI and reads the result; 3 opens live camera text reading; 4 opens Camera Magnifier; and 9 opens captured-image description.
 @text Press R1 twice to hear a guide to all command keys. After opening Camera, use R1 with 5, 6, 7, star, 0, and hash to switch cameras, control the torch, capture, and zoom.

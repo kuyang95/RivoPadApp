@@ -292,7 +292,7 @@ struct RivoRemoteView: View {
                 systemImage: "rectangle.rightthird.inset.filled"
             )
             Label(
-                "2/4: 이전 · 6/8: 다음 · 5: 선택",
+                "4/6: 메뉴 이동 · 2/8: 선택 항목 조절 · 5: 선택 또는 기본값",
                 systemImage: "move.3d"
             )
             Label(
@@ -304,7 +304,7 @@ struct RivoRemoteView: View {
                 systemImage: "speaker.slash"
             )
             Label(
-                "돋보기 R1 카메라 모드: 4 닫기 · 5 전환 · 6 토치 · 7 읽기 · R2 초점",
+                "돋보기 R1 카메라 모드: 4 닫기 · 5 전환 · 6 토치 · 7 사진 저장 · R2 초점",
                 systemImage: "plus.magnifyingglass"
             )
             Label(
