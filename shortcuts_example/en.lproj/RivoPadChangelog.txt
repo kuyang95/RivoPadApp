@@ -7,6 +7,7 @@
 @text Improved the Home AI card to open New Chat or Chat History directly like Android and stack its buttons vertically at accessibility text sizes.
 @text Improved the Home Camera card to open Document Scan and Live Text Reading directly like Android, with Magnifier and Image Description also available in one step.
 @text Fixed the four Camera Tools card descriptions and the OCR-result recognition-box toggle to follow the selected English or Japanese app language.
+@text Unified document-result OCR on a dedicated background processing path and stabilized progress animation and recognition-region coordinates for current iPadOS concurrency rules.
 @text Added a custom document scanner, Magnifier, Live Text Reading, and Android-compatible color filters.
 @text Added storage and restoration of the camera’s last Android-compatible color combination, inversion, and threshold when entering Rivo screen control mode.
 @text Added PDF and TXT document viewing and EPUB, DAISY, and SMIL reading.

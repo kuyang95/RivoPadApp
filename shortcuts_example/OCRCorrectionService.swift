@@ -162,9 +162,10 @@ final class LocalOCRCorrectionService {
     private let llmService: LLMService
 
     init(
-        llmService: LLMService = .shared
+        llmService: LLMService? = nil
     ) {
-        self.llmService = llmService
+        self.llmService =
+            llmService ?? .shared
     }
 
     func correct(

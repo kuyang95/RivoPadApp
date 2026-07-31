@@ -1,11 +1,22 @@
 import CoreImage
 import Metal
 import CoreVideo
+import UIKit
 import XCTest
 
 @testable import shortcuts_example
 
 final class ScannerRegressionTests: XCTestCase {
+    func testOCRServicePreservesEmptyImageFallback()
+        async throws
+    {
+        let text = try await OCRService.shared
+            .recognize(
+                from: UIImage()
+            )
+        XCTAssertEqual(text, "")
+    }
+
     func testScannerDiagnosticsRequireExplicitOptIn() {
         XCTAssertFalse(
             ScannerDiagnostics.isRequested(

@@ -8,25 +8,64 @@
 import Vision
 import UIKit
 
+struct OCRRecognizedLine: Equatable, Sendable {
+    let text: String
+    let boundingBox: CGRect
+}
+
 actor OCRService {
 
     static let shared = OCRService()
 
     func recognize(from image: UIImage) async throws -> String {
+        guard image.cgImage != nil else {
+            return ""
+        }
+        let lines = try recognizeLines(
+            from: image
+        )
+        return lines.isEmpty
+            ? "(텍스트 없음)"
+            : lines
+                .map(\.text)
+                .joined(separator: "\n")
+    }
 
-        guard let cgImage = image.cgImage else { return "" }
+    func recognizeLines(
+        from image: UIImage,
+        minimumTextHeight: Float? = nil
+    ) throws -> [OCRRecognizedLine] {
+        guard let cgImage = image.cgImage else {
+            return []
+        }
 
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
         request.recognitionLanguages = ["ko-KR", "en-US"]
+        if let minimumTextHeight {
+            request.minimumTextHeight =
+                minimumTextHeight
+        }
 
         let handler = VNImageRequestHandler(cgImage: cgImage)
         try handler.perform([request])
 
         return request.results?
-            .compactMap { $0.topCandidates(1).first?.string }
-            .joined(separator: "\n") ?? "(텍스트 없음)"
+            .compactMap { observation in
+                guard let text = observation
+                    .topCandidates(1)
+                    .first?
+                    .string
+                else {
+                    return nil
+                }
+                return OCRRecognizedLine(
+                    text: text,
+                    boundingBox:
+                        observation.boundingBox
+                )
+            } ?? []
     }
 
     func recognizeAndCorrect(

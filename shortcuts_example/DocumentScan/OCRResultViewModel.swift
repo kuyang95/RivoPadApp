@@ -6,9 +6,7 @@
 //
 
 import Foundation
-import Vision
 import UIKit
-import AVFoundation
 import Combine
 
 @MainActor
@@ -80,8 +78,13 @@ final class OCRResultViewModel: ObservableObject {
     func startThinkingAnimation() {
         dotTimer?.invalidate()
         dotTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            self.activeDotIndex = (self.activeDotIndex + 1) % 3
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    return
+                }
+                activeDotIndex =
+                    (activeDotIndex + 1) % 3
+            }
         }
         RunLoop.main.add(dotTimer!, forMode: .common)
     }
@@ -103,64 +106,57 @@ final class OCRResultViewModel: ObservableObject {
             )
         startThinkingAnimation()
 
-        guard let cg = image.cgImage else {
+        guard image.cgImage != nil else {
             stopThinkingAnimation()
             isExtracting = false
             return
         }
 
-        let request = VNRecognizeTextRequest { [weak self] req, _ in
-            guard let self else { return }
-
-            let observations = (req.results as? [VNRecognizedTextObservation]) ?? []
-            var boxes: [TextBox2] = []
-
-            for obs in observations {
-                guard let best = obs.topCandidates(1).first else { continue }
-                boxes.append(TextBox2(text: best.string, box: obs.boundingBox))
-            }
-
-            boxes = self.sortReadingOrder(boxes)
-
-            Task { @MainActor [weak self] in
-                guard let self else {
-                    return
-                }
-                self.lineBoxes = boxes
-                let original = boxes
-                    .map(\.text)
-                    .joined(separator: "\n")
-                if AppSettingsStore.shared
-                    .ocrAutoCorrectionEnabled,
-                   !original.isEmpty {
-                    self.extractionStatus =
-                        AppLocalization.string(
-                            "OCR 오타 교정중"
+        Task { @MainActor [weak self] in
+            let recognizedLines =
+                (
+                    try? await OCRService.shared
+                        .recognizeLines(
+                            from: image,
+                            minimumTextHeight: 0.02
                         )
-                }
-                self.extractedText =
-                    await LocalOCRCorrectionService
-                    .shared
-                    .correct(
-                        image: image,
-                        originalText: original,
-                        isEnabled:
-                            AppSettingsStore
-                            .shared
-                            .ocrAutoCorrectionEnabled
-                    )
-                self.stopThinkingAnimation()
-                self.isExtracting = false
+                ) ?? []
+            guard let self else {
+                return
             }
-        }
-
-        request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = true
-        request.recognitionLanguages = ["ko-KR", "en-US"]
-        request.minimumTextHeight = 0.02
-
-        DispatchQueue.global(qos: .userInitiated).async {
-            try? VNImageRequestHandler(cgImage: cg, options: [:]).perform([request])
+            let boxes = sortReadingOrder(
+                recognizedLines.map {
+                    TextBox2(
+                        text: $0.text,
+                        box: $0.boundingBox
+                    )
+                }
+            )
+            lineBoxes = boxes
+            let original = boxes
+                .map(\.text)
+                .joined(separator: "\n")
+            let correctionEnabled =
+                AppSettingsStore.shared
+                    .ocrAutoCorrectionEnabled
+            if correctionEnabled,
+               !original.isEmpty {
+                extractionStatus =
+                    AppLocalization.string(
+                        "OCR 오타 교정중"
+                    )
+            }
+            extractedText =
+                await LocalOCRCorrectionService
+                .shared
+                .correct(
+                    image: image,
+                    originalText: original,
+                    isEnabled:
+                        correctionEnabled
+                )
+            stopThinkingAnimation()
+            isExtracting = false
         }
     }
 
@@ -170,7 +166,7 @@ final class OCRResultViewModel: ObservableObject {
     ) {
 
         spatialIndex = OCRSpatialIndex(
-            screenSize: UIScreen.main.bounds.size
+            screenSize: image.size
         )
 
         for (i, box) in boxes.enumerated() {
