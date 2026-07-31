@@ -98,7 +98,6 @@ Android 원본의 홈 설정과 `AppSettingsActivity`, 문서 스캐너·텍스�
   다른 앱에서는 위젯과 시스템 빠른 실행을 사용한다.
 - 시스템 밝기·색상 필터·VoiceOver·회전 잠금을 앱이 직접 바꾸지 않는다.
   iPad 설정과 접근성 단축키로 안내한다.
-- 내려받은 글꼴은 Application Support 파일 URL 등록을 거부하는 iPadOS
-  제약 때문에 검증된 데이터를 앱 프로세스에 직접 등록한다. 이 경로는
-  iOS 18에서 deprecated 표시되지만 동적 파일의 동작 가능한 공개 대체
-  API가 없어 유지하며, M4 실기기에서 재실행 등록을 확인한다.
+- 내려받은 글꼴은 크기와 SHA-256을 검증한 뒤 Application Support의
+  파일 URL을 CoreText의 process scope로 등록한다. 앱이 실행되는 동안
+  원본 파일을 이동하지 않고, 다음 실행에서 같은 검증과 등록을 반복한다.
