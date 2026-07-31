@@ -31,11 +31,9 @@ final class SharedInboxStoreTests: XCTestCase {
     func testTextAndImageItemsCommitInCreationOrder()
         throws
     {
-        let later = Date(
-            timeIntervalSince1970: 200
-        )
-        let earlier = Date(
-            timeIntervalSince1970: 100
+        let later = Date()
+        let earlier = later.addingTimeInterval(
+            -100
         )
         let text = try store.enqueueText(
             "  선택한 문장  ",
@@ -129,6 +127,114 @@ final class SharedInboxStoreTests: XCTestCase {
 
         XCTAssertTrue(
             try store.pendingItems().isEmpty
+        )
+    }
+
+    func testCleanupRemovesExpiredAndAbandonedItemsOnly()
+        throws
+    {
+        let now = Date()
+        let recent = try store.enqueueText(
+            "최근 항목",
+            createdAt:
+                now.addingTimeInterval(
+                    -60 * 60
+                )
+        )
+        let expired = try store.enqueueText(
+            "만료 항목",
+            createdAt:
+                now.addingTimeInterval(
+                    -8 * 24 * 60 * 60
+                )
+        )
+        let freshIncomplete =
+            rootURL.appendingPathComponent(
+                UUID().uuidString,
+                isDirectory: true
+            )
+        let staleIncomplete =
+            rootURL.appendingPathComponent(
+                UUID().uuidString,
+                isDirectory: true
+            )
+        let foreignDirectory =
+            rootURL.appendingPathComponent(
+                "foreign-data",
+                isDirectory: true
+            )
+        for directory in [
+            freshIncomplete,
+            staleIncomplete,
+            foreignDirectory,
+        ] {
+            try FileManager.default
+                .createDirectory(
+                    at: directory,
+                    withIntermediateDirectories:
+                        true
+                )
+        }
+        let staleDate =
+            now.addingTimeInterval(
+                -2 * 24 * 60 * 60
+            )
+        try FileManager.default
+            .setAttributes(
+                [
+                    .modificationDate:
+                        staleDate,
+                ],
+                ofItemAtPath:
+                    staleIncomplete.path
+            )
+        try FileManager.default
+            .setAttributes(
+                [
+                    .modificationDate:
+                        staleDate,
+                ],
+                ofItemAtPath:
+                    foreignDirectory.path
+            )
+
+        let result = try store.cleanup(
+            now: now
+        )
+
+        XCTAssertEqual(
+            result,
+            SharedInboxCleanupResult(
+                removedExpiredItems: 1,
+                removedAbandonedItems: 1,
+                failedRemovals: 0
+            )
+        )
+        XCTAssertEqual(
+            try store.pendingItems()
+                .map(\.id),
+            [recent.id]
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath:
+                    rootURL
+                    .appendingPathComponent(
+                        expired.id.uuidString
+                    ).path
+            )
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath:
+                    freshIncomplete.path
+            )
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath:
+                    foreignDirectory.path
+            )
         )
     }
 }

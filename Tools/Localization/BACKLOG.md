@@ -16,7 +16,8 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 - 동적으로 표시하는 말하기 속도, 문서 16색 테마와 재생 배수
 - 언어별 서버 글꼴 목록·다운로드/검증 상태·오류와 라이선스 링크
 - 도움말 센터의 탐색·검색·앱 정보·로컬 처리·Android 차이 안내
-- Share Extension과 선택 텍스트 Action의 표시 이름, 상태와 오류 안내
+- Share Extension과 선택 텍스트 Action의 표시 이름, 배치 저장 상태·오류,
+  공유 수신함 목록과 보존 기한 안내
 - Rivo 위젯의 표시 이름, 연결 상태, 바로가기와 VoiceOver 안내
 - 구성 가능한 VisionCraft 빠른 실행 위젯의 아홉 기능 이름·설명·힌트
 - 제어 센터·잠금 화면의 구성 가능한 VisionCraft 빠른 실행 컨트롤

@@ -221,6 +221,13 @@ struct shortcuts_exampleApp: App {
                                 rivoScreenRemoteControlCenter
                                     .deactivate(.voiceAction)
                             }
+                        case .sharedInbox:
+                            SharedInboxView {
+                                item in
+                                await openSharedInboxItem(
+                                    item
+                                )
+                            }
                         case .documentLibrary:
                             DocumentLibraryView()
                         case .localDocument(let fileURL):
@@ -666,10 +673,17 @@ struct shortcuts_exampleApp: App {
                 isConsumingSharedInbox = false
             }
             do {
-                guard let item = try
+                let items = try
                         SharedInboxStore.shared
                         .pendingItems()
-                        .first else {
+                guard let item = items.first
+                else {
+                    return
+                }
+                if items.count > 1 {
+                    replaceNavigation(
+                        with: .sharedInbox
+                    )
                     return
                 }
                 let route = try await route(
@@ -682,6 +696,29 @@ struct shortcuts_exampleApp: App {
                 sharedInboxError =
                     error.localizedDescription
             }
+        }
+    }
+
+    private func openSharedInboxItem(
+        _ item: SharedInboxItem
+    ) async -> Bool {
+        do {
+            let destination =
+                try await route(
+                    for: item
+                )
+            try SharedInboxStore.shared
+                .remove(item)
+            path = NavigationPath()
+            path.append(
+                AppRoute.sharedInbox
+            )
+            path.append(destination)
+            return true
+        } catch {
+            sharedInboxError =
+                error.localizedDescription
+            return false
         }
     }
 

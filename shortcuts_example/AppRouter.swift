@@ -53,6 +53,7 @@ enum AppRoute: Hashable {
             Bool
     )
     case voiceAction
+    case sharedInbox
     case documentLibrary
     case localDocument(fileURL: URL)
     case documentQuestion(document: String, question: String)

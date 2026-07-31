@@ -29,6 +29,15 @@ nonisolated struct SharedInboxItem:
     let typeIdentifier: String?
 }
 
+nonisolated struct SharedInboxCleanupResult:
+    Equatable,
+    Sendable
+{
+    let removedExpiredItems: Int
+    let removedAbandonedItems: Int
+    let failedRemovals: Int
+}
+
 enum SharedInboxStoreError: LocalizedError {
     case appGroupUnavailable
     case emptyText
@@ -63,6 +72,10 @@ final class SharedInboxStore {
     static let directoryName = "ShareInbox"
     static let manifestFilename = "manifest.json"
     static let maximumPayloadBytes = 100 * 1_024 * 1_024
+    static let committedItemRetention:
+        TimeInterval = 7 * 24 * 60 * 60
+    static let abandonedItemRetention:
+        TimeInterval = 24 * 60 * 60
 
     private let fileManager: FileManager
     private let rootURL: URL?
@@ -88,6 +101,7 @@ final class SharedInboxStore {
     }
 
     func pendingItems() throws -> [SharedInboxItem] {
+        _ = try? cleanup()
         let root = try preparedRoot()
         let directories = try fileManager
             .contentsOfDirectory(
@@ -135,6 +149,127 @@ final class SharedInboxStore {
             }
             return $0.createdAt < $1.createdAt
         }
+    }
+
+    @discardableResult
+    func cleanup(
+        now: Date = Date()
+    ) throws -> SharedInboxCleanupResult {
+        let root = try preparedRoot()
+        let directories = try fileManager
+            .contentsOfDirectory(
+                at: root,
+                includingPropertiesForKeys: [
+                    .isDirectoryKey,
+                    .isSymbolicLinkKey,
+                    .creationDateKey,
+                    .contentModificationDateKey,
+                ],
+                options: [.skipsHiddenFiles]
+            )
+        var removedExpiredItems = 0
+        var removedAbandonedItems = 0
+        var failedRemovals = 0
+
+        for directory in directories {
+            guard UUID(
+                uuidString:
+                    directory.lastPathComponent
+            ) != nil,
+            let values =
+                try? directory.resourceValues(
+                    forKeys: [
+                        .isDirectoryKey,
+                        .isSymbolicLinkKey,
+                        .creationDateKey,
+                        .contentModificationDateKey,
+                    ]
+                ),
+            values.isDirectory == true,
+            values.isSymbolicLink != true
+            else {
+                continue
+            }
+
+            let manifestURL = directory
+                .appendingPathComponent(
+                    Self.manifestFilename
+                )
+            let item: SharedInboxItem?
+            if let data = try? Data(
+                contentsOf: manifestURL
+            ) {
+                item = try? JSONDecoder
+                    .sharedInbox
+                    .decode(
+                        SharedInboxItem.self,
+                        from: data
+                    )
+            } else {
+                item = nil
+            }
+
+            let isCommitted: Bool
+            if let item {
+                isCommitted = Self.isValid(
+                    item,
+                    directory: directory
+                ) && (
+                    item.kind == .text
+                    || (try? payloadURL(
+                        for: item
+                    )) != nil
+                )
+            } else {
+                isCommitted = false
+            }
+
+            let shouldRemoveExpired =
+                isCommitted
+                && item.map {
+                    now.timeIntervalSince(
+                        $0.createdAt
+                    ) >= Self
+                        .committedItemRetention
+                } == true
+            let directoryDate =
+                values
+                    .contentModificationDate
+                ?? values.creationDate
+                ?? now
+            let shouldRemoveAbandoned =
+                !isCommitted
+                && now.timeIntervalSince(
+                    directoryDate
+                ) >= Self
+                    .abandonedItemRetention
+
+            guard shouldRemoveExpired
+                    || shouldRemoveAbandoned
+            else {
+                continue
+            }
+            do {
+                try fileManager.removeItem(
+                    at: directory
+                )
+                if shouldRemoveExpired {
+                    removedExpiredItems += 1
+                } else {
+                    removedAbandonedItems += 1
+                }
+            } catch {
+                failedRemovals += 1
+            }
+        }
+        return SharedInboxCleanupResult(
+            removedExpiredItems:
+                removedExpiredItems,
+            removedAbandonedItems:
+                removedAbandonedItems,
+            failedRemovals:
+                failedRemovals
+        )
     }
 
     func payloadURL(

@@ -32,6 +32,20 @@ final class ShareViewController: UIViewController {
         "group.com.rivo.shortcuts.example"
     private static let maximumPayloadBytes =
         100 * 1_024 * 1_024
+    private static let maximumBatchPayloadBytes =
+        250 * 1_024 * 1_024
+    private static let maximumBatchItems = 20
+    private static let supportedDocumentExtensions:
+        Set<String> = [
+            "epub",
+            "hwp",
+            "hwpx",
+            "pdf",
+            "txt",
+            "text",
+            "xls",
+            "xlsx",
+        ]
 
     private let statusLabel: UILabel = {
         let label = UILabel()
@@ -71,6 +85,8 @@ final class ShareViewController: UIViewController {
     }()
 
     private var didStart = false
+    private var committedPayloadBytes = 0
+    private var batchCreatedAt = Date()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -106,34 +122,132 @@ final class ShareViewController: UIViewController {
             return
         }
         didStart = true
-        receiveFirstSupportedItem()
+        receiveSupportedItems()
     }
 
-    private func receiveFirstSupportedItem() {
+    private func receiveSupportedItems() {
         let providers = extensionContext?
             .inputItems
             .compactMap { $0 as? NSExtensionItem }
             .flatMap { $0.attachments ?? [] }
             ?? []
-        guard let provider = providers.first(
-            where: Self.isSupported
-        ) else {
+        let supported = providers.filter(
+            Self.isSupported
+        )
+        guard !supported.isEmpty else {
             finish(
                 with:
                     shareLocalized(
-                        "사진, PDF, 텍스트 또는 URL만 공유할 수 있습니다."
+                        "사진, 지원 문서, 텍스트 또는 URL만 공유할 수 있습니다."
                     )
             )
             return
         }
+        guard supported.count
+                <= Self.maximumBatchItems else {
+            finish(
+                with:
+                    String(
+                        format:
+                            shareLocalized(
+                                "한 번에 공유 항목은 최대 %lld개까지 저장할 수 있습니다."
+                            ),
+                        Self.maximumBatchItems
+                    )
+            )
+            return
+        }
+        committedPayloadBytes = 0
+        batchCreatedAt = Date()
+        let unsupportedCount =
+            providers.count
+            - supported.count
+        process(
+            supported,
+            at: 0,
+            savedCount: 0,
+            errors: Array(
+                repeating:
+                    shareLocalized(
+                        "지원하지 않는 공유 항목입니다."
+                    ),
+                count:
+                    max(
+                        unsupportedCount,
+                        0
+                    )
+            )
+        )
+    }
 
+    private func process(
+        _ providers: [NSItemProvider],
+        at index: Int,
+        savedCount: Int,
+        errors: [String]
+    ) {
+        guard index < providers.count
+        else {
+            finishBatch(
+                savedCount: savedCount,
+                failedCount: errors.count,
+                firstError: errors.first
+            )
+            return
+        }
+        let createdAt = batchCreatedAt
+            .addingTimeInterval(
+                Double(index) / 1_000
+            )
+        store(
+            providers[index],
+            createdAt: createdAt
+        ) { [weak self] result in
+            guard let self else {
+                return
+            }
+            switch result {
+            case .success:
+                self.process(
+                    providers,
+                    at: index + 1,
+                    savedCount:
+                        savedCount + 1,
+                    errors: errors
+                )
+            case .failure(let error):
+                self.process(
+                    providers,
+                    at: index + 1,
+                    savedCount:
+                        savedCount,
+                    errors:
+                        errors
+                        + [
+                            error
+                                .localizedDescription
+                        ]
+                )
+            }
+        }
+    }
+
+    private func store(
+        _ provider: NSItemProvider,
+        createdAt: Date,
+        completion:
+            @escaping (Result<Void, Error>)
+                -> Void
+    ) {
         if provider.hasItemConformingToTypeIdentifier(
             UTType.image.identifier
         ) {
             loadFile(
                 from: provider,
                 type: .image,
-                kind: .image
+                kind: .image,
+                createdAt: createdAt,
+                completion: completion
             )
         } else if provider
             .hasItemConformingToTypeIdentifier(
@@ -142,10 +256,49 @@ final class ShareViewController: UIViewController {
             loadFile(
                 from: provider,
                 type: .pdf,
-                kind: .file
+                kind: .file,
+                createdAt: createdAt,
+                completion: completion
+            )
+        } else if provider
+            .hasItemConformingToTypeIdentifier(
+                UTType.plainText.identifier
+            )
+            || provider
+                .hasItemConformingToTypeIdentifier(
+                    UTType.url.identifier
+                ) {
+            loadText(
+                from: provider,
+                createdAt: createdAt,
+                completion: completion
+            )
+        } else if let typeIdentifier =
+                    Self.fileTypeIdentifier(
+                        for: provider
+                    ) {
+            loadFile(
+                from: provider,
+                typeIdentifier:
+                    typeIdentifier,
+                kind: .file,
+                createdAt: createdAt,
+                completion: completion
             )
         } else {
-            loadText(from: provider)
+            completion(
+                .failure(
+                    CocoaError(
+                        .fileReadUnsupportedScheme,
+                        userInfo: [
+                            NSLocalizedDescriptionKey:
+                                shareLocalized(
+                                    "지원하지 않는 공유 항목입니다."
+                                )
+                        ]
+                    )
+                )
+            )
         }
     }
 
@@ -167,10 +320,39 @@ final class ShareViewController: UIViewController {
                 .hasItemConformingToTypeIdentifier(
                     UTType.url.identifier
                 )
+            || fileTypeIdentifier(
+                for: provider
+            ) != nil
+    }
+
+    private nonisolated static func fileTypeIdentifier(
+        for provider: NSItemProvider
+    ) -> String? {
+        provider.registeredTypeIdentifiers
+            .first { identifier in
+                guard let type =
+                        UTType(identifier)
+                else {
+                    return false
+                }
+                return type.conforms(
+                    to: .data
+                )
+                    && !type.conforms(
+                        to: .image
+                    )
+                    && !type.conforms(
+                        to: .plainText
+                    )
+            }
     }
 
     private func loadText(
-        from provider: NSItemProvider
+        from provider: NSItemProvider,
+        createdAt: Date,
+        completion:
+            @escaping (Result<Void, Error>)
+                -> Void
     ) {
         let identifier =
             provider
@@ -187,13 +369,7 @@ final class ShareViewController: UIViewController {
                 return
             }
             if let error {
-                self.finish(
-                    with:
-                        shareLocalized(
-                            "텍스트를 읽지 못했습니다: "
-                        )
-                        + error.localizedDescription
-                )
+                completion(.failure(error))
                 return
             }
             let text: String?
@@ -211,25 +387,29 @@ final class ShareViewController: UIViewController {
                   !text.trimmingCharacters(
                       in: .whitespacesAndNewlines
                   ).isEmpty else {
-                self.finish(
-                    with:
-                        shareLocalized(
-                            "공유된 텍스트가 비어 있습니다."
+                completion(
+                    .failure(
+                        CocoaError(
+                            .fileReadCorruptFile,
+                            userInfo: [
+                                NSLocalizedDescriptionKey:
+                                    shareLocalized(
+                                        "공유된 텍스트가 비어 있습니다."
+                                    )
+                            ]
                         )
+                    )
                 )
                 return
             }
             do {
-                try self.commitText(text)
-                self.finishSuccessfully()
-            } catch {
-                self.finish(
-                    with:
-                        shareLocalized(
-                            "공유 항목을 저장하지 못했습니다: "
-                        )
-                        + error.localizedDescription
+                try self.commitText(
+                    text,
+                    createdAt: createdAt
                 )
+                completion(.success(()))
+            } catch {
+                completion(.failure(error))
             }
         }
     }
@@ -237,30 +417,53 @@ final class ShareViewController: UIViewController {
     private func loadFile(
         from provider: NSItemProvider,
         type: UTType,
-        kind: ShareInboxKind
+        kind: ShareInboxKind,
+        createdAt: Date,
+        completion:
+            @escaping (Result<Void, Error>)
+                -> Void
+    ) {
+        loadFile(
+            from: provider,
+            typeIdentifier: type.identifier,
+            kind: kind,
+            createdAt: createdAt,
+            completion: completion
+        )
+    }
+
+    private func loadFile(
+        from provider: NSItemProvider,
+        typeIdentifier: String,
+        kind: ShareInboxKind,
+        createdAt: Date,
+        completion:
+            @escaping (Result<Void, Error>)
+                -> Void
     ) {
         provider.loadFileRepresentation(
-            forTypeIdentifier: type.identifier
+            forTypeIdentifier: typeIdentifier
         ) { [weak self] sourceURL, error in
             guard let self else {
                 return
             }
             if let error {
-                self.finish(
-                    with:
-                        shareLocalized(
-                            "공유 파일을 읽지 못했습니다: "
-                        )
-                        + error.localizedDescription
-                )
+                completion(.failure(error))
                 return
             }
             guard let sourceURL else {
-                self.finish(
-                    with:
-                        shareLocalized(
-                            "공유 파일을 찾지 못했습니다."
+                completion(
+                    .failure(
+                        CocoaError(
+                            .fileNoSuchFile,
+                            userInfo: [
+                                NSLocalizedDescriptionKey:
+                                    shareLocalized(
+                                        "공유 파일을 찾지 못했습니다."
+                                    )
+                            ]
                         )
+                    )
                 )
                 return
             }
@@ -268,29 +471,30 @@ final class ShareViewController: UIViewController {
                 try self.commitFile(
                     sourceURL,
                     kind: kind,
-                    typeIdentifier: type.identifier
+                    typeIdentifier:
+                        typeIdentifier,
+                    originalFilename:
+                        provider.suggestedName,
+                    createdAt: createdAt
                 )
-                self.finishSuccessfully()
+                completion(.success(()))
             } catch {
-                self.finish(
-                    with:
-                        shareLocalized(
-                            "공유 파일을 저장하지 못했습니다: "
-                        )
-                        + error.localizedDescription
-                )
+                completion(.failure(error))
             }
         }
     }
 
-    private func commitText(_ text: String) throws {
+    private func commitText(
+        _ text: String,
+        createdAt: Date
+    ) throws {
         let trimmed = text.trimmingCharacters(
             in: .whitespacesAndNewlines
         )
         let manifest = ShareInboxManifest(
             id: UUID(),
             schemaVersion: 1,
-            createdAt: Date(),
+            createdAt: createdAt,
             kind: .text,
             text: String(
                 trimmed.prefix(200_000)
@@ -300,13 +504,29 @@ final class ShareViewController: UIViewController {
             typeIdentifier:
                 UTType.plainText.identifier
         )
-        try commit(manifest)
+        let directory = try inboxRoot()
+            .appendingPathComponent(
+                manifest.id.uuidString,
+                isDirectory: true
+            )
+        do {
+            try commit(
+                manifest,
+                directory: directory
+            )
+        } catch {
+            try? FileManager.default
+                .removeItem(at: directory)
+            throw error
+        }
     }
 
     private func commitFile(
         _ sourceURL: URL,
         kind: ShareInboxKind,
-        typeIdentifier: String
+        typeIdentifier: String,
+        originalFilename: String?,
+        createdAt: Date
     ) throws {
         let values = try sourceURL.resourceValues(
             forKeys: [
@@ -320,13 +540,78 @@ final class ShareViewController: UIViewController {
         }
         guard fileSize
             <= Self.maximumPayloadBytes else {
-            throw CocoaError(.fileWriteOutOfSpace)
+            throw CocoaError(
+                .fileWriteOutOfSpace,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        shareLocalized(
+                            "공유 파일 하나는 최대 100MB까지 저장할 수 있습니다."
+                        )
+                ]
+            )
+        }
+        guard committedPayloadBytes
+                + fileSize
+                <= Self
+                    .maximumBatchPayloadBytes
+        else {
+            throw CocoaError(
+                .fileWriteOutOfSpace,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        shareLocalized(
+                            "공유 파일 합계가 250MB 제한을 초과했습니다."
+                        )
+                ]
+            )
         }
         let id = UUID()
+        let trimmedOriginalFilename =
+            originalFilename?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+        var sourceFilename =
+            trimmedOriginalFilename
+                .flatMap {
+                    $0.isEmpty ? nil : $0
+                }
+            ?? sourceURL.lastPathComponent
+        if URL(
+            fileURLWithPath: sourceFilename
+        ).pathExtension.isEmpty,
+        !sourceURL.pathExtension.isEmpty {
+            sourceFilename +=
+                "." + sourceURL.pathExtension
+        }
+        let pathExtension = URL(
+            fileURLWithPath: sourceFilename
+        ).pathExtension.lowercased()
+        guard kind != .file
+                || Self
+                    .supportedDocumentExtensions
+                    .contains(pathExtension)
+        else {
+            throw CocoaError(
+                .fileReadUnsupportedScheme,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        shareLocalized(
+                            "이 문서 형식은 아직 지원하지 않습니다."
+                        )
+                ]
+            )
+        }
         let filename = Self.safeFilename(
-            sourceURL.lastPathComponent,
+            sourceFilename,
             fallbackExtension:
-                kind == .image ? "jpg" : "pdf"
+                kind == .image
+                ? "jpg"
+                : (
+                    UTType(typeIdentifier)?
+                        .preferredFilenameExtension
+                    ?? "bin"
+                )
         )
         let directory = try inboxRoot()
             .appendingPathComponent(
@@ -346,7 +631,7 @@ final class ShareViewController: UIViewController {
             let manifest = ShareInboxManifest(
                 id: id,
                 schemaVersion: 1,
-                createdAt: Date(),
+                createdAt: createdAt,
                 kind: kind,
                 text: nil,
                 payloadFilename: filename,
@@ -357,6 +642,8 @@ final class ShareViewController: UIViewController {
                 manifest,
                 directory: directory
             )
+            committedPayloadBytes +=
+                fileSize
         } catch {
             try? FileManager.default.removeItem(
                 at: directory
@@ -442,18 +729,68 @@ final class ShareViewController: UIViewController {
         return trimmed
     }
 
-    private func finishSuccessfully() {
+    private func finishBatch(
+        savedCount: Int,
+        failedCount: Int,
+        firstError: String?
+    ) {
+        guard savedCount > 0 else {
+            let detail = firstError.map {
+                ": " + $0
+            } ?? ""
+            finish(
+                with:
+                    shareLocalized(
+                        "공유 항목을 저장하지 못했습니다"
+                    )
+                    + detail
+            )
+            return
+        }
+        finishSuccessfully(
+            savedCount: savedCount,
+            failedCount: failedCount
+        )
+    }
+
+    private func finishSuccessfully(
+        savedCount: Int,
+        failedCount: Int
+    ) {
         DispatchQueue.main.async {
-            self.statusLabel.text =
-                shareLocalized(
+            let message: String
+            if savedCount == 1,
+               failedCount == 0 {
+                message = shareLocalized(
                     "VisionCraft 수신함에 저장했습니다."
                 )
+            } else if failedCount == 0 {
+                message = String(
+                    format:
+                        shareLocalized(
+                            "공유 항목 %lld개를 VisionCraft 수신함에 저장했습니다."
+                        ),
+                    savedCount
+                )
+            } else {
+                message = String(
+                    format:
+                        shareLocalized(
+                            "공유 항목 %1$lld개를 저장했고 %2$lld개는 저장하지 못했습니다."
+                        ),
+                    savedCount,
+                    failedCount
+                )
+            }
+            self.statusLabel.text = message
             self.openButton.isHidden = false
             UIAccessibility.post(
                 notification: .announcement,
                 argument:
-                    shareLocalized(
-                        "공유 항목을 저장했습니다. VisionCraft 열기 버튼을 누르세요."
+                    message
+                    + " "
+                    + shareLocalized(
+                        "VisionCraft 열기 버튼을 누르세요."
                     )
             )
         }
