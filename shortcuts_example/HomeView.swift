@@ -47,31 +47,7 @@ struct HomeView: View {
                         "EPUB 책을 열거나 마지막 책을 이어서 읽습니다."
                     )
 
-                    Button {
-                        appRouter.route = .cameraTools
-                    } label: {
-                        Text("카메라")
-                            .font(.system(size: 56, weight: .bold))
-                            .multilineTextAlignment(
-                                .center
-                            )
-                            .padding(
-                                .horizontal,
-                                12
-                            )
-                            .foregroundColor(.white)
-                            .frame(maxWidth: 520)
-                            .frame(minHeight: 120)
-                            .padding(
-                                .vertical,
-                                20
-                            )
-                            .background(Color.black)
-                            .cornerRadius(28)
-                    }
-                    .accessibilityHint(
-                        "카메라 돋보기 또는 문서 스캐너를 선택합니다."
-                    )
+                    cameraToolsPanel
 
                     Button {
                         appRouter.route = .visionLink
@@ -306,6 +282,109 @@ struct HomeView: View {
                     ? "AI 대화 기록을 엽니다."
                     : "빈 로컬 AI 대화를 시작합니다."
             )
+        )
+    }
+
+    private var cameraToolsPanel: some View {
+        VStack(spacing: 18) {
+            Text("카메라")
+                .font(
+                    .system(
+                        size: 48,
+                        weight: .bold
+                    )
+                )
+                .multilineTextAlignment(.center)
+
+            Text(
+                "문서 스캔과 카메라 읽기 도구를 홈에서 바로 엽니다."
+            )
+            .font(.headline)
+            .multilineTextAlignment(.center)
+            .foregroundStyle(
+                Color.white.opacity(0.86)
+            )
+
+            VStack(spacing: 12) {
+                cameraToolActionButton(
+                    title: "문서 스캔",
+                    systemImage: "doc.viewfinder",
+                    route: .documentScanning,
+                    hint:
+                        "VisionCraft 방식의 문서 스캐너를 엽니다."
+                )
+                cameraToolActionButton(
+                    title: "실시간 텍스트 읽기",
+                    systemImage: "text.viewfinder",
+                    route: .liveTextReader,
+                    hint:
+                        "카메라 실시간 OCR과 자동 음성 읽기를 시작합니다."
+                )
+                cameraToolActionButton(
+                    title: "카메라 돋보기",
+                    systemImage:
+                        "plus.magnifyingglass",
+                    route: .magnifier,
+                    hint:
+                        "실시간 카메라 돋보기를 엽니다."
+                )
+                cameraToolActionButton(
+                    title: "이미지 설명",
+                    systemImage: "sparkles",
+                    route:
+                        .imageDescriptionCamera,
+                    hint:
+                        "카메라로 촬영한 이미지를 기기 안에서 분석합니다."
+                )
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 26)
+        .frame(maxWidth: 520)
+        .background(Color.black)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+        )
+        .accessibilityElement(
+            children: .contain
+        )
+    }
+
+    private func cameraToolActionButton(
+        title: String,
+        systemImage: String,
+        route: AppRoute,
+        hint: String
+    ) -> some View {
+        Button {
+            appRouter.route = route
+        } label: {
+            Label(
+                AppLocalization.string(title),
+                systemImage: systemImage
+            )
+            .font(.title3.bold())
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 58)
+            .padding(.horizontal, 14)
+            .background(
+                Color.white.opacity(0.18)
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 16,
+                    style: .continuous
+                )
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(
+            AppLocalization.string(hint)
         )
     }
 

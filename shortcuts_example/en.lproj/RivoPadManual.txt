@@ -62,22 +62,22 @@
 
 @chapter Camera and Document Scanning
 @section Magnifier
-@text Open Magnifier from Camera on the Home screen.
+@text Select Camera Magnifier on the Home Camera card to open it directly without an intermediate menu.
 @text It supports front and rear cameras, pinch to zoom, tap to focus, torch, and monochrome, inverted, and high-contrast color filters.
 @text The 16-color combination, inversion, and threshold used in Rivo L2 screen control mode are stored on the device and restored the next time that mode opens. Preview brightness does not change system brightness and is not saved.
 @text You can continue from a captured camera image to OCR results.
 @text Save Photo stores the currently filtered and zoomed frame in Photos or Files. Only add-only Photos permission is requested.
 @section Live Text Reading
-@text The app periodically recognizes text in front of the camera and automatically reads new sentences.
+@text Select Live Text Reading on the Home Camera card to open it directly. The app periodically recognizes text in front of the camera and automatically reads new sentences.
 @text A short first recognition is confirmed twice, and text that is too small waits until the camera is closer.
 @text Similar recently read sentences and partial recognition of the same document are not repeated for up to 30 seconds. Three consecutive text-free scenes reset the scene.
 @text Monitor heat and battery use during long sessions.
 @section Image Description
-@text Open Image Description from Camera on the Home screen and take a photo. The M4 local vision model describes the scene, objects, text, and people’s actions in the selected response language.
+@text Select Image Description on the Home Camera card and take a photo. The M4 local vision model describes the scene, objects, text, and people’s actions in the selected response language.
 @text The captured image is not automatically saved to a temporary file or Photos; it is passed directly from memory to the analysis screen.
 @text When the description is complete, the response is read automatically, and you can ask follow-up questions about the same photo in the input field.
 @section Custom Document Scanner
-@text VisionCraft uses its own AVFoundation camera instead of Apple’s system document scanner.
+@text Select Document Scan on the Home Camera card to directly open VisionCraft’s own AVFoundation camera instead of Apple’s system document scanner.
 @text It checks document corners, orientation, motion, and sharpness and captures automatically when the conditions are met.
 @text After capture, it applies perspective correction, curved-page correction, size normalization, and optional color enhancement.
 @text If automatic document capture is off in Settings, corner and stability guidance remain active, but capture occurs only from the on-screen button or Rivo 7.

@@ -5,6 +5,7 @@
 @text Rebuilt the main Android VisionCraft screens as a local-first iPad app.
 @text Added M4 MLX local AI chat, conversation history, image, PDF, and text questions, and voice commands.
 @text Improved the Home AI card to open New Chat or Chat History directly like Android and stack its buttons vertically at accessibility text sizes.
+@text Improved the Home Camera card to open Document Scan and Live Text Reading directly like Android, with Magnifier and Image Description also available in one step.
 @text Added a custom document scanner, Magnifier, Live Text Reading, and Android-compatible color filters.
 @text Added storage and restoration of the camera’s last Android-compatible color combination, inversion, and threshold when entering Rivo screen control mode.
 @text Added PDF and TXT document viewing and EPUB, DAISY, and SMIL reading.
