@@ -229,8 +229,22 @@ nonisolated enum EPUBBookParser {
             }
             let chapterData = try archive.data(at: chapterPath)
             let extractor = EPUBHTMLTextDelegate()
-            try parseXHTML(chapterData, delegate: extractor)
-            let text = extractor.text.trimmingCharacters(
+            let didParse = (
+                try? parseXHTML(
+                    chapterData,
+                    delegate: extractor
+                )
+            ) != nil
+            let fallback =
+                didParse
+                ? nil
+                : EPUBHTMLFallbackParser
+                    .content(from: chapterData)
+            let text = (
+                didParse
+                ? extractor.text
+                : fallback?.text ?? ""
+            ).trimmingCharacters(
                 in: .whitespacesAndNewlines
             )
             guard !text.isEmpty else {
@@ -238,16 +252,24 @@ nonisolated enum EPUBBookParser {
             }
             let title =
                 navigation.titlesByPath[chapterPath]
-                ?? extractor.firstHeading
+                ?? (
+                    didParse
+                    ? extractor.firstHeading
+                    : fallback?.firstHeading
+                )
                 ?? "제 \(index + 1)장"
             let capturedFragmentIndexes =
-                extractor.fragmentSegmentIndexes
+                didParse
+                ? extractor.fragmentSegmentIndexes
+                : [:]
             let textMatchedFragmentIndexes =
-                fragmentSegmentIndexes(
+                didParse
+                ? fragmentSegmentIndexes(
                     text: text,
                     fragmentTexts:
                         extractor.fragmentTexts
                 )
+                : [:]
             chapters.append(
                 EPUBChapter(
                     id: item.id,
@@ -425,10 +447,18 @@ nonisolated enum EPUBBookParser {
                 relativeTo: packagePath
             )
             let delegate = EPUBNavigationXMLDelegate()
-            try parseXHTML(
-                archive.data(at: navigationPath),
-                delegate: delegate
-            )
+            guard let navigationData =
+                    try? archive.data(
+                        at: navigationPath
+                    ),
+                  (
+                      try? parseXHTML(
+                          navigationData,
+                          delegate: delegate
+                      )
+                  ) != nil else {
+                return .empty
+            }
             return navigation(
                 tableOfContents:
                     delegate.tableOfContents,
@@ -450,10 +480,16 @@ nonisolated enum EPUBBookParser {
             relativeTo: packagePath
         )
         let delegate = EPUBNCXXMLDelegate()
-        try parseXML(
-            archive.data(at: ncxPath),
-            delegate: delegate
-        )
+        guard let ncxData =
+                try? archive.data(at: ncxPath),
+              (
+                  try? parseXML(
+                      ncxData,
+                      delegate: delegate
+                  )
+              ) != nil else {
+            return .empty
+        }
         return navigation(
             tableOfContents:
                 delegate.tableOfContents,
@@ -545,31 +581,8 @@ nonisolated enum EPUBBookParser {
                 EPUBArchive.decodeText(data) else {
             return data
         }
-        let replacements = [
-            "&nbsp;": "&#160;",
-            "&copy;": "&#169;",
-            "&reg;": "&#174;",
-            "&trade;": "&#8482;",
-            "&hellip;": "&#8230;",
-            "&mdash;": "&#8212;",
-            "&ndash;": "&#8211;",
-            "&lsquo;": "&#8216;",
-            "&rsquo;": "&#8217;",
-            "&ldquo;": "&#8220;",
-            "&rdquo;": "&#8221;",
-            "&bull;": "&#8226;",
-            "&middot;": "&#183;",
-            "&laquo;": "&#171;",
-            "&raquo;": "&#187;",
-            "&times;": "&#215;",
-            "&divide;": "&#247;"
-        ]
-        for (entity, numericEntity) in replacements {
-            text = text.replacingOccurrences(
-                of: entity,
-                with: numericEntity
-            )
-        }
+        text = EPUBHTMLEntityDecoder
+            .xmlCompatibleMarkup(text)
         text = text.replacingOccurrences(
             of:
                 #"(?i)(<\?xml\b[^>]*\bencoding\s*=\s*["'])[^"']+(["'])"#,
@@ -636,6 +649,472 @@ nonisolated enum EPUBBookParser {
             return resolvedPath
         }
         return resolvedPath + "#" + String(parts[1])
+    }
+}
+
+nonisolated enum EPUBHTMLEntityDecoder {
+    private static let namedScalars:
+        [String: UInt32] =
+    [
+        "nbsp": 160,
+        "iexcl": 161,
+        "cent": 162,
+        "pound": 163,
+        "curren": 164,
+        "yen": 165,
+        "brvbar": 166,
+        "sect": 167,
+        "uml": 168,
+        "copy": 169,
+        "ordf": 170,
+        "laquo": 171,
+        "not": 172,
+        "shy": 173,
+        "reg": 174,
+        "macr": 175,
+        "deg": 176,
+        "plusmn": 177,
+        "sup2": 178,
+        "sup3": 179,
+        "acute": 180,
+        "micro": 181,
+        "para": 182,
+        "middot": 183,
+        "cedil": 184,
+        "sup1": 185,
+        "ordm": 186,
+        "raquo": 187,
+        "frac14": 188,
+        "frac12": 189,
+        "frac34": 190,
+        "iquest": 191,
+        "Agrave": 192,
+        "Aacute": 193,
+        "Acirc": 194,
+        "Atilde": 195,
+        "Auml": 196,
+        "Aring": 197,
+        "AElig": 198,
+        "Ccedil": 199,
+        "Egrave": 200,
+        "Eacute": 201,
+        "Ecirc": 202,
+        "Euml": 203,
+        "Igrave": 204,
+        "Iacute": 205,
+        "Icirc": 206,
+        "Iuml": 207,
+        "ETH": 208,
+        "Ntilde": 209,
+        "Ograve": 210,
+        "Oacute": 211,
+        "Ocirc": 212,
+        "Otilde": 213,
+        "Ouml": 214,
+        "times": 215,
+        "Oslash": 216,
+        "Ugrave": 217,
+        "Uacute": 218,
+        "Ucirc": 219,
+        "Uuml": 220,
+        "Yacute": 221,
+        "THORN": 222,
+        "szlig": 223,
+        "agrave": 224,
+        "aacute": 225,
+        "acirc": 226,
+        "atilde": 227,
+        "auml": 228,
+        "aring": 229,
+        "aelig": 230,
+        "ccedil": 231,
+        "egrave": 232,
+        "eacute": 233,
+        "ecirc": 234,
+        "euml": 235,
+        "igrave": 236,
+        "iacute": 237,
+        "icirc": 238,
+        "iuml": 239,
+        "eth": 240,
+        "ntilde": 241,
+        "ograve": 242,
+        "oacute": 243,
+        "ocirc": 244,
+        "otilde": 245,
+        "ouml": 246,
+        "divide": 247,
+        "oslash": 248,
+        "ugrave": 249,
+        "uacute": 250,
+        "ucirc": 251,
+        "uuml": 252,
+        "yacute": 253,
+        "thorn": 254,
+        "yuml": 255,
+        "OElig": 338,
+        "oelig": 339,
+        "Scaron": 352,
+        "scaron": 353,
+        "Yuml": 376,
+        "fnof": 402,
+        "circ": 710,
+        "tilde": 732,
+        "ensp": 8194,
+        "emsp": 8195,
+        "thinsp": 8201,
+        "zwnj": 8204,
+        "zwj": 8205,
+        "lrm": 8206,
+        "rlm": 8207,
+        "ndash": 8211,
+        "mdash": 8212,
+        "lsquo": 8216,
+        "rsquo": 8217,
+        "sbquo": 8218,
+        "ldquo": 8220,
+        "rdquo": 8221,
+        "bdquo": 8222,
+        "dagger": 8224,
+        "Dagger": 8225,
+        "bull": 8226,
+        "hellip": 8230,
+        "permil": 8240,
+        "prime": 8242,
+        "Prime": 8243,
+        "lsaquo": 8249,
+        "rsaquo": 8250,
+        "oline": 8254,
+        "frasl": 8260,
+        "euro": 8364,
+        "trade": 8482,
+        "larr": 8592,
+        "uarr": 8593,
+        "rarr": 8594,
+        "darr": 8595,
+        "harr": 8596,
+        "crarr": 8629,
+        "prod": 8719,
+        "sum": 8721,
+        "minus": 8722,
+        "radic": 8730,
+        "infin": 8734,
+        "int": 8747,
+        "asymp": 8776,
+        "ne": 8800,
+        "equiv": 8801,
+        "le": 8804,
+        "ge": 8805,
+        "loz": 9674,
+        "spades": 9824,
+        "clubs": 9827,
+        "hearts": 9829,
+        "diams": 9830,
+    ]
+
+    private static let XMLNamedScalars:
+        [String: UInt32] =
+    [
+        "amp": 38,
+        "lt": 60,
+        "gt": 62,
+        "quot": 34,
+        "apos": 39,
+    ]
+
+    static func decodedText(
+        _ text: String
+    ) -> String {
+        replacingEntities(
+            in: text,
+            forXML: false
+        )
+    }
+
+    static func xmlCompatibleMarkup(
+        _ text: String
+    ) -> String {
+        replacingEntities(
+            in: text,
+            forXML: true
+        )
+    }
+
+    private static func replacingEntities(
+        in text: String,
+        forXML: Bool
+    ) -> String {
+        var output = ""
+        output.reserveCapacity(text.count)
+        var index = text.startIndex
+        while index < text.endIndex {
+            guard text[index] == "&" else {
+                output.append(text[index])
+                index = text.index(after: index)
+                continue
+            }
+            let tokenStart =
+                text.index(after: index)
+            let limit = text.index(
+                tokenStart,
+                offsetBy: 34,
+                limitedBy: text.endIndex
+            ) ?? text.endIndex
+            guard let semicolon =
+                    text[
+                        tokenStart ..< limit
+                    ].firstIndex(of: ";") else {
+                output.append("&")
+                index = tokenStart
+                continue
+            }
+            let token = String(
+                text[
+                    tokenStart ..< semicolon
+                ]
+            )
+            let scalar = scalarValue(
+                for: token
+            )
+            if forXML {
+                if XMLNamedScalars[token] != nil {
+                    output.append(
+                        contentsOf:
+                            text[
+                                index
+                                    ... semicolon
+                            ]
+                    )
+                } else if let scalar {
+                    output.append(
+                        "&#\(scalar);"
+                    )
+                } else {
+                    output.append(
+                        "&amp;\(token);"
+                    )
+                }
+            } else if let scalar,
+                      let unicodeScalar =
+                        Unicode.Scalar(scalar) {
+                output.unicodeScalars.append(
+                    unicodeScalar
+                )
+            } else {
+                output.append(
+                    contentsOf:
+                        text[
+                            index
+                                ... semicolon
+                        ]
+                )
+            }
+            index = text.index(
+                after: semicolon
+            )
+        }
+        return output
+    }
+
+    private static func scalarValue(
+        for token: String
+    ) -> UInt32? {
+        if token.hasPrefix("#x")
+            || token.hasPrefix("#X") {
+            return UInt32(
+                token.dropFirst(2),
+                radix: 16
+            ).flatMap(validScalar)
+        }
+        if token.hasPrefix("#") {
+            return UInt32(
+                token.dropFirst()
+            ).flatMap(validScalar)
+        }
+        return (
+            XMLNamedScalars[token]
+            ?? namedScalars[token]
+        ).flatMap(validScalar)
+    }
+
+    private static func validScalar(
+        _ value: UInt32
+    ) -> UInt32? {
+        guard value == 0x09
+                || value == 0x0A
+                || value == 0x0D
+                || value >= 0x20,
+              Unicode.Scalar(value) != nil else {
+            return nil
+        }
+        return value
+    }
+}
+
+nonisolated enum EPUBHTMLFallbackParser {
+    struct Content:
+        Equatable,
+        Sendable
+    {
+        let text: String
+        let firstHeading: String?
+    }
+
+    static func content(
+        from data: Data
+    ) -> Content? {
+        guard let markup =
+                EPUBBookParser.sourceMarkup(
+                    data
+                ) else {
+            return nil
+        }
+        let cleaned = removingHiddenContent(
+            from: markup
+        )
+        let heading = firstCapture(
+            pattern:
+                #"(?is)<h[1-6]\b[^>]*>(.*?)</h[1-6]\s*>"#,
+            in: cleaned
+        ).flatMap {
+            let value = normalizedText(
+                from: $0
+            )
+            return value.isEmpty
+                ? nil
+                : value.replacingOccurrences(
+                    of: "\n\n",
+                    with: " "
+                )
+        }
+        let text = normalizedText(
+            from: cleaned
+        )
+        guard !text.isEmpty else {
+            return nil
+        }
+        return Content(
+            text: text,
+            firstHeading: heading
+        )
+    }
+
+    static func normalizedText(
+        from markup: String
+    ) -> String {
+        var text = replacing(
+            pattern:
+                #"(?is)<!--.*?-->"#,
+            in: markup,
+            with: " "
+        )
+        text = replacing(
+            pattern:
+                #"(?i)</?(?:address|article|aside|blockquote|br|div|figcaption|figure|footer|h[1-6]|header|li|main|p|pre|section|table|td|th|tr|hd|sent|pagenum|doctitle|docauthor|byline|dateline|note|prodnote|sidebar|annotation|dt|dd)\b[^>]*>"#,
+            in: text,
+            with: "\n\n"
+        )
+        text = replacing(
+            pattern: #"(?s)<[^>]+>"#,
+            in: text,
+            with: " "
+        )
+        text = EPUBHTMLEntityDecoder
+            .decodedText(text)
+            .replacingOccurrences(
+                of: "\r\n",
+                with: "\n"
+            )
+            .replacingOccurrences(
+                of: "\r",
+                with: "\n"
+            )
+        return text.components(
+            separatedBy: .newlines
+        )
+        .map {
+            $0.split(
+                whereSeparator:
+                    \.isWhitespace
+            )
+            .joined(separator: " ")
+        }
+        .filter { !$0.isEmpty }
+        .joined(separator: "\n\n")
+    }
+
+    private static func removingHiddenContent(
+        from markup: String
+    ) -> String {
+        var result = markup
+        for element in [
+            "script", "style", "nav",
+            "svg", "noscript", "iframe",
+            "object",
+        ] {
+            result = replacing(
+                pattern:
+                    "(?is)<\(element)\\b[^>]*>.*?</\(element)\\s*>",
+                in: result,
+                with: " "
+            )
+            result = replacing(
+                pattern:
+                    "(?is)<\(element)\\b[^>]*>.*$",
+                in: result,
+                with: " "
+            )
+        }
+        return result
+    }
+
+    private static func firstCapture(
+        pattern: String,
+        in text: String
+    ) -> String? {
+        guard let expression =
+                try? NSRegularExpression(
+                    pattern: pattern
+                ),
+              let match =
+                expression.firstMatch(
+                    in: text,
+                    range: NSRange(
+                        text.startIndex...,
+                        in: text
+                    )
+                ),
+              match.numberOfRanges > 1,
+              let range = Range(
+                  match.range(at: 1),
+                  in: text
+              ) else {
+            return nil
+        }
+        return String(text[range])
+    }
+
+    private static func replacing(
+        pattern: String,
+        in text: String,
+        with replacement: String
+    ) -> String {
+        guard let expression =
+                try? NSRegularExpression(
+                    pattern: pattern
+                ) else {
+            return text
+        }
+        return expression
+            .stringByReplacingMatches(
+                in: text,
+                range: NSRange(
+                    text.startIndex...,
+                    in: text
+                ),
+                withTemplate:
+                    replacement
+            )
     }
 }
 

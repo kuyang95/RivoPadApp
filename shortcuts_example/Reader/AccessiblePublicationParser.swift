@@ -332,11 +332,26 @@ nonisolated enum AccessiblePublicationParser {
                 .trimmingCharacters(
                     in: .whitespacesAndNewlines
                 )
+            let fallback =
+                didParse
+                ? nil
+                : EPUBHTMLFallbackParser
+                    .content(from: data)
+            let fallbackValue: String
+            if let fallback {
+                fallbackValue = fallback.text
+            } else if didParse {
+                fallbackValue = ""
+            } else {
+                fallbackValue = fallbackText(
+                    try archive.text(
+                        at: path
+                    )
+                )
+            }
             let text = didParse
                 ? extractedText
-                : fallbackText(
-                    try archive.text(at: path)
-                )
+                : fallbackValue
             guard !text.isEmpty else {
                 continue
             }
@@ -354,15 +369,15 @@ nonisolated enum AccessiblePublicationParser {
                     title:
                         titleByPath[path]
                         ?? extractor.firstHeading
+                        ?? fallback?
+                            .firstHeading
                         ?? "제 \(index + 1)장",
                     href: path,
                     text: text,
                     sourceMarkup:
-                        didParse
-                        ? EPUBBookParser.sourceMarkup(
+                        EPUBBookParser.sourceMarkup(
                             data
-                        )
-                        : nil,
+                        ),
                     fragmentSegmentIndexes:
                         fragmentIndexes
                 )

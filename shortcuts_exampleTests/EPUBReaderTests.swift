@@ -1405,10 +1405,121 @@ final class EPUBReaderTests: XCTestCase {
             .blocked
         )
     }
+
+    func testHTMLNamedEntitiesRemainXMLCompatible()
+        throws
+    {
+        let delegate = EPUBHTMLTextDelegate()
+        try EPUBBookParser.parseXHTML(
+            Data(
+                """
+                <html><body><p>
+                Caf&eacute; &euro; &unknown; &#0;
+                </p></body></html>
+                """.utf8
+            ),
+            delegate: delegate
+        )
+
+        XCTAssertTrue(
+            delegate.text.contains(
+                "Café € &unknown; &#0;"
+            )
+        )
+    }
+
+    func testMalformedChapterUsesSafeTextFallback()
+        throws
+    {
+        let malformed = """
+        <html>
+          <head><title>깨진 XHTML</title></head>
+          <body>
+            <h1>깨진 장</h1>
+            <p>첫 caf&eacute; 문단
+            <p>둘째 &unknown; 문단
+            <script>숨기고 실행하지 않음</script>
+          </body>
+        </html>
+        """
+        let book = try EPUBBookParser.parse(
+            data:
+                EPUBFixture.makeBook(
+                    firstChapterMarkup:
+                        malformed
+                )
+        )
+
+        XCTAssertEqual(
+            book.chapters.count,
+            2
+        )
+        XCTAssertTrue(
+            book.chapters[0].text.contains(
+                "첫 café 문단"
+            )
+        )
+        XCTAssertTrue(
+            book.chapters[0].text.contains(
+                "둘째 &unknown; 문단"
+            )
+        )
+        XCTAssertFalse(
+            book.chapters[0].text.contains(
+                "숨기고 실행하지 않음"
+            )
+        )
+        XCTAssertEqual(
+            book.chapters[0]
+                .sourceMarkup,
+            malformed
+        )
+    }
+
+    func testMalformedNavigationDoesNotRejectReadableSpine()
+        throws
+    {
+        let malformedNavigation = """
+        <html xmlns="http://www.w3.org/1999/xhtml">
+          <body>
+            <nav type="toc">
+              <ol>
+                <li><a href="chapter1.xhtml">첫 장</a>
+                <li><a href="chapter2.xhtml">둘째 장</a>
+              </ol>
+            </nav>
+          </body>
+        </html>
+        """
+        let book = try EPUBBookParser.parse(
+            data:
+                EPUBFixture.makeBook(
+                    navigationMarkup:
+                        malformedNavigation
+                )
+        )
+
+        XCTAssertEqual(
+            book.chapters.count,
+            2
+        )
+        XCTAssertTrue(
+            book.navigationItems.isEmpty
+        )
+        XCTAssertEqual(
+            book.chapters[0].title,
+            "본문의 첫 제목"
+        )
+    }
 }
 
 private nonisolated enum EPUBFixture {
-    static func makeBook() throws -> Data {
+    static func makeBook(
+        firstChapterMarkup:
+            String? = nil,
+        navigationMarkup:
+            String? = nil
+    ) throws -> Data {
         let container = """
         <?xml version="1.0" encoding="UTF-8"?>
         <container
@@ -1463,7 +1574,7 @@ private nonisolated enum EPUBFixture {
           </spine>
         </package>
         """
-        let navigation = """
+        let defaultNavigation = """
         <?xml version="1.0" encoding="UTF-8"?>
         <html
           xmlns="http://www.w3.org/1999/xhtml"
@@ -1492,7 +1603,10 @@ private nonisolated enum EPUBFixture {
           </body>
         </html>
         """
-        let firstChapter = """
+        let navigation =
+            navigationMarkup
+            ?? defaultNavigation
+        let defaultFirstChapter = """
         <?xml version="1.0" encoding="UTF-8"?>
         <html
           xmlns="http://www.w3.org/1999/xhtml"
@@ -1513,6 +1627,9 @@ private nonisolated enum EPUBFixture {
           </body>
         </html>
         """
+        let firstChapter =
+            firstChapterMarkup
+            ?? defaultFirstChapter
         let secondChapter = """
         <?xml version="1.0" encoding="UTF-8"?>
         <html
