@@ -10,12 +10,14 @@ import AppIntents
 struct OCREntityQuery: EntityQuery {
 
     func entities(for identifiers: [UUID]) async throws -> [OCREntity] {
-        OCREntityStore.shared.entities.filter {
+        let entities =
+            await OCREntityStore.shared.entities
+        return entities.filter {
             identifiers.contains($0.id)
         }
     }
 
     func suggestedEntities() async throws -> [OCREntity] {
-        OCREntityStore.shared.entities
+        await OCREntityStore.shared.entities
     }
 }

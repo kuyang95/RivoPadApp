@@ -88,6 +88,7 @@ struct ChatBubble: View {
 private struct MessageRow: View {
 
     let message: Message
+    let availableWidth: CGFloat
 
     var body: some View {
 
@@ -120,7 +121,8 @@ private struct MessageRow: View {
                     }
                 }
                 .frame(
-                    maxWidth: UIScreen.main.bounds.width * 0.7,
+                    maxWidth:
+                        availableWidth * 0.7,
                     alignment: .trailing
                 )
 
@@ -147,7 +149,8 @@ private struct MessageRow: View {
                     }
                 }
                 .frame(
-                    maxWidth: UIScreen.main.bounds.width * 0.85,
+                    maxWidth:
+                        availableWidth * 0.85,
                     alignment: .leading
                 )
 
@@ -214,15 +217,21 @@ struct VoiceQueryResponseView: View {
             )
             .ignoresSafeArea()
             
-            ScrollView {
-                
-                VStack(spacing: 14) {
-                    
-                    ForEach(messages) { message in
-                        MessageRow(message: message)
+            GeometryReader { geometry in
+                ScrollView {
+
+                    VStack(spacing: 14) {
+
+                        ForEach(messages) { message in
+                            MessageRow(
+                                message: message,
+                                availableWidth:
+                                    geometry.size.width
+                            )
+                        }
                     }
+                    .padding(.vertical, 40)
                 }
-                .padding(.vertical, 40)
             }
             
             if stt.isRecording {

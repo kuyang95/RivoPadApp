@@ -684,8 +684,8 @@ actor AppFontDiskStore {
                 regularDescriptor =
                     descriptors.first
             }
-            try registerGraphicsFont(
-                from: data
+            try registerFont(
+                at: url
             )
         }
 
@@ -703,28 +703,15 @@ actor AppFontDiskStore {
         return familyName
     }
 
-    private func registerGraphicsFont(
-        from data: Data
+    private func registerFont(
+        at url: URL
     ) throws {
-        // URL-based registration rejects fonts stored in an iOS app's
-        // Application Support directory. Process-local CGFont registration is
-        // therefore required for verified, on-demand downloads. Apple
-        // deprecated this API in iOS 18 without a working dynamic-file
-        // replacement for this storage location.
-        guard let provider =
-                CGDataProvider(
-                    data: data as CFData
-                ),
-              let font =
-                CGFont(provider) else {
-            throw AppFontCatalogError
-                .registrationFailed
-        }
         var unmanagedError:
             Unmanaged<CFError>?
         let registered =
-            CTFontManagerRegisterGraphicsFont(
-                font,
+            CTFontManagerRegisterFontsForURL(
+                url as CFURL,
+                .process,
                 &unmanagedError
             )
         guard !registered else {

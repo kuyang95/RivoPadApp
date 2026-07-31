@@ -161,7 +161,10 @@ final class DocumentViewerViewController: UIViewController {
 
     private func buildAccessibilityElements() {
         accessibilityItems = sentenceBoxes.map { sb in
-            let el = UIAccessibilityElement(accessibilityContainer: view)
+            let el = UIAccessibilityElement(
+                accessibilityContainer:
+                    view!
+            )
             el.accessibilityLabel = sb.text
             el.accessibilityTraits = [.staticText]
             return el
