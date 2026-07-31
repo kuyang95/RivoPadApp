@@ -4,6 +4,7 @@
 @date 2026년 7월 31일
 @text Android VisionCraft의 주요 화면을 iPad용 로컬 우선 앱으로 구성했습니다.
 @text M4 MLX 로컬 AI 채팅, 대화 기록, 이미지·PDF·텍스트 질문과 음성 명령을 추가했습니다.
+@text 홈 AI 카드에서 Android처럼 새 대화와 대화 기록을 바로 나눠 열고 접근성 큰 글자에서는 버튼을 세로로 배치하도록 개선했습니다.
 @text 자체 문서 스캐너, 돋보기, 실시간 글자 읽기와 Android 호환 색상 필터를 추가했습니다.
 @text 카메라의 마지막 Android 호환 색상 조합·반전·임계값을 저장하고 Rivo 화면 조작 모드 진입 시 복원하도록 추가했습니다.
 @text PDF·TXT 문서 보기와 EPUB·DAISY·SMIL 독서 기능을 추가했습니다.

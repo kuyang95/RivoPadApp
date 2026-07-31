@@ -52,6 +52,7 @@
 @text Search sources and answers are not stored in conversation history or cached. Match the source numbers in an answer with the source list above it to open the originals.
 @section Voice Commands
 @text Start a voice command from the Rivo quick menu or another supported entry point.
+@text On the Home AI Chat card, New Chat immediately starts a blank on-device M4 conversation, while Chat History opens search, rename, and deletion for saved conversations.
 @text In-app commands such as “open scanner,” “open camera,” “open reader,” and “open files” are handled by local rules.
 @text General questions go to the local AI, while translation requests go to the dedicated local translation screen.
 @text When web search is enabled, a search request automatically continues through source retrieval, an M4 local answer, and TTS.

@@ -19,31 +19,7 @@ struct HomeView: View {
                     rivoConnectionStatus
                     localAIUsageStatus
 
-                    Button {
-                        appRouter.route = .chatHistory
-                    } label: {
-                        Text("AI 채팅")
-                            .font(.system(size: 56, weight: .bold))
-                            .multilineTextAlignment(
-                                .center
-                            )
-                            .padding(
-                                .horizontal,
-                                12
-                            )
-                            .foregroundColor(.white)
-                            .frame(maxWidth: 520)
-                            .frame(minHeight: 120)
-                            .padding(
-                                .vertical,
-                                20
-                            )
-                            .background(Color.indigo)
-                            .cornerRadius(28)
-                    }
-                    .accessibilityHint(
-                        "저장된 대화를 보거나 새 로컬 AI 대화를 시작합니다."
-                    )
+                    aiChatPanel
 
                     Button {
                         appRouter.route = .readerLibrary
@@ -218,6 +194,119 @@ struct HomeView: View {
         .onAppear {
             localAIUsage.refresh()
         }
+    }
+
+    private var aiChatPanel: some View {
+        VStack(spacing: 18) {
+            Text("AI 채팅")
+                .font(
+                    .system(
+                        size: 48,
+                        weight: .bold
+                    )
+                )
+                .multilineTextAlignment(.center)
+
+            Text(
+                "M4에서 새 대화를 시작하거나 저장된 기록을 엽니다."
+            )
+            .font(.headline)
+            .multilineTextAlignment(.center)
+            .foregroundStyle(
+                Color.white.opacity(0.86)
+            )
+
+            ViewThatFits(
+                in: .horizontal
+            ) {
+                HStack(spacing: 14) {
+                    aiChatActionButton(
+                        title: "새 대화",
+                        systemImage:
+                            "plus.bubble.fill",
+                        route:
+                            .localChat(
+                                conversationID: nil
+                            )
+                    )
+                    aiChatActionButton(
+                        title: "대화 기록",
+                        systemImage:
+                            "clock.arrow.circlepath",
+                        route: .chatHistory
+                    )
+                }
+
+                VStack(spacing: 12) {
+                    aiChatActionButton(
+                        title: "새 대화",
+                        systemImage:
+                            "plus.bubble.fill",
+                        route:
+                            .localChat(
+                                conversationID: nil
+                            )
+                    )
+                    aiChatActionButton(
+                        title: "대화 기록",
+                        systemImage:
+                            "clock.arrow.circlepath",
+                        route: .chatHistory
+                    )
+                }
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 26)
+        .frame(maxWidth: 520)
+        .background(Color.indigo)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+        )
+        .accessibilityElement(
+            children: .contain
+        )
+    }
+
+    private func aiChatActionButton(
+        title: String,
+        systemImage: String,
+        route: AppRoute
+    ) -> some View {
+        Button {
+            appRouter.route = route
+        } label: {
+            Label(
+                AppLocalization.string(title),
+                systemImage: systemImage
+            )
+            .font(.title3.bold())
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 58)
+            .padding(.horizontal, 14)
+            .background(
+                Color.white.opacity(0.18)
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 16,
+                    style: .continuous
+                )
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(
+            AppLocalization.string(
+                route == .chatHistory
+                    ? "AI 대화 기록을 엽니다."
+                    : "빈 로컬 AI 대화를 시작합니다."
+            )
+        )
     }
 
     private var rivoConnectionStatus: some View {
