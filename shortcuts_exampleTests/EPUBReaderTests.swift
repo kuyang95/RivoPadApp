@@ -1377,6 +1377,29 @@ final class EPUBReaderTests: XCTestCase {
         )
     }
 
+    func testDaisy3FallsBackToNCXWhenSMILTextIsEmpty()
+        throws
+    {
+        let book = try AccessiblePublicationParser
+            .parse(
+                data:
+                    DaisyFixture
+                    .makeDaisy3WithEmptySMILText()
+            )
+
+        XCTAssertEqual(book.format, .daisy3)
+        XCTAssertEqual(book.chapters.count, 1)
+        XCTAssertEqual(
+            book.chapters[0].title,
+            "복구된 장"
+        )
+        XCTAssertTrue(
+            book.chapters[0].text.contains(
+                "NCX가 가리키는 정상 본문"
+            )
+        )
+    }
+
     func testAccessiblePublicationRejectsUnknownZIP()
         throws
     {
@@ -2285,6 +2308,124 @@ private nonisolated enum DaisyFixture {
                         0x49, 0x44, 0x33, 0x04,
                     ]),
                     compressionMethod: 0
+                ),
+            ]
+        )
+    }
+
+    static func makeDaisy3WithEmptySMILText()
+        throws -> Data
+    {
+        let package = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <package
+          unique-identifier="book-id"
+          xmlns="http://openebook.org/namespaces/oeb-package/1.0/">
+          <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <dc:identifier id="book-id">rivo-daisy-3-fallback</dc:identifier>
+            <dc:title>DAISY 3 복구 테스트</dc:title>
+            <dc:language>ko</dc:language>
+          </metadata>
+          <manifest>
+            <item
+              id="ncx"
+              href="navigation.ncx"
+              media-type="application/x-dtbncx+xml"/>
+            <item
+              id="smil"
+              href="audio.smil"
+              media-type="application/smil+xml"/>
+            <item
+              id="empty"
+              href="text/empty.xml"
+              media-type="application/x-dtbook+xml"/>
+            <item
+              id="text"
+              href="text/book.xml"
+              media-type="application/x-dtbook+xml"/>
+          </manifest>
+          <spine toc="ncx">
+            <itemref idref="smil"/>
+          </spine>
+        </package>
+        """
+        let navigation = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/">
+          <navMap>
+            <navPoint id="nav-1" playOrder="1">
+              <navLabel><text>복구된 장</text></navLabel>
+              <content src="text/book.xml#s1"/>
+            </navPoint>
+          </navMap>
+        </ncx>
+        """
+        let smil = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <smil xmlns="http://www.w3.org/2001/SMIL20/">
+          <body>
+            <seq>
+              <par id="par-1">
+                <text src="text/empty.xml#missing"/>
+              </par>
+            </seq>
+          </body>
+        </smil>
+        """
+        let emptyDocument = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <dtbook xmlns="http://www.daisy.org/z3986/2005/dtbook/">
+          <book/>
+        </dtbook>
+        """
+        let readableDocument = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <dtbook xmlns="http://www.daisy.org/z3986/2005/dtbook/">
+          <head>
+            <meta name="dc:Title" content="복구된 장"/>
+          </head>
+          <book>
+            <bodymatter>
+              <level1>
+                <h1>복구된 장</h1>
+                <p><sent id="s1">NCX가 가리키는 정상 본문입니다.</sent></p>
+              </level1>
+            </bodymatter>
+          </book>
+        </dtbook>
+        """
+        return try ZIPFixture.make(
+            entries: [
+                ZIPFixtureEntry(
+                    path: "DAISY/package.opf",
+                    data: Data(package.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path:
+                        "DAISY/navigation.ncx",
+                    data:
+                        Data(navigation.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path: "DAISY/audio.smil",
+                    data: Data(smil.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path:
+                        "DAISY/text/empty.xml",
+                    data:
+                        Data(emptyDocument.utf8),
+                    compressionMethod: 8
+                ),
+                ZIPFixtureEntry(
+                    path:
+                        "DAISY/text/book.xml",
+                    data:
+                        Data(readableDocument.utf8),
+                    compressionMethod: 8
                 ),
             ]
         )

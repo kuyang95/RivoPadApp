@@ -19,6 +19,8 @@
   NCC를 직전 제목 단계의 하위 항목으로 보존
 - NCC, `master.smil`, 전체 SMIL 순서의 DAISY 2.02 대체 탐색
 - DAISY 3 OPF manifest/spine, NCX 계층 목차·페이지 목록 파싱
+- DAISY 3 SMIL이 비어 있거나 읽을 본문을 만들지 못하면 NCX가 가리키는
+  정상 DTBook 읽기 순서로 한 번 복구
 - DAISY DTBook의 제목·문장·페이지 요소와 fragment 위치 추출
 - UTF-8/UTF-16 외 Shift-JIS, CP949/EUC-KR, CP437 텍스트·경로 호환
 - XHTML 본문을 로컬 텍스트로 변환하고 원본 표현 선택 시 이미지·표·목록·

@@ -245,10 +245,8 @@ nonisolated enum AccessiblePublicationParser {
                 archive: archive,
                 paths: smilPaths
             )
-        var documentPaths =
-            overlays.referencedTextPaths
-        if documentPaths.isEmpty {
-            documentPaths = unique(
+        let navigationDocumentPaths =
+            unique(
                 navigation.navigation
                     .compactMap { item in
                         guard let href =
@@ -269,6 +267,11 @@ nonisolated enum AccessiblePublicationParser {
                         return path
                     }
             )
+        var documentPaths =
+            overlays.referencedTextPaths
+        if documentPaths.isEmpty {
+            documentPaths =
+                navigationDocumentPaths
         }
         let titleByPath =
             documentTitles(
@@ -277,18 +280,29 @@ nonisolated enum AccessiblePublicationParser {
                 smilPaths: smilPaths,
                 overlays: overlays.items
             )
-        let chapters = try chapters(
+        var parsedChapters = try chapters(
             archive: archive,
             paths: documentPaths,
             titleByPath: titleByPath
         )
-        guard !chapters.isEmpty else {
+        if parsedChapters.isEmpty,
+           !navigationDocumentPaths.isEmpty,
+           documentPaths
+            != navigationDocumentPaths {
+            parsedChapters = try chapters(
+                archive: archive,
+                paths:
+                    navigationDocumentPaths,
+                titleByPath: titleByPath
+            )
+        }
+        guard !parsedChapters.isEmpty else {
             throw AccessiblePublicationParserError
                 .readableContentMissing
         }
         let title = packageDelegate.title?
             .nonEmptyTrimmed
-            ?? chapters.first?.title
+            ?? parsedChapters.first?.title
             ?? AppLocalization.string(
                 "제목 없는 DAISY 3"
             )
@@ -305,7 +319,7 @@ nonisolated enum AccessiblePublicationParser {
             language:
                 packageDelegate.language?
                 .nonEmptyTrimmed,
-            chapters: chapters,
+            chapters: parsedChapters,
             mediaOverlayItems:
                 overlays.items,
             navigationItems:
