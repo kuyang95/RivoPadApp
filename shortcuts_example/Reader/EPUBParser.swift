@@ -42,6 +42,7 @@ nonisolated struct EPUBChapter:
     let title: String
     let href: String
     let text: String
+    let sourceMarkup: String?
     let fragmentSegmentIndexes: [String: Int]
 
     init(
@@ -49,6 +50,7 @@ nonisolated struct EPUBChapter:
         title: String,
         href: String,
         text: String,
+        sourceMarkup: String? = nil,
         fragmentSegmentIndexes:
             [String: Int] = [:]
     ) {
@@ -56,6 +58,7 @@ nonisolated struct EPUBChapter:
         self.title = title
         self.href = href
         self.text = text
+        self.sourceMarkup = sourceMarkup
         self.fragmentSegmentIndexes =
             fragmentSegmentIndexes
     }
@@ -139,6 +142,9 @@ nonisolated enum EPUBParserError: LocalizedError {
 }
 
 nonisolated enum EPUBBookParser {
+    private static let maximumSourceMarkupBytes =
+        5 * 1_024 * 1_024
+
     private struct ManifestItem {
         let id: String
         let href: String
@@ -248,6 +254,10 @@ nonisolated enum EPUBBookParser {
                     title: title,
                     href: chapterPath,
                     text: text,
+                    sourceMarkup:
+                        sourceMarkup(
+                            chapterData
+                        ),
                     fragmentSegmentIndexes:
                         textMatchedFragmentIndexes
                         .merging(
@@ -300,6 +310,16 @@ nonisolated enum EPUBBookParser {
             pageListItems:
                 navigation.pageList
         )
+    }
+
+    static func sourceMarkup(
+        _ data: Data
+    ) -> String? {
+        guard data.count
+                <= maximumSourceMarkupBytes else {
+            return nil
+        }
+        return EPUBArchive.decodeText(data)
     }
 
     private static func mediaOverlayPaths(

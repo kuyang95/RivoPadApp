@@ -31,6 +31,8 @@ struct AppSettingsView: View {
     private var readerLineHeight = 1.7
     @AppStorage("reader.epub.speechRate")
     private var readerSpeechRate = 1.0
+    @AppStorage("reader.epub.originalLayout")
+    private var readerUsesOriginalLayout = true
 
     var body: some View {
         Form {
@@ -366,6 +368,12 @@ struct AppSettingsView: View {
                 "독서 줄 간격"
             )
 
+            Toggle(
+                "출판물 원본 표현",
+                isOn:
+                    $readerUsesOriginalLayout
+            )
+
             LabeledContent(
                 "재생 속도",
                 value:
@@ -615,6 +623,7 @@ struct AppSettingsView: View {
         readerFontScale = 1.0
         readerLineHeight = 1.7
         readerSpeechRate = 1.0
+        readerUsesOriginalLayout = true
     }
 
     private func saveWebSearchAPIKey() {

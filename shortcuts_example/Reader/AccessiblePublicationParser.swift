@@ -357,6 +357,12 @@ nonisolated enum AccessiblePublicationParser {
                         ?? "제 \(index + 1)장",
                     href: path,
                     text: text,
+                    sourceMarkup:
+                        didParse
+                        ? EPUBBookParser.sourceMarkup(
+                            data
+                        )
+                        : nil,
                     fragmentSegmentIndexes:
                         fragmentIndexes
                 )

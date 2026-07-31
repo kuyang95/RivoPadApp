@@ -271,6 +271,8 @@ nonisolated enum EPUBSearchEngine {
 @MainActor
 final class EPUBReaderViewModel: ObservableObject {
     @Published private(set) var book: EPUBBook?
+    @Published private(set) var publicationArchive:
+        EPUBArchive?
     @Published private(set) var isLoading = false
     @Published private(set) var errorDescription: String?
     @Published private(set) var currentChapterIndex = 0
@@ -320,13 +322,22 @@ final class EPUBReaderViewModel: ObservableObject {
                 contentsOf: fileURL,
                 options: .mappedIfSafe
             )
-            let parsedBook = try await Task.detached(
+            let parsedPublication =
+                try await Task.detached(
                 priority: .userInitiated
             ) {
-                try AccessiblePublicationParser
-                    .parse(data: data)
+                let book =
+                    try AccessiblePublicationParser
+                        .parse(data: data)
+                let archive =
+                    try EPUBArchive(data: data)
+                return (book, archive)
             }.value
+            let parsedBook =
+                parsedPublication.0
             book = parsedBook
+            publicationArchive =
+                parsedPublication.1
             let savedProgress =
                 EPUBProgressStore.progress(
                 for: parsedBook.identifier
@@ -550,6 +561,7 @@ private enum EPUBReaderTheme: String, CaseIterable, Identifiable {
 }
 
 struct EPUBReaderView: View {
+    @Environment(\.openURL) private var openURL
     @EnvironmentObject private var remoteControl:
         RivoScreenRemoteControlCenter
     @StateObject private var viewModel: EPUBReaderViewModel
@@ -563,6 +575,8 @@ struct EPUBReaderView: View {
     @State private var playbackSeekSeconds = 0.0
     @State private var resumesAfterPlaybackSeek =
         false
+    @State private var pendingExternalURL:
+        URL?
 
     @AppStorage("reader.epub.theme")
     private var themeID = EPUBReaderTheme.light.rawValue
@@ -572,6 +586,8 @@ struct EPUBReaderView: View {
     private var lineHeight = 1.7
     @AppStorage("reader.epub.speechRate")
     private var speechRate = 1.0
+    @AppStorage("reader.epub.originalLayout")
+    private var usesOriginalLayout = true
 
     init(fileURL: URL) {
         _viewModel = StateObject(
@@ -682,9 +698,92 @@ struct EPUBReaderView: View {
             settingsSheet
                 .presentationDetents([.medium])
         }
+        .alert(
+            "외부 링크 열기",
+            isPresented: Binding(
+                get: {
+                    pendingExternalURL != nil
+                },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingExternalURL = nil
+                    }
+                }
+            )
+        ) {
+            Button("Safari에서 열기") {
+                if let url =
+                        pendingExternalURL {
+                    openURL(url)
+                }
+                pendingExternalURL = nil
+            }
+            Button("취소", role: .cancel) {
+                pendingExternalURL = nil
+            }
+        } message: {
+            Text(
+                AppLocalization.format(
+                    "책 밖의 웹사이트를 Safari에서 열까요?\n%@",
+                    pendingExternalURL?
+                        .absoluteString
+                        ?? ""
+                )
+            )
+        }
     }
 
+    @ViewBuilder
     private func chapterView(
+        _ chapter: EPUBChapter
+    ) -> some View {
+        if usesOriginalLayout,
+           let archive =
+                viewModel.publicationArchive,
+           chapter.sourceMarkup != nil {
+            let segments =
+                EPUBTextSegmenter.segments(
+                    in: chapter
+                )
+            EPUBOriginalLayoutView(
+                archive: archive,
+                chapter: chapter,
+                segmentCount:
+                    segments.count,
+                navigationRevision:
+                    viewModel
+                    .navigationRevision,
+                targetSegmentIndex:
+                    viewModel
+                    .navigationTargetSegmentIndex,
+                style:
+                    originalLayoutStyle,
+                onVisibleSegment: {
+                    viewModel
+                        .noteVisibleSegment($0)
+                },
+                onNavigationFinished: {
+                    revision,
+                    segmentIndex in
+                    viewModel.finishNavigation(
+                        revision: revision,
+                        segmentIndex:
+                            segmentIndex
+                    )
+                },
+                onLink: {
+                    handlePublicationLink($0)
+                }
+            )
+            .background(
+                theme.background
+            )
+        } else {
+            textChapterView(chapter)
+        }
+    }
+
+    private func textChapterView(
         _ chapter: EPUBChapter
     ) -> some View {
         let segments =
@@ -1394,6 +1493,18 @@ struct EPUBReaderView: View {
                     } maximumValueLabel: {
                         Text("넓게")
                     }
+                    Toggle(
+                        "출판물 원본 표현",
+                        isOn:
+                            $usesOriginalLayout
+                    )
+                    Text(
+                        "이미지, 표, 목록, 강조와 책 안 링크를 보존합니다. 정확한 검색·발화 강조가 필요하면 끄세요."
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(
+                        .secondary
+                    )
                 }
 
                 Section("음성") {
@@ -1508,6 +1619,86 @@ struct EPUBReaderView: View {
             location: range.location,
             length: range.length
         )
+    }
+
+    private var originalLayoutStyle:
+        EPUBOriginalMarkupStyle
+    {
+        let colors:
+            (
+                background: String,
+                foreground: String,
+                link: String
+            )
+        switch theme {
+        case .light:
+            colors = (
+                "#FFFFFF",
+                "#1A1714",
+                "#005FCC"
+            )
+        case .sepia:
+            colors = (
+                "#F5EBD6",
+                "#2C2117",
+                "#7A3E00"
+            )
+        case .dark:
+            colors = (
+                "#121417",
+                "#F2F2F5",
+                "#66AFFF"
+            )
+        }
+        return EPUBOriginalMarkupStyle(
+            backgroundColor:
+                colors.background,
+            foregroundColor:
+                colors.foreground,
+            linkColor: colors.link,
+            fontScale: fontScale,
+            lineHeight: lineHeight
+        )
+    }
+
+    private func handlePublicationLink(
+        _ url: URL
+    ) {
+        switch EPUBOriginalResourcePolicy
+            .classifyLink(url) {
+        case .publication(
+            let path,
+            let fragment
+        ):
+            guard let book = viewModel.book,
+                  let chapterIndex =
+                    book.chapters
+                    .firstIndex(
+                        where: {
+                            $0.href == path
+                        }
+                    ) else {
+                return
+            }
+            let segmentIndex =
+                fragment.flatMap {
+                    book.chapters[
+                        chapterIndex
+                    ]
+                    .fragmentSegmentIndexes[
+                        $0
+                    ]
+                } ?? 0
+            selectLocation(
+                chapterIndex: chapterIndex,
+                segmentIndex:
+                    segmentIndex
+            )
+        case .external(let url):
+            pendingExternalURL = url
+        case .blocked:
+            break
+        }
     }
 
     private func moveChapter(by delta: Int) {

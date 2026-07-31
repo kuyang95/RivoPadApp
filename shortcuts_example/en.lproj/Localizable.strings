@@ -1253,3 +1253,8 @@
 "받은 파일을 삭제할까요?" = "Delete the received file?";
 "파일 삭제" = "Delete File";
 "이 파일은 iPad와 파일 앱의 VisionLink 폴더에서 삭제됩니다." = "This file will be deleted from the iPad and the VisionLink folder in Files.";
+"출판물 원본 표현" = "Original Publication Layout";
+"이미지, 표, 목록, 강조와 책 안 링크를 보존합니다. 정확한 검색·발화 강조가 필요하면 끄세요." = "Preserves images, tables, lists, emphasis, and links within the book. Turn this off for precise search and spoken-text highlighting.";
+"외부 링크 열기" = "Open External Link";
+"책 밖의 웹사이트를 Safari에서 열까요?\n%@" = "Open this website outside the book in Safari?\n%@";
+"Safari에서 열기" = "Open in Safari";

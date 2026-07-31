@@ -1212,6 +1212,199 @@ final class EPUBReaderTests: XCTestCase {
             }
         }
     }
+
+    func testParserPreservesOriginalChapterMarkup()
+        throws
+    {
+        let book = try EPUBBookParser.parse(
+            data: EPUBFixture.makeBook()
+        )
+        let markup = try XCTUnwrap(
+            book.chapters.first?
+                .sourceMarkup
+        )
+
+        XCTAssertTrue(
+            markup.contains(
+                "<p id=\"first-text\">"
+            )
+        )
+        XCTAssertTrue(
+            markup.contains(
+                "<script>표시하지 않음</script>"
+            )
+        )
+    }
+
+    func testOriginalMarkupCacheRejectsOversizedChapter() {
+        XCTAssertNil(
+            EPUBBookParser.sourceMarkup(
+                Data(
+                    repeating: 0x61,
+                    count:
+                        5 * 1_024 * 1_024
+                        + 1
+                )
+            )
+        )
+    }
+
+    func testOriginalMarkupAddsLocalOnlyPolicyAndAdaptiveStyle() {
+        let source = """
+        <html>
+          <head>
+            <base href="https://example.com/">
+            <meta http-equiv="Content-Security-Policy" content="default-src *">
+          </head>
+          <body>
+            <strong>강조</strong>
+            <table><tr><td>셀</td></tr></table>
+          </body>
+        </html>
+        """
+        let rendered =
+            EPUBOriginalMarkupRenderer
+            .document(
+                sourceMarkup: source,
+                style:
+                    EPUBOriginalMarkupStyle(
+                        backgroundColor:
+                            "#121417",
+                        foregroundColor:
+                            "#F2F2F5",
+                        linkColor:
+                            "#66AFFF",
+                        fontScale: 1.2,
+                        lineHeight: 1.8
+                    )
+            )
+
+        XCTAssertFalse(
+            rendered.localizedCaseInsensitiveContains(
+                "<base"
+            )
+        )
+        XCTAssertEqual(
+            rendered
+                .lowercased()
+                .components(
+                    separatedBy:
+                        "content-security-policy"
+                )
+                .count,
+            2
+        )
+        XCTAssertTrue(
+            rendered.contains(
+                "default-src 'none'"
+            )
+        )
+        XCTAssertTrue(
+            rendered.contains(
+                "script-src 'none'"
+            )
+        )
+        XCTAssertTrue(
+            rendered.contains(
+                "<strong>강조</strong>"
+            )
+        )
+        XCTAssertTrue(
+            rendered.contains(
+                "<table>"
+            )
+        )
+        XCTAssertTrue(
+            rendered.contains(
+                "font-size: 26.4px"
+            )
+        )
+    }
+
+    func testOriginalResourcePolicyAllowsOnlyPassiveBookAssets()
+        throws
+    {
+        let base = try XCTUnwrap(
+            EPUBOriginalResourcePolicy
+                .publicationURL(
+                    for:
+                        "OEBPS/Text/chapter.xhtml"
+                )
+        )
+        let imageURL = try XCTUnwrap(
+            URL(
+                string:
+                    "../Images/cover.png",
+                relativeTo: base
+            )?.absoluteURL
+        )
+        XCTAssertEqual(
+            EPUBOriginalResourcePolicy
+                .archivePath(
+                    forResourceURL:
+                        imageURL
+                ),
+            "OEBPS/Images/cover.png"
+        )
+        XCTAssertNil(
+            EPUBOriginalResourcePolicy
+                .archivePath(
+                    forResourceURL:
+                        URL(
+                            string:
+                                "rivo-epub://book/OEBPS/evil.js"
+                        )!
+                )
+        )
+        XCTAssertNil(
+            EPUBOriginalResourcePolicy
+                .archivePath(
+                    forResourceURL:
+                        URL(
+                            string:
+                                "https://example.com/cover.png"
+                        )!
+                )
+        )
+    }
+
+    func testOriginalLinkPolicySeparatesBookAndWebDestinations()
+        throws
+    {
+        XCTAssertEqual(
+            EPUBOriginalResourcePolicy
+                .classifyLink(
+                    URL(
+                        string:
+                            "rivo-epub://book/OEBPS/chapter2.xhtml#part"
+                    )!
+                ),
+            .publication(
+                path:
+                    "OEBPS/chapter2.xhtml",
+                fragment: "part"
+            )
+        )
+        let external = URL(
+            string:
+                "https://example.com/reference"
+        )!
+        XCTAssertEqual(
+            EPUBOriginalResourcePolicy
+                .classifyLink(external),
+            .external(external)
+        )
+        XCTAssertEqual(
+            EPUBOriginalResourcePolicy
+                .classifyLink(
+                    URL(
+                        string:
+                            "javascript:alert(1)"
+                    )!
+                ),
+            .blocked
+        )
+    }
 }
 
 private nonisolated enum EPUBFixture {

@@ -39,6 +39,8 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 - 홈과 소형 위젯의 오늘 M4 로컬 AI 완료·실패·취소·처리량·무제한 문구
 - EPUB·DAISY 서재·목차·검색·보기·혼합 재생 화면, 동적 탐색 단위·
   재생 방식과 ZIP/EPUB/DAISY 오류의 앱 내부 언어 즉시 반영
+- EPUB·DAISY 원본 표현 선택, 검색·발화 강조 차이 안내와 외부 링크
+  Safari 열기 확인
 - 카메라 도구 선택·돋보기·실시간 OCR·사진 저장과 자체 문서 스캐너의
   촬영 안내·오류·검토·다중 페이지·VoiceOver 문구
 - VisionLink의 코드 연결·신호·WebRTC·데이터 채널·파일·클립보드,
