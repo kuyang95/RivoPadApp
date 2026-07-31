@@ -166,7 +166,12 @@ struct RivoRemoteView: View {
                             Text(device.type.title)
                                 .foregroundStyle(.secondary)
                             Text(
-                                "\(device.discoverySource.title)으로 식별"
+                                AppLocalization.format(
+                                    "%@으로 식별",
+                                    device
+                                        .discoverySource
+                                        .title
+                                )
                             )
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -188,7 +193,11 @@ struct RivoRemoteView: View {
                     .padding(.vertical, 6)
                 }
                 .accessibilityLabel(
-                    "\(device.name), \(device.type.title)"
+                    AppLocalization.format(
+                        "%@, %@",
+                        device.name,
+                        device.type.title
+                    )
                 )
                 .accessibilityHint("이 리모컨에 연결합니다.")
             }
@@ -361,8 +370,9 @@ struct RivoRemoteView: View {
                     "아직 버튼 입력이 없습니다",
                     systemImage: "button.programmable",
                     description: Text(
-                        "연결 후 Rivo 버튼을 누르면 "
-                            + "해석 결과와 원본 패킷이 표시됩니다."
+                        AppLocalization.string(
+                            "연결 후 Rivo 버튼을 누르면 해석 결과와 원본 패킷이 표시됩니다."
+                        )
                     )
                 )
             } else {
@@ -403,8 +413,10 @@ struct RivoRemoteView: View {
         } footer: {
             if manager.invalidPacketCount > 0 {
                 Text(
-                    "해석하지 못한 패킷 "
-                        + "\(manager.invalidPacketCount)개"
+                    AppLocalization.format(
+                        "해석하지 못한 패킷 %lld개",
+                        manager.invalidPacketCount
+                    )
                 )
             }
         }
@@ -413,10 +425,9 @@ struct RivoRemoteView: View {
     private var limitationsSection: some View {
         Section("iPad 동작 범위") {
             Text(
-                "이 단계에서는 VisionCraft가 열려 있을 때 "
-                    + "Rivo 버튼으로 앱 내부 기능을 조작합니다. "
-                    + "다른 앱의 터치·홈·VoiceOver를 제어하지는 "
-                    + "않습니다."
+                AppLocalization.string(
+                    "이 단계에서는 VisionCraft가 열려 있을 때 Rivo 버튼으로 앱 내부 기능을 조작합니다. 다른 앱의 터치·홈·VoiceOver를 제어하지는 않습니다."
+                )
             )
             .foregroundStyle(.secondary)
         }

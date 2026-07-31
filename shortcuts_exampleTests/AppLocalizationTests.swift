@@ -715,6 +715,114 @@ final class AppLocalizationTests:
         )
     }
 
+    @MainActor
+    func testRivoRemoteDynamicStringsFollowInAppLanguage()
+    {
+        let defaults = UserDefaults.standard
+        let previous =
+            defaults.string(
+                forKey:
+                    AppLanguage
+                    .preferenceKey
+            )
+        defer {
+            if let previous {
+                defaults.set(
+                    previous,
+                    forKey:
+                        AppLanguage
+                        .preferenceKey
+                )
+            } else {
+                defaults.removeObject(
+                    forKey:
+                        AppLanguage
+                        .preferenceKey
+                )
+            }
+        }
+
+        defaults.set(
+            AppLanguage.english.rawValue,
+            forKey:
+                AppLanguage.preferenceKey
+        )
+        XCTAssertEqual(
+            RivoBluetoothState
+                .connecting("Rivo Mini")
+                .title,
+            "Connecting to Rivo Mini"
+        )
+        XCTAssertEqual(
+            RivoReconnectAttempt(
+                number: 3,
+                delay: 4
+            ).title,
+            "Reconnect automatically in 4 seconds. Attempt 3"
+        )
+        XCTAssertEqual(
+            RivoDiscoverySource
+                .advertisedName.title,
+            "Advertised Name"
+        )
+        XCTAssertEqual(
+            RivoRemoteInput
+                .button(
+                    button: .star,
+                    action: .doubleTapped,
+                    rawKey: 0
+                )
+                .summary,
+            "Star Double Press"
+        )
+        XCTAssertEqual(
+            RivoRestorationAction
+                .resumeServices
+                .diagnosticTitle,
+            "Resume discovery of connected services."
+        )
+        XCTAssertEqual(
+            RivoRemoteControlCenter()
+                .items[2].title,
+            "Camera Magnifier"
+        )
+
+        defaults.set(
+            AppLanguage.japanese.rawValue,
+            forKey:
+                AppLanguage.preferenceKey
+        )
+        XCTAssertEqual(
+            RivoBluetoothState
+                .discovering("Rivo Three")
+                .title,
+            "Rivo Threeのサービスを確認中"
+        )
+        XCTAssertEqual(
+            RivoDiscoveredDevice(
+                id: UUID(),
+                name: "Rivo Mini",
+                type: .mini,
+                discoverySource: .serviceUUID,
+                signalStrength: -50
+            ).signalDescription,
+            "非常に強い"
+        )
+        XCTAssertEqual(
+            RivoRemoteInput
+                .sequence("a/")
+                .summary,
+            "シーケンス a/"
+        )
+        let controlCenter =
+            RivoRemoteControlCenter()
+        controlCenter.dismissCommandMode()
+        XCTAssertEqual(
+            controlCenter.feedback,
+            "コマンドモードを閉じました"
+        )
+    }
+
     private func localizedBundle(
         language: String
     ) throws -> Bundle {

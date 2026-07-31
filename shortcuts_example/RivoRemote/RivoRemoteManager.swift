@@ -283,13 +283,21 @@ nonisolated enum RivoRestorationAction:
     var diagnosticTitle: String {
         switch self {
         case .resumeServices:
-            return "연결된 서비스 검색을 재개합니다."
+            return AppLocalization.string(
+                "연결된 서비스 검색을 재개합니다."
+            )
         case .awaitConnection:
-            return "진행 중인 연결을 기다립니다."
+            return AppLocalization.string(
+                "진행 중인 연결을 기다립니다."
+            )
         case .connect:
-            return "복원된 기기에 다시 연결합니다."
+            return AppLocalization.string(
+                "복원된 기기에 다시 연결합니다."
+            )
         case .awaitDisconnection:
-            return "연결 해제가 끝난 뒤 다시 연결합니다."
+            return AppLocalization.string(
+                "연결 해제가 끝난 뒤 다시 연결합니다."
+            )
         }
     }
 }
@@ -514,7 +522,10 @@ final class RivoRemoteManager:
             recordDiagnostic(
                 .info,
                 stage: .reconnecting,
-                message: "저장된 Rivo 자동 연결을 준비합니다."
+                message:
+                    AppLocalization.string(
+                        "저장된 Rivo 자동 연결을 준비합니다."
+                    )
             )
         }
         if RivoRestorationPolicy
@@ -628,7 +639,9 @@ final class RivoRemoteManager:
             .info,
             stage: .scanning,
             message:
-                "기존 선호 기기는 보존하고 다른 Rivo를 찾습니다."
+                AppLocalization.string(
+                    "기존 선호 기기는 보존하고 다른 Rivo를 찾습니다."
+                )
         )
         beginScanning()
     }
@@ -645,7 +658,10 @@ final class RivoRemoteManager:
         recordDiagnostic(
             .info,
             stage: .reconnecting,
-            message: "사용자가 Rivo 연결을 지금 다시 시도합니다."
+            message:
+                AppLocalization.string(
+                    "사용자가 Rivo 연결을 지금 다시 시도합니다."
+                )
         )
         prepareCentralManager()
         guard let centralManager else {
@@ -675,7 +691,9 @@ final class RivoRemoteManager:
             .info,
             stage: .reconnecting,
             message:
-                "새 기기 선택을 취소하고 저장된 Rivo로 돌아갑니다."
+                AppLocalization.string(
+                    "새 기기 선택을 취소하고 저장된 Rivo로 돌아갑니다."
+                )
         )
         retryConnectionNow()
     }
@@ -705,7 +723,9 @@ final class RivoRemoteManager:
             .info,
             stage: .scanning,
             message:
-                "Rivo 서비스 UUID와 기기 이름을 함께 검색합니다."
+                AppLocalization.string(
+                    "Rivo 서비스 UUID와 기기 이름을 함께 검색합니다."
+                )
         )
         centralManager.scanForPeripherals(
             withServices: nil,
@@ -732,7 +752,10 @@ final class RivoRemoteManager:
             recordDiagnostic(
                 .info,
                 stage: .scanning,
-                message: "사용자가 검색을 중지했습니다."
+                message:
+                    AppLocalization.string(
+                        "사용자가 검색을 중지했습니다."
+                    )
             )
         }
     }
@@ -741,7 +764,9 @@ final class RivoRemoteManager:
         guard let peripheral = peripherals[device.id],
               let centralManager else {
             let message =
-                "검색 결과가 만료되었습니다. 다시 검색해 주세요."
+                AppLocalization.string(
+                    "검색 결과가 만료되었습니다. 다시 검색해 주세요."
+                )
             state = .failed(message)
             recordDiagnostic(
                 .failure,
@@ -779,7 +804,10 @@ final class RivoRemoteManager:
             recordDiagnostic(
                 .info,
                 stage: .disconnected,
-                message: "연결할 Rivo가 없습니다."
+                message:
+                    AppLocalization.string(
+                        "연결할 Rivo가 없습니다."
+                    )
             )
             return
         }
@@ -790,7 +818,10 @@ final class RivoRemoteManager:
         recordDiagnostic(
             .info,
             stage: .disconnected,
-            message: "사용자가 Rivo 연결을 끊었습니다."
+            message:
+                AppLocalization.string(
+                    "사용자가 Rivo 연결을 끊었습니다."
+                )
         )
     }
 
@@ -831,7 +862,9 @@ final class RivoRemoteManager:
               let characteristic =
                 writeCharacteristic else {
             let message =
-                "Rivo가 연결된 뒤 다시 시도해 주세요."
+                AppLocalization.string(
+                    "Rivo가 연결된 뒤 다시 시도해 주세요."
+                )
             timeSyncState = .failed(message)
             recordDiagnostic(
                 .warning,
@@ -850,7 +883,9 @@ final class RivoRemoteManager:
             writeType = .withResponse
         } else {
             let message =
-                "이 Rivo의 시간 쓰기 특성을 지원하지 않습니다."
+                AppLocalization.string(
+                    "이 Rivo의 시간 쓰기 특성을 지원하지 않습니다."
+                )
             timeSyncState = .failed(message)
             recordDiagnostic(
                 .failure,
@@ -917,7 +952,10 @@ final class RivoRemoteManager:
         recordDiagnostic(
             .info,
             stage: .bluetooth,
-            message: "Bluetooth 중앙 장치를 준비합니다."
+            message:
+                AppLocalization.string(
+                    "Bluetooth 중앙 장치를 준비합니다."
+                )
         )
         centralManager = CBCentralManager(
             delegate: self,
@@ -947,7 +985,9 @@ final class RivoRemoteManager:
                 .warning,
                 stage: .reconnecting,
                 message:
-                    "저장된 Rivo를 찾지 못해 주변 검색으로 전환합니다."
+                    AppLocalization.string(
+                        "저장된 Rivo를 찾지 못해 주변 검색으로 전환합니다."
+                    )
             )
             beginScanning()
             return
@@ -964,8 +1004,12 @@ final class RivoRemoteManager:
             message:
                 pendingPreferredPeripheralIdentifier
                     == identifier
-                ? "선택한 Rivo에 다시 연결합니다."
-                : "저장된 Rivo에 다시 연결합니다."
+                ? AppLocalization.string(
+                    "선택한 Rivo에 다시 연결합니다."
+                )
+                : AppLocalization.string(
+                    "저장된 Rivo에 다시 연결합니다."
+                )
         )
         connect(peripheral, using: centralManager)
     }
@@ -1009,7 +1053,10 @@ final class RivoRemoteManager:
             .info,
             stage: .connecting,
             message:
-                "\(displayName(for: peripheral)) 연결을 시작합니다."
+                AppLocalization.format(
+                    "%@ 연결을 시작합니다.",
+                    displayName(for: peripheral)
+                )
         )
         centralManager.connect(peripheral)
         scheduleConnectionTimeout(for: peripheral.identifier)
@@ -1035,7 +1082,9 @@ final class RivoRemoteManager:
                     .cancelPeripheralConnection(peripheral)
             }
             let message =
-                "Rivo 연결 또는 준비 시간이 10초를 초과했습니다."
+                AppLocalization.string(
+                    "Rivo 연결 또는 준비 시간이 10초를 초과했습니다."
+                )
             self.state = .failed(message)
             self.recordDiagnostic(
                 .failure,
@@ -1099,7 +1148,9 @@ final class RivoRemoteManager:
             ?? savedDeviceType {
             return type.title
         }
-        return "Rivo 리모컨"
+        return AppLocalization.string(
+            "Rivo 리모컨"
+        )
     }
 
     private func deviceType(
@@ -1169,7 +1220,9 @@ final class RivoRemoteManager:
                 .info,
                 stage: .services,
                 message:
-                    "복원된 Rivo의 GATT 서비스를 다시 확인합니다."
+                    AppLocalization.string(
+                        "복원된 Rivo의 GATT 서비스를 다시 확인합니다."
+                    )
             )
             peripheral.discoverServices(nil)
         case .connecting:
@@ -1180,7 +1233,9 @@ final class RivoRemoteManager:
                 .info,
                 stage: .connecting,
                 message:
-                    "iPadOS가 진행 중이던 Rivo 연결을 기다립니다."
+                    AppLocalization.string(
+                        "iPadOS가 진행 중이던 Rivo 연결을 기다립니다."
+                    )
             )
             scheduleConnectionTimeout(
                 for: peripheral.identifier
@@ -1190,7 +1245,9 @@ final class RivoRemoteManager:
                 .info,
                 stage: .reconnecting,
                 message:
-                    "복원된 Rivo가 끊겨 있어 다시 연결합니다."
+                    AppLocalization.string(
+                        "복원된 Rivo가 끊겨 있어 다시 연결합니다."
+                    )
             )
             connect(
                 peripheral,
@@ -1202,7 +1259,9 @@ final class RivoRemoteManager:
                 .info,
                 stage: .reconnecting,
                 message:
-                    "복원된 Rivo의 연결 해제가 끝나기를 기다립니다."
+                    AppLocalization.string(
+                        "복원된 Rivo의 연결 해제가 끝나기를 기다립니다."
+                    )
             )
         @unknown default:
             state = .disconnected
@@ -1244,7 +1303,10 @@ final class RivoRemoteManager:
             .success,
             stage: .ready,
             message:
-                "\(displayName(for: peripheral)) 버튼 수신 준비가 끝났습니다."
+                AppLocalization.format(
+                    "%@ 버튼 수신 준비가 끝났습니다.",
+                    displayName(for: peripheral)
+                )
         )
         if automaticTimeSyncPeripheralIdentifier
             != peripheral.identifier {
@@ -1259,7 +1321,10 @@ final class RivoRemoteManager:
         recordDiagnostic(
             .success,
             stage: .timeSync,
-            message: "Rivo에 iPad 현재 시간을 전송했습니다."
+            message:
+                AppLocalization.string(
+                    "Rivo에 iPad 현재 시간을 전송했습니다."
+                )
         )
         schedulePeriodicTimeSync()
     }
@@ -1352,14 +1417,25 @@ final class RivoRemoteManager:
         didFinishCharacteristicDiscovery = true
         var missing: [String] = []
         if writeCharacteristic == nil {
-            missing.append("UART 쓰기")
+            missing.append(
+                AppLocalization.string(
+                    "UART 쓰기"
+                )
+            )
         }
         if notifyCharacteristic == nil {
-            missing.append("UART 알림")
+            missing.append(
+                AppLocalization.string(
+                    "UART 알림"
+                )
+            )
         }
         guard missing.isEmpty else {
             let message =
-                "필수 \(missing.joined(separator: "·")) 특성을 찾지 못했습니다."
+                AppLocalization.format(
+                    "필수 %@ 특성을 찾지 못했습니다.",
+                    missing.joined(separator: "·")
+                )
             state = .failed(message)
             recordDiagnostic(
                 .failure,
@@ -1374,7 +1450,10 @@ final class RivoRemoteManager:
         recordDiagnostic(
             .success,
             stage: .characteristics,
-            message: "UART 쓰기·알림 특성을 확인했습니다."
+            message:
+                AppLocalization.string(
+                    "UART 쓰기·알림 특성을 확인했습니다."
+                )
         )
         markReadyIfPossible()
     }
@@ -1408,7 +1487,10 @@ final class RivoRemoteManager:
             recordDiagnostic(
                 .success,
                 stage: .bluetooth,
-                message: "Bluetooth를 사용할 수 있습니다."
+                message:
+                    AppLocalization.string(
+                        "Bluetooth를 사용할 수 있습니다."
+                    )
             )
             if let centralManager,
                resumePendingRestoredPeripheral(
@@ -1453,7 +1535,10 @@ final class RivoRemoteManager:
             recordDiagnostic(
                 .warning,
                 stage: .bluetooth,
-                message: "Bluetooth가 꺼져 있습니다."
+                message:
+                    AppLocalization.string(
+                        "Bluetooth가 꺼져 있습니다."
+                    )
             )
         case .unauthorized:
             connectionTimeoutTask?.cancel()
@@ -1464,7 +1549,10 @@ final class RivoRemoteManager:
             recordDiagnostic(
                 .failure,
                 stage: .bluetooth,
-                message: "Bluetooth 권한이 허용되지 않았습니다."
+                message:
+                    AppLocalization.string(
+                        "Bluetooth 권한이 허용되지 않았습니다."
+                    )
             )
         case .unsupported:
             connectionTimeoutTask?.cancel()
@@ -1475,7 +1563,10 @@ final class RivoRemoteManager:
             recordDiagnostic(
                 .failure,
                 stage: .bluetooth,
-                message: "이 기기는 Bluetooth LE를 지원하지 않습니다."
+                message:
+                    AppLocalization.string(
+                        "이 기기는 Bluetooth LE를 지원하지 않습니다."
+                    )
             )
         case .resetting:
             connectionTimeoutTask?.cancel()
@@ -1483,18 +1574,26 @@ final class RivoRemoteManager:
             recordDiagnostic(
                 .warning,
                 stage: .bluetooth,
-                message: "Bluetooth가 재설정되고 있습니다."
+                message:
+                    AppLocalization.string(
+                        "Bluetooth가 재설정되고 있습니다."
+                    )
             )
         case .unknown:
             state = .preparing
             recordDiagnostic(
                 .info,
                 stage: .bluetooth,
-                message: "Bluetooth 상태를 확인하고 있습니다."
+                message:
+                    AppLocalization.string(
+                        "Bluetooth 상태를 확인하고 있습니다."
+                    )
             )
         @unknown default:
             let message =
-                "알 수 없는 Bluetooth 상태입니다."
+                AppLocalization.string(
+                    "알 수 없는 Bluetooth 상태입니다."
+                )
             state = .failed(message)
             recordDiagnostic(
                 .failure,
@@ -1561,7 +1660,9 @@ final class RivoRemoteManager:
                 .info,
                 stage: .reconnecting,
                 message:
-                    "iPadOS가 복원한 Rivo 검색을 이어받았습니다."
+                    AppLocalization.string(
+                        "iPadOS가 복원한 Rivo 검색을 이어받았습니다."
+                    )
             )
             return
         }
@@ -1586,7 +1687,10 @@ final class RivoRemoteManager:
             .info,
             stage: .reconnecting,
             message:
-                "iPadOS가 복원한 Rivo 연결을 이어받았습니다. \(decision.action.diagnosticTitle)"
+                AppLocalization.format(
+                    "iPadOS가 복원한 Rivo 연결을 이어받았습니다. %@",
+                    decision.action.diagnosticTitle
+                )
         )
 
         if central.state == .poweredOn {
@@ -1647,7 +1751,11 @@ final class RivoRemoteManager:
                 .success,
                 stage: .scanning,
                 message:
-                    "\(name)을 \(match.source.title)으로 찾았습니다."
+                    AppLocalization.format(
+                        "%@을 %@으로 찾았습니다.",
+                        name,
+                        match.source.title
+                    )
             )
         }
         discoveredDevices.sort {
@@ -1680,12 +1788,18 @@ final class RivoRemoteManager:
             .success,
             stage: .connecting,
             message:
-                "\(displayName(for: peripheral)) BLE 연결에 성공했습니다."
+                AppLocalization.format(
+                    "%@ BLE 연결에 성공했습니다.",
+                    displayName(for: peripheral)
+                )
         )
         recordDiagnostic(
             .info,
             stage: .services,
-            message: "GATT 서비스를 확인합니다."
+            message:
+                AppLocalization.string(
+                    "GATT 서비스를 확인합니다."
+                )
         )
         peripheral.discoverServices(nil)
     }
@@ -1699,7 +1813,10 @@ final class RivoRemoteManager:
         connectionTimeoutTask?.cancel()
         let message = connectionErrorMessage(
             error,
-            fallback: "Rivo 리모컨에 연결하지 못했습니다."
+            fallback:
+                AppLocalization.string(
+                    "Rivo 리모컨에 연결하지 못했습니다."
+                )
         )
         state = .failed(message)
         recordDiagnostic(
@@ -1726,7 +1843,10 @@ final class RivoRemoteManager:
                 .info,
                 stage: .disconnected,
                 message:
-                    "\(displayName(for: peripheral)) 연결을 기기 전환을 위해 종료했습니다."
+                    AppLocalization.format(
+                        "%@ 연결을 기기 전환을 위해 종료했습니다.",
+                        displayName(for: peripheral)
+                    )
             )
             if central.isScanning {
                 state = .scanning
@@ -1757,7 +1877,10 @@ final class RivoRemoteManager:
             message: connectionErrorMessage(
                 error,
                 fallback:
-                    "\(displayName(for: peripheral)) 연결이 끊겼습니다."
+                    AppLocalization.format(
+                        "%@ 연결이 끊겼습니다.",
+                        displayName(for: peripheral)
+                    )
             )
         )
         scheduleReconnect()
@@ -1770,7 +1893,10 @@ final class RivoRemoteManager:
         if let error {
             let message = connectionErrorMessage(
                 error,
-                fallback: "GATT 서비스 검색에 실패했습니다."
+                fallback:
+                    AppLocalization.string(
+                        "GATT 서비스 검색에 실패했습니다."
+                    )
             )
             state = .failed(message)
             recordDiagnostic(
@@ -1786,7 +1912,9 @@ final class RivoRemoteManager:
         let services = peripheral.services ?? []
         guard !services.isEmpty else {
             let message =
-                "Rivo에서 GATT 서비스를 찾지 못했습니다."
+                AppLocalization.string(
+                    "Rivo에서 GATT 서비스를 찾지 못했습니다."
+                )
             state = .failed(message)
             recordDiagnostic(
                 .failure,
@@ -1806,7 +1934,11 @@ final class RivoRemoteManager:
         recordDiagnostic(
             .success,
             stage: .services,
-            message: "GATT 서비스 \(services.count)개를 찾았습니다."
+            message:
+                AppLocalization.format(
+                    "GATT 서비스 %lld개를 찾았습니다.",
+                    services.count
+                )
         )
         pendingCharacteristicDiscoveryCount =
             services.count
@@ -1838,7 +1970,10 @@ final class RivoRemoteManager:
                 message: connectionErrorMessage(
                     error,
                     fallback:
-                        "\(service.uuid.uuidString) 특성 검색에 실패했습니다."
+                        AppLocalization.format(
+                            "%@ 특성 검색에 실패했습니다.",
+                            service.uuid.uuidString
+                        )
                 )
             )
             finishCharacteristicDiscovery(
@@ -1871,7 +2006,10 @@ final class RivoRemoteManager:
         if let error {
             let message = connectionErrorMessage(
                 error,
-                fallback: "UART 알림 구독에 실패했습니다."
+                fallback:
+                    AppLocalization.string(
+                        "UART 알림 구독에 실패했습니다."
+                    )
             )
             state = .failed(message)
             recordDiagnostic(
@@ -1886,7 +2024,9 @@ final class RivoRemoteManager:
         }
         guard characteristic.isNotifying else {
             let message =
-                "Rivo가 UART 알림 구독을 활성화하지 않았습니다."
+                AppLocalization.string(
+                    "Rivo가 UART 알림 구독을 활성화하지 않았습니다."
+                )
             state = .failed(message)
             recordDiagnostic(
                 .failure,
@@ -1901,7 +2041,10 @@ final class RivoRemoteManager:
         recordDiagnostic(
             .success,
             stage: .notifications,
-            message: "UART 버튼 알림 구독을 시작했습니다."
+            message:
+                AppLocalization.string(
+                    "UART 버튼 알림 구독을 시작했습니다."
+                )
         )
         markReadyIfPossible()
     }
@@ -1923,7 +2066,9 @@ final class RivoRemoteManager:
                     message: connectionErrorMessage(
                         error,
                         fallback:
-                            "Rivo 버튼 알림을 읽지 못했습니다."
+                            AppLocalization.string(
+                                "Rivo 버튼 알림을 읽지 못했습니다."
+                            )
                     )
                 )
             }
@@ -1942,7 +2087,10 @@ final class RivoRemoteManager:
                         .warning,
                         stage: .packets,
                         message:
-                            "해석하지 못한 Rivo 패킷이 \(invalidPacketCount)개입니다."
+                            AppLocalization.format(
+                                "해석하지 못한 Rivo 패킷이 %lld개입니다.",
+                                invalidPacketCount
+                            )
                     )
                 }
                 continue
@@ -1982,8 +2130,10 @@ final class RivoRemoteManager:
         }
         if let error {
             let message =
-                "현재 시간을 보내지 못했습니다: "
-                + error.localizedDescription
+                AppLocalization.format(
+                    "현재 시간을 보내지 못했습니다: %@",
+                    error.localizedDescription
+                )
             timeSyncState = .failed(message)
             recordDiagnostic(
                 .warning,

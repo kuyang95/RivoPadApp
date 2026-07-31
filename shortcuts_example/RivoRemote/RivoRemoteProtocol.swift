@@ -69,13 +69,21 @@ nonisolated enum RivoDiscoverySource:
     var title: String {
         switch self {
         case .serviceUUID:
-            return "서비스 UUID"
+            return AppLocalization.string(
+                "서비스 UUID"
+            )
         case .advertisedName:
-            return "광고 이름"
+            return AppLocalization.string(
+                "광고 이름"
+            )
         case .peripheralName:
-            return "기기 이름"
+            return AppLocalization.string(
+                "기기 이름"
+            )
         case .savedDevice:
-            return "저장된 기기 정보"
+            return AppLocalization.string(
+                "저장된 기기 정보"
+            )
         }
     }
 }
@@ -342,9 +350,9 @@ nonisolated enum RivoButton:
         case .zero:
             return "0"
         case .star:
-            return "별표"
+            return AppLocalization.string("별표")
         case .sharp:
-            return "샵"
+            return AppLocalization.string("샵")
         }
     }
 }
@@ -364,17 +372,25 @@ nonisolated enum RivoButtonAction:
     var title: String {
         switch self {
         case .pressed:
-            return "누름"
+            return AppLocalization.string("누름")
         case .released:
-            return "뗌"
+            return AppLocalization.string("뗌")
         case .longPressed:
-            return "길게 누름"
+            return AppLocalization.string(
+                "길게 누름"
+            )
         case .longPressEnded:
-            return "길게 누름 끝"
+            return AppLocalization.string(
+                "길게 누름 끝"
+            )
         case .doubleTapped:
-            return "두 번 누름"
+            return AppLocalization.string(
+                "두 번 누름"
+            )
         case .doubleTapEnded:
-            return "두 번 누름 끝"
+            return AppLocalization.string(
+                "두 번 누름 끝"
+            )
         }
     }
 }
@@ -390,9 +406,16 @@ nonisolated enum RivoRemoteInput: Equatable, Sendable {
     var summary: String {
         switch self {
         case .button(let button, let action, _):
-            return "\(button.title) \(action.title)"
+            return AppLocalization.format(
+                "%@ %@",
+                button.title,
+                action.title
+            )
         case .sequence(let payload):
-            return "시퀀스 \(payload)"
+            return AppLocalization.format(
+                "시퀀스 %@",
+                payload
+            )
         }
     }
 }

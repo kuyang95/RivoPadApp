@@ -41,6 +41,8 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
   촬영 안내·오류·검토·다중 페이지·VoiceOver 문구
 - VisionLink의 코드 연결·신호·WebRTC·데이터 채널·파일·클립보드,
   원격 OCR·이미지 설명·번역·AI 대화·실시간 읽기·진단과 오류 문구
+- Rivo BLE 검색·자동 재연결·복원·GATT/UART·시간 동기화·연결 진단,
+  버튼 이름·동작과 빠른 메뉴·R1 명령 모드·VoiceOver 안내 문구
 - Xcode `.stringsdata`의 화면별 키와 UIKit용 `AppLocalization` 리터럴
   키를 수집해 영어·일본어 누락, 두 번들의 키·printf 지정자 차이를
   검사하는 `audit_localizations.swift`
@@ -48,7 +50,6 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 ## 다음 번역 묶음
 
 - AI 대화 본문·이미지 질문·음성 입력의 나머지 화면
-- Rivo 연결 관리·진단 화면
 - App Intent의 title, description, parameter와 Siri phrase
 - 기능별 나머지 로컬 진단 로그, 파일명과 오류 문구
 - 영어·일본어 사용 설명서 및 변경 내역 본문
@@ -75,6 +76,8 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
       편집·내보내기, 문장 TTS·줄/페이지 탐색과 16색 이름을 확인한다.
 - [ ] 영어·일본어에서 VisionLink 코드 연결, 연결 상태, 파일·클립보드,
       원격 기능 상태·오류와 신호 진단을 실제 상대 기기로 확인한다.
+- [ ] 영어·일본어에서 Rivo를 검색·연결·재연결하고 시간 동기화, 연결·
+      버튼 진단, 빠른 메뉴와 R1 명령 모드의 화면·음성 안내를 확인한다.
 - [ ] 공유 시트, 선택 텍스트 동작과 홈 위젯의 이름이 앱 언어와 일치한다.
 - [ ] VoiceOver가 번역된 레이블과 동적 Rivo 상태를 자연스럽게 읽는다.
 
