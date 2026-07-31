@@ -725,7 +725,9 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         )
     }
 
-    private func execute<Uniforms>(
+    private func execute<
+        Uniforms: BitwiseCopyable
+    >(
         _ source: ScannerRGBAImage,
         outputWidth: Int,
         outputHeight: Int,
@@ -762,7 +764,9 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         )
     }
 
-    private func executeBuffer<Uniforms>(
+    private func executeBuffer<
+        Uniforms: BitwiseCopyable
+    >(
         _ source: ScannerRGBAImage,
         outputWidth: Int,
         outputHeight: Int,

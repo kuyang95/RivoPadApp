@@ -251,15 +251,33 @@ final class ManualDocumentScannerViewController: UIViewController {
     }
 
     private func updateVideoOrientation() {
-        let orientation: AVCaptureVideoOrientation = .portrait
-        if let c1 = previewLayer.connection, c1.isVideoOrientationSupported {
-            c1.videoOrientation = orientation
+        let portraitRotationAngle: CGFloat = 90
+        if let c1 = previewLayer.connection,
+           c1.isVideoRotationAngleSupported(
+               portraitRotationAngle
+           ) {
+            c1.videoRotationAngle =
+                portraitRotationAngle
         }
-        if let c2 = videoOutput.connection(with: .video), c2.isVideoOrientationSupported {
-            c2.videoOrientation = orientation
+        if let c2 =
+                videoOutput.connection(
+                    with: .video
+                ),
+           c2.isVideoRotationAngleSupported(
+               portraitRotationAngle
+           ) {
+            c2.videoRotationAngle =
+                portraitRotationAngle
         }
-        if let c3 = photoOutput.connection(with: .video), c3.isVideoOrientationSupported {
-            c3.videoOrientation = orientation
+        if let c3 =
+                photoOutput.connection(
+                    with: .video
+                ),
+           c3.isVideoRotationAngleSupported(
+               portraitRotationAngle
+           ) {
+            c3.videoRotationAngle =
+                portraitRotationAngle
         }
     }
 

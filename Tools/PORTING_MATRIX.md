@@ -242,6 +242,8 @@ iPad 앱에서는 동일 구현하지 않으며, 제품 범위와 대체 경로�
     Swift 6 동시성 경고와 이미지 좌표 인덱스 크기 기준 보강 ✅
 54. OCR App Entity의 actor 접근, 음성 질문 화면의 다중 창 너비, 다운로드
     글꼴 등록과 문서 OCR 접근성 컨테이너를 iOS 26 API 기준으로 보강 ✅
+55. 스캐너 카메라 회전 각도 API, 촬영 pixel buffer의 명시적 actor 전달,
+    Metal uniform의 bitwise 메모리 계약을 Swift 6 기준으로 보강 ✅
 
 ## 일괄 실기기 검증 원칙
 

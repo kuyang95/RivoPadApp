@@ -102,6 +102,30 @@ final class LocalDocumentScannerViewController: UIViewController {
         var photoData: Data?
     }
 
+    // AVCapturePhoto supplies a retained still-image pixel buffer. This
+    // wrapper transfers that read-only buffer to the main actor, where it is
+    // retained until the scanner's background processing task consumes it.
+    nonisolated private struct PhotoCapturePayload:
+        @unchecked Sendable
+    {
+        let callbackAt: TimeInterval
+        let pixelBuffer: CVPixelBuffer?
+        let data: Data?
+        let errorDescription: String?
+        let photoSettingsID: Int64
+
+        var hasPhotoData: Bool {
+            pixelBuffer != nil
+                || data != nil
+        }
+
+        var sourceLabel: String {
+            pixelBuffer == nil
+                ? "encodedData"
+                : "pixelBuffer"
+        }
+    }
+
     nonisolated private let configuration = CustomDocumentScannerConfiguration
         .androidParitySeed
     private var stateMachine = DocumentScannerStateMachine()
@@ -2176,45 +2200,63 @@ extension LocalDocumentScannerViewController: AVCapturePhotoCaptureDelegate {
         didFinishProcessingPhoto photo: AVCapturePhoto,
         error: Error?
     ) {
-        let callbackAt = ProcessInfo.processInfo.systemUptime
         let pixelBuffer = error == nil ? photo.pixelBuffer : nil
-        let data = error == nil && pixelBuffer == nil
-            ? photo.fileDataRepresentation()
-            : nil
-        let errorDescription = error?.localizedDescription
-        let photoSettingsID = photo.resolvedSettings.uniqueID
+        let payload = PhotoCapturePayload(
+            callbackAt:
+                ProcessInfo.processInfo
+                    .systemUptime,
+            pixelBuffer: pixelBuffer,
+            data:
+                error == nil
+                    && pixelBuffer == nil
+                ? photo.fileDataRepresentation()
+                : nil,
+            errorDescription:
+                error?.localizedDescription,
+            photoSettingsID:
+                photo.resolvedSettings
+                    .uniqueID
+        )
         Task { @MainActor [weak self] in
             guard let self,
                   let pending = pendingCapture,
-                  pending.photoSettingsID == photoSettingsID else {
+                  pending.photoSettingsID
+                    == payload.photoSettingsID else {
                 return
             }
             diagnostics.logDuration(
                 "shutterToPhotoData",
                 milliseconds: max(
-                    (callbackAt - pending.requestedAt) * 1_000,
+                    (
+                        payload.callbackAt
+                            - pending.requestedAt
+                    ) * 1_000,
                     0
                 ),
                 ticket: pending.ticket,
-                details: "success=\(pixelBuffer != nil || data != nil) "
+                details:
+                    "success="
+                    + "\(payload.hasPhotoData) "
                     + "source="
-                    + (pixelBuffer == nil ? "encodedData" : "pixelBuffer")
+                    + payload.sourceLabel
             )
-            guard pixelBuffer != nil || data != nil else {
+            guard payload.hasPhotoData else {
                 pendingCapture = nil
                 manualFocusTickets.remove(pending.ticket)
                 restoreContinuousFocus()
                 send(.captureFailed(ticket: pending.ticket))
                 setStatus(
-                    errorDescription
+                    payload.errorDescription
                         ?? LocalDocumentScannerError.photoDataUnavailable
                             .localizedDescription,
                     announce: true
                 )
                 return
             }
-            pendingCapture?.photoPixelBuffer = pixelBuffer
-            pendingCapture?.photoData = data
+            pendingCapture?.photoPixelBuffer =
+                payload.pixelBuffer
+            pendingCapture?.photoData =
+                payload.data
             send(.photoCaptured(ticket: pending.ticket))
         }
     }
