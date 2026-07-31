@@ -334,7 +334,9 @@ actor VisionLinkConversationStore {
             .split(whereSeparator: \.isWhitespace)
             .joined(separator: " ")
         guard !normalized.isEmpty else {
-            return "VisionLink 대화"
+            return AppLocalization.string(
+                "VisionLink 대화"
+            )
         }
         let limit = 30
         return normalized.count <= limit
@@ -389,7 +391,9 @@ nonisolated enum VisionLinkConversationStoreError:
     var errorDescription: String? {
         switch self {
         case .contextTooLarge:
-            return "대화에 첨부된 문맥이 256KB를 초과했습니다."
+            return AppLocalization.string(
+                "대화에 첨부된 문맥이 256KB를 초과했습니다."
+            )
         }
     }
 }

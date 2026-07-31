@@ -61,13 +61,21 @@ nonisolated enum VisionLinkRemoteFeature:
         case .ocr:
             return "OCR"
         case .imageAnalysis:
-            return "이미지 설명"
+            return AppLocalization.string(
+                "이미지 설명"
+            )
         case .aiChat:
-            return "AI 대화"
+            return AppLocalization.string(
+                "AI 대화"
+            )
         case .liveReading:
-            return "실시간 읽기"
+            return AppLocalization.string(
+                "실시간 읽기"
+            )
         case .translation:
-            return "번역"
+            return AppLocalization.string(
+                "번역"
+            )
         }
     }
 }
@@ -198,7 +206,9 @@ nonisolated enum VisionLinkFeatureControl {
                 requestID: requestID,
                 feature: feature,
                 message:
-                    "기능 결과가 전송 가능한 크기를 초과했습니다."
+                    AppLocalization.string(
+                        "기능 결과가 전송 가능한 크기를 초과했습니다."
+                    )
             )
         }
         return controlData(
@@ -332,7 +342,9 @@ actor VisionLinkDataReceiver {
             return [
                 .event(
                     .failed(
-                        "VisionLink 데이터 제어 메시지를 읽지 못했습니다."
+                        AppLocalization.string(
+                            "VisionLink 데이터 제어 메시지를 읽지 못했습니다."
+                        )
                     )
                 ),
             ]
@@ -405,7 +417,11 @@ actor VisionLinkDataReceiver {
                 ) else {
             return [
                 .event(
-                    .failed("파일 전송 ID가 비어 있습니다.")
+                    .failed(
+                        AppLocalization.string(
+                            "파일 전송 ID가 비어 있습니다."
+                        )
+                    )
                 ),
             ]
         }
@@ -415,7 +431,9 @@ actor VisionLinkDataReceiver {
               size >= 0,
               size <= Self.maximumFileSize else {
             return transferError(
-                "파일 크기가 올바르지 않습니다.",
+                AppLocalization.string(
+                    "파일 크기가 올바르지 않습니다."
+                ),
                 transferID: transferID
             )
         }
@@ -457,7 +475,9 @@ actor VisionLinkDataReceiver {
                   requestID != nil,
                   declaredKind == "image" else {
                 return transferError(
-                    "지원하지 않는 VisionCraft 기능 요청입니다.",
+                    AppLocalization.string(
+                        "지원하지 않는 VisionCraft 기능 요청입니다."
+                    ),
                     transferID: transferID
                 )
             }
@@ -465,7 +485,9 @@ actor VisionLinkDataReceiver {
                   size <= Self
                     .maximumFeatureImageSize else {
                 return transferError(
-                    "기능 이미지는 25MB 이하만 사용할 수 있습니다.",
+                    AppLocalization.string(
+                        "기능 이미지는 25MB 이하만 사용할 수 있습니다."
+                    ),
                     transferID: transferID
                 )
             }
@@ -519,7 +541,9 @@ actor VisionLinkDataReceiver {
                     size: size
                   ) else {
                 return transferError(
-                    "지원하지 않거나 잘못된 대화 첨부입니다.",
+                    AppLocalization.string(
+                        "지원하지 않거나 잘못된 대화 첨부입니다."
+                    ),
                     transferID: transferID
                 )
             }
@@ -541,7 +565,9 @@ actor VisionLinkDataReceiver {
                         kind: kind
                     ) else {
                 return transferError(
-                    "지원하지 않는 파일 형식입니다.",
+                    AppLocalization.string(
+                        "지원하지 않는 파일 형식입니다."
+                    ),
                     transferID: transferID
                 )
             }
@@ -595,8 +621,10 @@ actor VisionLinkDataReceiver {
                 )
             }
             return transferError(
-                "파일 저장 준비에 실패했습니다: "
-                    + error.localizedDescription,
+                AppLocalization.format(
+                    "파일 저장 준비에 실패했습니다: %@",
+                    error.localizedDescription
+                ),
                 transferID: transferID
             )
         }
@@ -637,7 +665,9 @@ actor VisionLinkDataReceiver {
             abort(transfer)
             activeTransfer = nil
             return transferError(
-                "선언된 파일 크기를 초과한 데이터가 수신되었습니다.",
+                AppLocalization.string(
+                    "선언된 파일 크기를 초과한 데이터가 수신되었습니다."
+                ),
                 transferID: transferID
             )
         }
@@ -654,8 +684,10 @@ actor VisionLinkDataReceiver {
             abort(transfer)
             activeTransfer = nil
             return transferError(
-                "파일 쓰기에 실패했습니다: "
-                    + error.localizedDescription,
+                AppLocalization.format(
+                    "파일 쓰기에 실패했습니다: %@",
+                    error.localizedDescription
+                ),
                 transferID: transferID
             )
         }
@@ -704,7 +736,9 @@ actor VisionLinkDataReceiver {
             return [
                 .event(
                     .failed(
-                        "완료할 파일 전송이 없습니다."
+                        AppLocalization.string(
+                            "완료할 파일 전송이 없습니다."
+                        )
                     )
                 ),
             ]
@@ -715,7 +749,9 @@ actor VisionLinkDataReceiver {
                 ),
               announcedID == transfer.transferID else {
             return transferError(
-                "파일 전송 ID가 일치하지 않습니다.",
+                AppLocalization.string(
+                    "파일 전송 ID가 일치하지 않습니다."
+                ),
                 transferID: Self.nonemptyString(
                     message["transferId"]
                 )
@@ -735,7 +771,9 @@ actor VisionLinkDataReceiver {
             abort(transfer)
             activeTransfer = nil
             return transferError(
-                "파일 검증 정보가 올바르지 않습니다.",
+                AppLocalization.string(
+                    "파일 검증 정보가 올바르지 않습니다."
+                ),
                 transferID: transferID
             )
         }
@@ -748,8 +786,10 @@ actor VisionLinkDataReceiver {
             abort(transfer)
             activeTransfer = nil
             return transferError(
-                "파일 저장 완료 처리에 실패했습니다: "
-                    + error.localizedDescription,
+                AppLocalization.format(
+                    "파일 저장 완료 처리에 실패했습니다: %@",
+                    error.localizedDescription
+                ),
                 transferID: transferID
             )
         }
@@ -759,9 +799,11 @@ actor VisionLinkDataReceiver {
                 == transfer.expectedSize else {
             abort(transfer)
             return transferError(
-                "파일 크기가 다릅니다: "
-                    + "\(transfer.receivedBytes)/"
-                    + "\(transfer.expectedSize) bytes",
+                AppLocalization.format(
+                    "파일 크기가 다릅니다: %lld/%lld bytes",
+                    transfer.receivedBytes,
+                    transfer.expectedSize
+                ),
                 transferID: transfer.transferID
             )
         }
@@ -779,7 +821,9 @@ actor VisionLinkDataReceiver {
                 == announcedHash.lowercased() else {
             abort(transfer)
             return transferError(
-                "파일 SHA-256 검증에 실패했습니다.",
+                AppLocalization.string(
+                    "파일 SHA-256 검증에 실패했습니다."
+                ),
                 transferID: transfer.transferID
             )
         }
@@ -789,7 +833,9 @@ actor VisionLinkDataReceiver {
                 ) else {
             abort(transfer)
             return transferError(
-                "수신한 이미지 형식이 올바르지 않습니다.",
+                AppLocalization.string(
+                    "수신한 이미지 형식이 올바르지 않습니다."
+                ),
                 transferID: transfer.transferID
             )
         }
@@ -817,8 +863,10 @@ actor VisionLinkDataReceiver {
         } catch {
             abort(transfer)
             return transferError(
-                "파일 저장 완료 처리에 실패했습니다: "
-                    + error.localizedDescription,
+                AppLocalization.format(
+                    "파일 저장 완료 처리에 실패했습니다: %@",
+                    error.localizedDescription
+                ),
                 transferID: transfer.transferID
             )
         }
@@ -904,7 +952,11 @@ actor VisionLinkDataReceiver {
         lastProgressPercent = -1
         return [
             .event(
-                .failed("파일 전송이 취소되었습니다.")
+                .failed(
+                    AppLocalization.string(
+                        "파일 전송이 취소되었습니다."
+                    )
+                )
             ),
         ]
     }
@@ -928,14 +980,17 @@ actor VisionLinkDataReceiver {
                             "type": "clipboard-error",
                             "transferId": transferID,
                             "message":
-                                "클립보드 텍스트가 비어 있거나 "
-                                + "128KB를 초과했습니다.",
+                                AppLocalization.string(
+                                    "클립보드 텍스트가 비어 있거나 128KB를 초과했습니다."
+                                ),
                         ]
                     )
                 ),
                 .event(
                     .failed(
-                        "클립보드 텍스트가 128KB를 초과했습니다."
+                        AppLocalization.string(
+                            "클립보드 텍스트가 128KB를 초과했습니다."
+                        )
                     )
                 ),
             ]
@@ -986,7 +1041,9 @@ actor VisionLinkDataReceiver {
                     requestID: requestID,
                     feature: feature,
                     message:
-                        "지원하지 않는 VisionCraft 기능입니다."
+                        AppLocalization.string(
+                            "지원하지 않는 VisionCraft 기능입니다."
+                        )
                 )
             } else {
                 data = Self.controlData(
@@ -995,7 +1052,9 @@ actor VisionLinkDataReceiver {
                         "requestId": requestID,
                         "feature": rawFeature,
                         "message":
-                            "지원하지 않는 VisionCraft 기능입니다.",
+                            AppLocalization.string(
+                                "지원하지 않는 VisionCraft 기능입니다."
+                            ),
                     ]
                 )
             }
@@ -1003,8 +1062,10 @@ actor VisionLinkDataReceiver {
                 .sendControl(data),
                 .event(
                     .failed(
-                        "지원하지 않는 원격 기능 요청입니다: "
-                            + rawFeature
+                        AppLocalization.format(
+                            "지원하지 않는 원격 기능 요청입니다: %@",
+                            rawFeature
+                        )
                     )
                 ),
             ]
@@ -1014,7 +1075,10 @@ actor VisionLinkDataReceiver {
                 .maximumFeatureRequestSize else {
             return featureRequestError(
                 requestID: requestID,
-                message: "번역할 텍스트가 너무 깁니다."
+                message:
+                    AppLocalization.string(
+                        "번역할 텍스트가 너무 깁니다."
+                    )
             )
         }
         let text = (
@@ -1030,8 +1094,9 @@ actor VisionLinkDataReceiver {
             return featureRequestError(
                 requestID: requestID,
                 message:
-                    "번역할 텍스트가 비어 있거나 "
-                    + "32KB를 초과했습니다."
+                    AppLocalization.string(
+                        "번역할 텍스트가 비어 있거나 32KB를 초과했습니다."
+                    )
             )
         }
         return [
@@ -1074,7 +1139,9 @@ actor VisionLinkDataReceiver {
             return chatRequestError(
                 requestID: requestID,
                 message:
-                    "대화 요청이 전송 가능한 크기를 초과했습니다."
+                    AppLocalization.string(
+                        "대화 요청이 전송 가능한 크기를 초과했습니다."
+                    )
             )
         }
         guard let conversationID =
@@ -1091,7 +1158,9 @@ actor VisionLinkDataReceiver {
             return chatRequestError(
                 requestID: requestID,
                 message:
-                    "대화 요청 형식이 올바르지 않습니다."
+                    AppLocalization.string(
+                        "대화 요청 형식이 올바르지 않습니다."
+                    )
             )
         }
 
@@ -1116,7 +1185,9 @@ actor VisionLinkDataReceiver {
                 return chatRequestError(
                     requestID: requestID,
                     message:
-                        "대화 메시지 형식이 올바르지 않습니다."
+                        AppLocalization.string(
+                            "대화 메시지 형식이 올바르지 않습니다."
+                        )
                 )
             }
             messages.append(
@@ -1130,7 +1201,9 @@ actor VisionLinkDataReceiver {
             return chatRequestError(
                 requestID: requestID,
                 message:
-                    "대화 메시지 형식이 올바르지 않습니다."
+                    AppLocalization.string(
+                        "대화 메시지 형식이 올바르지 않습니다."
+                    )
             )
         }
         return [
@@ -1183,7 +1256,9 @@ actor VisionLinkDataReceiver {
             in: .whitespacesAndNewlines
         )
         let name = trimmedName.isEmpty
-            ? "클립보드"
+            ? AppLocalization.string(
+                "클립보드"
+            )
             : String(trimmedName.prefix(120))
         guard let text = message["text"] as? String,
               !text.trimmingCharacters(
@@ -1200,8 +1275,9 @@ actor VisionLinkDataReceiver {
                             conversationID:
                                 conversationID,
                             message:
-                                "클립보드 첨부가 비어 있거나 "
-                                + "64KB를 초과했습니다."
+                                AppLocalization.string(
+                                    "클립보드 첨부가 비어 있거나 64KB를 초과했습니다."
+                                )
                         )
                 ),
             ]
@@ -1566,6 +1642,8 @@ nonisolated private enum VisionLinkDataReceiverError:
     case cannotCreateFile
 
     var errorDescription: String? {
-        "임시 파일을 만들 수 없습니다."
+        AppLocalization.string(
+            "임시 파일을 만들 수 없습니다."
+        )
     }
 }

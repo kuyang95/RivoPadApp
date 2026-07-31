@@ -325,7 +325,9 @@ struct VisionLinkRemoteChatProcessor {
             in: .whitespacesAndNewlines
         )
         return trimmed.isEmpty
-            ? "원격 AI 대화 처리에 실패했습니다."
+            ? AppLocalization.string(
+                "원격 AI 대화 처리에 실패했습니다."
+            )
             : trimmed
     }
 }
@@ -718,13 +720,21 @@ nonisolated enum VisionLinkRemoteChatError:
     var errorDescription: String? {
         switch self {
         case .unsupportedDocument:
-            return "PDF, TXT, XLSX, XLS와 HWP 문서만 원격 대화에 첨부할 수 있습니다."
+            return AppLocalization.string(
+                "PDF, TXT, XLSX, XLS와 HWP 문서만 원격 대화에 첨부할 수 있습니다."
+            )
         case .invalidPDF:
-            return "PDF 문서를 열 수 없습니다."
+            return AppLocalization.string(
+                "PDF 문서를 열 수 없습니다."
+            )
         case .documentHasNoText:
-            return "첨부한 문서에서 텍스트를 읽지 못했습니다."
+            return AppLocalization.string(
+                "첨부한 문서에서 텍스트를 읽지 못했습니다."
+            )
         case .documentTextTooLarge:
-            return "문서에서 추출한 텍스트가 256KB를 초과했습니다."
+            return AppLocalization.string(
+                "문서에서 추출한 텍스트가 256KB를 초과했습니다."
+            )
         }
     }
 }

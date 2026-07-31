@@ -23,27 +23,51 @@ nonisolated enum VisionLinkConnectionState:
     var title: String {
         switch self {
         case .inactive:
-            return "연결 전"
+            return AppLocalization.string(
+                "연결 전"
+            )
         case .creatingSession:
-            return "연결 코드 생성 중"
+            return AppLocalization.string(
+                "연결 코드 생성 중"
+            )
         case .reconnecting(let attempt):
-            return "저장된 기기에 재연결 중 · \(attempt)차"
+            return AppLocalization.format(
+                "저장된 기기에 재연결 중 · %lld차",
+                attempt
+            )
         case .waitingForCompanion:
-            return "VisionLink 기기 대기 중"
+            return AppLocalization.string(
+                "VisionLink 기기 대기 중"
+            )
         case .companionConnected(let name):
-            return "\(name) 신호 연결됨"
+            return AppLocalization.format(
+                "%@ 신호 연결됨",
+                name
+            )
         case .mediaOfferReceived:
-            return "영상 연결 제안 수신"
+            return AppLocalization.string(
+                "영상 연결 제안 수신"
+            )
         case .mediaConnecting:
-            return "영상 연결 중"
+            return AppLocalization.string(
+                "영상 연결 중"
+            )
         case .mediaConnected:
-            return "영상 연결됨 · 첫 화면 대기 중"
+            return AppLocalization.string(
+                "영상 연결됨 · 첫 화면 대기 중"
+            )
         case .videoReceiving:
-            return "원격 영상 수신 중"
+            return AppLocalization.string(
+                "원격 영상 수신 중"
+            )
         case .disconnected:
-            return "연결 끊김"
+            return AppLocalization.string(
+                "연결 끊김"
+            )
         case .codeExpired:
-            return "연결 코드 만료"
+            return AppLocalization.string(
+                "연결 코드 만료"
+            )
         case .failed(let message):
             return message
         }
@@ -468,7 +492,11 @@ final class VisionLinkManager: ObservableObject {
         )
         webSocket = socket
         state = .waitingForCompanion
-        appendEvent("신호 서버 연결 시작")
+        appendEvent(
+            AppLocalization.string(
+                "신호 서버 연결 시작"
+            )
+        )
         socket.resume()
 
         receiveTask = Task { [weak self, socket] in
@@ -513,7 +541,9 @@ final class VisionLinkManager: ObservableObject {
                     handle(event)
                 } catch {
                     appendEvent(
-                        "해석하지 못한 신호 메시지"
+                        AppLocalization.string(
+                            "해석하지 못한 신호 메시지"
+                        )
                     )
                 }
             }
@@ -525,8 +555,10 @@ final class VisionLinkManager: ObservableObject {
             }
             webSocket = nil
             state = .failed(
-                "VisionLink 신호 연결 끊김: "
-                    + Self.userMessage(for: error)
+                AppLocalization.format(
+                    "VisionLink 신호 연결 끊김: %@",
+                    Self.userMessage(for: error)
+                )
             )
         }
     }
@@ -582,8 +614,11 @@ final class VisionLinkManager: ObservableObject {
 
         case .serverError(let code, let message):
             state = .failed(
-                "VisionLink 오류 \(code ?? "unknown"): "
-                    + (message ?? "")
+                AppLocalization.format(
+                    "VisionLink 오류 %@: %@",
+                    code ?? "unknown",
+                    message ?? ""
+                )
             )
 
         case .iceCandidate(let candidate):
@@ -602,7 +637,11 @@ final class VisionLinkManager: ObservableObject {
             return
         }
         state = .videoReceiving
-        appendEvent("원격 영상 첫 화면 표시")
+        appendEvent(
+            AppLocalization.string(
+                "원격 영상 첫 화면 표시"
+            )
+        )
     }
 
     private func confirmPairing() {
@@ -740,11 +779,18 @@ final class VisionLinkManager: ObservableObject {
                 requestID: sessionID,
                 feature: .liveReading,
                 stage: "started",
-                message: "원격 화면 글자 읽는 중",
+                message:
+                    AppLocalization.string(
+                        "원격 화면 글자 읽는 중"
+                    ),
                 isWorking: true
             )
         dataTransferMessage = nil
-        appendEvent("원격 실시간 읽기 시작")
+        appendEvent(
+            AppLocalization.string(
+                "원격 실시간 읽기 시작"
+            )
+        )
         webRTCReceiver
             .requestLiveReadingFrame()
     }
@@ -789,7 +835,9 @@ final class VisionLinkManager: ObservableObject {
                     feature: .liveReading,
                     stage: "stopped",
                     message:
-                        "원격 실시간 읽기 중지",
+                        AppLocalization.string(
+                            "원격 실시간 읽기 중지"
+                        ),
                     isWorking: false
                 )
         } else if remoteFeatureStatus?
@@ -797,8 +845,10 @@ final class VisionLinkManager: ObservableObject {
             remoteFeatureStatus = nil
         }
         appendEvent(
-            "원격 실시간 읽기 중지 · "
-                + reason
+            AppLocalization.format(
+                "원격 실시간 읽기 중지 · %@",
+                reason
+            )
         )
     }
 
@@ -819,7 +869,10 @@ final class VisionLinkManager: ObservableObject {
                 requestID: sessionID,
                 feature: .liveReading,
                 stage: "recognizing",
-                message: "원격 화면 글자 인식 중",
+                message:
+                    AppLocalization.string(
+                        "원격 화면 글자 인식 중"
+                    ),
                 isWorking: true
             )
         liveReadingOCRTask = Task {
@@ -844,10 +897,12 @@ final class VisionLinkManager: ObservableObject {
                             sequence:
                                 liveReadingSequence,
                             text: text
-                        )
+                    )
                     appendEvent(
-                        "실시간 읽기 결과 전송 · "
-                            + "\(text.count)자"
+                        AppLocalization.format(
+                            "실시간 읽기 결과 전송 · %lld자",
+                            text.count
+                        )
                     )
                 }
             } catch is CancellationError {
@@ -931,11 +986,13 @@ final class VisionLinkManager: ObservableObject {
             .sendLiveReadingError(
                 sessionID: sessionID,
                 message: message
-            )
+        )
         dataTransferMessage = message
         appendEvent(
-            "원격 실시간 읽기 오류 · "
-                + message
+            AppLocalization.format(
+                "원격 실시간 읽기 오류 · %@",
+                message
+            )
         )
     }
 
@@ -944,7 +1001,10 @@ final class VisionLinkManager: ObservableObject {
     ) {
         remoteWorkQueue.append(.feature(request))
         appendEvent(
-            "원격 \(request.feature.title) 요청 수신"
+            AppLocalization.format(
+                "원격 %@ 요청 수신",
+                request.feature.title
+            )
         )
         startRemoteFeatureQueueIfNeeded()
     }
@@ -955,16 +1015,24 @@ final class VisionLinkManager: ObservableObject {
         remoteWorkQueue.append(.chat(work))
         switch work {
         case .request:
-            appendEvent("원격 AI 대화 요청 수신")
+            appendEvent(
+                AppLocalization.string(
+                    "원격 AI 대화 요청 수신"
+                )
+            )
         case .context(let attachment):
             appendEvent(
-                "AI 대화 문맥 첨부 수신 · "
-                    + attachment.name
+                AppLocalization.format(
+                    "AI 대화 문맥 첨부 수신 · %@",
+                    attachment.name
+                )
             )
         case .file(let attachment):
             appendEvent(
-                "AI 대화 파일 첨부 수신 · "
-                    + attachment.name
+                AppLocalization.format(
+                    "AI 대화 파일 첨부 수신 · %@",
+                    attachment.name
+                )
             )
         }
         startRemoteFeatureQueueIfNeeded()
@@ -1091,10 +1159,17 @@ final class VisionLinkManager: ObservableObject {
                     requestID: request.requestID,
                     feature: .aiChat,
                     stage: stage,
-                    message: "답변 생각 중",
+                    message:
+                        AppLocalization.string(
+                            "답변 생각 중"
+                        ),
                     isWorking: true
                 )
-            appendEvent("원격 AI 대화 · 답변 생각 중")
+            appendEvent(
+                AppLocalization.string(
+                    "원격 AI 대화 · 답변 생각 중"
+                )
+            )
 
         case .result(let request, let text):
             _ = webRTCReceiver.sendFeatureResult(
@@ -1107,11 +1182,18 @@ final class VisionLinkManager: ObservableObject {
                     requestID: request.requestID,
                     feature: .aiChat,
                     stage: "complete",
-                    message: "AI 대화 완료",
+                    message:
+                        AppLocalization.string(
+                            "AI 대화 완료"
+                        ),
                     isWorking: false
                 )
             dataTransferMessage = nil
-            appendEvent("원격 AI 대화 결과 전송 완료")
+            appendEvent(
+                AppLocalization.string(
+                    "원격 AI 대화 결과 전송 완료"
+                )
+            )
 
         case .failed(let request, let message):
             _ = webRTCReceiver.sendFeatureError(
@@ -1141,12 +1223,19 @@ final class VisionLinkManager: ObservableObject {
                     requestID: attachmentID,
                     feature: .aiChat,
                     stage: "attachment-ready",
-                    message: "\(name) 첨부 완료",
+                    message:
+                        AppLocalization.format(
+                            "%@ 첨부 완료",
+                            name
+                        ),
                     isWorking: false
                 )
             dataTransferMessage = nil
             appendEvent(
-                "AI 대화 첨부 준비 완료 · \(name)"
+                AppLocalization.format(
+                    "AI 대화 첨부 준비 완료 · %@",
+                    name
+                )
             )
 
         case .attachmentFailed(
@@ -1227,7 +1316,10 @@ final class VisionLinkManager: ObservableObject {
             )
         dataTransferMessage = message
         appendEvent(
-            "원격 AI 대화 실패 · " + message
+            AppLocalization.format(
+                "원격 AI 대화 실패 · %@",
+                message
+            )
         )
     }
 
@@ -1255,13 +1347,16 @@ final class VisionLinkManager: ObservableObject {
                             stage: stage
                         ),
                     isWorking: true
-                )
+            )
             appendEvent(
-                "원격 \(feature.title) · "
-                    + Self.featureStageMessage(
+                AppLocalization.format(
+                    "원격 %@ · %@",
+                    feature.title,
+                    Self.featureStageMessage(
                         feature: feature,
                         stage: stage
                     )
+                )
             )
 
         case .result(let text):
@@ -1275,12 +1370,19 @@ final class VisionLinkManager: ObservableObject {
                     requestID: requestID,
                     feature: feature,
                     stage: "complete",
-                    message: "\(feature.title) 완료",
+                    message:
+                        AppLocalization.format(
+                            "%@ 완료",
+                            feature.title
+                        ),
                     isWorking: false
                 )
             dataTransferMessage = nil
             appendEvent(
-                "원격 \(feature.title) 결과 전송 완료"
+                AppLocalization.format(
+                    "원격 %@ 결과 전송 완료",
+                    feature.title
+                )
             )
 
         case .failed(let message):
@@ -1296,11 +1398,14 @@ final class VisionLinkManager: ObservableObject {
                     stage: "error",
                     message: message,
                     isWorking: false
-                )
+            )
             dataTransferMessage = message
             appendEvent(
-                "원격 \(feature.title) 실패 · "
-                    + message
+                AppLocalization.format(
+                    "원격 %@ 실패 · %@",
+                    feature.title,
+                    message
+                )
             )
         }
     }
@@ -1323,7 +1428,10 @@ final class VisionLinkManager: ObservableObject {
         remoteFeatureStatus = nil
         if !queuedFiles.isEmpty {
             appendEvent(
-                "원격 기능 작업 취소 · \(reason)"
+                AppLocalization.format(
+                    "원격 기능 작업 취소 · %@",
+                    reason
+                )
             )
         }
     }
@@ -1334,13 +1442,22 @@ final class VisionLinkManager: ObservableObject {
     ) -> String {
         switch stage {
         case "recognizing":
-            return "글자 인식 중"
+            return AppLocalization.string(
+                "글자 인식 중"
+            )
         case "translating":
-            return "번역 중"
+            return AppLocalization.string(
+                "번역 중"
+            )
         case "analyzing":
-            return "이미지 분석 중"
+            return AppLocalization.string(
+                "이미지 분석 중"
+            )
         default:
-            return "\(feature.title) 처리 중"
+            return AppLocalization.format(
+                "%@ 처리 중",
+                feature.title
+            )
         }
     }
 
@@ -1350,7 +1467,9 @@ final class VisionLinkManager: ObservableObject {
     ) {
         guard let socket = webSocket else {
             state = .failed(
-                "VisionLink 신호 연결이 없어 응답을 보낼 수 없습니다."
+                AppLocalization.string(
+                    "VisionLink 신호 연결이 없어 응답을 보낼 수 없습니다."
+                )
             )
             return
         }
@@ -1369,8 +1488,10 @@ final class VisionLinkManager: ObservableObject {
                     return
                 }
                 self.state = .failed(
-                    "VisionLink 신호 전송 실패: "
-                        + Self.userMessage(for: error)
+                    AppLocalization.format(
+                        "VisionLink 신호 전송 실패: %@",
+                        Self.userMessage(for: error)
+                    )
                 )
             }
         }
@@ -1441,7 +1562,10 @@ extension VisionLinkManager:
         do {
             sendSignaling(
                 try VisionLinkJSON.answerMessage(sdp: sdp),
-                successEvent: "영상 연결 응답 전송"
+                successEvent:
+                    AppLocalization.string(
+                        "영상 연결 응답 전송"
+                    )
             )
         } catch {
             state = .failed(
@@ -1459,7 +1583,10 @@ extension VisionLinkManager:
                 try VisionLinkJSON.iceCandidateMessage(
                     candidate
                 ),
-                successEvent: "로컬 네트워크 후보 전송"
+                successEvent:
+                    AppLocalization.string(
+                        "로컬 네트워크 후보 전송"
+                    )
             )
         } catch {
             state = .failed(
@@ -1474,7 +1601,10 @@ extension VisionLinkManager:
         do {
             sendSignaling(
                 try VisionLinkJSON.iceCandidateMessage(nil),
-                successEvent: "로컬 네트워크 후보 수집 완료"
+                successEvent:
+                    AppLocalization.string(
+                        "로컬 네트워크 후보 수집 완료"
+                    )
             )
         } catch {
             state = .failed(
@@ -1494,16 +1624,30 @@ extension VisionLinkManager:
             if state != .videoReceiving {
                 state = .mediaConnected
             }
-            appendEvent("WebRTC 미디어 연결됨")
+            appendEvent(
+                AppLocalization.string(
+                    "WebRTC 미디어 연결됨"
+                )
+            )
         case .disconnected:
             state = .disconnected
-            appendEvent("WebRTC 미디어 연결 끊김")
+            appendEvent(
+                AppLocalization.string(
+                    "WebRTC 미디어 연결 끊김"
+                )
+            )
         case .failed:
             remoteVideoTrack = nil
             state = .failed(
-                "VisionLink 영상 연결에 실패했습니다."
+                AppLocalization.string(
+                    "VisionLink 영상 연결에 실패했습니다."
+                )
             )
-            appendEvent("WebRTC 미디어 연결 실패")
+            appendEvent(
+                AppLocalization.string(
+                    "WebRTC 미디어 연결 실패"
+                )
+            )
         }
     }
 
@@ -1512,7 +1656,11 @@ extension VisionLinkManager:
         didReceive videoTrack: RTCVideoTrack
     ) {
         remoteVideoTrack = videoTrack
-        appendEvent("원격 비디오 트랙 수신")
+        appendEvent(
+            AppLocalization.string(
+                "원격 비디오 트랙 수신"
+            )
+        )
     }
 
     func webRTCReceiver(
@@ -1526,7 +1674,11 @@ extension VisionLinkManager:
         isDataChannelReady = dataChannelReady
         if dataChannelReady {
             dataTransferMessage = nil
-            appendEvent("VisionLink 데이터 채널 연결됨")
+            appendEvent(
+                AppLocalization.string(
+                    "VisionLink 데이터 채널 연결됨"
+                )
+            )
             startRemoteFeatureQueueIfNeeded()
         } else {
             invalidateRemoteFeatureWork(
@@ -1534,7 +1686,11 @@ extension VisionLinkManager:
             )
             isCameraShareActive = false
             incomingTransfer = nil
-            appendEvent("VisionLink 데이터 채널 연결 끊김")
+            appendEvent(
+                AppLocalization.string(
+                    "VisionLink 데이터 채널 연결 끊김"
+                )
+            )
         }
     }
 
@@ -1553,22 +1709,30 @@ extension VisionLinkManager:
             }
             appendEvent(
                 active
-                    ? "상대 카메라 공유 시작"
-                    : "상대 카메라 공유 종료"
+                    ? AppLocalization.string(
+                        "상대 카메라 공유 시작"
+                    )
+                    : AppLocalization.string(
+                        "상대 카메라 공유 종료"
+                    )
             )
         case .clipboardReceived(let text):
             receivedClipboardText = text
             dataTransferMessage = nil
             appendEvent(
-                "클립보드 텍스트 수신 · "
-                    + "\(text.count)자"
+                AppLocalization.format(
+                    "클립보드 텍스트 수신 · %lld자",
+                    text.count
+                )
             )
         case .transferStarted(let progress):
             incomingTransfer = progress
             dataTransferMessage = nil
             appendEvent(
-                "파일 수신 시작 · "
-                    + progress.fileName
+                AppLocalization.format(
+                    "파일 수신 시작 · %@",
+                    progress.fileName
+                )
             )
         case .transferProgress(let progress):
             incomingTransfer = progress
@@ -1577,8 +1741,10 @@ extension VisionLinkManager:
             lastReceivedFile = file
             dataTransferMessage = nil
             appendEvent(
-                "파일 수신 완료 · "
-                    + file.fileName
+                AppLocalization.format(
+                    "파일 수신 완료 · %@",
+                    file.fileName
+                )
             )
         case .remoteFeatureRequested(let request):
             incomingTransfer = nil
@@ -1648,7 +1814,9 @@ extension VisionLinkManager:
         sendLiveReadingError(
             sessionID: sessionID,
             message: message.isEmpty
-                ? "카메라 화면을 읽지 못했습니다."
+                ? AppLocalization.string(
+                    "카메라 화면을 읽지 못했습니다."
+                )
                 : message
         )
         scheduleNextLiveReadingFrame(

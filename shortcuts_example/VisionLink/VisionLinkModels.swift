@@ -306,30 +306,59 @@ nonisolated enum VisionLinkSignalingEvent:
     var summary: String {
         switch self {
         case .connected:
-            return "신호 서버 연결됨"
+            return AppLocalization.string(
+                "신호 서버 연결됨"
+            )
         case .peerJoined(_, _, _, let peerName):
-            return "\(peerName ?? "VisionLink") 연결됨"
+            return AppLocalization.format(
+                "%@ 연결됨",
+                peerName ?? "VisionLink"
+            )
         case .peerLeft:
-            return "상대 기기 연결 끊김"
+            return AppLocalization.string(
+                "상대 기기 연결 끊김"
+            )
         case .peerWaiting:
-            return "상대 기기 대기 중"
+            return AppLocalization.string(
+                "상대 기기 대기 중"
+            )
         case .pairCreated(_, let cameraName):
-            return "\(cameraName ?? "VisionLink") 페어링 완료"
+            return AppLocalization.format(
+                "%@ 페어링 완료",
+                cameraName ?? "VisionLink"
+            )
         case .pairDeleted:
-            return "페어링 삭제됨"
+            return AppLocalization.string(
+                "페어링 삭제됨"
+            )
         case .offer:
-            return "영상 연결 제안 수신"
+            return AppLocalization.string(
+                "영상 연결 제안 수신"
+            )
         case .answer:
-            return "영상 연결 응답 수신"
+            return AppLocalization.string(
+                "영상 연결 응답 수신"
+            )
         case .iceCandidate:
-            return "네트워크 후보 수신"
+            return AppLocalization.string(
+                "네트워크 후보 수신"
+            )
         case .hangup:
-            return "상대 기기 연결 종료"
+            return AppLocalization.string(
+                "상대 기기 연결 종료"
+            )
         case .serverError(let code, let message):
-            return "서버 오류 \(code ?? "") \(message ?? "")"
+            return AppLocalization.format(
+                "서버 오류 %@ %@",
+                code ?? "",
+                message ?? ""
+            )
                 .trimmingCharacters(in: .whitespaces)
         case .unknown(let type):
-            return "알 수 없는 메시지 \(type ?? "")"
+            return AppLocalization.format(
+                "알 수 없는 메시지 %@",
+                type ?? ""
+            )
                 .trimmingCharacters(in: .whitespaces)
         }
     }
@@ -576,13 +605,21 @@ nonisolated enum VisionLinkProtocolError:
     var errorDescription: String? {
         switch self {
         case .invalidMessage:
-            return "VisionLink 메시지 형식이 올바르지 않습니다."
+            return AppLocalization.string(
+                "VisionLink 메시지 형식이 올바르지 않습니다."
+            )
         case .invalidDescription:
-            return "VisionLink 연결 협상 정보가 올바르지 않습니다."
+            return AppLocalization.string(
+                "VisionLink 연결 협상 정보가 올바르지 않습니다."
+            )
         case .missingReceiverCredentials:
-            return "수신기 자격정보가 응답에 없습니다."
+            return AppLocalization.string(
+                "수신기 자격정보가 응답에 없습니다."
+            )
         case .invalidWebSocketURL:
-            return "VisionLink 신호 서버 주소가 올바르지 않습니다."
+            return AppLocalization.string(
+                "VisionLink 신호 서버 주소가 올바르지 않습니다."
+            )
         }
     }
 }

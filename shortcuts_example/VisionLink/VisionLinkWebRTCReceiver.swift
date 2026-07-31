@@ -209,8 +209,10 @@ final class VisionLinkWebRTCReceiver: NSObject {
                 return
             } catch {
                 self.fail(
-                    "VisionLink 연결 협상 실패: "
-                        + error.localizedDescription
+                    AppLocalization.format(
+                        "VisionLink 연결 협상 실패: %@",
+                        error.localizedDescription
+                    )
                 )
             }
         }
@@ -422,8 +424,10 @@ final class VisionLinkWebRTCReceiver: NSObject {
                 try await peerConnection.add(candidate)
             } catch {
                 fail(
-                    "VisionLink ICE 후보 적용 실패: "
-                        + error.localizedDescription
+                    AppLocalization.format(
+                        "VisionLink ICE 후보 적용 실패: %@",
+                        error.localizedDescription
+                    )
                 )
             }
         }
@@ -488,7 +492,9 @@ final class VisionLinkWebRTCReceiver: NSObject {
         }
         guard let continuation else {
             fail(
-                "VisionLink 데이터 수신기를 만들 수 없습니다."
+                AppLocalization.string(
+                    "VisionLink 데이터 수신기를 만들 수 없습니다."
+                )
             )
             return
         }
@@ -780,6 +786,8 @@ nonisolated enum VisionLinkWebRTCError:
     case peerConnectionCreationFailed
 
     var errorDescription: String? {
-        "VisionLink 미디어 연결을 만들 수 없습니다."
+        AppLocalization.string(
+            "VisionLink 미디어 연결을 만들 수 없습니다."
+        )
     }
 }

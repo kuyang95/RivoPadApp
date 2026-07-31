@@ -30,7 +30,9 @@ nonisolated enum VisionLinkLiveReadingControl {
             return error(
                 sessionID: sessionID,
                 message:
-                    "인식한 글이 전송 가능한 크기를 초과했습니다."
+                    AppLocalization.string(
+                        "인식한 글이 전송 가능한 크기를 초과했습니다."
+                    )
             )
         }
         return controlData(

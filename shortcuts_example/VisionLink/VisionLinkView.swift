@@ -46,8 +46,9 @@ struct VisionLinkView: View {
             Button("취소", role: .cancel) {}
         } message: {
             Text(
-                "상대 기기와 서버에 저장된 연결 정보가 "
-                    + "삭제됩니다."
+                AppLocalization.string(
+                    "상대 기기와 서버에 저장된 연결 정보가 삭제됩니다."
+                )
             )
         }
     }
@@ -101,8 +102,10 @@ struct VisionLinkView: View {
                         spacing: 3
                     ) {
                         Text(
-                            "원격 "
-                                + status.feature.title
+                            AppLocalization.format(
+                                "원격 %@",
+                                status.feature.title
+                            )
                         )
                         .font(.headline)
                         Text(status.message)
@@ -205,7 +208,13 @@ struct VisionLinkView: View {
                 ) {
                     Text("받은 클립보드 텍스트")
                         .font(.headline)
-                    Text(text.isEmpty ? "(빈 텍스트)" : text)
+                    Text(
+                        text.isEmpty
+                            ? AppLocalization.string(
+                                "(빈 텍스트)"
+                            )
+                            : text
+                    )
                         .lineLimit(6)
                         .textSelection(.enabled)
                         .frame(
@@ -323,9 +332,11 @@ struct VisionLinkView: View {
                     .tracking(10)
                     .minimumScaleFactor(0.6)
                     .accessibilityLabel(
-                        "연결 코드 "
-                            + code.map(String.init)
+                        AppLocalization.format(
+                            "연결 코드 %@",
+                            code.map(String.init)
                                 .joined(separator: " ")
+                        )
                     )
 
                 if let seconds = manager.remainingSeconds {
@@ -425,8 +436,9 @@ struct VisionLinkView: View {
                     "아직 신호 이벤트가 없습니다",
                     systemImage: "wave.3.right",
                     description: Text(
-                        "서버나 상대 기기에서 메시지가 오면 "
-                            + "여기에 표시됩니다."
+                        AppLocalization.string(
+                            "서버나 상대 기기에서 메시지가 오면 여기에 표시됩니다."
+                        )
                     )
                 )
             } else {

@@ -115,10 +115,18 @@ nonisolated enum VisionLinkCredentialError:
             let systemMessage = SecCopyErrorMessageString(
                 status,
                 nil
-            ) as String? ?? "상태 \(status)"
-            return "VisionLink 보안 저장소 오류: \(systemMessage)"
+            ) as String? ?? AppLocalization.format(
+                "상태 %lld",
+                Int(status)
+            )
+            return AppLocalization.format(
+                "VisionLink 보안 저장소 오류: %@",
+                systemMessage
+            )
         case .corruptData:
-            return "저장된 VisionLink 연결 정보가 손상되었습니다."
+            return AppLocalization.string(
+                "저장된 VisionLink 연결 정보가 손상되었습니다."
+            )
         }
     }
 }

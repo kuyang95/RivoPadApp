@@ -154,6 +154,8 @@ nonisolated enum
     case conversionFailed
 
     var errorDescription: String? {
-        "카메라 화면을 읽을 이미지로 변환하지 못했습니다."
+        AppLocalization.string(
+            "카메라 화면을 읽을 이미지로 변환하지 못했습니다."
+        )
     }
 }

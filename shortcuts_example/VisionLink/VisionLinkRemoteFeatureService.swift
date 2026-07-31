@@ -125,7 +125,9 @@ struct VisionLinkRemoteFeatureProcessor {
             in: .whitespacesAndNewlines
         )
         return trimmed.isEmpty
-            ? "로컬 기능 처리에 실패했습니다."
+            ? AppLocalization.string(
+                "로컬 기능 처리에 실패했습니다."
+            )
             : trimmed
     }
 }
@@ -359,17 +361,29 @@ nonisolated enum VisionLinkRemoteFeatureError:
     var errorDescription: String? {
         switch self {
         case .invalidImage:
-            return "이미지를 읽을 수 없습니다."
+            return AppLocalization.string(
+                "이미지를 읽을 수 없습니다."
+            )
         case .noTextToTranslate:
-            return "번역할 텍스트가 없습니다."
+            return AppLocalization.string(
+                "번역할 텍스트가 없습니다."
+            )
         case .localAIBusy:
-            return "로컬 AI가 다른 작업을 처리 중입니다. 잠시 후 다시 시도해 주세요."
+            return AppLocalization.string(
+                "로컬 AI가 다른 작업을 처리 중입니다. 잠시 후 다시 시도해 주세요."
+            )
         case .emptyResult:
-            return "로컬 AI가 결과를 만들지 못했습니다."
+            return AppLocalization.string(
+                "로컬 AI가 결과를 만들지 못했습니다."
+            )
         case .resultTooLarge:
-            return "기능 결과가 전송 가능한 크기를 초과했습니다."
+            return AppLocalization.string(
+                "기능 결과가 전송 가능한 크기를 초과했습니다."
+            )
         case .unsupportedRequest:
-            return "지원하지 않는 원격 기능 요청입니다."
+            return AppLocalization.string(
+                "지원하지 않는 원격 기능 요청입니다."
+            )
         }
     }
 }

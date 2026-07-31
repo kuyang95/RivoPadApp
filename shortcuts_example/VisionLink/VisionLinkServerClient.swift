@@ -164,16 +164,24 @@ nonisolated enum VisionLinkServerError:
     var errorDescription: String? {
         switch self {
         case .invalidResponse:
-            return "VisionLink 서버 응답을 확인할 수 없습니다."
+            return AppLocalization.string(
+                "VisionLink 서버 응답을 확인할 수 없습니다."
+            )
         case .http(let statusCode, let responseBody):
             let detail = responseBody.trimmingCharacters(
                 in: .whitespacesAndNewlines
             )
             if detail.isEmpty {
-                return "VisionLink 서버 오류 \(statusCode)"
+                return AppLocalization.format(
+                    "VisionLink 서버 오류 %lld",
+                    statusCode
+                )
             }
-            return "VisionLink 서버 오류 \(statusCode): "
-                + String(detail.prefix(160))
+            return AppLocalization.format(
+                "VisionLink 서버 오류 %lld: %@",
+                statusCode,
+                String(detail.prefix(160))
+            )
         }
     }
 }

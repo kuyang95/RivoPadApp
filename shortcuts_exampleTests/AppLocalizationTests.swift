@@ -626,6 +626,95 @@ final class AppLocalizationTests:
         )
     }
 
+    func testVisionLinkDynamicStringsFollowInAppLanguage()
+    {
+        let defaults = UserDefaults.standard
+        let previous =
+            defaults.string(
+                forKey:
+                    AppLanguage
+                    .preferenceKey
+            )
+        defer {
+            if let previous {
+                defaults.set(
+                    previous,
+                    forKey:
+                        AppLanguage
+                        .preferenceKey
+                )
+            } else {
+                defaults.removeObject(
+                    forKey:
+                        AppLanguage
+                        .preferenceKey
+                )
+            }
+        }
+
+        defaults.set(
+            AppLanguage.english.rawValue,
+            forKey:
+                AppLanguage.preferenceKey
+        )
+        XCTAssertEqual(
+            VisionLinkConnectionState
+                .reconnecting(attempt: 2)
+                .title,
+            "Reconnecting to saved device · Attempt 2"
+        )
+        XCTAssertEqual(
+            VisionLinkRemoteFeature
+                .imageAnalysis.title,
+            "Describe Image"
+        )
+        XCTAssertEqual(
+            VisionLinkProtocolError
+                .invalidDescription
+                .localizedDescription,
+            "The VisionLink connection negotiation information is invalid."
+        )
+        XCTAssertEqual(
+            VisionLinkServerError
+                .http(
+                    statusCode: 503,
+                    responseBody: ""
+                )
+                .localizedDescription,
+            "VisionLink server error 503"
+        )
+
+        defaults.set(
+            AppLanguage.japanese.rawValue,
+            forKey:
+                AppLanguage.preferenceKey
+        )
+        XCTAssertEqual(
+            VisionLinkConnectionState
+                .mediaConnected.title,
+            "映像に接続済み・最初のフレームを待機中"
+        )
+        XCTAssertEqual(
+            VisionLinkRemoteFeature
+                .liveReading.title,
+            "リアルタイム読み上げ"
+        )
+        XCTAssertEqual(
+            VisionLinkRemoteChatError
+                .documentHasNoText
+                .localizedDescription,
+            "添付した文書からテキストを読み取れませんでした。"
+        )
+        XCTAssertEqual(
+            AppLocalization.format(
+                "파일 크기가 다릅니다: %lld/%lld bytes",
+                8,
+                10
+            ),
+            "ファイルサイズが一致しません：8/10 bytes"
+        )
+    }
+
     private func localizedBundle(
         language: String
     ) throws -> Bundle {
