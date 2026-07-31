@@ -523,6 +523,22 @@ final class AppLocalizationTests:
                 .localizedDescription,
             "No text was found."
         )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "확대, 토치, 색상 필터로 가까운 대상을 봅니다."
+            ),
+            "View nearby objects with magnification, the torch, and color filters."
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "문서 모서리를 찾고 촬영해 텍스트를 읽습니다."
+            ),
+            "Find document edges, capture the page, and read its text."
+        )
+        XCTAssertEqual(
+            AppLocalization.string("박스"),
+            "Boxes"
+        )
 
         defaults.set(
             AppLanguage.japanese.rawValue,
@@ -551,6 +567,22 @@ final class AppLocalizationTests:
                 .ExtractError.cgImageMissing
                 .localizedDescription,
             "画像をCGImageに変換できませんでした。"
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "카메라에 보이는 글자를 찾아 자동으로 읽습니다."
+            ),
+            "カメラに映る文字を見つけて自動的に読み上げます。"
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "사진을 촬영하고 M4 로컬 AI가 보이는 장면을 설명합니다."
+            ),
+            "写真を撮影し、M4のオンデバイスAIが見えている場面を説明します。"
+        )
+        XCTAssertEqual(
+            AppLocalization.string("박스"),
+            "枠"
         )
     }
 

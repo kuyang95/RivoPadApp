@@ -643,6 +643,11 @@
 "EPUB에서 읽을 수 있는 본문을 찾지 못했습니다." = "No readable text was found in the EPUB.";
 
 /* Camera, live OCR, and local document scanner */
+"확대, 토치, 색상 필터로 가까운 대상을 봅니다." = "View nearby objects with magnification, the torch, and color filters.";
+"카메라에 보이는 글자를 찾아 자동으로 읽습니다." = "Find text visible to the camera and read it automatically.";
+"사진을 촬영하고 M4 로컬 AI가 보이는 장면을 설명합니다." = "Take a photo and have the M4 on-device AI describe the scene.";
+"문서 모서리를 찾고 촬영해 텍스트를 읽습니다." = "Find document edges, capture the page, and read its text.";
+"박스" = "Boxes";
 "실시간 카메라 돋보기를 엽니다." = "Open the live camera magnifier.";
 "카메라 실시간 OCR과 자동 음성 읽기를 시작합니다." = "Start live camera OCR with automatic speech.";
 "카메라로 촬영한 이미지를 기기 안에서 분석합니다." = "Analyze a camera image on this device.";
