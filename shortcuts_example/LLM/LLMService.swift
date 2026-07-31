@@ -228,7 +228,12 @@ final class LLMService: ObservableObject {
                 throw NSError(
                     domain: "LLMService",
                     code: -1,
-                    userInfo: [NSLocalizedDescriptionKey: "잘못된 모델 타입입니다."]
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            AppLocalization.string(
+                                "잘못된 모델 타입입니다."
+                            ),
+                    ]
                 )
             }
 

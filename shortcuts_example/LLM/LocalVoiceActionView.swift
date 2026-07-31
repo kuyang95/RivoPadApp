@@ -9,7 +9,10 @@ struct LocalVoiceActionView: View {
     let onFileImport: () -> Void
     let onClose: () -> Void
 
-    @State private var status = "말씀해 주세요."
+    @State private var status =
+        AppLocalization.string(
+            "말씀해 주세요."
+        )
     @State private var errorDescription: String?
     @State private var listeningTask:
         Task<Void, Never>?
@@ -108,7 +111,9 @@ struct LocalVoiceActionView: View {
             return
         }
         errorDescription = nil
-        status = "말씀해 주세요."
+        status = AppLocalization.string(
+            "말씀해 주세요."
+        )
         TTSManager.shared.stop()
         SoundEffectManager.shared.play(.recording)
 
@@ -128,7 +133,9 @@ struct LocalVoiceActionView: View {
                 if !didFinish,
                    errorDescription == nil {
                     errorDescription =
-                        "음성을 인식하지 못했습니다. 다시 시도해 주세요."
+                        AppLocalization.string(
+                            "음성을 인식하지 못했습니다. 다시 시도해 주세요."
+                        )
                 }
             } catch is CancellationError {
                 return
@@ -145,7 +152,9 @@ struct LocalVoiceActionView: View {
                     transcription
                 ) else {
             errorDescription =
-                "음성을 인식하지 못했습니다. 다시 시도해 주세요."
+                AppLocalization.string(
+                    "음성을 인식하지 못했습니다. 다시 시도해 주세요."
+                )
             return
         }
         didFinish = true
@@ -155,57 +164,87 @@ struct LocalVoiceActionView: View {
         case .readVisibleText:
             route(
                 .liveTextReader,
-                announcement: "실시간 텍스트 읽기를 엽니다."
+                announcement:
+                    AppLocalization.string(
+                        "실시간 텍스트 읽기를 엽니다."
+                    )
             )
         case .describeScene:
             route(
                 .magnifier,
                 announcement:
-                    "카메라를 엽니다. 대상을 촬영해 설명할 수 있습니다."
+                    AppLocalization.string(
+                        "카메라를 엽니다. 대상을 촬영해 설명할 수 있습니다."
+                    )
             )
         case .capture:
             route(
                 .magnifier,
-                announcement: "카메라를 엽니다."
+                announcement:
+                    AppLocalization.string(
+                        "카메라를 엽니다."
+                    )
             )
         case .openAIChat:
             route(
                 .localChat(conversationID: nil),
-                announcement: "새 로컬 AI 대화를 엽니다."
+                announcement:
+                    AppLocalization.string(
+                        "새 로컬 AI 대화를 엽니다."
+                    )
             )
         case .openChatHistory:
             route(
                 .chatHistory,
-                announcement: "AI 대화 기록을 엽니다."
+                announcement:
+                    AppLocalization.string(
+                        "AI 대화 기록을 엽니다."
+                    )
             )
         case .openAIDocument:
             announce(
-                "질문할 PDF 또는 텍스트 문서를 선택해 주세요."
+                AppLocalization.string(
+                    "질문할 PDF 또는 텍스트 문서를 선택해 주세요."
+                )
             )
             onFileImport()
         case .openReader:
             route(
                 .readerLibrary,
-                announcement: "독서 보관함을 엽니다."
+                announcement:
+                    AppLocalization.string(
+                        "독서 보관함을 엽니다."
+                    )
             )
         case .openDocumentScanner:
             route(
                 .documentScanning,
-                announcement: "문서 스캐너를 엽니다."
+                announcement:
+                    AppLocalization.string(
+                        "문서 스캐너를 엽니다."
+                    )
             )
         case .openMagnifier:
             route(
                 .magnifier,
-                announcement: "카메라 돋보기를 엽니다."
+                announcement:
+                    AppLocalization.string(
+                        "카메라 돋보기를 엽니다."
+                    )
             )
         case .openCamera:
             route(
                 .magnifier,
-                announcement: "카메라를 엽니다."
+                announcement:
+                    AppLocalization.string(
+                        "카메라를 엽니다."
+                    )
             )
         case .openTextDocument:
             announce(
-                "열 PDF 또는 텍스트 문서를 선택해 주세요."
+                AppLocalization.string(
+                    "열 PDF 또는 텍스트 문서를 선택해 주세요."
+                )
             )
             onFileImport()
         case .translate(let source):
@@ -217,11 +256,15 @@ struct LocalVoiceActionView: View {
                             : source
                 ),
                 announcement:
-                    "로컬 번역 화면을 엽니다."
+                    AppLocalization.string(
+                        "로컬 번역 화면을 엽니다."
+                    )
             )
         case .introduce:
             status =
-                "저는 iPad에서 로컬로 동작하는 VisionCraft 도우미입니다."
+                AppLocalization.string(
+                    "저는 iPad에서 로컬로 동작하는 VisionCraft 도우미입니다."
+                )
             announce(status)
         case .webSearch(let question):
             route(
@@ -232,12 +275,17 @@ struct LocalVoiceActionView: View {
                     speaksAnswer: true
                 ),
                 announcement:
-                    "온라인에서 출처를 찾고 M4 로컬 AI가 답변합니다."
+                    AppLocalization.string(
+                        "온라인에서 출처를 찾고 M4 로컬 AI가 답변합니다."
+                    )
             )
         case .question(let question):
             route(
                 .voiceQuestion(question: question),
-                announcement: "로컬 AI가 답변합니다."
+                announcement:
+                    AppLocalization.string(
+                        "로컬 AI가 답변합니다."
+                    )
             )
         }
     }

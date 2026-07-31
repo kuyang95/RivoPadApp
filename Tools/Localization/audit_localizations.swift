@@ -270,7 +270,7 @@ private func appLocalizationLiteralKeys(
     let expression =
         try NSRegularExpression(
             pattern:
-                #"AppLocalization\.(?:string|format)\s*\(\s*"((?:\\.|[^"\\])*)""#
+                #"AppLocalization\s*\.\s*(?:string|format)\s*\(\s*"((?:\\.|[^"\\])*)""#
         )
     var result: Set<String> = []
     for case let url as URL in enumerator {

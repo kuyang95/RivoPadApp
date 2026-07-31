@@ -178,18 +178,27 @@ struct VoiceQueryResponseView: View {
     
   
     
-    let systemPromptLLM = """
-    너는 한국어로 간결하게 답하는 도우미야.
-    유저가 "Document:" 뒤에 제공하는 내용은 참고할 내용이고,
-    "Question:" 뒤의 질문에 참고 내용을 근거로 답해.
-    참고에 없는 내용은 추측하지 말고 모른다고 말해.
-    """
+    private var systemPromptLLM: String {
+        """
+        너는 \(responseLanguageName)로 간결하게 답하는 도우미야.
+        유저가 "Document:" 뒤에 제공하는 내용은 참고할 내용이고,
+        "Question:" 뒤의 질문에 참고 내용을 근거로 답해.
+        참고에 없는 내용은 추측하지 말고 모른다고 말해.
+        """
+    }
     
-    let systemPromptVLM = """
-    너는 이미지와 질문을 함께 분석하는 한국어 도우미야.
-    이미지에 보이는 정보와 사용자의 질문을 기반으로 간결하게 답해.
-    확실하지 않으면 추측하지 말고 모른다고 말해.
-    """
+    private var systemPromptVLM: String {
+        """
+        너는 이미지와 질문을 함께 분석하는 \(responseLanguageName) 도우미야.
+        이미지에 보이는 정보와 사용자의 질문을 기반으로 간결하게 답해.
+        확실하지 않으면 추측하지 말고 모른다고 말해.
+        """
+    }
+
+    private var responseLanguageName: String {
+        AppLanguage.current()
+            .localAIResponseLanguageName
+    }
     
     var body: some View {
         
@@ -273,7 +282,10 @@ struct VoiceQueryResponseView: View {
                         // 🔹 이미지 수신
                         messages.append(
                             Message(
-                                text: "이미지 수신",
+                                text:
+                                    AppLocalization.string(
+                                        "이미지 수신"
+                                    ),
                                 image: nil,
                                 isMe: false
                             )
@@ -286,7 +298,10 @@ struct VoiceQueryResponseView: View {
                         // 🔹 문서 수신
                         messages.append(
                             Message(
-                                text: "문서 수신",
+                                text:
+                                    AppLocalization.string(
+                                        "문서 수신"
+                                    ),
                                 image: nil,
                                 isMe: false
                             )
@@ -306,7 +321,10 @@ struct VoiceQueryResponseView: View {
 
                         messages.append(
                             Message(
-                                text: "이미지 수신",
+                                text:
+                                    AppLocalization.string(
+                                        "이미지 수신"
+                                    ),
                                 image: nil,
                                 isMe: false
                             )
@@ -320,7 +338,10 @@ struct VoiceQueryResponseView: View {
 
                         messages.append(
                             Message(
-                                text: "이미지 해석 실패",
+                                text:
+                                    AppLocalization.string(
+                                        "이미지 해석 실패"
+                                    ),
                                 image: nil,
                                 isMe: false
                             )
@@ -339,7 +360,10 @@ struct VoiceQueryResponseView: View {
         
         messages.append(
             Message(
-                text: "문서 수신",
+                text:
+                    AppLocalization.string(
+                        "문서 수신"
+                    ),
                 image: nil,
                 isMe: false
             )
@@ -402,7 +426,10 @@ struct VoiceQueryResponseView: View {
          
         messages.append(
             Message(
-                text: "모델 로딩중",
+                text:
+                    AppLocalization.string(
+                        "모델 로딩중"
+                    ),
                 image: nil,
                 isMe: false
             )
@@ -428,7 +455,10 @@ struct VoiceQueryResponseView: View {
 
                     messages.append(
                         Message(
-                            text: "모델 준비됨",
+                            text:
+                                AppLocalization.string(
+                                    "모델 준비됨"
+                                ),
                             image: nil,
                             isMe: false
                         )
@@ -442,6 +472,20 @@ struct VoiceQueryResponseView: View {
             } catch {
 
                 print("VLM 오류:", error)
+                await MainActor.run {
+                    messages.append(
+                        Message(
+                            text:
+                                AppLocalization.format(
+                                    "모델 로드 실패: %@",
+                                    error
+                                        .localizedDescription
+                                ),
+                            image: nil,
+                            isMe: false
+                        )
+                    )
+                }
             }
 
             await sttTask
@@ -458,7 +502,10 @@ struct VoiceQueryResponseView: View {
         
         messages.append(
             Message(
-                text: "모델 로딩중",
+                text:
+                    AppLocalization.string(
+                        "모델 로딩중"
+                    ),
                 image: nil,
                 isMe: false
             )
@@ -483,7 +530,10 @@ struct VoiceQueryResponseView: View {
 
                     messages.append(
                         Message(
-                            text: "모델 준비됨",
+                            text:
+                                AppLocalization.string(
+                                    "모델 준비됨"
+                                ),
                             image: nil,
                             isMe: false
                         )
@@ -496,6 +546,20 @@ struct VoiceQueryResponseView: View {
 
             } catch {
                 print("LLM 오류:", error)
+                await MainActor.run {
+                    messages.append(
+                        Message(
+                            text:
+                                AppLocalization.format(
+                                    "모델 로드 실패: %@",
+                                    error
+                                        .localizedDescription
+                                ),
+                            image: nil,
+                            isMe: false
+                        )
+                    )
+                }
             }
 
             await sttTask
@@ -533,6 +597,20 @@ struct VoiceQueryResponseView: View {
         } catch {
 
             print("STT 오류:", error)
+            await MainActor.run {
+                messages.append(
+                    Message(
+                        text:
+                            AppLocalization.format(
+                                "음성 인식 실패: %@",
+                                error
+                                    .localizedDescription
+                            ),
+                        image: nil,
+                        isMe: false
+                    )
+                )
+            }
         }
     }
     
@@ -549,14 +627,25 @@ struct VoiceQueryResponseView: View {
 
             guard let ciImage = CIImage(image: image) else { return }
 
-            let stream = try? await service.streamVision(
-                conversationID: conversationID,
-                system: systemPromptVLM,
-                prompt: question,
-                images: [ciImage]
-            )
-
-            await streamAssistantResponseFiltered(stream)
+            do {
+                let stream =
+                    try await service
+                    .streamVision(
+                        conversationID:
+                            conversationID,
+                        system:
+                            systemPromptVLM,
+                        prompt: question,
+                        images: [ciImage]
+                    )
+                await streamAssistantResponseFiltered(
+                    stream
+                )
+            } catch {
+                await showGenerationFailure(
+                    error
+                )
+            }
 
         } else if let doc = pendingDocument {
 
@@ -568,32 +657,64 @@ struct VoiceQueryResponseView: View {
             \(question)
             """
 
-            let stream = try? await service.streamText(
-                conversationID: conversationID,
-                system: systemPromptLLM,
-                prompt: prompt
-            )
+            do {
+                let stream =
+                    try await service
+                    .streamText(
+                        conversationID:
+                            conversationID,
+                        system:
+                            systemPromptLLM,
+                        prompt: prompt
+                    )
+                await streamAssistantResponseFiltered(
+                    stream
+                )
+            } catch {
+                await showGenerationFailure(
+                    error
+                )
+            }
+        }
+    }
 
-            await streamAssistantResponseFiltered(stream)
+    private func showGenerationFailure(
+        _ error: Error
+    ) async {
+        await MainActor.run {
+            messages.append(
+                Message(
+                    text:
+                        AppLocalization.format(
+                            "답변 생성 실패: %@",
+                            error
+                                .localizedDescription
+                        ),
+                    image: nil,
+                    isMe: false
+                )
+            )
         }
     }
     
     private func streamAssistantResponseFiltered(
-        _ stream: AsyncThrowingStream<String, Error>?
+        _ stream: AsyncThrowingStream<String, Error>
     ) async {
 
-        guard let stream else { return }
-
         await MainActor.run {
+            let generating =
+                AppLocalization.string(
+                    "답변 생성중"
+                )
             messages.append(
                 Message(
-                    text: "답변 생성중",
+                    text: generating,
                     image: nil,
                     isMe: false
                 )
             )
             soundEffectManager.play(.startingLLM)
-            tts.speakFeedback("답변 생성중")
+            tts.speakFeedback(generating)
 
             messages.append(
                 Message(
@@ -634,7 +755,10 @@ struct VoiceQueryResponseView: View {
             finalText += thinkFilter.finish()
             await MainActor.run {
                 messages[answerIndex].text =
-                    finalText + "\n\n(스트림 오류)"
+                    finalText
+                    + AppLocalization.string(
+                        "\n\n(스트림 오류)"
+                    )
             }
 
             print("LLM stream error:", error)

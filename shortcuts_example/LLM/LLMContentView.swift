@@ -176,7 +176,12 @@ struct LLMContentView: View {
                         .foregroundStyle(.red)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 12)
-                        .accessibilityLabel("오류: \(error)")
+                        .accessibilityLabel(
+                            AppLocalization.format(
+                                "오류: %@",
+                                error
+                            )
+                        )
                 } else if stt.isRecording {
                     Text("듣는 중… 마이크 버튼을 다시 누르면 종료됩니다.")
                         .font(.footnote)
@@ -207,7 +212,12 @@ struct LLMContentView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 12)
                         .accessibilityLabel(
-                            "AI 상태: \(vm.attachmentStatusDescription ?? vm.status)"
+                            AppLocalization.format(
+                                "AI 상태: %@",
+                                vm
+                                    .attachmentStatusDescription
+                                    ?? vm.status
+                            )
                         )
                 }
 
@@ -453,7 +463,10 @@ struct LLMContentView: View {
                 return
             }
             shouldSpeakNextResponse = false
-            guard vm.status == "완료",
+            guard vm.status
+                    == AppLocalization.string(
+                        "완료"
+                    ),
                   let response = vm.messages.last(where: {
                       $0.role == "assistant"
                           && !$0.text.trimmingCharacters(
@@ -641,18 +654,30 @@ struct LLMContentView: View {
         switch intent {
         case .textChat,
              .voiceQuestion:
-            return "로컬 AI"
+            return AppLocalization.string(
+                "로컬 AI"
+            )
         case .sharedTextQuestion:
-            return "공유 텍스트 질문"
+            return AppLocalization.string(
+                "공유 텍스트 질문"
+            )
         case .imageAnalysis,
              .capturedImageAnalysis:
-            return "이미지 질문"
+            return AppLocalization.string(
+                "이미지 질문"
+            )
         case .documentQA:
-            return "문서 질문"
+            return AppLocalization.string(
+                "문서 질문"
+            )
         case .webPageQA:
-            return "웹페이지 질문"
+            return AppLocalization.string(
+                "웹페이지 질문"
+            )
         case .webSearchQA:
-            return "웹 검색 답변"
+            return AppLocalization.string(
+                "웹 검색 답변"
+            )
         }
     }
 
@@ -820,7 +845,11 @@ struct LLMContentView: View {
                     ) {
                         HStack {
                             Text(
-                                "[\(result.id)] \(result.title)"
+                                AppLocalization.format(
+                                    "[%lld] %@",
+                                    result.id,
+                                    result.title
+                                )
                             )
                             .lineLimit(2)
                             .multilineTextAlignment(
@@ -899,7 +928,9 @@ struct LLMContentView: View {
                 )
             }
             .accessibilityLabel(
-                "Safari에서 원문 열기"
+                AppLocalization.string(
+                    "Safari에서 원문 열기"
+                )
             )
         }
         .padding(.horizontal, 12)
@@ -911,7 +942,11 @@ struct LLMContentView: View {
             children: .combine
         )
         .accessibilityLabel(
-            "출처: \(content.title), \(content.sourceURL.absoluteString)"
+            AppLocalization.format(
+                "출처: %@, %@",
+                content.title,
+                content.sourceURL.absoluteString
+            )
         )
     }
 
@@ -941,7 +976,9 @@ struct LLMContentView: View {
                     )
                     guard !question.isEmpty else {
                         voiceErrorDescription =
-                            "음성을 인식하지 못했습니다. 다시 시도해 주세요."
+                            AppLocalization.string(
+                                "음성을 인식하지 못했습니다. 다시 시도해 주세요."
+                            )
                         continue
                     }
 
@@ -997,7 +1034,10 @@ struct LLMContentView: View {
             voiceErrorDescription = nil
             UIAccessibility.post(
                 notification: .announcement,
-                argument: "음성 입력 취소"
+                argument:
+                    AppLocalization.string(
+                        "음성 입력 취소"
+                    )
             )
         } else {
             let didStart = startVoiceInput()
@@ -1005,8 +1045,12 @@ struct LLMContentView: View {
                 notification: .announcement,
                 argument:
                     didStart
-                        ? "음성 입력 시작"
-                        : "AI가 준비되거나 답변을 마친 뒤 다시 시도해 주세요."
+                        ? AppLocalization.string(
+                            "음성 입력 시작"
+                        )
+                        : AppLocalization.string(
+                            "AI가 준비되거나 답변을 마친 뒤 다시 시도해 주세요."
+                        )
             )
         }
     }
@@ -1121,7 +1165,11 @@ private struct MessageRow: View {
                     .resizable()
                     .scaledToFit()
                     .frame(maxWidth: 260)
-                    .accessibilityLabel("첨부 이미지")
+                    .accessibilityLabel(
+                        AppLocalization.string(
+                            "첨부 이미지"
+                        )
+                    )
             }
 
             if !m.text.isEmpty {
@@ -1139,7 +1187,15 @@ private struct MessageRow: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "\(m.role == "user" ? "사용자" : "AI"): \(m.text)"
+            AppLocalization.format(
+                "%@: %@",
+                m.role == "user"
+                    ? AppLocalization.string(
+                        "사용자"
+                    )
+                    : "AI",
+                m.text
+            )
         )
     }
 }

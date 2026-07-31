@@ -823,6 +823,92 @@ final class AppLocalizationTests:
         )
     }
 
+    @MainActor
+    func testAIChatAndVoiceStringsFollowInAppLanguage()
+    {
+        let defaults = UserDefaults.standard
+        let previous =
+            defaults.string(
+                forKey:
+                    AppLanguage
+                    .preferenceKey
+            )
+        defer {
+            if let previous {
+                defaults.set(
+                    previous,
+                    forKey:
+                        AppLanguage
+                        .preferenceKey
+                )
+            } else {
+                defaults.removeObject(
+                    forKey:
+                        AppLanguage
+                        .preferenceKey
+                )
+            }
+        }
+
+        defaults.set(
+            AppLanguage.english.rawValue,
+            forKey:
+                AppLanguage.preferenceKey
+        )
+        XCTAssertEqual(
+            AppLanguage.current()
+                .speechLanguageCode,
+            "en-US"
+        )
+        XCTAssertEqual(
+            AppLanguage.current()
+                .localAIResponseLanguageName,
+            "영어"
+        )
+        XCTAssertEqual(
+            AppLocalization.format(
+                "AI 상태: %@",
+                "Ready"
+            ),
+            "AI Status: Ready"
+        )
+        XCTAssertEqual(
+            STTManager.STTError
+                .permissionDenied
+                .localizedDescription,
+            "Microphone and speech recognition permissions are required."
+        )
+
+        defaults.set(
+            AppLanguage.japanese.rawValue,
+            forKey:
+                AppLanguage.preferenceKey
+        )
+        XCTAssertEqual(
+            AppLanguage.current()
+                .speechLanguageCode,
+            "ja-JP"
+        )
+        XCTAssertEqual(
+            AppLanguage.current()
+                .localAIResponseLanguageName,
+            "일본어"
+        )
+        XCTAssertEqual(
+            AppLocalization.format(
+                "\n\n(스트림 오류: %@)",
+                "offline"
+            ),
+            "\n\n（ストリームエラー：offline）"
+        )
+        XCTAssertEqual(
+            STTManager.STTError
+                .onDeviceRecognitionUnavailable
+                .localizedDescription,
+            "このデバイスでは韓国語のオンデバイス音声認識を利用できません。"
+        )
+    }
+
     private func localizedBundle(
         language: String
     ) throws -> Bundle {

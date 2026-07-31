@@ -116,6 +116,28 @@ nonisolated enum AppLanguage:
         )
     }
 
+    var speechLanguageCode: String {
+        switch effectiveLanguageCode {
+        case "ja":
+            return "ja-JP"
+        case "en":
+            return "en-US"
+        default:
+            return "ko-KR"
+        }
+    }
+
+    var localAIResponseLanguageName: String {
+        switch effectiveLanguageCode {
+        case "ja":
+            return "일본어"
+        case "en":
+            return "영어"
+        default:
+            return "한국어"
+        }
+    }
+
     static func current(
         defaults: UserDefaults = .standard
     ) -> Self {

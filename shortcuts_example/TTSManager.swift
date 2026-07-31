@@ -48,7 +48,12 @@ final class TTSManager:
         stop()
 
         let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice(language: "ko-KR")
+        utterance.voice =
+            AVSpeechSynthesisVoice(
+                language:
+                    AppLanguage.current()
+                    .speechLanguageCode
+            )
         utterance.rate = min(
             max(
                 rate

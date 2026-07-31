@@ -42,13 +42,21 @@ final class STTManager: ObservableObject {
         var errorDescription: String? {
             switch self {
             case .permissionDenied:
-                return "마이크와 음성 인식 권한이 필요합니다."
+                return AppLocalization.string(
+                    "마이크와 음성 인식 권한이 필요합니다."
+                )
             case .recognizerUnavailable:
-                return "한국어 음성 인식을 사용할 수 없습니다."
+                return AppLocalization.string(
+                    "한국어 음성 인식을 사용할 수 없습니다."
+                )
             case .alreadyRecording:
-                return "이미 음성을 듣고 있습니다."
+                return AppLocalization.string(
+                    "이미 음성을 듣고 있습니다."
+                )
             case .onDeviceRecognitionUnavailable:
-                return "이 기기에서 한국어 온디바이스 음성 인식을 사용할 수 없습니다."
+                return AppLocalization.string(
+                    "이 기기에서 한국어 온디바이스 음성 인식을 사용할 수 없습니다."
+                )
             }
         }
     }
