@@ -151,7 +151,10 @@ final class ManualDocumentScannerViewController: UIViewController {
 
     private func setupUI() {
         // Shutter
-        shutterButton.setTitle("촬영", for: .normal)
+        shutterButton.setTitle(
+            AppLocalization.string("촬영"),
+            for: .normal
+        )
         shutterButton.titleLabel?.font = .systemFont(ofSize: 18, weight: .semibold)
         shutterButton.backgroundColor = UIColor.white.withAlphaComponent(0.9)
         shutterButton.setTitleColor(.black, for: .normal)
@@ -159,13 +162,19 @@ final class ManualDocumentScannerViewController: UIViewController {
         shutterButton.addTarget(self, action: #selector(didTapShutter), for: .touchUpInside)
 
         // Cancel
-        cancelButton.setTitle("닫기", for: .normal)
+        cancelButton.setTitle(
+            AppLocalization.string("닫기"),
+            for: .normal
+        )
         cancelButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .regular)
         cancelButton.setTitleColor(.white, for: .normal)
         cancelButton.addTarget(self, action: #selector(didTapCancel), for: .touchUpInside)
 
         // Status
-        statusLabel.text = "문서를 프레임 안에 맞춰주세요"
+        statusLabel.text =
+            AppLocalization.string(
+                "문서를 프레임 안에 맞춰주세요"
+            )
         statusLabel.textColor = .white
         statusLabel.font = .systemFont(ofSize: 14, weight: .regular)
         statusLabel.textAlignment = .center
@@ -366,9 +375,19 @@ final class ManualDocumentScannerViewController: UIViewController {
             self.updateOverlayPath()
 
             if let q, isGoodDocumentQuad(q) {
-                self.statusLabel.text = stable ? "문서 감지됨 ✅ (안정)" : "문서 감지됨 ✅"
+                self.statusLabel.text =
+                    stable
+                    ? AppLocalization.string(
+                        "문서 감지됨 ✅ (안정)"
+                    )
+                    : AppLocalization.string(
+                        "문서 감지됨 ✅"
+                    )
             } else {
-                self.statusLabel.text = "문서를 프레임 안에 맞춰주세요"
+                self.statusLabel.text =
+                    AppLocalization.string(
+                        "문서를 프레임 안에 맞춰주세요"
+                    )
             }
         }
     }

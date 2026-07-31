@@ -35,13 +35,15 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 - 홈과 소형 위젯의 오늘 M4 로컬 AI 완료·실패·취소·처리량·무제한 문구
 - EPUB·DAISY 서재·목차·검색·보기·혼합 재생 화면, 동적 탐색 단위·
   재생 방식과 ZIP/EPUB/DAISY 오류의 앱 내부 언어 즉시 반영
-- Xcode `.stringsdata`에서 화면별 키를 수집해 영어·일본어 누락과 두
-  번들의 키·printf 지정자 차이를 검사하는 `audit_localizations.swift`
+- 카메라 도구 선택·돋보기·실시간 OCR·사진 저장과 자체 문서 스캐너의
+  촬영 안내·오류·검토·다중 페이지·VoiceOver 문구
+- Xcode `.stringsdata`의 화면별 키와 UIKit용 `AppLocalization` 리터럴
+  키를 수집해 영어·일본어 누락, 두 번들의 키·printf 지정자 차이를
+  검사하는 `audit_localizations.swift`
 
 ## 다음 번역 묶음
 
 - AI 대화 본문·이미지 질문·음성 입력의 나머지 화면
-- 카메라 도구 선택, 돋보기, 실시간 OCR과 자체 문서 스캐너
 - PDF/TXT 문서 뷰어와 내보내기
 - VisionLink 연결·수신·원격 기능과 Rivo 연결 관리·진단 화면
 - App Intent의 title, description, parameter와 Siri phrase
@@ -64,6 +66,8 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 - [ ] 앱 설정에서 언어를 바꾸면 번역된 화면이 즉시 갱신되고, 완전히
       종료·재실행해도 선택이 복원되며 시스템 설정 선택도 정상 동작한다.
 - [ ] 각 언어에서 카메라·마이크·음성 인식·Bluetooth 권한 설명을 확인한다.
+- [ ] 영어·일본어에서 돋보기·실시간 OCR·문서 스캐너를 열어 버튼,
+      촬영 안내, 오류, 다중 페이지 검토와 VoiceOver 문구를 확인한다.
 - [ ] 공유 시트, 선택 텍스트 동작과 홈 위젯의 이름이 앱 언어와 일치한다.
 - [ ] VoiceOver가 번역된 레이블과 동적 Rivo 상태를 자연스럽게 읽는다.
 

@@ -78,7 +78,8 @@ private func printUsage() {
             [--objects-dir PATH] [--source-prefix PATH] [--require-complete]
 
         Always checks that the English and Japanese Localizable.strings files
-        have identical keys and compatible printf placeholders.
+        have identical keys and compatible printf placeholders. It also scans
+        AppLocalization.string/format calls with literal keys in Swift source.
 
         When --objects-dir points to Xcode's Objects-normal directory, the
         script also reads every .stringsdata file and reports compiler-extracted
@@ -235,6 +236,97 @@ private func extractedKeys(
     return result
 }
 
+private func appLocalizationLiteralKeys(
+    in root: URL,
+    sourcePrefix: String?
+) throws -> Set<String> {
+    let sourceRoot: URL
+    if let sourcePrefix {
+        sourceRoot =
+            root.appendingPathComponent(
+                sourcePrefix,
+                isDirectory: true
+            )
+    } else {
+        sourceRoot =
+            root.appendingPathComponent(
+                "shortcuts_example",
+                isDirectory: true
+            )
+    }
+    guard let enumerator =
+            FileManager.default
+                .enumerator(
+                    at: sourceRoot,
+                    includingPropertiesForKeys:
+                        [.isRegularFileKey],
+                    options:
+                        [.skipsHiddenFiles]
+                ) else {
+        throw AuditError.unreadable(
+            "cannot enumerate \(sourceRoot.path)"
+        )
+    }
+    let expression =
+        try NSRegularExpression(
+            pattern:
+                #"AppLocalization\.(?:string|format)\s*\(\s*"((?:\\.|[^"\\])*)""#
+        )
+    var result: Set<String> = []
+    for case let url as URL in enumerator {
+        guard url.pathExtension == "swift"
+        else {
+            continue
+        }
+        let source = try String(
+            contentsOf: url,
+            encoding: .utf8
+        )
+        let range = NSRange(
+            location: 0,
+            length:
+                (source as NSString)
+                .length
+        )
+        for match in expression.matches(
+            in: source,
+            range: range
+        ) {
+            guard let literalRange =
+                    Range(
+                        match.range(at: 1),
+                        in: source
+                    ) else {
+                continue
+            }
+            let escaped =
+                String(
+                    source[literalRange]
+                )
+            let json =
+                "\"\(escaped)\""
+            guard let data =
+                    json.data(
+                        using: .utf8
+                    ),
+                  let key =
+                    try JSONSerialization
+                    .jsonObject(
+                        with: data,
+                        options:
+                            .fragmentsAllowed
+                    )
+                        as? String else {
+                throw AuditError.unreadable(
+                    "cannot decode localization key in \(url.path)"
+                )
+            }
+            result.insert(key)
+        }
+    }
+    return result
+}
+
 private func printItems(
     _ title: String,
     _ items: [String]
@@ -321,6 +413,32 @@ do {
         formatMismatches
     )
 
+    let literalKeys =
+        try appLocalizationLiteralKeys(
+            in: root,
+            sourcePrefix:
+                options.sourcePrefix
+        )
+    let literalMissingEnglish =
+        literalKeys.subtracting(
+            englishKeys
+        ).sorted()
+    let literalMissingJapanese =
+        literalKeys.subtracting(
+            japaneseKeys
+        ).sorted()
+    print(
+        "AppLocalization literal keys: \(literalKeys.count)"
+    )
+    printItems(
+        "Literal keys missing from English",
+        literalMissingEnglish
+    )
+    printItems(
+        "Literal keys missing from Japanese",
+        literalMissingJapanese
+    )
+
     var extractionFailures = false
     if let objectsDirectory =
             options.objectsDirectory {
@@ -363,6 +481,16 @@ do {
         !missingEnglish.isEmpty
         || !missingJapanese.isEmpty
         || !formatMismatches.isEmpty
+        || (
+            options
+                .requiresCompleteExtraction
+            && (
+                !literalMissingEnglish
+                    .isEmpty
+                || !literalMissingJapanese
+                    .isEmpty
+            )
+        )
         || extractionFailures
     if failed {
         exit(EXIT_FAILURE)

@@ -23,8 +23,14 @@ final class DocumentTextExtractor {
 
         var errorDescription: String? {
             switch self {
-            case .cgImageMissing: return "이미지 변환(CGImage)에 실패했어요."
-            case .noText: return "텍스트를 찾지 못했어요."
+            case .cgImageMissing:
+                return AppLocalization.string(
+                    "이미지 변환(CGImage)에 실패했어요."
+                )
+            case .noText:
+                return AppLocalization.string(
+                    "텍스트를 찾지 못했어요."
+                )
             }
         }
     }

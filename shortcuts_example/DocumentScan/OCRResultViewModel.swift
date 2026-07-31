@@ -213,14 +213,18 @@ final class OCRResultViewModel: ObservableObject {
         guard !q.isEmpty else { return }
 
         aiAnswer = ""
-        aiStatus = "Generating..."
+        aiStatus = AppLocalization.string(
+            "AI 답변 생성중"
+        )
         isGeneratingAI = true
         startThinkingAnimation()
 
         if isTTSEnabled {
             TTSManager.shared.stop()
             TTSManager.shared.speakFeedback(
-                "AI 답변 생성중"
+                AppLocalization.string(
+                    "AI 답변 생성중"
+                )
             )
         }
 
@@ -240,9 +244,13 @@ final class OCRResultViewModel: ObservableObject {
                 prompt: fullPrompt
             )
             try await consumeAIStream(stream)
-            aiStatus = "Done"
+            aiStatus =
+                AppLocalization.string("완료")
         } catch {
-            aiStatus = "QA 실패: \(error.localizedDescription)"
+            aiStatus = AppLocalization.format(
+                "QA 실패: %@",
+                error.localizedDescription
+            )
         }
 
         stopThinkingAnimation()

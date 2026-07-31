@@ -30,7 +30,9 @@ final class DocumentViewerViewController: UIViewController {
         self.image = image
         self.sentenceBoxes = sentenceBoxes
         super.init(nibName: nil, bundle: nil)
-        title = "문서 보기"
+        title = AppLocalization.string(
+            "문서 보기"
+        )
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) not supported") }
@@ -59,11 +61,13 @@ final class DocumentViewerViewController: UIViewController {
 
         // 하단 버튼
         var leftConfig = UIButton.Configuration.filled()
-        leftConfig.title = "왼쪽"
+        leftConfig.title =
+            AppLocalization.string("왼쪽")
         leftButton.configuration = leftConfig
 
         var rightConfig = UIButton.Configuration.filled()
-        rightConfig.title = "오른쪽"
+        rightConfig.title =
+            AppLocalization.string("오른쪽")
         rightButton.configuration = rightConfig
 
         leftButton.addTarget(self, action: #selector(goLeft), for: .touchUpInside)

@@ -452,6 +452,91 @@ final class AppLocalizationTests:
         )
     }
 
+    func testCameraAndScannerDynamicStringsFollowInAppLanguage()
+    {
+        let defaults = UserDefaults.standard
+        let previous =
+            defaults.string(
+                forKey:
+                    AppLanguage
+                    .preferenceKey
+            )
+        defer {
+            if let previous {
+                defaults.set(
+                    previous,
+                    forKey:
+                        AppLanguage
+                        .preferenceKey
+                )
+            } else {
+                defaults.removeObject(
+                    forKey:
+                        AppLanguage
+                        .preferenceKey
+                )
+            }
+        }
+
+        defaults.set(
+            AppLanguage.english.rawValue,
+            forKey:
+                AppLanguage.preferenceKey
+        )
+        XCTAssertEqual(
+            MagnifierFilter
+                .highContrast.title,
+            "High Contrast"
+        )
+        XCTAssertEqual(
+            MagnifierPhotoCaptureError
+                .photoLibraryPermissionDenied
+                .localizedDescription,
+            "Photos add permission is unavailable. Save to Files instead."
+        )
+        XCTAssertEqual(
+            DocumentScanSessionError
+                .pageLimitReached(maximum: 20)
+                .localizedDescription,
+            "A document can contain up to 20 pages."
+        )
+        XCTAssertEqual(
+            DocumentTextExtractor
+                .ExtractError.noText
+                .localizedDescription,
+            "No text was found."
+        )
+
+        defaults.set(
+            AppLanguage.japanese.rawValue,
+            forKey:
+                AppLanguage.preferenceKey
+        )
+        XCTAssertEqual(
+            MagnifierFilter
+                .grayscale.title,
+            "グレースケール"
+        )
+        XCTAssertEqual(
+            MagnifierPhotoCaptureError
+                .encodingFailed
+                .localizedDescription,
+            "撮影した写真をJPEGに変換できません。"
+        )
+        XCTAssertEqual(
+            DocumentScanSessionError
+                .noPages
+                .localizedDescription,
+            "保存または開くスキャンページがありません。"
+        )
+        XCTAssertEqual(
+            DocumentTextExtractor
+                .ExtractError.cgImageMissing
+                .localizedDescription,
+            "画像をCGImageに変換できませんでした。"
+        )
+    }
+
     private func localizedBundle(
         language: String
     ) throws -> Bundle {

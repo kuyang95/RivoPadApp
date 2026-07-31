@@ -38,17 +38,29 @@ extension LocalDocumentScannerError: LocalizedError {
     nonisolated var errorDescription: String? {
         switch self {
         case .cameraConfigurationFailed:
-            return "카메라를 준비하지 못했습니다."
+            return AppLocalization.string(
+                "카메라를 준비하지 못했습니다."
+            )
         case .missingViewport:
-            return "카메라 화면 좌표를 확인하지 못했습니다."
+            return AppLocalization.string(
+                "카메라 화면 좌표를 확인하지 못했습니다."
+            )
         case .photoDataUnavailable:
-            return "촬영한 사진 데이터를 가져오지 못했습니다."
+            return AppLocalization.string(
+                "촬영한 사진 데이터를 가져오지 못했습니다."
+            )
         case .photoDecodeFailed:
-            return "촬영한 사진을 열지 못했습니다."
+            return AppLocalization.string(
+                "촬영한 사진을 열지 못했습니다."
+            )
         case .captureTooBlurry:
-            return "촬영 중 흔들림이 감지되었습니다. 다시 촬영해 주세요."
+            return AppLocalization.string(
+                "촬영 중 흔들림이 감지되었습니다. 다시 촬영해 주세요."
+            )
         case .renderFailed:
-            return "스캔 결과 이미지를 만들지 못했습니다."
+            return AppLocalization.string(
+                "스캔 결과 이미지를 만들지 못했습니다."
+            )
         }
     }
 }
@@ -158,7 +170,9 @@ final class LocalDocumentScannerViewController: UIViewController {
 
     private let statusLabel: UILabel = {
         let label = UILabel()
-        label.text = "로컬 문서 인식 모델을 준비하는 중입니다."
+        label.text = AppLocalization.string(
+            "로컬 문서 인식 모델을 준비하는 중입니다."
+        )
         label.textColor = .white
         label.font = .preferredFont(forTextStyle: .headline)
         label.textAlignment = .center
@@ -174,7 +188,9 @@ final class LocalDocumentScannerViewController: UIViewController {
 
     private let backendLabel: UILabel = {
         let label = UILabel()
-        label.text = "LCNet 준비 중 · UVDoc 준비 중"
+        label.text = AppLocalization.string(
+            "LCNet 준비 중 · UVDoc 준비 중"
+        )
         label.textColor = UIColor.white.withAlphaComponent(0.78)
         label.font = .preferredFont(forTextStyle: .caption1)
         label.textAlignment = .center
@@ -185,7 +201,8 @@ final class LocalDocumentScannerViewController: UIViewController {
 
     private lazy var shutterButton: UIButton = {
         var configuration = UIButton.Configuration.filled()
-        configuration.title = "촬영"
+        configuration.title =
+            AppLocalization.string("촬영")
         configuration.baseBackgroundColor = .white
         configuration.baseForegroundColor = .black
         configuration.cornerStyle = .capsule
@@ -205,15 +222,21 @@ final class LocalDocumentScannerViewController: UIViewController {
             for: .touchUpInside
         )
         button.translatesAutoresizingMaskIntoConstraints = false
-        button.accessibilityLabel = "문서 수동 촬영"
+        button.accessibilityLabel =
+            AppLocalization.string(
+                "문서 수동 촬영"
+            )
         button.accessibilityHint =
-            "자동 촬영을 기다리지 않고 현재 문서를 촬영합니다."
+            AppLocalization.string(
+                "자동 촬영을 기다리지 않고 현재 문서를 촬영합니다."
+            )
         return button
     }()
 
     private lazy var cancelButton: UIButton = {
         var configuration = UIButton.Configuration.gray()
-        configuration.title = "닫기"
+        configuration.title =
+            AppLocalization.string("닫기")
         configuration.baseForegroundColor = .white
         configuration.cornerStyle = .capsule
         let button = UIButton(configuration: configuration)
@@ -223,14 +246,20 @@ final class LocalDocumentScannerViewController: UIViewController {
             for: .touchUpInside
         )
         button.translatesAutoresizingMaskIntoConstraints = false
-        button.accessibilityLabel = "문서 스캐너 닫기"
+        button.accessibilityLabel =
+            AppLocalization.string(
+                "문서 스캐너 닫기"
+            )
         return button
     }()
 
     private lazy var nextPageButton: UIButton = {
         var configuration =
             UIButton.Configuration.filled()
-        configuration.title = "다음 페이지 준비"
+        configuration.title =
+            AppLocalization.string(
+                "다음 페이지 준비"
+            )
         configuration.baseBackgroundColor =
             .systemBlue
         configuration.baseForegroundColor =
@@ -248,9 +277,13 @@ final class LocalDocumentScannerViewController: UIViewController {
         button.translatesAutoresizingMaskIntoConstraints =
             false
         button.accessibilityLabel =
-            "문서를 치웠습니다"
+            AppLocalization.string(
+                "문서를 치웠습니다"
+            )
         button.accessibilityHint =
-            "다음 페이지 촬영을 시작합니다."
+            AppLocalization.string(
+                "다음 페이지 촬영을 시작합니다."
+            )
         button.isHidden = true
         return button
     }()
@@ -483,7 +516,11 @@ final class LocalDocumentScannerViewController: UIViewController {
                 detectorLoadErrorDescription = nil
                 updateBackendLabel()
                 if case .searching = stateMachine.state {
-                    setStatus("문서를 화면 안에 맞춰주세요.")
+                    setStatus(
+                        AppLocalization.string(
+                            "문서를 화면 안에 맞춰주세요."
+                        )
+                    )
                 }
             } catch {
                 scannerDiagnostics.logDuration(
@@ -500,7 +537,9 @@ final class LocalDocumentScannerViewController: UIViewController {
                 detectorLoadErrorDescription = error.localizedDescription
                 updateBackendLabel()
                 setStatus(
-                    "자동 문서 인식을 준비하지 못했습니다. 수동 촬영은 가능합니다.",
+                    AppLocalization.string(
+                        "자동 문서 인식을 준비하지 못했습니다. 수동 촬영은 가능합니다."
+                    ),
                     announce: true
                 )
             }
@@ -540,9 +579,15 @@ final class LocalDocumentScannerViewController: UIViewController {
                 ? "LCNet Core ML"
                 : "LCNet CPU"
         } else if detectorLoadErrorDescription != nil {
-            detectorText = "LCNet 수동 모드"
+            detectorText =
+                AppLocalization.string(
+                    "LCNet 수동 모드"
+                )
         } else {
-            detectorText = "LCNet 준비 중"
+            detectorText =
+                AppLocalization.string(
+                    "LCNet 준비 중"
+                )
         }
 
         Task { [weak self] in
@@ -553,15 +598,23 @@ final class LocalDocumentScannerViewController: UIViewController {
             let dewarperText: String
             if !curvedPageCorrectionEnabled {
                 dewarperText =
-                    "UVDoc 곡면 보정 꺼짐"
+                    AppLocalization.string(
+                        "UVDoc 곡면 보정 꺼짐"
+                    )
             } else if let backend {
                 dewarperText = backend == .coreML
                     ? "UVDoc Core ML"
                     : "UVDoc CPU"
             } else if await processor.dewarperLoadErrorDescription != nil {
-                dewarperText = "UVDoc 원근 보정 fallback"
+                dewarperText =
+                    AppLocalization.string(
+                        "UVDoc 원근 보정 fallback"
+                    )
             } else {
-                dewarperText = "UVDoc 준비 중"
+                dewarperText =
+                    AppLocalization.string(
+                        "UVDoc 준비 중"
+                    )
             }
             backendLabel.text = "\(detectorText) · \(dewarperText)"
         }
@@ -602,7 +655,12 @@ final class LocalDocumentScannerViewController: UIViewController {
             processPhoto(ticket: ticket)
         case .promptForPageRemoval:
             pageRemovalNoDocumentFrames = 0
-            setStatus("다음 문서를 위해 촬영한 문서를 치워주세요.", announce: true)
+            setStatus(
+                AppLocalization.string(
+                    "다음 문서를 위해 촬영한 문서를 치워주세요."
+                ),
+                announce: true
+            )
         }
     }
 
@@ -662,7 +720,9 @@ final class LocalDocumentScannerViewController: UIViewController {
                     } else {
                         self.send(.cameraFailed(.cameraPermissionDenied))
                         self.showCameraFailure(
-                            "카메라 권한이 필요합니다. 설정에서 카메라 접근을 허용해 주세요."
+                            AppLocalization.string(
+                                "카메라 권한이 필요합니다. 설정에서 카메라 접근을 허용해 주세요."
+                            )
                         )
                     }
                 }
@@ -670,7 +730,9 @@ final class LocalDocumentScannerViewController: UIViewController {
         default:
             send(.cameraFailed(.cameraPermissionDenied))
             showCameraFailure(
-                "카메라 권한이 필요합니다. 설정에서 카메라 접근을 허용해 주세요."
+                AppLocalization.string(
+                    "카메라 권한이 필요합니다. 설정에서 카메라 접근을 허용해 주세요."
+                )
             )
         }
     }
@@ -767,7 +829,9 @@ final class LocalDocumentScannerViewController: UIViewController {
         }
         if isViewActive {
             setStatus(
-                "카메라 사용이 잠시 중단되었습니다. 곧 자동으로 다시 시작합니다.",
+                AppLocalization.string(
+                    "카메라 사용이 잠시 중단되었습니다. 곧 자동으로 다시 시작합니다."
+                ),
                 announce: true
             )
         }
@@ -962,8 +1026,12 @@ final class LocalDocumentScannerViewController: UIViewController {
         }
         setStatus(
             detector == nil
-                ? "카메라가 준비되었습니다. 로컬 문서 모델을 불러오는 중입니다."
-                : "문서를 화면 안에 맞춰주세요.",
+                ? AppLocalization.string(
+                    "카메라가 준비되었습니다. 로컬 문서 모델을 불러오는 중입니다."
+                )
+                : AppLocalization.string(
+                    "문서를 화면 안에 맞춰주세요."
+                ),
             announce: true
         )
     }
@@ -1109,7 +1177,9 @@ final class LocalDocumentScannerViewController: UIViewController {
             latestLiveDetection = nil
             clearOverlay()
             setStatus(
-                "문서를 다시 찾는 중입니다. 수동 촬영도 가능합니다."
+                AppLocalization.string(
+                    "문서를 다시 찾는 중입니다. 수동 촬영도 가능합니다."
+                )
             )
         }
     }
@@ -1133,7 +1203,9 @@ final class LocalDocumentScannerViewController: UIViewController {
             pageRemovalNoDocumentFrames = 0
             clearOverlay()
             setStatus(
-                "촬영한 문서를 치우면 다음 페이지를 시작합니다."
+                AppLocalization.string(
+                    "촬영한 문서를 치우면 다음 페이지를 시작합니다."
+                )
             )
             return
         }
@@ -1144,7 +1216,9 @@ final class LocalDocumentScannerViewController: UIViewController {
         pageRemovalNoDocumentFrames = 0
         send(.pageRemoved)
         setStatus(
-            "다음 문서를 화면 안에 맞춰주세요.",
+            AppLocalization.string(
+                "다음 문서를 화면 안에 맞춰주세요."
+            ),
             announce: true
         )
     }
@@ -1163,21 +1237,47 @@ final class LocalDocumentScannerViewController: UIViewController {
         if let guidance = gates.framingGuidance {
             setStatus(text(for: guidance))
         } else if gates.detection == nil {
-            setStatus("문서를 화면 안에 맞춰주세요.")
+            setStatus(
+                AppLocalization.string(
+                    "문서를 화면 안에 맞춰주세요."
+                )
+            )
         } else if !gates.cornersStable {
-            setStatus("문서를 찾았습니다. 잠시 고정해 주세요.")
+            setStatus(
+                AppLocalization.string(
+                    "문서를 찾았습니다. 잠시 고정해 주세요."
+                )
+            )
         } else if !gates.deviceStill {
-            setStatus("기기를 조금만 더 고정해 주세요.")
+            setStatus(
+                AppLocalization.string(
+                    "기기를 조금만 더 고정해 주세요."
+                )
+            )
         } else if !gates.sharpEnough {
-            setStatus("초점이 선명해질 때까지 기다려 주세요.")
+            setStatus(
+                AppLocalization.string(
+                    "초점이 선명해질 때까지 기다려 주세요."
+                )
+            )
         } else if !gates.focusReady {
-            setStatus("카메라 초점을 맞추는 중입니다.")
+            setStatus(
+                AppLocalization.string(
+                    "카메라 초점을 맞추는 중입니다."
+                )
+            )
         } else if !automaticCaptureEnabled {
             setStatus(
-                "수동 촬영 준비가 완료되었습니다."
+                AppLocalization.string(
+                    "수동 촬영 준비가 완료되었습니다."
+                )
             )
         } else {
-            setStatus("촬영 준비가 완료되었습니다.")
+            setStatus(
+                AppLocalization.string(
+                    "촬영 준비가 완료되었습니다."
+                )
+            )
         }
     }
 
@@ -1211,7 +1311,11 @@ final class LocalDocumentScannerViewController: UIViewController {
     }
 
     private func lockFocus(ticket: UUID) {
-        setStatus("초점을 고정하는 중입니다.")
+        setStatus(
+            AppLocalization.string(
+                "초점을 고정하는 중입니다."
+            )
+        )
         focusTask?.cancel()
         let scannerDiagnostics = diagnostics
         let focusStartedAt = ProcessInfo.processInfo.systemUptime
@@ -1287,7 +1391,12 @@ final class LocalDocumentScannerViewController: UIViewController {
                 restoreContinuousFocus()
                 focusTask = nil
                 send(.focusLockFailed(ticket: ticket))
-                setStatus("기기를 고정한 뒤 다시 촬영해 주세요.", announce: true)
+                setStatus(
+                    AppLocalization.string(
+                        "기기를 고정한 뒤 다시 촬영해 주세요."
+                    ),
+                    announce: true
+                )
                 return
             }
 
@@ -1370,7 +1479,12 @@ final class LocalDocumentScannerViewController: UIViewController {
                 + "pixelFormat=\(requestedPixelFormat ?? 0)"
         )
         diagnostics.logResource("photoRequested", ticket: ticket)
-        setStatus("문서를 촬영합니다.", announce: true)
+        setStatus(
+            AppLocalization.string(
+                "문서를 촬영합니다."
+            ),
+            announce: true
+        )
         photoOutput.capturePhoto(with: settings, delegate: self)
     }
 
@@ -1386,7 +1500,12 @@ final class LocalDocumentScannerViewController: UIViewController {
             return
         }
 
-        setStatus("문서를 로컬 AI로 보정하는 중입니다.", announce: true)
+        setStatus(
+            AppLocalization.string(
+                "문서를 로컬 AI로 보정하는 중입니다."
+            ),
+            announce: true
+        )
         processingTask?.cancel()
         let stillDetector = detector
         let documentProcessor = processor
@@ -1701,12 +1820,19 @@ final class LocalDocumentScannerViewController: UIViewController {
         send(.processingFailed(ticket: ticket))
 
         let alert = UIAlertController(
-            title: "다시 촬영해 주세요",
+            title: AppLocalization.string(
+                "다시 촬영해 주세요"
+            ),
             message: error.localizedDescription,
             preferredStyle: .alert
         )
         alert.addAction(
-            UIAlertAction(title: "재시도", style: .default) { [weak self] _ in
+            UIAlertAction(
+                title: AppLocalization.string(
+                    "재시도"
+                ),
+                style: .default
+            ) { [weak self] _ in
                 self?.send(.retry)
             }
         )
@@ -1753,29 +1879,48 @@ final class LocalDocumentScannerViewController: UIViewController {
     ) -> String {
         switch guidance {
         case .moveLeft:
-            return "기기를 왼쪽으로 이동해 주세요."
+            return AppLocalization.string(
+                "기기를 왼쪽으로 이동해 주세요."
+            )
         case .moveRight:
-            return "기기를 오른쪽으로 이동해 주세요."
+            return AppLocalization.string(
+                "기기를 오른쪽으로 이동해 주세요."
+            )
         case .moveUp:
-            return "기기를 위로 이동해 주세요."
+            return AppLocalization.string(
+                "기기를 위로 이동해 주세요."
+            )
         case .moveDown:
-            return "기기를 아래로 이동해 주세요."
+            return AppLocalization.string(
+                "기기를 아래로 이동해 주세요."
+            )
         case .moveCloser:
-            return "문서에 조금 더 가까이 이동해 주세요."
+            return AppLocalization.string(
+                "문서에 조금 더 가까이 이동해 주세요."
+            )
         case .moveFarther:
-            return "문서에서 조금 더 멀리 이동해 주세요."
+            return AppLocalization.string(
+                "문서에서 조금 더 멀리 이동해 주세요."
+            )
         }
     }
 
     private func showCameraFailure(_ message: String) {
         setStatus(message, announce: true)
         let alert = UIAlertController(
-            title: "카메라를 사용할 수 없습니다",
+            title: AppLocalization.string(
+                "카메라를 사용할 수 없습니다"
+            ),
             message: message,
             preferredStyle: .alert
         )
         alert.addAction(
-            UIAlertAction(title: "닫기", style: .cancel) { [weak self] _ in
+            UIAlertAction(
+                title: AppLocalization.string(
+                    "닫기"
+                ),
+                style: .cancel
+            ) { [weak self] _ in
                 self?.onCancel?()
             }
         )
@@ -1873,7 +2018,9 @@ final class LocalDocumentScannerViewController: UIViewController {
         pageRemovalNoDocumentFrames = 0
         send(.pageRemoved)
         setStatus(
-            "다음 문서를 화면 안에 맞춰주세요.",
+            AppLocalization.string(
+                "다음 문서를 화면 안에 맞춰주세요."
+            ),
             announce: true
         )
     }

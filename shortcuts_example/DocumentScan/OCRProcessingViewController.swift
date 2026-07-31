@@ -17,7 +17,9 @@ final class OCRProcessingViewController: UIViewController {
     private let spinner = UIActivityIndicatorView(style: .large)
     private let statusLabel: UILabel = {
         let l = UILabel()
-        l.text = "OCR 처리 중..."
+        l.text = AppLocalization.string(
+            "OCR 처리 중..."
+        )
         l.textAlignment = .center
         l.numberOfLines = 2
         l.textColor = .secondaryLabel
@@ -35,7 +37,9 @@ final class OCRProcessingViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "처리(B)"
+        title = AppLocalization.string(
+            "처리(B)"
+        )
         view.backgroundColor = .systemBackground
 
         setupUI()
@@ -90,17 +94,46 @@ final class OCRProcessingViewController: UIViewController {
                     self.navigationController?.pushViewController(viewer, animated: true)
 
                 case .failure(let error):
-                    self.statusLabel.text = "OCR 실패: \(error.localizedDescription)"
-                    let alert = UIAlertController(title: "처리 실패",
-                                                  message: error.localizedDescription,
-                                                  preferredStyle: .alert)
-                    alert.addAction(UIAlertAction(title: "확인", style: .default))
-                    alert.addAction(UIAlertAction(title: "재시도", style: .default) { [weak self] _ in
-                        guard let self else { return }
-                        self.spinner.startAnimating()
-                        self.statusLabel.text = "OCR 처리 중..."
-                        self.runOCR()
-                    })
+                    self.statusLabel.text =
+                        AppLocalization.format(
+                            "OCR 실패: %@",
+                            error.localizedDescription
+                        )
+                    let alert = UIAlertController(
+                        title: AppLocalization.string(
+                            "처리 실패"
+                        ),
+                        message:
+                            error.localizedDescription,
+                        preferredStyle: .alert
+                    )
+                    alert.addAction(
+                        UIAlertAction(
+                            title: AppLocalization.string(
+                                "확인"
+                            ),
+                            style: .default
+                        )
+                    )
+                    alert.addAction(
+                        UIAlertAction(
+                            title: AppLocalization.string(
+                                "재시도"
+                            ),
+                            style: .default
+                        ) { [weak self] _ in
+                            guard let self else {
+                                return
+                            }
+                            self.spinner
+                                .startAnimating()
+                            self.statusLabel.text =
+                                AppLocalization.string(
+                                    "OCR 처리 중..."
+                                )
+                            self.runOCR()
+                        }
+                    )
                     self.present(alert, animated: true)
                 }
             }

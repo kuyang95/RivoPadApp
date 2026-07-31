@@ -14,13 +14,22 @@ nonisolated enum DocumentScanSessionError:
     var errorDescription: String? {
         switch self {
         case .pageLimitReached(let maximum):
-            return "문서는 최대 \(maximum)페이지까지 촬영할 수 있습니다."
+            return AppLocalization.format(
+                "문서는 최대 %lld페이지까지 촬영할 수 있습니다.",
+                maximum
+            )
         case .imageEncodingFailed:
-            return "스캔 페이지를 저장할 수 없습니다."
+            return AppLocalization.string(
+                "스캔 페이지를 저장할 수 없습니다."
+            )
         case .imageDecodingFailed:
-            return "저장된 스캔 페이지를 열 수 없습니다."
+            return AppLocalization.string(
+                "저장된 스캔 페이지를 열 수 없습니다."
+            )
         case .noPages:
-            return "저장하거나 열 스캔 페이지가 없습니다."
+            return AppLocalization.string(
+                "저장하거나 열 스캔 페이지가 없습니다."
+            )
         }
     }
 }

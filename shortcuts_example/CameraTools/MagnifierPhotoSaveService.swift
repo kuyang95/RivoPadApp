@@ -12,9 +12,13 @@ nonisolated enum MagnifierPhotoCaptureError:
     var errorDescription: String? {
         switch self {
         case .encodingFailed:
-            return "촬영한 사진을 JPEG로 만들 수 없습니다."
+            return AppLocalization.string(
+                "촬영한 사진을 JPEG로 만들 수 없습니다."
+            )
         case .photoLibraryPermissionDenied:
-            return "사진 보관함 추가 권한이 없습니다. Files 저장을 이용해 주세요."
+            return AppLocalization.string(
+                "사진 보관함 추가 권한이 없습니다. Files 저장을 이용해 주세요."
+            )
         }
     }
 }

@@ -648,13 +648,13 @@ nonisolated enum MagnifierFilter: Int, CaseIterable, Sendable {
     var title: String {
         switch self {
         case .normal:
-            return "원본"
+            return AppLocalization.string("원본")
         case .grayscale:
-            return "흑백"
+            return AppLocalization.string("흑백")
         case .inverted:
-            return "반전"
+            return AppLocalization.string("반전")
         case .highContrast:
-            return "고대비"
+            return AppLocalization.string("고대비")
         }
     }
 
@@ -1053,7 +1053,8 @@ final class MagnifierViewController:
         view.addSubview(controlsBackdrop)
 
         closeButton.configuration = .filled()
-        closeButton.configuration?.title = "닫기"
+        closeButton.configuration?.title =
+            AppLocalization.string("닫기")
         closeButton.configuration?.image = UIImage(
             systemName: "xmark"
         )
@@ -1063,7 +1064,10 @@ final class MagnifierViewController:
             action: #selector(closeTapped),
             for: .touchUpInside
         )
-        closeButton.accessibilityHint = "카메라 도구 화면으로 돌아갑니다."
+        closeButton.accessibilityHint =
+            AppLocalization.string(
+                "카메라 도구 화면으로 돌아갑니다."
+            )
 
         zoomLabel.text = "1.0×"
         zoomLabel.textColor = .white
@@ -1072,16 +1076,25 @@ final class MagnifierViewController:
             weight: .bold
         )
         zoomLabel.textAlignment = .center
-        zoomLabel.accessibilityLabel = "현재 확대 배율"
+        zoomLabel.accessibilityLabel =
+            AppLocalization.string(
+                "현재 확대 배율"
+            )
 
-        statusLabel.text = "카메라 준비 중"
+        statusLabel.text =
+            AppLocalization.string(
+                "카메라 준비 중"
+            )
         statusLabel.textColor = .white
         statusLabel.font = .preferredFont(forTextStyle: .footnote)
         statusLabel.textAlignment = .center
         statusLabel.numberOfLines = 2
 
         liveTextLabel.translatesAutoresizingMaskIntoConstraints = false
-        liveTextLabel.text = "텍스트를 찾는 중…"
+        liveTextLabel.text =
+            AppLocalization.string(
+                "텍스트를 찾는 중…"
+            )
         liveTextLabel.textColor = .white
         liveTextLabel.font = .preferredFont(
             forTextStyle: .title2
@@ -1095,7 +1108,10 @@ final class MagnifierViewController:
         liveTextLabel.layer.masksToBounds = true
         liveTextLabel.isHidden = mode != .liveTextReader
         liveTextLabel.isAccessibilityElement = true
-        liveTextLabel.accessibilityLabel = "인식된 텍스트"
+        liveTextLabel.accessibilityLabel =
+            AppLocalization.string(
+                "인식된 텍스트"
+            )
         view.addSubview(liveTextLabel)
 
         zoomSlider.minimumValue = 1
@@ -1112,7 +1128,10 @@ final class MagnifierViewController:
             action: #selector(zoomSliderChanged),
             for: .valueChanged
         )
-        zoomSlider.accessibilityLabel = "확대 배율"
+        zoomSlider.accessibilityLabel =
+            AppLocalization.string(
+                "확대 배율"
+            )
 
         filterControl.selectedSegmentIndex =
             MagnifierFilter.normal.rawValue
@@ -1121,28 +1140,35 @@ final class MagnifierViewController:
             action: #selector(filterChanged),
             for: .valueChanged
         )
-        filterControl.accessibilityLabel = "카메라 색상 필터"
+        filterControl.accessibilityLabel =
+            AppLocalization.string(
+                "카메라 색상 필터"
+            )
 
         configureActionButton(
             torchButton,
-            title: "토치",
+            title: AppLocalization.string("토치"),
             systemImage: "flashlight.off.fill",
             action: #selector(torchTapped)
         )
         configureActionButton(
             switchCameraButton,
-            title: "전환",
+            title: AppLocalization.string("전환"),
             systemImage: "camera.rotate.fill",
             action: #selector(switchCameraTapped)
         )
         configureActionButton(
             photoSaveButton,
-            title: "사진 저장",
+            title: AppLocalization.string(
+                "사진 저장"
+            ),
             systemImage: "camera.fill",
             action: #selector(photoSaveTapped)
         )
         photoSaveButton.accessibilityHint =
-            "현재 필터와 확대가 적용된 프레임을 사진 보관함이나 Files에 저장합니다."
+            AppLocalization.string(
+                "현재 필터와 확대가 적용된 프레임을 사진 보관함이나 Files에 저장합니다."
+            )
         configureActionButton(
             captureButton,
             title: captureButtonTitle,
@@ -1291,7 +1317,9 @@ final class MagnifierViewController:
         doubleTap.numberOfTapsRequired = 2
         cameraView.addGestureRecognizer(doubleTap)
         cameraView.accessibilityHint =
-            "두 번 탭하면 확대 배율을 초기화합니다."
+            AppLocalization.string(
+                "두 번 탭하면 확대 배율을 초기화합니다."
+            )
     }
 
     private func requestCameraAndStart() {
@@ -1310,7 +1338,9 @@ final class MagnifierViewController:
 
             guard authorized else {
                 statusLabel.text =
-                    "설정에서 카메라 권한을 허용해 주세요."
+                    AppLocalization.string(
+                        "설정에서 카메라 권한을 허용해 주세요."
+                    )
                 return
             }
             sessionQueue.async { [weak self] in
@@ -1334,7 +1364,11 @@ final class MagnifierViewController:
               let input = try? AVCaptureDeviceInput(device: device),
               session.canAddInput(input) else {
             session.commitConfiguration()
-            publishStatus("카메라를 사용할 수 없습니다.")
+            publishStatus(
+                AppLocalization.string(
+                    "카메라를 사용할 수 없습니다."
+                )
+            )
             return
         }
         session.addInput(input)
@@ -1353,7 +1387,11 @@ final class MagnifierViewController:
             ]
             guard session.canAddOutput(videoOutput) else {
                 session.commitConfiguration()
-                publishStatus("카메라 영상을 받을 수 없습니다.")
+                publishStatus(
+                    AppLocalization.string(
+                        "카메라 영상을 받을 수 없습니다."
+                    )
+                )
                 return
             }
             session.addOutput(videoOutput)
@@ -1375,11 +1413,17 @@ final class MagnifierViewController:
             self.updateTorchUI()
             self.statusLabel.text =
                 self.mode == .liveTextReader
-                ? "실시간 텍스트를 찾는 중"
+                ? AppLocalization.string(
+                    "실시간 텍스트를 찾는 중"
+                )
                 : (
                     position == .back
-                    ? "후면 카메라"
-                    : "전면 카메라"
+                    ? AppLocalization.string(
+                        "후면 카메라"
+                    )
+                    : AppLocalization.string(
+                        "전면 카메라"
+                    )
                 )
         }
     }
@@ -1497,25 +1541,40 @@ final class MagnifierViewController:
             switch mode {
             case .magnifier:
                 seventhKeyAction =
-                    "7 사진 저장"
+                    AppLocalization.string(
+                        "7 사진 저장"
+                    )
             case .liveTextReader:
                 seventhKeyAction =
-                    "7 읽기 일시정지 또는 재개"
+                    AppLocalization.string(
+                        "7 읽기 일시정지 또는 재개"
+                    )
             case .imageDescription:
                 seventhKeyAction =
-                    "7 이미지 설명"
+                    AppLocalization.string(
+                        "7 이미지 설명"
+                    )
             }
             announceRemoteStatus(
                 showGuide
-                    ? "카메라 조작 모드. 4 닫기, 5 카메라 전환, 6 토치, \(seventhKeyAction), R2 초점, 별표 0 샵 확대"
-                    : "카메라 조작 모드"
+                    ? AppLocalization.format(
+                        "카메라 조작 모드. 4 닫기, 5 카메라 전환, 6 토치, %@, R2 초점, 별표 0 샵 확대",
+                        seventhKeyAction
+                    )
+                    : AppLocalization.string(
+                        "카메라 조작 모드"
+                    )
             )
         case .enterDisplayMode(let showGuide):
             restoreSavedDisplayAdjustment()
             announceRemoteStatus(
                 showGuide
-                    ? "화면 조작 모드. 4 이전 색상, 5 원본, 6 다음 색상, 7 8 9 임계값, 별표 0 샵 밝기, R2 반전, R1 카메라 조작"
-                    : "화면 조작 모드"
+                    ? AppLocalization.string(
+                        "화면 조작 모드. 4 이전 색상, 5 원본, 6 다음 색상, 7 8 9 임계값, 별표 0 샵 밝기, R2 반전, R1 카메라 조작"
+                    )
+                    : AppLocalization.string(
+                        "화면 조작 모드"
+                    )
             )
         case .close:
             closeTapped()
@@ -1564,7 +1623,10 @@ final class MagnifierViewController:
         UIAccessibility.post(
             notification: .announcement,
             argument:
-                "확대 배율 \(zoomLabel.text ?? "")"
+                AppLocalization.format(
+                    "확대 배율 %@",
+                    zoomLabel.text ?? ""
+                )
         )
     }
 
@@ -1603,14 +1665,18 @@ final class MagnifierViewController:
             && currentPosition == .back
         torchButton.isEnabled = isAvailable
         torchButton.configuration?.title =
-            isTorchEnabled ? "토치 끄기" : "토치"
+            isTorchEnabled
+            ? AppLocalization.string("토치 끄기")
+            : AppLocalization.string("토치")
         torchButton.configuration?.image = UIImage(
             systemName: isTorchEnabled
                 ? "flashlight.on.fill"
                 : "flashlight.off.fill"
         )
         torchButton.accessibilityValue =
-            isTorchEnabled ? "켜짐" : "꺼짐"
+            isTorchEnabled
+            ? AppLocalization.string("켜짐")
+            : AppLocalization.string("꺼짐")
     }
 
     @objc private func closeTapped() {
@@ -1629,7 +1695,10 @@ final class MagnifierViewController:
         displayAdjustment.isInverted = false
         UIAccessibility.post(
             notification: .announcement,
-            argument: "\(currentFilter.title) 필터"
+            argument: AppLocalization.format(
+                "%@ 필터",
+                currentFilter.title
+            )
         )
     }
 
@@ -1652,35 +1721,44 @@ final class MagnifierViewController:
                 displayAdjustment.colorIndex ?? 0
             let theme =
                 LocalDocumentColorTheme.all[index]
-            message = "색상 \(theme.name)"
+            message = AppLocalization.format(
+                "색상 %@",
+                AppLocalization.string(
+                    theme.name
+                )
+            )
         case .originalColor:
             currentFilter = .normal
             filterControl.selectedSegmentIndex =
                 MagnifierFilter.normal.rawValue
-            message = "원본 색상"
+            message = AppLocalization.string(
+                "원본 색상"
+            )
         case .decreaseThreshold,
              .resetThreshold,
              .increaseThreshold:
-            message = String(
-                format:
-                    "색상 임계값 %.0f퍼센트",
+            message = AppLocalization.format(
+                "색상 임계값 %.0f퍼센트",
                 displayAdjustment.threshold
                     * 100
             )
         case .decreaseBrightness,
              .resetBrightness,
              .increaseBrightness:
-            message = String(
-                format:
-                    "미리보기 밝기 %+.0f",
+            message = AppLocalization.format(
+                "미리보기 밝기 %+.0f",
                 displayAdjustment.brightness
                     * 100
             )
         case .invertColor:
             message =
                 displayAdjustment.isInverted
-                ? "미리보기 색상 반전"
-                : "미리보기 색상 반전 해제"
+                ? AppLocalization.string(
+                    "미리보기 색상 반전"
+                )
+                : AppLocalization.string(
+                    "미리보기 색상 반전 해제"
+                )
         default:
             return
         }
@@ -1731,7 +1809,9 @@ final class MagnifierViewController:
     private func focusAtCenter() {
         guard let device = cameraInput?.device else {
             announceRemoteStatus(
-                "카메라가 준비되지 않았습니다."
+                AppLocalization.string(
+                    "카메라가 준비되지 않았습니다."
+                )
             )
             return
         }
@@ -1769,13 +1849,19 @@ final class MagnifierViewController:
             device.unlockForConfiguration()
             announceRemoteStatus(
                 didAdjust
-                    ? "화면 중앙에 초점을 맞춥니다."
-                    : "이 카메라는 수동 초점을 지원하지 않습니다."
+                    ? AppLocalization.string(
+                        "화면 중앙에 초점을 맞춥니다."
+                    )
+                    : AppLocalization.string(
+                        "이 카메라는 수동 초점을 지원하지 않습니다."
+                    )
             )
         } catch {
             announceRemoteStatus(
-                "초점을 맞추지 못했습니다: "
-                    + error.localizedDescription
+                AppLocalization.format(
+                    "초점을 맞추지 못했습니다: %@",
+                    error.localizedDescription
+                )
             )
         }
     }
@@ -1809,7 +1895,10 @@ final class MagnifierViewController:
             return
         }
         guard let image = capturedImage() else {
-            statusLabel.text = "카메라 프레임을 기다리는 중입니다."
+            statusLabel.text =
+                AppLocalization.string(
+                    "카메라 프레임을 기다리는 중입니다."
+                )
             return
         }
         UIImpactFeedbackGenerator(style: .medium)
@@ -1820,11 +1909,17 @@ final class MagnifierViewController:
     private var captureButtonTitle: String {
         switch mode {
         case .magnifier:
-            return "텍스트 읽기"
+            return AppLocalization.string(
+                "텍스트 읽기"
+            )
         case .liveTextReader:
-            return "읽기 일시정지"
+            return AppLocalization.string(
+                "읽기 일시정지"
+            )
         case .imageDescription:
-            return "이미지 설명"
+            return AppLocalization.string(
+                "이미지 설명"
+            )
         }
     }
 
@@ -1842,7 +1937,9 @@ final class MagnifierViewController:
     @objc private func photoSaveTapped() {
         guard let image = capturedImage() else {
             announceRemoteStatus(
-                "카메라 프레임을 기다리는 중입니다."
+                AppLocalization.string(
+                    "카메라 프레임을 기다리는 중입니다."
+                )
             )
             return
         }
@@ -1855,14 +1952,20 @@ final class MagnifierViewController:
         for image: UIImage
     ) {
         let alert = UIAlertController(
-            title: "사진 저장",
+            title: AppLocalization.string(
+                "사진 저장"
+            ),
             message:
-                "저장할 위치를 선택합니다. 사진 보관함은 추가 전용 권한만 사용합니다.",
+                AppLocalization.string(
+                    "저장할 위치를 선택합니다. 사진 보관함은 추가 전용 권한만 사용합니다."
+                ),
             preferredStyle: .actionSheet
         )
         alert.addAction(
             UIAlertAction(
-                title: "사진 보관함",
+                title: AppLocalization.string(
+                    "사진 보관함"
+                ),
                 style: .default
             ) { [weak self] _ in
                 self?.saveImageToPhotos(image)
@@ -1878,7 +1981,9 @@ final class MagnifierViewController:
         )
         alert.addAction(
             UIAlertAction(
-                title: "취소",
+                title: AppLocalization.string(
+                    "취소"
+                ),
                 style: .cancel
             )
         )
@@ -1894,7 +1999,9 @@ final class MagnifierViewController:
     private func saveCurrentFrameToPhotos() {
         guard let image = capturedImage() else {
             announceRemoteStatus(
-                "카메라 프레임을 기다리는 중입니다."
+                AppLocalization.string(
+                    "카메라 프레임을 기다리는 중입니다."
+                )
             )
             return
         }
@@ -1906,7 +2013,9 @@ final class MagnifierViewController:
     ) {
         photoSaveButton.isEnabled = false
         statusLabel.text =
-            "사진 보관함에 저장하는 중"
+            AppLocalization.string(
+                "사진 보관함에 저장하는 중"
+            )
         Task { [weak self] in
             guard let self else {
                 return
@@ -1929,13 +2038,16 @@ final class MagnifierViewController:
                     style: .medium
                 ).impactOccurred()
                 self.announceRemoteStatus(
-                    "사진 보관함에 저장했습니다."
+                    AppLocalization.string(
+                        "사진 보관함에 저장했습니다."
+                    )
                 )
             } catch {
                 self.announceRemoteStatus(
-                    "사진을 저장하지 못했습니다: "
-                        + error
-                            .localizedDescription
+                    AppLocalization.format(
+                        "사진을 저장하지 못했습니다: %@",
+                        error.localizedDescription
+                    )
                 )
             }
         }
@@ -1969,8 +2081,10 @@ final class MagnifierViewController:
             present(picker, animated: true)
         } catch {
             announceRemoteStatus(
-                "Files로 내보내지 못했습니다: "
-                    + error.localizedDescription
+                AppLocalization.format(
+                    "Files로 내보내지 못했습니다: %@",
+                    error.localizedDescription
+                )
             )
         }
     }
@@ -1984,7 +2098,9 @@ final class MagnifierViewController:
         )
         pendingPhotoExportURL = nil
         announceRemoteStatus(
-            "Files에 사진을 저장했습니다."
+            AppLocalization.string(
+                "Files에 사진을 저장했습니다."
+            )
         )
     }
 
@@ -1996,7 +2112,9 @@ final class MagnifierViewController:
         )
         pendingPhotoExportURL = nil
         statusLabel.text =
-            "Files 저장을 취소했습니다."
+            AppLocalization.string(
+                "Files 저장을 취소했습니다."
+            )
     }
 
     @objc private func handlePinch(
@@ -2017,7 +2135,9 @@ final class MagnifierViewController:
         setZoom(1)
         UIAccessibility.post(
             notification: .announcement,
-            argument: "확대 배율 1배"
+            argument: AppLocalization.string(
+                "확대 배율 1배"
+            )
         )
     }
 
@@ -2223,7 +2343,10 @@ final class MagnifierViewController:
             }
         } catch {
             publishStatus(
-                "실시간 OCR 오류: \(error.localizedDescription)"
+                AppLocalization.format(
+                    "실시간 OCR 오류: %@",
+                    error.localizedDescription
+                )
             )
         }
     }
@@ -2243,9 +2366,15 @@ final class MagnifierViewController:
         )
 
         guard decision.disposition != .noText else {
-            liveTextLabel.text = "텍스트를 찾는 중…"
+            liveTextLabel.text =
+                AppLocalization.string(
+                    "텍스트를 찾는 중…"
+                )
             liveTextLabel.accessibilityValue = nil
-            statusLabel.text = "실시간 텍스트를 찾는 중"
+            statusLabel.text =
+                AppLocalization.string(
+                    "실시간 텍스트를 찾는 중"
+                )
             return
         }
         liveTextLabel.text = trimmed
@@ -2254,18 +2383,27 @@ final class MagnifierViewController:
         switch decision.disposition {
         case .lowQuality:
             statusLabel.text =
-                "글자가 작아 더 가까이 비춰 주세요"
+                AppLocalization.string(
+                    "글자가 작아 더 가까이 비춰 주세요"
+                )
         case .checking:
             statusLabel.text =
-                "인식 결과를 확인하는 중"
+                AppLocalization.string(
+                    "인식 결과를 확인하는 중"
+                )
         case .suppressed:
             statusLabel.text =
-                "실시간 텍스트를 찾는 중"
+                AppLocalization.string(
+                    "실시간 텍스트를 찾는 중"
+                )
         case .announce:
             guard isLiveReadingEnabled else {
                 return
             }
-            statusLabel.text = "인식한 텍스트 읽는 중"
+            statusLabel.text =
+                AppLocalization.string(
+                    "인식한 텍스트 읽는 중"
+                )
             tts.speak(decision.text)
         case .noText:
             return
@@ -2283,26 +2421,44 @@ final class MagnifierViewController:
 
         if isEnabled {
             liveTextDeduplicator.reset()
-            captureButton.configuration?.title = "읽기 일시정지"
+            captureButton.configuration?.title =
+                AppLocalization.string(
+                    "읽기 일시정지"
+                )
             captureButton.configuration?.image = UIImage(
                 systemName: "pause.fill"
             )
-            statusLabel.text = "실시간 텍스트를 찾는 중"
+            statusLabel.text =
+                AppLocalization.string(
+                    "실시간 텍스트를 찾는 중"
+                )
         } else {
             tts.stop()
-            captureButton.configuration?.title = "읽기 재개"
+            captureButton.configuration?.title =
+                AppLocalization.string(
+                    "읽기 재개"
+                )
             captureButton.configuration?.image = UIImage(
                 systemName: "play.fill"
             )
-            statusLabel.text = "실시간 읽기 일시정지"
+            statusLabel.text =
+                AppLocalization.string(
+                    "실시간 읽기 일시정지"
+                )
         }
         captureButton.accessibilityValue =
-            isEnabled ? "실행 중" : "일시정지"
+            isEnabled
+            ? AppLocalization.string("실행 중")
+            : AppLocalization.string("일시정지")
         UIAccessibility.post(
             notification: .announcement,
             argument: isEnabled
-                ? "실시간 읽기를 재개했습니다."
-                : "실시간 읽기를 일시정지했습니다."
+                ? AppLocalization.string(
+                    "실시간 읽기를 재개했습니다."
+                )
+                : AppLocalization.string(
+                    "실시간 읽기를 일시정지했습니다."
+                )
         )
     }
 
