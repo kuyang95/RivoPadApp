@@ -8,7 +8,8 @@
 import AppIntents
 
 struct appIntentExtension: AppIntent {
-    static var title: LocalizedStringResource { "appIntentExtension" }
+    static var title: LocalizedStringResource { "VisionCraft" }
+    static var isDiscoverable: Bool { false }
     
     func perform() async throws -> some IntentResult {
         return .result()

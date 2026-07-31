@@ -909,6 +909,137 @@ final class AppLocalizationTests:
         )
     }
 
+    func testAppShortcutCatalogLocalizesEveryPhraseGroup()
+        throws
+    {
+        let english = try localizedBundle(
+            language: "en"
+        )
+        let japanese = try localizedBundle(
+            language: "ja"
+        )
+        let expected:
+            [(String, String, String)] = [
+            (
+                "${applicationName} 설정 열기",
+                "Open ${applicationName} Settings",
+                "${applicationName}の設定を開く"
+            ),
+            (
+                "${applicationName} AI 채팅 열기",
+                "Open AI Chat in ${applicationName}",
+                "${applicationName}でAIチャットを開く"
+            ),
+            (
+                "${applicationName} 독서 열기",
+                "Open Reading in ${applicationName}",
+                "${applicationName}で読書を始める"
+            ),
+            (
+                "${applicationName} 카메라 열기",
+                "Open the Camera in ${applicationName}",
+                "${applicationName}でカメラを開く"
+            ),
+            (
+                "${applicationName} 문서 스캔",
+                "Scan a Document with ${applicationName}",
+                "${applicationName}で書類をスキャン"
+            ),
+            (
+                "${applicationName} 돋보기 열기",
+                "Open the Magnifier in ${applicationName}",
+                "${applicationName}で拡大鏡を開く"
+            ),
+            (
+                "${applicationName} 실시간 글자 읽기",
+                "Read Text Live with ${applicationName}",
+                "${applicationName}で文字をリアルタイムに読み上げる"
+            ),
+            (
+                "${applicationName} 파일 열기",
+                "Open Files in ${applicationName}",
+                "${applicationName}でファイルを開く"
+            ),
+            (
+                "${applicationName} Rivo 연결",
+                "Connect Rivo in ${applicationName}",
+                "${applicationName}でRivoに接続"
+            ),
+            (
+                "${applicationName} VisionLink 열기",
+                "Open VisionLink in ${applicationName}",
+                "${applicationName}でVisionLinkを開く"
+            )
+        ]
+
+        for (
+            key,
+            englishValue,
+            japaneseValue
+        ) in expected {
+            let localizedEnglish =
+                english.localizedString(
+                    forKey: key,
+                    value: nil,
+                    table: "AppShortcuts"
+                )
+            let localizedJapanese =
+                japanese.localizedString(
+                    forKey: key,
+                    value: nil,
+                    table: "AppShortcuts"
+                )
+            XCTAssertEqual(
+                localizedEnglish,
+                englishValue
+            )
+            XCTAssertEqual(
+                localizedJapanese,
+                japaneseValue
+            )
+            XCTAssertTrue(
+                localizedEnglish.contains(
+                    "${applicationName}"
+                )
+            )
+            XCTAssertTrue(
+                localizedJapanese.contains(
+                    "${applicationName}"
+                )
+            )
+        }
+    }
+
+    func testAppIntentRuntimeErrorsAreLocalized()
+    {
+        XCTAssertEqual(
+            AppLocalization.string(
+                "이미지가 전달되지 않았습니다.",
+                language: .english
+            ),
+            "No image was provided."
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "처리 가능한 이미지 타입이 없습니다.",
+                language: .japanese
+            ),
+            "対応している画像形式がありません。"
+        )
+        XCTAssertEqual(
+            String(
+                format:
+                    AppLocalization.string(
+                        "이미지를 UIImage로 변환하지 못했습니다. 형식: %@",
+                        language:
+                            .english
+                    ),
+                "public.heic"
+            ),
+            "The image couldn’t be converted to UIImage. Format: public.heic"
+        )
+    }
+
     private func localizedBundle(
         language: String
     ) throws -> Bundle {

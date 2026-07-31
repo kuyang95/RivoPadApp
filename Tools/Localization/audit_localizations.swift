@@ -22,6 +22,25 @@ private enum AuditError: Error, CustomStringConvertible {
     }
 }
 
+private struct StringCatalog: Decodable {
+    struct Entry: Decodable {
+        struct Localization: Decodable {
+            struct StringUnit: Decodable {
+                let state: String
+                let value: String
+            }
+
+            let stringUnit: StringUnit?
+        }
+
+        let localizations:
+            [String: Localization]?
+    }
+
+    let sourceLanguage: String
+    let strings: [String: Entry]
+}
+
 private func parseOptions() throws -> Options {
     var options = Options()
     var index = 1
@@ -78,13 +97,15 @@ private func printUsage() {
             [--objects-dir PATH] [--source-prefix PATH] [--require-complete]
 
         Always checks that the English and Japanese Localizable.strings files
-        have identical keys and compatible printf placeholders. It also scans
-        AppLocalization.string/format calls with literal keys in Swift source.
+        have identical keys and compatible printf placeholders. It also checks
+        the AppShortcuts string catalog and scans AppLocalization.string/format
+        calls with literal keys in Swift source.
 
         When --objects-dir points to Xcode's Objects-normal directory, the
         script also reads every .stringsdata file and reports compiler-extracted
-        keys missing from either bundle. Use --source-prefix to limit that
-        check, for example: shortcuts_example/Reader.
+        Localizable keys missing from either bundle and AppShortcuts groups
+        missing from the catalog. Use --source-prefix to limit that check, for
+        example: shortcuts_example/Reader.
         """
     )
 }
@@ -119,6 +140,46 @@ private func loadStrings(
         )
     }
     return strings
+}
+
+private func loadStringCatalog(
+    at url: URL
+) throws -> StringCatalog {
+    let data = try Data(
+        contentsOf: url
+    )
+    do {
+        return try JSONDecoder()
+            .decode(
+                StringCatalog.self,
+                from: data
+            )
+    } catch {
+        throw AuditError.unreadable(
+            "\(url.path) is not a valid string catalog: \(error)"
+        )
+    }
+}
+
+private func localizedCatalogValues(
+    _ catalog: StringCatalog,
+    language: String
+) -> [String: String] {
+    catalog.strings
+        .reduce(
+            into: [String: String]()
+        ) { result, item in
+            guard let unit =
+                    item.value
+                    .localizations?[language]?
+                    .stringUnit,
+                  unit.state == "translated",
+                  !unit.value.isEmpty else {
+                return
+            }
+            result[item.key] =
+                unit.value
+        }
 }
 
 private func placeholderSignature(
@@ -168,9 +229,44 @@ private func placeholderSignature(
     .sorted()
 }
 
+private func catalogTokenSignature(
+    in value: String
+) -> [String] {
+    let pattern = #"\$\{[^}]+\}"#
+    guard let expression =
+            try? NSRegularExpression(
+                pattern: pattern
+            ) else {
+        return []
+    }
+    let range = NSRange(
+        location: 0,
+        length:
+            (value as NSString)
+            .length
+    )
+    return expression.matches(
+        in: value,
+        range: range
+    ).compactMap { match in
+        guard let tokenRange =
+                Range(
+                    match.range,
+                    in: value
+                ) else {
+            return nil
+        }
+        return String(
+            value[tokenRange]
+        )
+    }
+    .sorted()
+}
+
 private func extractedKeys(
     in directory: URL,
-    sourcePrefix: String?
+    sourcePrefix: String?,
+    table: String
 ) throws -> Set<String> {
     guard let enumerator =
             FileManager.default
@@ -221,14 +317,15 @@ private func extractedKeys(
                 root["tables"]
                     as? [String: Any],
               let entries =
-                tables["Localizable"]
+                tables[table]
                     as? [[String: Any]] else {
             continue
         }
         for entry in entries {
             if let key =
                     entry["key"]
-                        as? String {
+                        as? String,
+               !key.isEmpty {
                 result.insert(key)
             }
         }
@@ -355,6 +452,29 @@ do {
                 "shortcuts_example/ja.lproj/Localizable.strings"
             )
     )
+    let shortcutCatalog =
+        try loadStringCatalog(
+            at:
+                root.appendingPathComponent(
+                    "shortcuts_example/AppShortcuts.xcstrings"
+                )
+        )
+    guard shortcutCatalog.sourceLanguage
+            == "ko" else {
+        throw AuditError.unreadable(
+            "AppShortcuts.xcstrings sourceLanguage must be ko"
+        )
+    }
+    let shortcutEnglish =
+        localizedCatalogValues(
+            shortcutCatalog,
+            language: "en"
+        )
+    let shortcutJapanese =
+        localizedCatalogValues(
+            shortcutCatalog,
+            language: "ja"
+        )
     let englishKeys = Set(
         english.keys
     )
@@ -413,6 +533,72 @@ do {
         formatMismatches
     )
 
+    let shortcutKeys = Set(
+        shortcutCatalog.strings.keys
+    )
+    let shortcutEnglishKeys = Set(
+        shortcutEnglish.keys
+    )
+    let shortcutJapaneseKeys = Set(
+        shortcutJapanese.keys
+    )
+    let shortcutMissingEnglish =
+        shortcutKeys
+        .subtracting(
+            shortcutEnglishKeys
+        )
+        .sorted()
+    let shortcutMissingJapanese =
+        shortcutKeys
+        .subtracting(
+            shortcutJapaneseKeys
+        )
+        .sorted()
+    var shortcutTokenMismatches:
+        [String] = []
+    for key in shortcutKeys.sorted() {
+        let sourceSignature =
+            catalogTokenSignature(
+                in: key
+            )
+        let englishSignature =
+            catalogTokenSignature(
+                in:
+                    shortcutEnglish[key]
+                    ?? ""
+            )
+        let japaneseSignature =
+            catalogTokenSignature(
+                in:
+                    shortcutJapanese[key]
+                    ?? ""
+            )
+        if sourceSignature
+            != englishSignature
+            || sourceSignature
+                != japaneseSignature {
+            shortcutTokenMismatches
+                .append(
+                    "\(key) | source \(sourceSignature) | en \(englishSignature) | ja \(japaneseSignature)"
+                )
+        }
+    }
+    print(
+        "App Shortcut catalog keys: \(shortcutKeys.count)"
+    )
+    printItems(
+        "App Shortcut keys missing from English",
+        shortcutMissingEnglish
+    )
+    printItems(
+        "App Shortcut keys missing from Japanese",
+        shortcutMissingJapanese
+    )
+    printItems(
+        "App Shortcut token mismatches",
+        shortcutTokenMismatches
+    )
+
     let literalKeys =
         try appLocalizationLiteralKeys(
             in: root,
@@ -445,7 +631,8 @@ do {
         let keys = try extractedKeys(
             in: objectsDirectory,
             sourcePrefix:
-                options.sourcePrefix
+                options.sourcePrefix,
+            table: "Localizable"
         )
         let extractedMissingEnglish =
             keys.subtracting(
@@ -475,12 +662,43 @@ do {
                 || !extractedMissingJapanese
                     .isEmpty
             )
+        let extractedShortcutKeys =
+            try extractedKeys(
+                in: objectsDirectory,
+                sourcePrefix:
+                    options.sourcePrefix,
+                table: "AppShortcuts"
+            )
+        let missingShortcutCatalogKeys =
+            extractedShortcutKeys
+            .subtracting(
+                shortcutKeys
+            )
+            .sorted()
+        print(
+            "Compiler-extracted App Shortcut groups: \(extractedShortcutKeys.count)"
+        )
+        printItems(
+            "Extracted App Shortcut groups missing from catalog",
+            missingShortcutCatalogKeys
+        )
+        extractionFailures =
+            extractionFailures
+            || (
+                options
+                .requiresCompleteExtraction
+                && !missingShortcutCatalogKeys
+                    .isEmpty
+            )
     }
 
     let failed =
         !missingEnglish.isEmpty
         || !missingJapanese.isEmpty
         || !formatMismatches.isEmpty
+        || !shortcutMissingEnglish.isEmpty
+        || !shortcutMissingJapanese.isEmpty
+        || !shortcutTokenMismatches.isEmpty
         || (
             options
                 .requiresCompleteExtraction

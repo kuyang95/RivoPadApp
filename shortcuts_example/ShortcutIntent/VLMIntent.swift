@@ -1,9 +1,14 @@
 import AppIntents
+import Foundation
 import UniformTypeIdentifiers
 
 struct VMLIntent: AppIntent {
 
     static var title: LocalizedStringResource = "이미지 질의"
+    static var description =
+        IntentDescription(
+            "이미지를 M4 로컬 AI로 분석합니다."
+        )
     static var openAppWhenRun: Bool = true
 
     @Parameter(title: "이미지", supportedContentTypes: [.image])
@@ -34,7 +39,10 @@ struct VMLIntent: AppIntent {
         // 1) 이미지 존재 확인
         guard let imageFile = image else {
             throw NSError(domain: "VMLIntent", code: -1, userInfo: [
-                NSLocalizedDescriptionKey: "이미지가 전달되지 않았습니다."
+                NSLocalizedDescriptionKey:
+                    AppLocalization.string(
+                        "이미지가 전달되지 않았습니다."
+                    )
             ])
         }
 

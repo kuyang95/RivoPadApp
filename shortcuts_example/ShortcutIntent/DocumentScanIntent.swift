@@ -9,6 +9,10 @@ import AppIntents
 
 struct DocumentScanIntent : AppIntent {
     static var title : LocalizedStringResource = "문서 스캔"
+    static var description =
+        IntentDescription(
+            "VisionCraft 자체 문서 스캐너를 엽니다."
+        )
     static var openAppWhenRun : Bool = true
     
     

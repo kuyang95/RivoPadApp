@@ -5,6 +5,10 @@ import UIKit
 struct VoiceQueryIntent: AppIntent {
 
     static var title: LocalizedStringResource = "음성 질의"
+    static var description =
+        IntentDescription(
+            "이미지나 문서를 열고 한국어 음성 질문을 시작합니다."
+        )
     static var openAppWhenRun: Bool = true
 
     @Parameter(title: "이미지", supportedContentTypes: [.image])
@@ -38,7 +42,10 @@ struct VoiceQueryIntent: AppIntent {
 
         guard let imageFile = image else {
             throw NSError(domain: "VoiceQueryIntent", code: -1, userInfo: [
-                NSLocalizedDescriptionKey: "이미지가 전달되지 않았습니다."
+                NSLocalizedDescriptionKey:
+                    AppLocalization.string(
+                        "이미지가 전달되지 않았습니다."
+                    )
             ])
         }
 
@@ -47,7 +54,10 @@ struct VoiceQueryIntent: AppIntent {
 
         guard let sourceType = pickBestImageType(from: availableTypes) else {
             throw NSError(domain: "VoiceQueryIntent", code: -2, userInfo: [
-                NSLocalizedDescriptionKey: "처리 가능한 이미지 타입이 없습니다."
+                NSLocalizedDescriptionKey:
+                    AppLocalization.string(
+                        "처리 가능한 이미지 타입이 없습니다."
+                    )
             ])
         }
 
@@ -59,7 +69,11 @@ struct VoiceQueryIntent: AppIntent {
         // 2) 어떤 포맷이든 UIImage로 디코드
         guard let uiImage = UIImage(data: sourceData) else {
             throw NSError(domain: "VoiceQueryIntent", code: -3, userInfo: [
-                NSLocalizedDescriptionKey: "이미지를 UIImage로 변환하지 못했습니다. type=\(sourceType.identifier)"
+                NSLocalizedDescriptionKey:
+                    AppLocalization.format(
+                        "이미지를 UIImage로 변환하지 못했습니다. 형식: %@",
+                        sourceType.identifier
+                    )
             ])
         }
 
@@ -80,7 +94,10 @@ struct VoiceQueryIntent: AppIntent {
 
         guard let encodedData = finalData else {
             throw NSError(domain: "VoiceQueryIntent", code: -4, userInfo: [
-                NSLocalizedDescriptionKey: "이미지 재인코딩에 실패했습니다."
+                NSLocalizedDescriptionKey:
+                    AppLocalization.string(
+                        "이미지 재인코딩에 실패했습니다."
+                    )
             ])
         }
 

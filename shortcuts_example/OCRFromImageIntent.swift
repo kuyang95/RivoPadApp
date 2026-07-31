@@ -13,6 +13,10 @@ import UniformTypeIdentifiers
 
 struct OCRIntent: AppIntent {
     static var title: LocalizedStringResource = "스크린샷 OCR"
+    static var description =
+        IntentDescription(
+            "스크린샷 또는 이미지의 글자를 로컬로 인식합니다."
+        )
     static var openAppWhenRun: Bool = true  // ✅ 앱을 열기 :contentReference[oaicite:2]{index=2}
 
     @Parameter(title: "이미지", supportedContentTypes: [.image])
@@ -48,7 +52,7 @@ struct OCRIntent: AppIntent {
             )
 
         // ✅ 앱 화면에서 읽어갈 수 있게 저장
-        OCRSharedStore.save(text: text)
+        await OCRSharedStore.save(text: text)
 
         // ✅ 단축어에서도 다음 단계로 텍스트를 쓸 수 있게 반환
         return .result(value: text, dialog: "OCR 완료")

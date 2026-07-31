@@ -12,6 +12,10 @@ iPadOS가 허용하는 앱 외부 진입점을 VisionCraft 기능에 연결한�
 - Siri·단축어에 노출되는 다음 10개 App Shortcut과 한국어 문구:
   설정, AI 채팅, 독서, 카메라, 문서 스캔, 돋보기, 실시간 글자 읽기,
   파일 열기, Rivo 리모컨, VisionLink
+- 기존 AI·이미지·OCR·음성·스캔 Intent와 10개 바로가기의 제목·설명·
+  매개변수·요약·결과·오류를 영어·일본어로 번역하고, 현지어 Siri
+  호출 문구에서 앱 이름 토큰을 유지
+- 동작이 없는 Xcode 템플릿 App Intent를 검색과 단축어 목록에서 숨김
 - App Shortcut 요청을 App Group envelope에 저장한 뒤 앱의
   `NavigationStack` 또는 Files 선택기로 한 번만 라우팅
 - 앱 최초 실행과 활성 복귀 양쪽에서 대기 중인 envelope 소비
@@ -28,6 +32,8 @@ iPadOS가 허용하는 앱 외부 진입점을 VisionCraft 기능에 연결한�
   날짜가 바뀌면 자동 초기화하며, 서버 쿼터 대신 `일일 제한 없음`을 표시
 - 10개 바로가기의 App Intents 메타데이터 추출과 화면 envelope
   직렬화·역직렬화 자동 테스트
+- 10개 App Shortcut 문자열 카탈로그의 영어·일본어 번역, 컴파일러
+  추출 그룹 일치와 `${applicationName}` 토큰 자동 검사
 - 새 AI 대화·AI 기록·음성 명령 전용 URL 라우팅 자동 테스트
 - 일일 AI 활동의 결과별 누적·App Group 복원·날짜 변경·손상 데이터·
   측정값 상한 자동 테스트
@@ -41,6 +47,8 @@ iPadOS가 허용하는 앱 외부 진입점을 VisionCraft 기능에 연결한�
 - [ ] “VisionCraft AI 채팅 열기”, “VisionCraft 문서 스캔”,
       “VisionCraft 돋보기 열기”, “VisionCraft 파일 열기”를 Siri에
       말하면 정확한 화면이 한 번만 열린다.
+- [ ] Siri 언어를 영어·일본어로 바꿔 각 언어의 AI 채팅·문서 스캔·
+      돋보기·파일 호출 문구가 한국어 없이 같은 화면을 연다.
 - [ ] 앱이 완전히 종료된 상태와 이미 열린 상태 모두에서 같은 명령이
       동작하고 이전 요청이 다시 실행되지 않는다.
 - [ ] `파일 열기`는 홈으로 돌아간 뒤 Files 선택기를 한 번만 표시한다.

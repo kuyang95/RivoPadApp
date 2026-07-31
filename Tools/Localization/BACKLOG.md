@@ -47,13 +47,18 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
   한국어 온디바이스 음성 입력 화면·명령·권한 안내 문구
 - 선택한 앱 언어를 M4 로컬 AI 답변 언어와 TTS 음성에 연결하고,
   영어·일본어 UI에서 한국어 음성 인식 제약을 명시
+- App Intent의 제목·설명·매개변수·요약·결과 대화와 오류 문구,
+  10개 App Shortcut의 영어·일본어 Siri 호출 문구
+- 기능 없는 템플릿 App Intent를 검색·단축어 목록에서 숨겨 실제
+  VisionCraft 동작만 노출
 - Xcode `.stringsdata`의 화면별 키와 UIKit용 `AppLocalization` 리터럴
   키를 수집해 영어·일본어 누락, 두 번들의 키·printf 지정자 차이를
   검사하며 줄바꿈된 호출 형식도 놓치지 않는 `audit_localizations.swift`
+- `AppShortcuts.xcstrings`의 영어·일본어 완성도, 컴파일러가 추출한
+  바로가기 그룹과 `${applicationName}` 토큰 보존을 같은 감사에서 검사
 
 ## 다음 번역 묶음
 
-- App Intent의 title, description, parameter와 Siri phrase
 - 기능별 나머지 로컬 진단 로그, 파일명과 오류 문구
 - 영어·일본어 사용 설명서 및 변경 내역 본문
 
@@ -63,6 +68,8 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
       계속 줄이는 검사 도구를 추가한다.
 - [x] 영어와 일본어 `.strings`가 같은 key 집합과 printf 지정자를
       유지하는지 검사한다.
+- [x] App Shortcut 문자열 카탈로그의 언어별 누락과 앱 이름 토큰을
+      검사한다.
 - [ ] 영어·일본어로 시뮬레이터를 각각 실행해 주요 화면 스크린샷을 남긴다.
 - [ ] 긴 영어 문구와 일본어에서 큰 글자·가로/세로 레이아웃을 확인한다.
 
@@ -84,11 +91,13 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 - [ ] 영어·일본어에서 AI 대화·이미지·PDF 질문의 화면과 오류가 번역되고,
       답변과 TTS가 선택 언어를 사용하며 음성 입력은 한국어 인식으로
       정확히 안내되는지 확인한다.
+- [ ] iPad와 Siri 언어를 영어·일본어로 바꿔 10개 App Shortcut의
+      이름·매개변수와 현지어 호출 문구를 확인한다.
 - [ ] 공유 시트, 선택 텍스트 동작과 홈 위젯의 이름이 앱 언어와 일치한다.
 - [ ] VoiceOver가 번역된 레이블과 동적 Rivo 상태를 자연스럽게 읽는다.
 
 ## 현재 범위
 
-앱 셸과 주요 로컬 기능 화면은 번역했지만 App Intent 메타데이터와
-매뉴얼 본문에는 아직 한국어가 남아 있으므로 전체 다국어 완료로
-표시하지 않는다.
+앱 셸, 주요 로컬 기능 화면과 App Intent 메타데이터는 번역했지만
+매뉴얼·변경 내역 본문과 기능별 일부 진단 문자열에는 아직 한국어가
+남아 있으므로 전체 다국어 완료로 표시하지 않는다.

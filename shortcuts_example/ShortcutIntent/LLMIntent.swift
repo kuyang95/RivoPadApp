@@ -9,6 +9,10 @@ import AppIntents
 
 struct LLMIntent : AppIntent {
     static var title : LocalizedStringResource = "AI에게 요청하기"
+    static var description =
+        IntentDescription(
+            "텍스트 문서를 M4 로컬 AI에 질문합니다."
+        )
     static var openAppWhenRun : Bool = true
     
     @Parameter(title: "분석할 텍스트")
