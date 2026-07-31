@@ -137,15 +137,28 @@ struct DocumentLibraryView: View {
                     Label(
                         "파일 하나 선택",
                         systemImage:
-                            "doc.badge.plus"
+                        "doc.badge.plus"
                     )
                 }
                 .accessibilityHint(
                     "Files에서 파일 하나를 바로 선택해 엽니다."
                 )
+
+                Button {
+                    openClipboardText()
+                } label: {
+                    Label(
+                        "클립보드 열기",
+                        systemImage:
+                            "doc.on.clipboard"
+                    )
+                }
+                .accessibilityHint(
+                    "사용자가 복사한 텍스트를 편집하고 읽을 수 있는 문서로 엽니다."
+                )
             } footer: {
                 Text(
-                    "사진·EPUB 또는 문서 하나를 바로 열 수 있습니다."
+                    "사진·EPUB·문서 파일 또는 복사한 텍스트를 바로 열 수 있습니다."
                 )
             }
 
@@ -470,5 +483,27 @@ struct DocumentLibraryView: View {
         .accessibilityHint(
             "문서를 앱 안으로 복사해 엽니다."
         )
+    }
+
+    private func openClipboardText() {
+        guard let text =
+                UIPasteboard.general.string,
+              !text.trimmingCharacters(
+                  in: .whitespacesAndNewlines
+              ).isEmpty else {
+            viewModel.errorDescription =
+                AppLocalization.string(
+                    "클립보드가 비어 있습니다."
+                )
+            return
+        }
+        appRouter.route =
+            .localTextDocument(
+                title:
+                    AppLocalization.string(
+                        "클립보드 텍스트"
+                    ),
+                text: text
+            )
     }
 }

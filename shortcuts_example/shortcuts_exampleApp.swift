@@ -248,6 +248,26 @@ struct shortcuts_exampleApp: App {
                                             .localDocumentReader
                                         )
                                 }
+                        case .localTextDocument(
+                            let title,
+                            let text
+                        ):
+                            LocalDocumentView(
+                                title: title,
+                                text: text
+                            )
+                            .onAppear {
+                                rivoScreenRemoteControlCenter
+                                    .activate(
+                                        .localDocumentReader
+                                    )
+                            }
+                            .onDisappear {
+                                rivoScreenRemoteControlCenter
+                                    .deactivate(
+                                        .localDocumentReader
+                                    )
+                            }
                         case .documentQuestion(
                             let document,
                             let question

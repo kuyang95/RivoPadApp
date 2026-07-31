@@ -93,6 +93,7 @@
 @chapter Documents and Reading
 @section PDF and Text
 @text From Files on the Home screen, choose one image, EPUB, PDF, TXT, XLSX, XLS, HWP, or HWPX file, or authorize a folder to search.
+@text Tap Open Clipboard on the Files screen to open copied text exactly as an in-memory document for editing, speech, copying, AI questions, and TXT or PDF export.
 @text Authorized folder access is stored as a security-scoped bookmark. PDF, TXT, XLSX, XLS, HWP, and HWPX files can be searched by name and relative folder path and are shown by most recent modification date.
 @text Under iPadOS policy, storage outside folders you approve cannot be searched. Removing folder access does not delete original files.
 @text PDFs and text open in a large-text document screen with reading, editing, copying, and AI questions.

@@ -56,6 +56,10 @@ enum AppRoute: Hashable {
     case sharedInbox
     case documentLibrary
     case localDocument(fileURL: URL)
+    case localTextDocument(
+        title: String,
+        text: String
+    )
     case documentQuestion(document: String, question: String)
     case readerLibrary
     case epubReader(fileURL: URL)

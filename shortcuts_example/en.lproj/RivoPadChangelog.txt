@@ -11,6 +11,7 @@
 @text Added a custom document scanner, Magnifier, Live Text Reading, and Android-compatible color filters.
 @text Added storage and restoration of the camera’s last Android-compatible color combination, inversion, and threshold when entering Rivo screen control mode.
 @text Added PDF and TXT document viewing and EPUB, DAISY, and SMIL reading.
+@text Added an Android-style clipboard document that opens copied text directly from Files for editing, speech, AI questions, and TXT or PDF export.
 @text Added single-line landscape document reading and TTS navigation with spoken-sentence highlighting, previous, repeat, and next.
 @text Added a complete EPUB and DAISY library, recently read sorting, SHA-256 duplicate prevention, and book deletion that preserves the original.
 @text Added a combined EPUB and DAISY audio and local-speech timeline with time and percentage displays and an arbitrary-position slider.

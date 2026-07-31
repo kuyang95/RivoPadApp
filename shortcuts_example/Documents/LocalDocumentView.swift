@@ -14,12 +14,20 @@ final class LocalDocumentViewModel: ObservableObject {
 
     let fileName: String
 
-    private let fileURL: URL
+    private let fileURL: URL?
+    private let initialText: String?
     private var didLoad = false
 
     init(fileURL: URL) {
         self.fileURL = fileURL
+        self.initialText = nil
         self.fileName = fileURL.lastPathComponent
+    }
+
+    init(title: String, text: String) {
+        self.fileURL = nil
+        self.initialText = text
+        self.fileName = title
     }
 
     func load() async {
@@ -30,7 +38,28 @@ final class LocalDocumentViewModel: ObservableObject {
         isLoading = true
         errorDescription = nil
 
+        if let initialText {
+            text = initialText
+            status = AppLocalization.format(
+                "본문 %lld자",
+                initialText.count
+            )
+            isLoading = false
+            return
+        }
+
         do {
+            guard let fileURL else {
+                throw CocoaError(
+                    .fileNoSuchFile,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            AppLocalization.string(
+                                "문서를 열 수 없습니다."
+                            )
+                    ]
+                )
+            }
             let pathExtension = fileURL
                 .pathExtension
                 .lowercased()
@@ -42,7 +71,7 @@ final class LocalDocumentViewModel: ObservableObject {
                 )
 
             if contentType?.conforms(to: .pdf) == true {
-                try await loadPDF()
+                try await loadPDF(from: fileURL)
             } else if contentType?.conforms(to: .plainText) == true {
                 let data = try Data(
                     contentsOf: fileURL,
@@ -87,7 +116,9 @@ final class LocalDocumentViewModel: ObservableObject {
         isLoading = false
     }
 
-    private func loadPDF() async throws {
+    private func loadPDF(
+        from fileURL: URL
+    ) async throws {
         guard let document = PDFDocument(url: fileURL) else {
             throw CocoaError(
                 .fileReadCorruptFile,
@@ -247,6 +278,27 @@ struct LocalDocumentView: View {
         _viewModel = StateObject(
             wrappedValue: LocalDocumentViewModel(
                 fileURL: fileURL
+            )
+        )
+        _speechController = StateObject(
+            wrappedValue:
+                LocalDocumentSpeechController()
+        )
+        _appearance = State(
+            initialValue:
+                appearanceStore.load()
+        )
+    }
+
+    init(title: String, text: String) {
+        let appearanceStore =
+            LocalDocumentAppearanceStore()
+        self.appearanceStore =
+            appearanceStore
+        _viewModel = StateObject(
+            wrappedValue: LocalDocumentViewModel(
+                title: title,
+                text: text
             )
         )
         _speechController = StateObject(

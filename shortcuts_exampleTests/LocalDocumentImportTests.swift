@@ -5,6 +5,36 @@ import XCTest
 @testable import shortcuts_example
 
 final class LocalDocumentImportTests: XCTestCase {
+    @MainActor
+    func testInMemoryClipboardDocumentLoadsExactText()
+        async
+    {
+        let expected =
+            "첫 줄\n\n공백을 보존한 두 번째 줄 "
+        let viewModel =
+            LocalDocumentViewModel(
+                title: "클립보드 텍스트",
+                text: expected
+            )
+
+        await viewModel.load()
+        await viewModel.load()
+
+        XCTAssertEqual(
+            viewModel.fileName,
+            "클립보드 텍스트"
+        )
+        XCTAssertEqual(
+            viewModel.text,
+            expected
+        )
+        XCTAssertFalse(viewModel.isLoading)
+        XCTAssertNil(
+            viewModel.errorDescription
+        )
+        XCTAssertNil(viewModel.pdfDocument)
+    }
+
     func testTextDecoderSupportsUTF8AndUTF16() throws {
         let korean = "로컬 문서 테스트"
 
