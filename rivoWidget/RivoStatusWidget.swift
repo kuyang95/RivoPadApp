@@ -746,6 +746,63 @@ struct VisionCraftShortcutWidget:
     }
 }
 
+struct VisionCraftControlConfiguration:
+    ControlConfigurationIntent
+{
+    static let title:
+        LocalizedStringResource =
+        "VisionCraft 제어 센터"
+    static let description =
+        IntentDescription(
+            "제어 센터와 잠금 화면에서 자주 쓰는 기능 하나를 바로 엽니다."
+        )
+
+    @Parameter(
+        title: "열 기능",
+        default: .newAIChat
+    )
+    var shortcut:
+        VisionCraftWidgetShortcut
+}
+
+struct VisionCraftQuickLaunchControl:
+    ControlWidget
+{
+    static let kind =
+        "VisionCraftQuickLaunchControl"
+
+    var body:
+        some ControlWidgetConfiguration
+    {
+        AppIntentControlConfiguration(
+            kind: Self.kind,
+            intent:
+                VisionCraftControlConfiguration
+                .self
+        ) { configuration in
+            ControlWidgetButton(
+                action: OpenURLIntent(
+                    configuration.shortcut
+                        .deepLinkURL
+                )
+            ) {
+                Label(
+                    configuration.shortcut.title,
+                    systemImage:
+                        configuration.shortcut
+                        .systemImage
+                )
+            }
+        }
+        .displayName(
+            "VisionCraft 빠른 실행"
+        )
+        .description(
+            "제어 센터나 잠금 화면에서 선택한 VisionCraft 기능을 엽니다."
+        )
+    }
+}
+
 private struct LocalAIUsageWidgetSnapshot:
     Codable
 {
@@ -1126,5 +1183,6 @@ struct RivoWidgetBundle: WidgetBundle {
         RivoStatusWidget()
         VisionCraftShortcutWidget()
         LocalAIUsageWidget()
+        VisionCraftQuickLaunchControl()
     }
 }

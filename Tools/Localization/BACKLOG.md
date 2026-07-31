@@ -19,6 +19,8 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
 - Share Extension과 선택 텍스트 Action의 표시 이름, 상태와 오류 안내
 - Rivo 위젯의 표시 이름, 연결 상태, 바로가기와 VoiceOver 안내
 - 구성 가능한 VisionCraft 빠른 실행 위젯의 아홉 기능 이름·설명·힌트
+- 제어 센터·잠금 화면의 구성 가능한 VisionCraft 빠른 실행 컨트롤
+  이름·설명과 아홉 기능 선택 값
 - 카메라·마이크·동작·음성 인식·Bluetooth 권한 설명
 - PDF·TXT·XLS·XLSX·HWP 문서 보기·편집·복사·내보내기, 줄·페이지
   탐색, 문장 TTS, 16색 테마와 Rivo 문서 조작 피드백
@@ -93,7 +95,8 @@ Android의 `values`, `values-en`, `values-ja` 구성을 기준으로 iPad 앱도
       정확히 안내되는지 확인한다.
 - [ ] iPad와 Siri 언어를 영어·일본어로 바꿔 10개 App Shortcut의
       이름·매개변수와 현지어 호출 문구를 확인한다.
-- [ ] 공유 시트, 선택 텍스트 동작과 홈 위젯의 이름이 앱 언어와 일치한다.
+- [ ] 공유 시트, 선택 텍스트 동작과 홈 위젯·제어 센터 컨트롤의 이름이
+      앱 언어와 일치한다.
 - [ ] VoiceOver가 번역된 레이블과 동적 Rivo 상태를 자연스럽게 읽는다.
 
 ## 현재 범위
