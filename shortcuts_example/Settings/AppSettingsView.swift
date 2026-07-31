@@ -40,6 +40,7 @@ struct AppSettingsView: View {
             sharingSection
             scannerSection
             appearanceSection
+            rivoQuickMenuSection
             documentSection
             readerSection
             webSearchSection
@@ -318,6 +319,50 @@ struct AppSettingsView: View {
                 isOn:
                     $documentAppearance
                     .usesSingleLineInLandscape
+            )
+        }
+    }
+
+    private var rivoQuickMenuSection:
+        some View
+    {
+        Section {
+            Toggle(
+                "메뉴바 펼쳐보기",
+                isOn:
+                    $settings
+                    .rivoQuickMenuExpanded
+            )
+            .accessibilityHint(
+                "메뉴 항목을 위에서 아래로 한 번에 펼쳐 표시합니다."
+            )
+
+            Picker(
+                "리모컨 조작 메뉴 색 조합",
+                selection:
+                    $settings
+                    .rivoQuickMenuColorIndex
+            ) {
+                ForEach(
+                    Array(
+                        LocalDocumentColorTheme
+                            .all.enumerated()
+                    ),
+                    id: \.offset
+                ) { index, theme in
+                    Text(
+                        LocalizedStringKey(
+                            theme.name
+                        )
+                    )
+                    .tag(index)
+                }
+            }
+        } header: {
+            Text("앱 내부 빠른 메뉴")
+        } footer: {
+            Text(
+                "Android의 Remote Ribbon 설정을 앱 안에서만 적용합니다. iPadOS에서는 다른 앱 위에 메뉴를 표시할 수 없습니다."
             )
         }
     }

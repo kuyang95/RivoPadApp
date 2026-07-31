@@ -69,6 +69,15 @@ final class AppSettingsStoreTests:
             store.sharedTextEntryMode,
             .voice
         )
+        XCTAssertFalse(
+            store.rivoQuickMenuExpanded
+        )
+        XCTAssertEqual(
+            store.rivoQuickMenuColorIndex,
+            LocalDocumentAppearance
+                .defaultValue
+                .colorIndex
+        )
     }
 
     func testChangesPersistAcrossStoreInstances()
@@ -92,6 +101,8 @@ final class AppSettingsStoreTests:
             false
         store.appLanguage = .japanese
         store.sharedTextEntryMode = .chat
+        store.rivoQuickMenuExpanded = false
+        store.rivoQuickMenuColorIndex = 9
 
         let restored = AppSettingsStore(
             defaults: defaults
@@ -129,6 +140,13 @@ final class AppSettingsStoreTests:
         XCTAssertEqual(
             restored.sharedTextEntryMode,
             .chat
+        )
+        XCTAssertFalse(
+            restored.rivoQuickMenuExpanded
+        )
+        XCTAssertEqual(
+            restored.rivoQuickMenuColorIndex,
+            9
         )
     }
 
@@ -187,6 +205,8 @@ final class AppSettingsStoreTests:
             false
         store.appLanguage = .english
         store.sharedTextEntryMode = .chat
+        store.rivoQuickMenuExpanded = false
+        store.rivoQuickMenuColorIndex = 12
 
         store.resetToDefaults()
 
@@ -223,6 +243,15 @@ final class AppSettingsStoreTests:
             store.sharedTextEntryMode,
             .voice
         )
+        XCTAssertFalse(
+            store.rivoQuickMenuExpanded
+        )
+        XCTAssertEqual(
+            store.rivoQuickMenuColorIndex,
+            LocalDocumentAppearance
+                .defaultValue
+                .colorIndex
+        )
         XCTAssertEqual(
             AppSpeechRate.normal.avSpeechRate,
             AVSpeechUtteranceDefaultSpeechRate
@@ -248,6 +277,48 @@ final class AppSettingsStoreTests:
             SharedTextEntryMode
                 .chat
                 .automaticallyStartsVoiceInput
+        )
+    }
+
+    func testQuickMenuColorUsesDocumentFallbackAndClamps()
+    {
+        LocalDocumentAppearanceStore(
+            defaults: defaults
+        )
+        .save(
+            LocalDocumentAppearance(
+                fontLevel: 5,
+                lineHeightLevel: 5,
+                colorIndex: 7,
+                showsLineSeparators: false
+            )
+        )
+
+        let fallbackStore =
+            AppSettingsStore(
+                defaults: defaults
+            )
+        XCTAssertEqual(
+            fallbackStore
+                .rivoQuickMenuColorIndex,
+            7
+        )
+
+        fallbackStore
+            .rivoQuickMenuColorIndex = 999
+        XCTAssertEqual(
+            fallbackStore
+                .rivoQuickMenuColorIndex,
+            LocalDocumentColorTheme
+                .all.count - 1
+        )
+
+        fallbackStore
+            .rivoQuickMenuColorIndex = -10
+        XCTAssertEqual(
+            fallbackStore
+                .rivoQuickMenuColorIndex,
+            0
         )
     }
 

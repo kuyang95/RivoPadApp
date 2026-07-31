@@ -77,7 +77,7 @@ Android `TextEditorViewerScreen`과 iPad의 `LocalDocumentView`를 대조해,
       페이지 순서·줄바꿈·숫자·URL이 보존되고 진행 상태와 총 시간이
       이해 가능한지 확인한다.
 
-## 다음 구현
+## 제품 확장 — Android 포팅 완료 조건 아님
 
 - XLS/XLSX 시트별 전용 표 탐색
 

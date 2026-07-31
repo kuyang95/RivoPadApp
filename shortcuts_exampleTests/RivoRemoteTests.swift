@@ -758,6 +758,34 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         XCTAssertFalse(controlCenter.isMenuPresented)
     }
 
+    func testQuickMenuTouchFocusMovesWithoutActivation() {
+        let controlCenter =
+            RivoRemoteControlCenter()
+
+        XCTAssertNil(
+            controlCenter.receive(
+                button(
+                    .l1,
+                    action: .pressed
+                )
+            )
+        )
+        controlCenter.focusItem(at: 5)
+
+        XCTAssertTrue(
+            controlCenter.isMenuPresented
+        )
+        XCTAssertEqual(
+            controlCenter.selectedIndex,
+            5
+        )
+        XCTAssertTrue(
+            controlCenter.feedback.contains(
+                controlCenter.items[5].title
+            )
+        )
+    }
+
     func testReleaseDoesNotTriggerMenuAndGlobalCommandsWork() {
         let controlCenter = RivoRemoteControlCenter()
 

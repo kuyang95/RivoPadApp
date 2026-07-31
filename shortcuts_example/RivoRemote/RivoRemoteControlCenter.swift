@@ -286,6 +286,15 @@ final class RivoRemoteControlCenter: ObservableObject {
         return activateSelection()
     }
 
+    func focusItem(at index: Int) {
+        guard items.indices.contains(index)
+        else {
+            return
+        }
+        selectedIndex = index
+        announceSelection()
+    }
+
     func dismissMenu() {
         isMenuPresented = false
         feedback = AppLocalization.string(
@@ -467,7 +476,69 @@ final class RivoRemoteControlCenter: ObservableObject {
 
 struct RivoQuickMenuOverlay: View {
     @ObservedObject var controlCenter: RivoRemoteControlCenter
+    @ObservedObject private var settings =
+        AppSettingsStore.shared
     let onCommand: (RivoRemoteCommand) -> Void
+
+    private var theme: LocalDocumentColorTheme {
+        let themes = LocalDocumentColorTheme.all
+        let index = min(
+            max(
+                settings.rivoQuickMenuColorIndex,
+                0
+            ),
+            max(themes.count - 1, 0)
+        )
+        return themes[index]
+    }
+
+    private var backgroundColor: Color {
+        color(hex: theme.backgroundHex)
+    }
+
+    private var foregroundColor: Color {
+        color(hex: theme.foregroundHex)
+    }
+
+    private var indexedItems: [
+        (
+            offset: Int,
+            element: RivoQuickMenuItem
+        )
+    ] {
+        Array(
+            controlCenter.items.enumerated()
+        )
+    }
+
+    private var compactItems: [
+        (
+            offset: Int,
+            element: RivoQuickMenuItem
+        )
+    ] {
+        let indexed = indexedItems
+        guard indexed.count > 1,
+              indexed.indices.contains(
+                  controlCenter.selectedIndex
+              ) else {
+            return indexed
+        }
+        let selected =
+            controlCenter.selectedIndex
+        let previous =
+            selected == 0
+            ? indexed.count - 1
+            : selected - 1
+        let next =
+            (selected + 1)
+            % indexed.count
+        return [
+            indexed[previous],
+            indexed[selected],
+            indexed[next],
+        ]
+    }
 
     var body: some View {
         HStack {
@@ -485,60 +556,30 @@ struct RivoQuickMenuOverlay: View {
                     .font(.title2)
                 }
 
-                ForEach(
-                    Array(controlCenter.items.enumerated()),
-                    id: \.element.id
-                ) { index, item in
-                    Button {
-                        if let command =
-                            controlCenter.activateItem(
-                                at: index
-                            ) {
-                            onCommand(command)
-                        }
-                    } label: {
-                        HStack(spacing: 16) {
-                            Image(systemName: item.systemImage)
-                                .frame(width: 34)
-                            Text(item.title)
-                                .font(.title3.bold())
-                            Spacer()
-                            if index
-                                == controlCenter.selectedIndex {
-                                Image(systemName: "circle.fill")
-                                    .font(.caption)
-                            }
-                        }
-                        .padding(.horizontal, 18)
-                        .frame(height: 62)
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            index == controlCenter.selectedIndex
-                                ? Color.orange
-                                : Color.white.opacity(0.12)
-                        )
-                        .clipShape(
-                            RoundedRectangle(
-                                cornerRadius: 16,
-                                style: .continuous
-                            )
+                if settings
+                    .rivoQuickMenuExpanded {
+                    ForEach(
+                        indexedItems,
+                        id: \.element.id
+                    ) { index, item in
+                        expandedMenuRow(
+                            item,
+                            at: index
                         )
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(item.title)
-                    .accessibilityValue(
-                        Text(
-                            verbatim:
-                                index
-                                    == controlCenter
-                                    .selectedIndex
-                                ? AppLocalization
-                                    .string(
-                                        "선택됨"
-                                    )
-                                : ""
-                        )
-                    )
+                } else {
+                    HStack(spacing: 8) {
+                        ForEach(
+                            compactItems,
+                            id: \.offset
+                        ) { index, item in
+                            compactMenuItem(
+                                item,
+                                at: index
+                            )
+                        }
+                    }
+                    .frame(height: 96)
                 }
 
                 Text(
@@ -547,12 +588,16 @@ struct RivoQuickMenuOverlay: View {
                     )
                 )
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(
+                    foregroundColor.opacity(0.75)
+                )
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(foregroundColor)
             .padding(24)
             .frame(width: 420)
-            .background(.black.opacity(0.94))
+            .background(
+                backgroundColor.opacity(0.97)
+            )
             .clipShape(
                 RoundedRectangle(
                     cornerRadius: 28,
@@ -565,6 +610,170 @@ struct RivoQuickMenuOverlay: View {
         .transition(
             .move(edge: .trailing)
                 .combined(with: .opacity)
+        )
+    }
+
+    private func expandedMenuRow(
+        _ item: RivoQuickMenuItem,
+        at index: Int
+    ) -> some View {
+        let isSelected =
+            index
+            == controlCenter.selectedIndex
+        return Button {
+            if let command =
+                controlCenter.activateItem(
+                    at: index
+                ) {
+                onCommand(command)
+            }
+        } label: {
+            HStack(spacing: 16) {
+                Image(
+                    systemName:
+                        item.systemImage
+                )
+                .frame(width: 34)
+                Text(item.title)
+                    .font(.title3.bold())
+                Spacer()
+                if isSelected {
+                    Image(
+                        systemName:
+                            "circle.fill"
+                    )
+                    .font(.caption)
+                }
+            }
+            .foregroundStyle(
+                isSelected
+                    ? backgroundColor
+                    : foregroundColor
+            )
+            .padding(.horizontal, 18)
+            .frame(height: 62)
+            .frame(maxWidth: .infinity)
+            .background(
+                isSelected
+                    ? foregroundColor
+                    : foregroundColor
+                        .opacity(0.12)
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 16,
+                    style: .continuous
+                )
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(item.title)
+        .accessibilityValue(
+            Text(
+                verbatim:
+                    isSelected
+                    ? AppLocalization.string(
+                        "선택됨"
+                    )
+                    : ""
+            )
+        )
+    }
+
+    private func compactMenuItem(
+        _ item: RivoQuickMenuItem,
+        at index: Int
+    ) -> some View {
+        let isSelected =
+            index
+            == controlCenter.selectedIndex
+        return Button {
+            if isSelected {
+                if let command =
+                    controlCenter.activateItem(
+                        at: index
+                    ) {
+                    onCommand(command)
+                }
+            } else {
+                controlCenter.focusItem(
+                    at: index
+                )
+            }
+        } label: {
+            VStack(spacing: 8) {
+                Image(
+                    systemName:
+                        item.systemImage
+                )
+                .font(
+                    isSelected
+                        ? .title2
+                        : .headline
+                )
+                Text(item.title)
+                    .font(
+                        isSelected
+                            ? .headline.bold()
+                            : .subheadline
+                    )
+                    .multilineTextAlignment(
+                        .center
+                    )
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.75)
+            }
+            .foregroundStyle(
+                foregroundColor
+            )
+            .opacity(
+                isSelected ? 1 : 0.42
+            )
+            .frame(maxWidth: .infinity)
+            .frame(height: 88)
+            .background(
+                isSelected
+                    ? foregroundColor
+                        .opacity(0.12)
+                    : Color.clear
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
+            )
+            .scaleEffect(
+                isSelected ? 1 : 0.9
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(item.title)
+        .accessibilityValue(
+            Text(
+                verbatim:
+                    isSelected
+                    ? AppLocalization.string(
+                        "선택됨"
+                    )
+                    : ""
+            )
+        )
+    }
+
+    private func color(hex: Int) -> Color {
+        Color(
+            red:
+                Double(
+                    (hex >> 16) & 0xFF
+                ) / 255,
+            green:
+                Double(
+                    (hex >> 8) & 0xFF
+                ) / 255,
+            blue:
+                Double(hex & 0xFF)
+                / 255
         )
     }
 }

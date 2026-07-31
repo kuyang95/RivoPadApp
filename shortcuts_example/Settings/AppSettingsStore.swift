@@ -243,6 +243,10 @@ final class AppSettingsStore:
             AppLanguage.preferenceKey
         static let sharedTextEntryMode =
             "settings.sharedTextEntryMode.v1"
+        static let rivoQuickMenuExpanded =
+            "settings.rivoQuickMenuExpanded.v1"
+        static let rivoQuickMenuColorIndex =
+            "settings.rivoQuickMenuColorIndex.v1"
     }
 
     static let shared = AppSettingsStore()
@@ -346,6 +350,39 @@ final class AppSettingsStore:
         }
     }
 
+    @Published var rivoQuickMenuExpanded:
+        Bool
+    {
+        didSet {
+            save(
+                rivoQuickMenuExpanded,
+                forKey:
+                    Key.rivoQuickMenuExpanded
+            )
+        }
+    }
+
+    @Published var rivoQuickMenuColorIndex:
+        Int
+    {
+        didSet {
+            let normalized =
+                Self.normalizedRivoQuickMenuColorIndex(
+                    rivoQuickMenuColorIndex
+                )
+            if normalized
+                != rivoQuickMenuColorIndex {
+                rivoQuickMenuColorIndex =
+                    normalized
+            }
+            defaults.set(
+                normalized,
+                forKey:
+                    Key.rivoQuickMenuColorIndex
+            )
+        }
+    }
+
     private let defaults: UserDefaults
 
     init(
@@ -413,6 +450,36 @@ final class AppSettingsStore:
                 SharedTextEntryMode.init
             )
             ?? .voice
+        rivoQuickMenuExpanded =
+            Self.bool(
+                forKey:
+                    Key.rivoQuickMenuExpanded,
+                defaults: defaults,
+                fallback: false
+            )
+        let quickMenuColorFallback =
+            LocalDocumentAppearanceStore(
+                defaults: defaults
+            )
+            .load()
+            .colorIndex
+        if defaults.object(
+            forKey:
+                Key.rivoQuickMenuColorIndex
+        ) != nil {
+            rivoQuickMenuColorIndex =
+                Self.normalizedRivoQuickMenuColorIndex(
+                    defaults.integer(
+                        forKey:
+                            Key.rivoQuickMenuColorIndex
+                    )
+                )
+        } else {
+            rivoQuickMenuColorIndex =
+                Self.normalizedRivoQuickMenuColorIndex(
+                    quickMenuColorFallback
+                )
+        }
     }
 
     func resetToDefaults() {
@@ -428,6 +495,11 @@ final class AppSettingsStore:
         ocrAutoCorrectionEnabled = true
         appLanguage = .system
         sharedTextEntryMode = .voice
+        rivoQuickMenuExpanded = false
+        rivoQuickMenuColorIndex =
+            LocalDocumentAppearance
+            .defaultValue
+            .colorIndex
     }
 
     private func save(
@@ -448,5 +520,20 @@ final class AppSettingsStore:
             return fallback
         }
         return defaults.bool(forKey: key)
+    }
+
+    private static func
+        normalizedRivoQuickMenuColorIndex(
+            _ value: Int
+        ) -> Int
+    {
+        min(
+            max(value, 0),
+            max(
+                LocalDocumentColorTheme
+                    .all.count - 1,
+                0
+            )
+        )
     }
 }
