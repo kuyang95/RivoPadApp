@@ -103,6 +103,14 @@ nonisolated enum EPUBReaderAutoplayPolicy {
     }
 }
 
+nonisolated enum EPUBReaderProgressTrackingPolicy {
+    static func shouldAdoptVisibleSegment(
+        isPlaybackActive: Bool
+    ) -> Bool {
+        !isPlaybackActive
+    }
+}
+
 nonisolated struct PublicationNavigationLocation:
     Equatable,
     Sendable
@@ -478,7 +486,10 @@ final class EPUBReaderViewModel: ObservableObject {
         )
     }
 
-    func noteVisibleSegment(_ index: Int) {
+    func noteVisibleSegment(
+        _ index: Int,
+        isPlaybackActive: Bool
+    ) {
         guard !isApplyingNavigation,
               let chapter = currentChapter else {
             return
@@ -489,6 +500,13 @@ final class EPUBReaderViewModel: ObservableObject {
             )
         guard segments.indices.contains(index),
               index != currentSegmentIndex else {
+            return
+        }
+        guard EPUBReaderProgressTrackingPolicy
+            .shouldAdoptVisibleSegment(
+                isPlaybackActive:
+                    isPlaybackActive
+            ) else {
             return
         }
         currentSegmentIndex = index
@@ -834,7 +852,12 @@ struct EPUBReaderView: View {
                     originalLayoutStyle,
                 onVisibleSegment: {
                     viewModel
-                        .noteVisibleSegment($0)
+                        .noteVisibleSegment(
+                            $0,
+                            isPlaybackActive:
+                                mediaOverlayPlayer
+                                .isPlaying
+                        )
                 },
                 onNavigationFinished: {
                     revision,
@@ -976,7 +999,10 @@ struct EPUBReaderView: View {
                     return
                 }
                 viewModel.noteVisibleSegment(
-                    visible
+                    visible,
+                    isPlaybackActive:
+                        mediaOverlayPlayer
+                        .isPlaying
                 )
             }
             .task(

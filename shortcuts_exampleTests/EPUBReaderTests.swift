@@ -775,6 +775,22 @@ final class EPUBReaderTests: XCTestCase {
         )
     }
 
+    func testReaderProgressIgnoresViewportWhilePlaybackIsActive()
+    {
+        XCTAssertFalse(
+            EPUBReaderProgressTrackingPolicy
+                .shouldAdoptVisibleSegment(
+                    isPlaybackActive: true
+                )
+        )
+        XCTAssertTrue(
+            EPUBReaderProgressTrackingPolicy
+                .shouldAdoptVisibleSegment(
+                    isPlaybackActive: false
+                )
+        )
+    }
+
     func testReadAloudSpeechChunksAtSentenceBoundaries()
         throws
     {
