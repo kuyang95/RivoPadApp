@@ -9,6 +9,8 @@ struct VisionLinkView: View {
         VisionLinkManager
     @State private var isUnregisterConfirmationPresented =
         false
+    @State private var isFileDeletionConfirmationPresented =
+        false
     @State private var previewURL: URL?
     @State private var isOpeningReceivedText =
         false
@@ -54,6 +56,26 @@ struct VisionLinkView: View {
             Text(
                 AppLocalization.string(
                     "상대 기기와 서버에 저장된 연결 정보가 삭제됩니다."
+                )
+            )
+        }
+        .confirmationDialog(
+            "받은 파일을 삭제할까요?",
+            isPresented:
+                $isFileDeletionConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button(
+                "파일 삭제",
+                role: .destructive
+            ) {
+                manager.deleteLastReceivedFile()
+            }
+            Button("취소", role: .cancel) {}
+        } message: {
+            Text(
+                AppLocalization.string(
+                    "이 파일은 iPad와 파일 앱의 VisionLink 폴더에서 삭제됩니다."
                 )
             )
         }
@@ -199,6 +221,17 @@ struct VisionLinkView: View {
                                 "내보내기",
                                 systemImage:
                                     "square.and.arrow.up"
+                            )
+                        }
+                        .buttonStyle(.bordered)
+
+                        Button(role: .destructive) {
+                            isFileDeletionConfirmationPresented =
+                                true
+                        } label: {
+                            Label(
+                                "삭제",
+                                systemImage: "trash"
                             )
                         }
                         .buttonStyle(.bordered)

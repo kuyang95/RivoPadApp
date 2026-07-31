@@ -275,6 +275,10 @@ actor VisionLinkDataReceiver {
     static let maximumChatMessages = 40
     static let maximumLiveReadingSessionIDLength =
         80
+    static let minimumFreeSpaceReserve: Int64 =
+        64 * 1_024 * 1_024
+    static let maximumTemporaryFileAge:
+        TimeInterval = 24 * 60 * 60
 
     private static let blockedGeneralExtensions:
         Set<String> = [
@@ -300,16 +304,38 @@ actor VisionLinkDataReceiver {
 
     private let destinationDirectory: URL
     private let partialDirectory: URL
+    private let minimumFreeSpaceReserve: Int64
+    private let availableCapacityProvider:
+        @Sendable (URL) -> Int64?
     private var activeTransfer: IncomingTransfer?
     private var lastProgressPercent = -1
 
     init(
         destinationDirectory: URL,
-        partialDirectory: URL
+        partialDirectory: URL,
+        minimumFreeSpaceReserve: Int64 =
+            VisionLinkDataReceiver
+            .minimumFreeSpaceReserve,
+        availableCapacityProvider:
+            @escaping @Sendable (URL) -> Int64? =
+                { url in
+                    (
+                        try? url.resourceValues(
+                            forKeys: [
+                                .volumeAvailableCapacityForImportantUsageKey
+                            ]
+                        )
+                        .volumeAvailableCapacityForImportantUsage
+                    ) ?? nil
+                }
     ) {
         self.destinationDirectory =
             destinationDirectory
         self.partialDirectory = partialDirectory
+        self.minimumFreeSpaceReserve =
+            max(minimumFreeSpaceReserve, 0)
+        self.availableCapacityProvider =
+            availableCapacityProvider
     }
 
     func receive(
@@ -317,6 +343,7 @@ actor VisionLinkDataReceiver {
     ) -> [VisionLinkDataAction] {
         switch input {
         case .opened:
+            cleanupOrphanedTemporaryFiles()
             return []
         case .control(let data):
             return handleControl(data)
@@ -584,6 +611,12 @@ actor VisionLinkDataReceiver {
                 at: partialDirectory,
                 withIntermediateDirectories: true
             )
+            guard hasCapacity(
+                for: size
+            ) else {
+                throw VisionLinkDataReceiverError
+                    .insufficientStorage
+            }
             let partialURL = partialDirectory
                 .appendingPathComponent(
                     UUID().uuidString
@@ -1364,6 +1397,101 @@ actor VisionLinkDataReceiver {
         )
     }
 
+    private func hasCapacity(
+        for expectedSize: Int64
+    ) -> Bool {
+        guard let availableCapacity =
+                availableCapacityProvider(
+                    partialDirectory
+                ) else {
+            return true
+        }
+        let usableCapacity = max(
+            availableCapacity
+                - minimumFreeSpaceReserve,
+            0
+        )
+        return expectedSize <= usableCapacity
+    }
+
+    private func cleanupOrphanedTemporaryFiles(
+        now: Date = Date()
+    ) {
+        let fileManager = FileManager.default
+        guard let items =
+                try? fileManager
+                .contentsOfDirectory(
+                    at: partialDirectory,
+                    includingPropertiesForKeys: [
+                        .isRegularFileKey,
+                        .isSymbolicLinkKey,
+                    ],
+                    options: [.skipsHiddenFiles]
+                ) else {
+            return
+        }
+        for item in items {
+            guard item.pathExtension
+                    == "visionlink-part",
+                  item != activeTransfer?
+                    .partialURL,
+                  let values =
+                    try? item.resourceValues(
+                        forKeys: [
+                            .isRegularFileKey,
+                            .isSymbolicLinkKey,
+                        ]
+                    ),
+                  values.isRegularFile == true,
+                  values.isSymbolicLink != true else {
+                continue
+            }
+            try? fileManager.removeItem(at: item)
+        }
+
+        let featureDirectory =
+            partialDirectory
+            .appendingPathComponent(
+                "Features",
+                isDirectory: true
+            )
+        guard let featureItems =
+                try? fileManager
+                .contentsOfDirectory(
+                    at: featureDirectory,
+                    includingPropertiesForKeys: [
+                        .contentModificationDateKey,
+                        .isRegularFileKey,
+                        .isSymbolicLinkKey,
+                    ],
+                    options: [.skipsHiddenFiles]
+                ) else {
+            return
+        }
+        let expirationDate = now.addingTimeInterval(
+            -Self.maximumTemporaryFileAge
+        )
+        for item in featureItems {
+            guard let values =
+                    try? item.resourceValues(
+                        forKeys: [
+                            .contentModificationDateKey,
+                            .isRegularFileKey,
+                            .isSymbolicLinkKey,
+                        ]
+                    ),
+                  values.isRegularFile == true,
+                  values.isSymbolicLink != true,
+                  let modificationDate =
+                    values.contentModificationDate,
+                  modificationDate
+                    < expirationDate else {
+                continue
+            }
+            try? fileManager.removeItem(at: item)
+        }
+    }
+
     private func uniqueDestinationURL(
         fileName: String
     ) -> URL {
@@ -1640,10 +1768,18 @@ nonisolated private enum VisionLinkDataReceiverError:
     LocalizedError
 {
     case cannotCreateFile
+    case insufficientStorage
 
     var errorDescription: String? {
-        AppLocalization.string(
-            "임시 파일을 만들 수 없습니다."
-        )
+        switch self {
+        case .cannotCreateFile:
+            return AppLocalization.string(
+                "임시 파일을 만들 수 없습니다."
+            )
+        case .insufficientStorage:
+            return AppLocalization.string(
+                "파일을 받을 저장 공간이 부족합니다."
+            )
+        }
     }
 }

@@ -215,6 +215,116 @@ final class VisionLinkDataReceiverTests:
         )
     }
 
+    func testOpenedChannelCleansOnlyOrphanedTemporaryFiles()
+        async throws
+    {
+        let fixture = makeFixture()
+        defer { fixture.remove() }
+        let featureDirectory =
+            fixture.partial
+            .appendingPathComponent(
+                "Features",
+                isDirectory: true
+            )
+        try FileManager.default.createDirectory(
+            at: featureDirectory,
+            withIntermediateDirectories: true
+        )
+        let orphan = fixture.partial
+            .appendingPathComponent(
+                "orphan.visionlink-part"
+            )
+        let unrelated = fixture.partial
+            .appendingPathComponent("keep.tmp")
+        let expiredFeature = featureDirectory
+            .appendingPathComponent("expired.png")
+        let currentFeature = featureDirectory
+            .appendingPathComponent("current.png")
+        try Data("partial".utf8).write(to: orphan)
+        try Data("keep".utf8).write(to: unrelated)
+        try Data("old".utf8).write(
+            to: expiredFeature
+        )
+        try Data("new".utf8).write(
+            to: currentFeature
+        )
+        try FileManager.default.setAttributes(
+            [
+                .modificationDate:
+                    Date().addingTimeInterval(
+                        -2 * 24 * 60 * 60
+                    )
+            ],
+            ofItemAtPath: expiredFeature.path
+        )
+
+        let actions = await fixture.receiver
+            .receive(.opened)
+
+        XCTAssertEqual(actions, [])
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: orphan.path
+            )
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: unrelated.path
+            )
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: expiredFeature.path
+            )
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: currentFeature.path
+            )
+        )
+    }
+
+    func testInsufficientStorageRejectsBeforePartialFileCreation()
+        async throws
+    {
+        let fixture = makeFixture(
+            availableCapacity: 1_000,
+            minimumFreeSpaceReserve: 400
+        )
+        defer { fixture.remove() }
+
+        let actions = await start(
+            fixture,
+            transferID: "no-space",
+            name: "large.txt",
+            size: 601
+        )
+
+        XCTAssertEqual(
+            controlType(in: actions),
+            "file-error"
+        )
+        XCTAssertTrue(
+            actions.contains(
+                .event(
+                    .failed(
+                        "파일 저장 준비에 실패했습니다: 파일을 받을 저장 공간이 부족합니다."
+                    )
+                )
+            )
+        )
+        XCTAssertEqual(
+            try directoryContents(fixture.partial),
+            []
+        )
+        XCTAssertEqual(
+            try directoryContents(
+                fixture.destination
+            ),
+            []
+        )
+    }
+
     func testClipboardPingAndCameraStateControls()
         async
     {
@@ -1206,7 +1316,12 @@ final class VisionLinkDataReceiverTests:
         )
     }
 
-    private func makeFixture() -> Fixture {
+    private func makeFixture(
+        availableCapacity: Int64? = nil,
+        minimumFreeSpaceReserve: Int64 =
+            VisionLinkDataReceiver
+            .minimumFreeSpaceReserve
+    ) -> Fixture {
         let root = FileManager.default
             .temporaryDirectory
             .appendingPathComponent(
@@ -1224,14 +1339,28 @@ final class VisionLinkDataReceiverTests:
                 "Partial",
                 isDirectory: true
             )
+        let receiver: VisionLinkDataReceiver
+        if let availableCapacity {
+            receiver = VisionLinkDataReceiver(
+                destinationDirectory: destination,
+                partialDirectory: partial,
+                minimumFreeSpaceReserve:
+                    minimumFreeSpaceReserve,
+                availableCapacityProvider: {
+                    _ in availableCapacity
+                }
+            )
+        } else {
+            receiver = VisionLinkDataReceiver(
+                destinationDirectory: destination,
+                partialDirectory: partial
+            )
+        }
         return Fixture(
             root: root,
             destination: destination,
             partial: partial,
-            receiver: VisionLinkDataReceiver(
-                destinationDirectory: destination,
-                partialDirectory: partial
-            )
+            receiver: receiver
         )
     }
 

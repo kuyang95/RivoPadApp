@@ -397,8 +397,45 @@ final class VisionLinkManager: ObservableObject {
         receivedClipboardText = nil
     }
 
+    func deleteLastReceivedFile() {
+        guard let file = lastReceivedFile else {
+            return
+        }
+        do {
+            if FileManager.default.fileExists(
+                atPath: file.url.path
+            ) {
+                try FileManager.default.removeItem(
+                    at: file.url
+                )
+            }
+            lastReceivedFile = nil
+            recordReceivedFileDeletion(
+                fileName: file.fileName
+            )
+        } catch {
+            dataTransferMessage =
+                AppLocalization.format(
+                    "받은 파일을 삭제하지 못했습니다: %@",
+                    Self.userMessage(for: error)
+                )
+        }
+    }
+
     func clearDataTransferMessage() {
         dataTransferMessage = nil
+    }
+
+    private func recordReceivedFileDeletion(
+        fileName: String
+    ) {
+        dataTransferMessage = nil
+        appendEvent(
+            AppLocalization.format(
+                "받은 파일 삭제 · %@",
+                fileName
+            )
+        )
     }
 
     private func launchConnection(
