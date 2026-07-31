@@ -3,11 +3,17 @@ import SwiftUI
 import UIKit
 
 struct VisionLinkView: View {
+    @EnvironmentObject private var appRouter:
+        AppRouter
     @EnvironmentObject private var manager:
         VisionLinkManager
     @State private var isUnregisterConfirmationPresented =
         false
     @State private var previewURL: URL?
+    @State private var isOpeningReceivedText =
+        false
+    @State private var receivedTextOpenError:
+        String?
 
     var body: some View {
         List {
@@ -231,10 +237,42 @@ struct VisionLinkView: View {
                         }
                         .buttonStyle(.borderedProminent)
 
+                        Button {
+                            openReceivedText(text)
+                        } label: {
+                            if isOpeningReceivedText {
+                                ProgressView()
+                                    .accessibilityLabel(
+                                        "받은 텍스트를 여는 중"
+                                    )
+                            } else {
+                                Label(
+                                    "텍스트뷰로 열기",
+                                    systemImage:
+                                        "doc.text.magnifyingglass"
+                                )
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(
+                            isOpeningReceivedText
+                        )
+
                         Button("닫기") {
+                            receivedTextOpenError =
+                                nil
                             manager
                                 .clearReceivedClipboard()
                         }
+                    }
+                    if let receivedTextOpenError {
+                        Label(
+                            receivedTextOpenError,
+                            systemImage:
+                                "exclamationmark.triangle.fill"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.red)
                     }
                 }
             }
@@ -508,6 +546,33 @@ struct VisionLinkView: View {
             fromByteCount: value,
             countStyle: .file
         )
+    }
+
+    private func openReceivedText(
+        _ text: String
+    ) {
+        guard !isOpeningReceivedText else {
+            return
+        }
+        isOpeningReceivedText = true
+        receivedTextOpenError = nil
+        Task {
+            do {
+                let fileURL =
+                    try await
+                    VisionLinkReceivedTextStore
+                    .shared.save(text)
+                isOpeningReceivedText = false
+                appRouter.route =
+                    .localDocument(
+                        fileURL: fileURL
+                    )
+            } catch {
+                isOpeningReceivedText = false
+                receivedTextOpenError =
+                    error.localizedDescription
+            }
+        }
     }
 
     private var statusIcon: String {

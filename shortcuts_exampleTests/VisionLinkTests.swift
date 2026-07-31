@@ -134,6 +134,143 @@ final class VisionLinkModelTests: XCTestCase {
     }
 }
 
+final class VisionLinkReceivedTextStoreTests:
+    XCTestCase
+{
+    func testStoresExactTextAndPrunesOldestItem()
+        async throws
+    {
+        let root =
+            FileManager.default
+            .temporaryDirectory
+            .appendingPathComponent(
+                UUID().uuidString,
+                isDirectory: true
+            )
+        defer {
+            try? FileManager.default
+                .removeItem(at: root)
+        }
+        let store =
+            VisionLinkReceivedTextStore(
+                rootDirectory: root,
+                maximumCachedItemCount: 2
+            )
+
+        let first = try await store.save(
+            "첫 번째\n줄"
+        )
+        try FileManager.default
+            .setAttributes(
+                [
+                    .modificationDate:
+                        Date(
+                            timeIntervalSince1970:
+                                1
+                        )
+                ],
+                ofItemAtPath:
+                    first.deletingLastPathComponent()
+                    .path
+            )
+        let second = try await store.save(
+            "second"
+        )
+        try FileManager.default
+            .setAttributes(
+                [
+                    .modificationDate:
+                        Date(
+                            timeIntervalSince1970:
+                                2
+                        )
+                ],
+                ofItemAtPath:
+                    second.deletingLastPathComponent()
+                    .path
+            )
+        let third = try await store.save(
+            "third"
+        )
+
+        XCTAssertFalse(
+            FileManager.default
+                .fileExists(atPath: first.path)
+        )
+        XCTAssertTrue(
+            FileManager.default
+                .fileExists(atPath: second.path)
+        )
+        XCTAssertTrue(
+            FileManager.default
+                .fileExists(atPath: third.path)
+        )
+        XCTAssertEqual(
+            try String(
+                contentsOf: second,
+                encoding: .utf8
+            ),
+            "second"
+        )
+    }
+
+    func testRejectsBlankAndOversizedText()
+        async throws
+    {
+        let root =
+            FileManager.default
+            .temporaryDirectory
+            .appendingPathComponent(
+                UUID().uuidString,
+                isDirectory: true
+            )
+        defer {
+            try? FileManager.default
+                .removeItem(at: root)
+        }
+        let store =
+            VisionLinkReceivedTextStore(
+                rootDirectory: root,
+                maximumTextBytes: 1_024
+            )
+
+        do {
+            _ = try await store.save(
+                " \n "
+            )
+            XCTFail(
+                "Expected empty text rejection"
+            )
+        } catch let error
+                    as VisionLinkReceivedTextStoreError {
+            XCTAssertEqual(
+                error,
+                .emptyText
+            )
+        }
+
+        do {
+            _ = try await store.save(
+                String(
+                    repeating: "a",
+                    count: 1_025
+                )
+            )
+            XCTFail(
+                "Expected size rejection"
+            )
+        } catch let error
+                    as VisionLinkReceivedTextStoreError {
+            XCTAssertEqual(
+                error,
+                .textTooLarge(
+                    maximumKilobytes: 1
+                )
+            )
+        }
+    }
+}
+
 final class VisionLinkSignalingTests: XCTestCase {
     func testParsesConnectionAndPairingEvents() throws {
         XCTAssertEqual(

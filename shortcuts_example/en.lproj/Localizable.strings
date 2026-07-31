@@ -1237,3 +1237,8 @@
 "처리 가능한 이미지 타입이 없습니다." = "No supported image format was found.";
 "텍스트 문서를 M4 로컬 AI에 질문합니다." = "Asks the M4 on-device AI about a text document.";
 "파일 열기" = "Open Files";
+"VisionLink 받은 텍스트.txt" = "VisionLink Received Text.txt";
+"받은 텍스트가 %lldKB를 초과했습니다." = "The received text exceeds %lldKB.";
+"받은 텍스트가 비어 있습니다." = "The received text is empty.";
+"받은 텍스트를 여는 중" = "Opening received text";
+"텍스트뷰로 열기" = "Open in Text Viewer";
