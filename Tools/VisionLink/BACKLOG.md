@@ -8,6 +8,8 @@
 - 수신기 `pairId`, `deviceId`, `deviceToken`을 Keychain에 저장
 - 저장된 수신기의 다음 실행 재연결
 - 서버와 상대 기기의 페어 삭제 및 로컬 자격정보 정리
+- 상대 기기의 `pair-deleted`는 현재 Keychain의 `pairId`와 정확히 일치할
+  때만 적용하고, 즉시 새 수신 세션과 4자리 연결 코드를 자동 생성
 - URLSession WebSocket을 이용한 신호 메시지 수신
 - connected, peer joined/left/waiting, pair created/deleted 해석
 - offer, answer, ICE candidate, hangup, error 메시지 해석
@@ -70,6 +72,8 @@
 - [ ] WebSocket 실패와 WebRTC 연결 끊김 뒤 앱이 활성 상태이면 저장된
       페어로 각각 즉시·5초 뒤 자동 재연결된다.
 - [ ] 등록 해제 시 서버와 iPad Keychain 양쪽 정보가 삭제된다.
+- [ ] 상대 기기에서 현재 페어를 삭제하면 iPad가 잘못된 재연결을 반복하지
+      않고 새 4자리 코드를 자동 표시하며, 과거·ID 없는 삭제 신호는 무시한다.
 - [ ] 만료된 코드로 재접속하지 않고 새 코드 생성이 가능하다.
 - [ ] VoiceOver가 코드 숫자, 남은 시간, 연결 상태를 읽을 수 있다.
 - [ ] 영어·일본어에서 코드 연결, 연결 상태, 파일·클립보드, 원격 기능

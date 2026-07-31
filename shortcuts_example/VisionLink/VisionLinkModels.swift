@@ -364,6 +364,19 @@ nonisolated enum VisionLinkSignalingEvent:
     }
 }
 
+nonisolated enum VisionLinkPairDeletionPolicy {
+    static func shouldReset(
+        currentPairID: String?,
+        deletedPairID: String?
+    ) -> Bool {
+        guard let currentPairID,
+              let deletedPairID else {
+            return false
+        }
+        return currentPairID == deletedPairID
+    }
+}
+
 nonisolated enum VisionLinkJSON {
     static func decodeSession(
         _ data: Data

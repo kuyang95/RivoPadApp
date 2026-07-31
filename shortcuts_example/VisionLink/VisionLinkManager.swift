@@ -669,7 +669,14 @@ final class VisionLinkManager: ObservableObject {
     private func handle(
         _ event: VisionLinkSignalingEvent
     ) {
-        appendEvent(event.summary)
+        switch event {
+        case .pairDeleted:
+            // Pair deletion is logged after validating that the event
+            // belongs to the currently stored connection.
+            break
+        default:
+            appendEvent(event.summary)
+        }
         switch event {
         case .connected(let roomID, _, _):
             if let roomID {
@@ -711,16 +718,31 @@ final class VisionLinkManager: ObservableObject {
             state = .disconnected
 
         case .pairDeleted(let pairID, _):
-            if let credentials = try? credentialStore.read(),
-               pairID == nil
-                || credentials.pairID == pairID {
-                try? credentialStore.clear()
-                hasStoredPair = false
+            let currentPairID = (
+                try? credentialStore.read()
+            )?.pairID
+            guard VisionLinkPairDeletionPolicy
+                .shouldReset(
+                    currentPairID:
+                        currentPairID,
+                    deletedPairID: pairID
+                ) else {
+                appendEvent(
+                    AppLocalization.string(
+                        "현재 연결과 일치하지 않는 페어링 삭제 신호를 무시했습니다."
+                    )
+                )
+                return
             }
-            stopMediaWatchdog()
-            cancelConnectionRecovery()
-            cancelSocket(reason: "pair-deleted")
-            state = .disconnected
+            appendEvent(event.summary)
+            appendEvent(
+                AppLocalization.string(
+                    "페어링이 해제되어 새 연결 코드를 만듭니다."
+                )
+            )
+            launchConnection(
+                forceNewSession: true
+            )
 
         case .serverError(let code, let message):
             state = .failed(

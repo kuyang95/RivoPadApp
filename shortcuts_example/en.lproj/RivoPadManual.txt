@@ -139,6 +139,7 @@
 @text On the VisionLink screen, use a pairing code to connect another device. Credentials are stored in Keychain.
 @text WebRTC video and a data channel can receive images, general files, clipboard text, and camera status.
 @text When video startup or the first frame is late, or frames stall, the status explains the cause. If signaling or media disconnects while the app is active, the saved pair is restored automatically.
+@text If the other device deletes the current pairing, VisionCraft clears only the matching Keychain credentials and automatically creates a new four-digit connection code. Deletion events for an old pair or without an ID do not affect the current connection.
 @text Large files stream to disk, with size and SHA-256 verification and transfer cancellation.
 @text Received general files are not deleted automatically. They remain in Files under On My iPad, VisionCraft, VisionLink. Deleting the latest file from the VisionLink screen also deletes it from Files.
 @text Before receiving, the app checks whether 64 MB of free space can remain. On reconnection, it removes unfinished partial files and feature temporary files older than 24 hours.

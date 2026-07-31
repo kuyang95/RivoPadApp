@@ -495,6 +495,21 @@ final class VisionLinkSignalingTests: XCTestCase {
             try parse(
                 """
                 {
+                  "type":"pair-deleted",
+                  "pairId":"pair-current",
+                  "deletedBy":"camera"
+                }
+                """
+            ),
+            .pairDeleted(
+                pairID: "pair-current",
+                deletedBy: "camera"
+            )
+        )
+        XCTAssertEqual(
+            try parse(
+                """
+                {
                   "type":"error",
                   "code":"expired",
                   "message":"Pair expired"
@@ -513,6 +528,43 @@ final class VisionLinkSignalingTests: XCTestCase {
                 """
             ),
             .unknown(type: "future-event")
+        )
+    }
+
+    func testPairDeletionRequiresExactCurrentPair() {
+        XCTAssertTrue(
+            VisionLinkPairDeletionPolicy
+                .shouldReset(
+                    currentPairID:
+                        "pair-current",
+                    deletedPairID:
+                        "pair-current"
+                )
+        )
+        XCTAssertFalse(
+            VisionLinkPairDeletionPolicy
+                .shouldReset(
+                    currentPairID:
+                        "pair-current",
+                    deletedPairID:
+                        "pair-old"
+                )
+        )
+        XCTAssertFalse(
+            VisionLinkPairDeletionPolicy
+                .shouldReset(
+                    currentPairID: nil,
+                    deletedPairID:
+                        "pair-current"
+                )
+        )
+        XCTAssertFalse(
+            VisionLinkPairDeletionPolicy
+                .shouldReset(
+                    currentPairID:
+                        "pair-current",
+                    deletedPairID: nil
+                )
         )
     }
 

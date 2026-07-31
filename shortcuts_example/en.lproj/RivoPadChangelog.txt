@@ -15,6 +15,7 @@
 @text Added immediate M4 on-device translation of corrected OCR results from camera captures, photos, shared images, and scans.
 @text Added direct M4 local image description and follow-up questions using the original photo from photo files, shared images, Camera OCR, and scan results, including photos with no recognized text.
 @text Extended the Android-style shared-screen setting across shared text, webpages, photos, and supported documents, opening them either with automatic Voice Question listening or in AI Chat with the original material attached.
+@text Improved VisionLink so deletion of the current pair by the other device validates the exact pair ID, clears the matching Keychain connection, and automatically issues a new four-digit code.
 @text Added single-line landscape document reading and TTS navigation with spoken-sentence highlighting, previous, repeat, and next.
 @text Added a complete EPUB and DAISY library, recently read sorting, SHA-256 duplicate prevention, and book deletion that preserves the original.
 @text Added a combined EPUB and DAISY audio and local-speech timeline with time and percentage displays and an arbitrary-position slider.

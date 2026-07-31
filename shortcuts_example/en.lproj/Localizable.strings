@@ -1013,6 +1013,8 @@
 "파일 크기가 다릅니다: %lld/%lld bytes" = "File size mismatch: %lld/%lld bytes";
 "파일 크기가 올바르지 않습니다." = "The file size is invalid.";
 "페어링 삭제됨" = "Pairing deleted";
+"현재 연결과 일치하지 않는 페어링 삭제 신호를 무시했습니다." = "Ignored a pairing-deletion event that does not match the current connection.";
+"페어링이 해제되어 새 연결 코드를 만듭니다." = "Pairing was removed. Creating a new connection code.";
 "해석하지 못한 신호 메시지" = "Unrecognized signaling message";
 "VisionCraft 서버와 같은 코드 페어링" = "Code pairing compatible with the VisionCraft server";
 "VisionLink 원격 카메라 영상" = "VisionLink Remote Camera Video";
