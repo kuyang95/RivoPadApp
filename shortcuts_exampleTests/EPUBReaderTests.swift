@@ -111,6 +111,49 @@ final class EPUBReaderTests: XCTestCase {
         )
     }
 
+    func testSMILRecoversTextDocumentMissingFromSpine()
+        throws
+    {
+        let book = try EPUBBookParser.parse(
+            data:
+                EPUBFixture.makeBook(
+                    includesSecondChapterInSpine:
+                        false
+                )
+        )
+
+        XCTAssertEqual(
+            book.chapters.map(\.href),
+            [
+                "OEBPS/chapter1.xhtml",
+                "OEBPS/chapter2.xhtml",
+            ]
+        )
+        XCTAssertEqual(
+            book.chapters[1].title,
+            "두 번째 장"
+        )
+        XCTAssertTrue(
+            book.chapters[1].text.contains(
+                "오프라인 독서를 위한 두 번째 본문"
+            )
+        )
+        XCTAssertEqual(
+            book.mediaOverlayItems.count,
+            2
+        )
+        XCTAssertEqual(
+            PublicationNavigationResolver.location(
+                for: book.navigationItems[2],
+                in: book
+            ),
+            PublicationNavigationLocation(
+                chapterIndex: 1,
+                segmentIndex: 0
+            )
+        )
+    }
+
     func testParsesEPUB2NCXHierarchyAndPageTargets()
         throws
     {
@@ -1734,7 +1777,9 @@ private nonisolated enum EPUBFixture {
         firstChapterMarkup:
             String? = nil,
         navigationMarkup:
-            String? = nil
+            String? = nil,
+        includesSecondChapterInSpine:
+            Bool = true
     ) throws -> Data {
         let container = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -1748,6 +1793,12 @@ private nonisolated enum EPUBFixture {
           </rootfiles>
         </container>
         """
+        let secondSpineItem =
+            includesSecondChapterInSpine
+            ? """
+              <itemref idref="chapter-2"/>
+            """
+            : ""
         let package = """
         <?xml version="1.0" encoding="UTF-8"?>
         <package
@@ -1786,7 +1837,7 @@ private nonisolated enum EPUBFixture {
           </manifest>
           <spine>
             <itemref idref="chapter-1"/>
-            <itemref idref="chapter-2"/>
+            \(secondSpineItem)
           </spine>
         </package>
         """

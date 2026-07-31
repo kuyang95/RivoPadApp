@@ -44,6 +44,8 @@
 - 검색어의 모든 일치 위치와 문맥 목록 표시
 - 검색 결과 선택 시 해당 문단 이동과 일치 문자열 강조
 - EPUB OPF `media-overlay`와 spine 순서에 따른 SMIL 연결
+- EPUB SMIL이 spine에서 누락된 본문을 가리켜도 Android와 같이 해당
+  본문을 읽기 순서 뒤에 복구
 - SMIL `par → text fragment + audio clip` 파싱과 Android식 clock 값 지원
 - EPUB 내부 오디오를 앱 전용 임시 공간에 안전하게 추출
 - AVPlayer 구간 시작/끝 재생, 이전/다음 클립, 자동 연속 재생

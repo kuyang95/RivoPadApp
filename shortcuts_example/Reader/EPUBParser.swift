@@ -208,101 +208,12 @@ nonisolated enum EPUBBookParser {
         let spine = packageDelegate.spineIDs.compactMap {
             manifest[$0]
         }
-        guard !spine.isEmpty else {
-            throw EPUBParserError.readingOrderMissing
-        }
-
         let navigation = try parsedNavigation(
             archive: archive,
             packagePath: packagePath,
             manifest: manifest,
             navigationID: packageDelegate.navigationID
         )
-        var chapters: [EPUBChapter] = []
-        for (index, item) in spine.enumerated() {
-            let chapterPath = try resolve(
-                href: item.href,
-                relativeTo: packagePath
-            )
-            guard archive.contains(chapterPath) else {
-                continue
-            }
-            let chapterData = try archive.data(at: chapterPath)
-            let extractor = EPUBHTMLTextDelegate()
-            let didParse = (
-                try? parseXHTML(
-                    chapterData,
-                    delegate: extractor
-                )
-            ) != nil
-            let fallback =
-                didParse
-                ? nil
-                : EPUBHTMLFallbackParser
-                    .content(from: chapterData)
-            let text = (
-                didParse
-                ? extractor.text
-                : fallback?.text ?? ""
-            ).trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-            guard !text.isEmpty else {
-                continue
-            }
-            let title =
-                navigation.titlesByPath[chapterPath]
-                ?? (
-                    didParse
-                    ? extractor.firstHeading
-                    : fallback?.firstHeading
-                )
-                ?? AppLocalization.format(
-                    "제 %lld장",
-                    Int64(index + 1)
-                )
-            let capturedFragmentIndexes =
-                didParse
-                ? extractor.fragmentSegmentIndexes
-                : [:]
-            let textMatchedFragmentIndexes =
-                didParse
-                ? fragmentSegmentIndexes(
-                    text: text,
-                    fragmentTexts:
-                        extractor.fragmentTexts
-                )
-                : [:]
-            chapters.append(
-                EPUBChapter(
-                    id: item.id,
-                    title: title,
-                    href: chapterPath,
-                    text: text,
-                    sourceMarkup:
-                        sourceMarkup(
-                            chapterData
-                        ),
-                    fragmentSegmentIndexes:
-                        textMatchedFragmentIndexes
-                        .merging(
-                            capturedFragmentIndexes,
-                            uniquingKeysWith: {
-                                _, captured in
-                                captured
-                            }
-                        )
-                )
-            )
-        }
-        guard !chapters.isEmpty else {
-            throw EPUBParserError.chapterTextMissing
-        }
-
-        let identifier = packageDelegate.identifier?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let title = packageDelegate.title?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
         let overlayPaths =
             try mediaOverlayPaths(
                 spine: spine,
@@ -315,11 +226,67 @@ nonisolated enum EPUBBookParser {
                     },
                 packagePath: packagePath
             )
-        let mediaOverlayItems =
-            EPUBMediaOverlayParser.parse(
+        let mediaOverlayResult =
+            EPUBMediaOverlayParser.parseResult(
                 archive: archive,
                 paths: overlayPaths
             )
+        if spine.isEmpty,
+           mediaOverlayResult
+            .referencedTextPaths.isEmpty {
+            throw EPUBParserError.readingOrderMissing
+        }
+
+        var chapterSources:
+            [(id: String, path: String)] = []
+        var seenChapterPaths: Set<String> = []
+        for item in spine {
+            let path = try resolve(
+                href: item.href,
+                relativeTo: packagePath
+            )
+            if seenChapterPaths.insert(path)
+                .inserted {
+                chapterSources.append(
+                    (item.id, path)
+                )
+            }
+        }
+        for (index, path) in mediaOverlayResult
+            .referencedTextPaths.enumerated()
+        where seenChapterPaths.insert(path)
+            .inserted {
+            chapterSources.append(
+                (
+                    "media-overlay-\(index)",
+                    path
+                )
+            )
+        }
+
+        var chapters: [EPUBChapter] = []
+        for (index, source) in chapterSources
+            .enumerated() {
+            if let chapter = try chapter(
+                archive: archive,
+                id: source.id,
+                path: source.path,
+                title:
+                    navigation
+                    .titlesByPath[source.path],
+                ordinal: index + 1
+            ) {
+                chapters.append(chapter)
+            }
+        }
+        guard !chapters.isEmpty else {
+            throw EPUBParserError.chapterTextMissing
+        }
+
+        let identifier = packageDelegate.identifier?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = packageDelegate.title?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         return EPUBBook(
             identifier: identifier?.isEmpty == false
                 ? identifier!
@@ -334,11 +301,85 @@ nonisolated enum EPUBBookParser {
             language: packageDelegate.language,
             chapters: chapters,
             mediaOverlayItems:
-                mediaOverlayItems,
+                mediaOverlayResult.items,
             navigationItems:
                 navigation.tableOfContents,
             pageListItems:
                 navigation.pageList
+        )
+    }
+
+    private static func chapter(
+        archive: EPUBArchive,
+        id: String,
+        path: String,
+        title: String?,
+        ordinal: Int
+    ) throws -> EPUBChapter? {
+        guard archive.contains(path) else {
+            return nil
+        }
+        let data = try archive.data(at: path)
+        let extractor = EPUBHTMLTextDelegate()
+        let didParse = (
+            try? parseXHTML(
+                data,
+                delegate: extractor
+            )
+        ) != nil
+        let fallback =
+            didParse
+            ? nil
+            : EPUBHTMLFallbackParser
+                .content(from: data)
+        let text = (
+            didParse
+            ? extractor.text
+            : fallback?.text ?? ""
+        ).trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !text.isEmpty else {
+            return nil
+        }
+        let capturedFragmentIndexes =
+            didParse
+            ? extractor.fragmentSegmentIndexes
+            : [:]
+        let textMatchedFragmentIndexes =
+            didParse
+            ? fragmentSegmentIndexes(
+                text: text,
+                fragmentTexts:
+                    extractor.fragmentTexts
+            )
+            : [:]
+        return EPUBChapter(
+            id: id,
+            title:
+                title
+                ?? (
+                    didParse
+                    ? extractor.firstHeading
+                    : fallback?.firstHeading
+                )
+                ?? AppLocalization.format(
+                    "제 %lld장",
+                    Int64(ordinal)
+                ),
+            href: path,
+            text: text,
+            sourceMarkup:
+                sourceMarkup(data),
+            fragmentSegmentIndexes:
+                textMatchedFragmentIndexes
+                .merging(
+                    capturedFragmentIndexes,
+                    uniquingKeysWith: {
+                        _, captured in
+                        captured
+                    }
+                )
         )
     }
 
