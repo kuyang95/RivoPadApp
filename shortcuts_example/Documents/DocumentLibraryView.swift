@@ -271,6 +271,8 @@ struct DocumentLibraryView: View {
                 }
             }
         }
+        .listStyle(.insetGrouped)
+        .visionCraftListScreen()
         .navigationTitle("파일과 문서")
         .searchable(
             text: $viewModel.searchQuery,

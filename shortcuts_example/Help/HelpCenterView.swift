@@ -147,6 +147,8 @@ struct HelpCenterView: View {
                 )
             }
         }
+        .listStyle(.insetGrouped)
+        .visionCraftListScreen()
         .navigationTitle("도움말")
         .navigationBarTitleDisplayMode(.large)
     }

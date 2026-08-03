@@ -49,6 +49,7 @@ struct AppSettingsView: View {
             systemSection
             resetSection
         }
+        .visionCraftListScreen()
         .navigationTitle("설정")
         .navigationBarTitleDisplayMode(.large)
         .onChange(of: documentAppearance) {

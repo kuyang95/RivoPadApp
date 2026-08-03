@@ -54,6 +54,7 @@ struct ChatHistoryView: View {
                 conversationList
             }
         }
+        .visionCraftNavigationScreen()
         .navigationTitle("AI 대화")
         .searchable(
             text: $searchText,
@@ -254,6 +255,7 @@ struct ChatHistoryView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .visionCraftListScreen()
         .disabled(isMutating)
         .overlay {
             if isMutating {

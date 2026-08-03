@@ -35,6 +35,8 @@ struct VisionLinkView: View {
             diagnosticsSection
             currentScopeSection
         }
+        .listStyle(.insetGrouped)
+        .visionCraftListScreen()
         .navigationTitle("VisionLink")
         .task {
             manager.activate()

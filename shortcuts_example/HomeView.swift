@@ -1,143 +1,59 @@
 import SwiftUI
 
 struct HomeView: View {
-    @EnvironmentObject var appRouter: AppRouter
-    @EnvironmentObject private var rivoRemoteManager:
-        RivoRemoteManager
-    @ObservedObject private var localAIUsage =
-        LocalAIUsageStore.shared
+    @EnvironmentObject private var appRouter: AppRouter
+    @EnvironmentObject private var rivoRemoteManager: RivoRemoteManager
+    @ObservedObject private var localAIUsage = LocalAIUsageStore.shared
+
     @State private var isFileImporterPresented = false
     @State private var fileImportError: String?
-    
+
     var body: some View {
         ZStack {
-            Color.white
+            VisionCraftUI.background
                 .ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: 32) {
-                    rivoConnectionStatus
-                    localAIUsageStatus
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    VisionCraftSectionHeader(title: "빠른 실행")
 
-                    aiChatPanel
-
-                    Button {
-                        appRouter.route = .readerLibrary
-                    } label: {
-                        Text("독서")
-                            .font(.system(size: 56, weight: .bold))
-                            .multilineTextAlignment(
-                                .center
-                            )
-                            .padding(
-                                .horizontal,
-                                12
-                            )
-                            .foregroundColor(.white)
-                            .frame(maxWidth: 520)
-                            .frame(minHeight: 120)
-                            .padding(
-                                .vertical,
-                                20
-                            )
-                            .background(Color.green)
-                            .cornerRadius(28)
-                    }
-                    .accessibilityHint(
-                        "EPUB 책을 열거나 마지막 책을 이어서 읽습니다."
+                    VisionCraftPrimaryActionPanel(
+                        icon: "doc.text.magnifyingglass",
+                        title: "AI와 문서 보기",
+                        description: aiPanelDescription,
+                        primaryTitle: "새 대화",
+                        secondaryTitle: "대화 기록",
+                        onPrimary: {
+                            appRouter.route = .localChat(conversationID: nil)
+                        },
+                        onSecondary: {
+                            appRouter.route = .chatHistory
+                        }
                     )
 
-                    cameraToolsPanel
+                    sectionSpacer
+                    VisionCraftSectionHeader(title: "읽기와 문서")
+                    VisionCraftActionList(items: readingActions)
 
-                    Button {
-                        appRouter.route = .visionLink
-                    } label: {
-                        Text("VisionLink")
-                            .font(.system(size: 56, weight: .bold))
-                            .multilineTextAlignment(
-                                .center
-                            )
-                            .padding(
-                                .horizontal,
-                                12
-                            )
-                            .foregroundColor(.white)
-                            .frame(maxWidth: 520)
-                            .frame(minHeight: 120)
-                            .padding(
-                                .vertical,
-                                20
-                            )
-                            .background(Color.teal)
-                            .cornerRadius(28)
-                    }
-                    .accessibilityHint(
-                        "다른 기기의 VisionLink와 연결합니다."
-                    )
+                    sectionSpacer
+                    VisionCraftSectionHeader(title: "카메라와 연결")
+                    VisionCraftActionList(items: cameraAndConnectionActions)
 
-                    Button {
-                        appRouter.route =
-                            .documentLibrary
-                    } label: {
-                        Text("파일")
-                            .font(.system(size: 56, weight: .bold))
-                            .multilineTextAlignment(
-                                .center
-                            )
-                            .padding(
-                                .horizontal,
-                                12
-                            )
-                            .foregroundColor(.white)
-                            .frame(maxWidth: 520)
-                            .frame(minHeight: 120)
-                            .padding(
-                                .vertical,
-                                20
-                            )
-                            .background(Color.black)
-                            .cornerRadius(28)
-                    }
-                    .accessibilityHint(
-                        "파일 하나를 열거나 허용한 폴더의 문서를 검색합니다."
-                    )
-
-                    Button {
-                        appRouter.route = .settings
-                    } label: {
-                        Label(
-                            "설정",
-                            systemImage: "gearshape"
-                        )
-                        .font(
-                            .system(
-                                size: 40,
-                                weight: .bold
-                            )
-                        )
-                        .foregroundColor(.white)
-                        .frame(maxWidth: 520)
-                        .frame(minHeight: 88)
-                        .padding(
-                            .vertical,
-                            12
-                        )
-                        .background(Color.gray)
-                        .cornerRadius(24)
-                    }
-                    .accessibilityHint(
-                        "음성, 스캐너, 문서와 독서 기본 설정을 엽니다."
-                    )
+                    sectionSpacer
+                    VisionCraftSectionHeader(title: "설정과 도움말")
+                    VisionCraftActionList(items: settingsActions)
                 }
-                .padding(32)
+                .padding(.horizontal, VisionCraftUI.horizontalPadding)
+                .padding(.top, 24)
+                .padding(.bottom, 36)
+                .frame(maxWidth: VisionCraftUI.contentWidth)
                 .frame(maxWidth: .infinity)
             }
         }
+        .visionCraftNavigationScreen()
         .fileImporter(
             isPresented: $isFileImporterPresented,
-            allowedContentTypes:
-                VisionCraftFileTypes
-                .openable,
+            allowedContentTypes: VisionCraftFileTypes.openable,
             allowsMultipleSelection: false
         ) { result in
             handleFileImport(result)
@@ -159,9 +75,7 @@ struct HomeView: View {
         } message: {
             Text(fileImportError ?? "")
         }
-        .onChange(
-            of: appRouter.fileImportRequestID
-        ) { oldValue, newValue in
+        .onChange(of: appRouter.fileImportRequestID) { oldValue, newValue in
             guard newValue != oldValue else {
                 return
             }
@@ -172,390 +86,152 @@ struct HomeView: View {
         }
     }
 
-    private var aiChatPanel: some View {
-        VStack(spacing: 18) {
-            Text("AI 채팅")
-                .font(
-                    .system(
-                        size: 48,
-                        weight: .bold
-                    )
-                )
-                .multilineTextAlignment(.center)
-
-            Text(
-                "M4에서 새 대화를 시작하거나 저장된 기록을 엽니다."
-            )
-            .font(.headline)
-            .multilineTextAlignment(.center)
-            .foregroundStyle(
-                Color.white.opacity(0.86)
-            )
-
-            ViewThatFits(
-                in: .horizontal
-            ) {
-                HStack(spacing: 14) {
-                    aiChatActionButton(
-                        title: "새 대화",
-                        systemImage:
-                            "plus.bubble.fill",
-                        route:
-                            .localChat(
-                                conversationID: nil
-                            )
-                    )
-                    aiChatActionButton(
-                        title: "대화 기록",
-                        systemImage:
-                            "clock.arrow.circlepath",
-                        route: .chatHistory
-                    )
-                }
-
-                VStack(spacing: 12) {
-                    aiChatActionButton(
-                        title: "새 대화",
-                        systemImage:
-                            "plus.bubble.fill",
-                        route:
-                            .localChat(
-                                conversationID: nil
-                            )
-                    )
-                    aiChatActionButton(
-                        title: "대화 기록",
-                        systemImage:
-                            "clock.arrow.circlepath",
-                        route: .chatHistory
-                    )
-                }
-            }
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 26)
-        .frame(maxWidth: 520)
-        .background(Color.indigo)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 28,
-                style: .continuous
-            )
-        )
-        .accessibilityElement(
-            children: .contain
-        )
+    private var sectionSpacer: some View {
+        Color.clear
+            .frame(height: VisionCraftUI.sectionSpacing)
+            .accessibilityHidden(true)
     }
 
-    private func aiChatActionButton(
-        title: String,
-        systemImage: String,
-        route: AppRoute
-    ) -> some View {
-        Button {
-            appRouter.route = route
-        } label: {
-            Label(
-                AppLocalization.string(title),
-                systemImage: systemImage
-            )
-            .font(.title3.bold())
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: 58)
-            .padding(.horizontal, 14)
-            .background(
-                Color.white.opacity(0.18)
-            )
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 16,
-                    style: .continuous
-                )
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint(
-            AppLocalization.string(
-                route == .chatHistory
-                    ? "AI 대화 기록을 엽니다."
-                    : "빈 로컬 AI 대화를 시작합니다."
-            )
-        )
+    private var readingActions: [VisionCraftActionItem] {
+        [
+            VisionCraftActionItem(
+                id: "scanner",
+                icon: "doc.viewfinder",
+                title: "문서 스캔",
+                description: "문서 한 장을 촬영해 텍스트로 이어갑니다.",
+                action: { appRouter.route = .documentScanning }
+            ),
+            VisionCraftActionItem(
+                id: "live-text",
+                icon: "text.viewfinder",
+                title: "실시간 텍스트 읽기",
+                description: "카메라 앞 글자를 자동으로 읽습니다.",
+                action: { appRouter.route = .liveTextReader }
+            ),
+            VisionCraftActionItem(
+                id: "reader",
+                icon: "book.closed",
+                title: "데이지/EPUB 플레이어",
+                description: "EPUB/DAISY 도서를 이어 읽습니다.",
+                action: { appRouter.route = .readerLibrary }
+            ),
+            VisionCraftActionItem(
+                id: "vision-link",
+                icon: "desktopcomputer",
+                title: "스마트폰과 연동",
+                description: "원격 카메라를 사용하거나 스마트폰 파일을 받아옵니다.",
+                action: { appRouter.route = .visionLink }
+            ),
+            VisionCraftActionItem(
+                id: "files",
+                icon: "folder",
+                title: "파일과 문서",
+                description: "기기 안의 문서를 열거나 허용한 폴더에서 검색합니다.",
+                action: { appRouter.route = .documentLibrary }
+            ),
+        ]
     }
 
-    private var cameraToolsPanel: some View {
-        VStack(spacing: 18) {
-            Text("카메라")
-                .font(
-                    .system(
-                        size: 48,
-                        weight: .bold
-                    )
-                )
-                .multilineTextAlignment(.center)
-
-            Text(
-                "문서 스캔과 카메라 읽기 도구를 홈에서 바로 엽니다."
-            )
-            .font(.headline)
-            .multilineTextAlignment(.center)
-            .foregroundStyle(
-                Color.white.opacity(0.86)
-            )
-
-            VStack(spacing: 12) {
-                cameraToolActionButton(
-                    title: "문서 스캔",
-                    systemImage: "doc.viewfinder",
-                    route: .documentScanning,
-                    hint:
-                        "VisionCraft 방식의 문서 스캐너를 엽니다."
-                )
-                cameraToolActionButton(
-                    title: "실시간 텍스트 읽기",
-                    systemImage: "text.viewfinder",
-                    route: .liveTextReader,
-                    hint:
-                        "카메라 실시간 OCR과 자동 음성 읽기를 시작합니다."
-                )
-                cameraToolActionButton(
-                    title: "카메라 돋보기",
-                    systemImage:
-                        "plus.magnifyingglass",
-                    route: .magnifier,
-                    hint:
-                        "실시간 카메라 돋보기를 엽니다."
-                )
-                cameraToolActionButton(
-                    title: "이미지 설명",
-                    systemImage: "sparkles",
-                    route:
-                        .imageDescriptionCamera,
-                    hint:
-                        "카메라로 촬영한 이미지를 기기 안에서 분석합니다."
-                )
-            }
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 26)
-        .frame(maxWidth: 520)
-        .background(Color.black)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 28,
-                style: .continuous
-            )
-        )
-        .accessibilityElement(
-            children: .contain
-        )
+    private var cameraAndConnectionActions: [VisionCraftActionItem] {
+        [
+            VisionCraftActionItem(
+                id: "magnifier",
+                icon: "plus.magnifyingglass",
+                title: "카메라 돋보기",
+                description: "확대, 토치, 색상 필터로 가까운 대상을 봅니다.",
+                action: { appRouter.route = .magnifier }
+            ),
+            VisionCraftActionItem(
+                id: "describe-image",
+                icon: "sparkles",
+                title: "이미지 설명",
+                description: "사진을 촬영하고 M4 로컬 AI가 보이는 장면을 설명합니다.",
+                action: { appRouter.route = .imageDescriptionCamera }
+            ),
+            VisionCraftActionItem(
+                id: "remote",
+                icon: "dot.radiowaves.left.and.right",
+                title: "Rivo 리모컨",
+                description: rivoDescription,
+                accent: rivoStatusColor,
+                action: { appRouter.route = .rivoRemote }
+            ),
+        ]
     }
 
-    private func cameraToolActionButton(
-        title: String,
-        systemImage: String,
-        route: AppRoute,
-        hint: String
-    ) -> some View {
-        Button {
-            appRouter.route = route
-        } label: {
-            Label(
-                AppLocalization.string(title),
-                systemImage: systemImage
-            )
-            .font(.title3.bold())
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: 58)
-            .padding(.horizontal, 14)
-            .background(
-                Color.white.opacity(0.18)
-            )
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 16,
-                    style: .continuous
-                )
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint(
-            AppLocalization.string(hint)
-        )
+    private var settingsActions: [VisionCraftActionItem] {
+        [
+            VisionCraftActionItem(
+                id: "settings",
+                icon: "gearshape",
+                title: "설정",
+                description: "음성, 스캐너, 문서와 독서 기본 설정을 엽니다.",
+                action: { appRouter.route = .settings }
+            ),
+            VisionCraftActionItem(
+                id: "help",
+                icon: "questionmark.circle",
+                title: "도움말과 변경 내역",
+                description: "VisionCraft 사용 설명서와 업데이트 기록을 봅니다.",
+                action: { appRouter.route = .help }
+            ),
+        ]
     }
 
-    private var rivoConnectionStatus: some View {
-        Button {
-            appRouter.route = .rivoRemote
-        } label: {
-            HStack(spacing: 14) {
-                if isRivoTransitioning {
-                    ProgressView()
-                        .tint(rivoStatusColor)
-                } else {
-                    Image(systemName: "circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(rivoStatusColor)
-                }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Rivo 리모컨")
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    Text(rivoHomeStatusTitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .frame(maxWidth: 520)
-            .frame(minHeight: 68)
-            .background(Color.secondary.opacity(0.09))
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 18,
-                    style: .continuous
-                )
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(
-            "Rivo 리모컨, \(rivoHomeStatusTitle)"
+    private var aiPanelDescription: String {
+        let base = AppLocalization.string(
+            "문서, 클립보드, 사진을 첨부할 수 있는 새 채팅을 시작하거나 이전 대화를 엽니다."
         )
-        .accessibilityHint("연결 관리 화면을 엽니다.")
-    }
-
-    private var localAIUsageStatus:
-        some View
-    {
-        Button {
-            appRouter.route = .chatHistory
-        } label: {
-            HStack(spacing: 14) {
-                Image(
-                    systemName:
-                        "apple.intelligence"
-                )
-                .font(.title2)
-                .foregroundStyle(.indigo)
-                .accessibilityHidden(true)
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 3
-                ) {
-                    Text(
-                        "오늘 M4 로컬 AI"
-                    )
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                    Text(
-                        localAIUsageTitle
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(
-                        .secondary
-                    )
-                    if let detail =
-                            localAIUsageDetail {
-                        Text(detail)
-                            .font(.caption2)
-                            .foregroundStyle(
-                                .secondary
-                            )
-                            .lineLimit(2)
-                    }
-                }
-                Spacer()
-                Text("일일 제한 없음")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.indigo)
-                    .multilineTextAlignment(
-                        .trailing
-                    )
-                Image(
-                    systemName:
-                        "chevron.right"
-                )
-                .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .frame(maxWidth: 520)
-            .frame(minHeight: 88)
-            .background(
-                Color.indigo
-                    .opacity(0.08)
-            )
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 18,
-                    style: .continuous
-                )
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(
-            children: .combine
-        )
-        .accessibilityLabel(
-            AppLocalization.format(
-                "오늘 M4 로컬 AI, %@, %@, 일일 제한 없음",
-                localAIUsageTitle,
-                localAIUsageDetail
-                    ?? AppLocalization.string(
-                        "오늘 활동 없음"
-                    )
-            )
-        )
-        .accessibilityHint(
-            "AI 대화 기록을 엽니다."
-        )
-    }
-
-    private var localAIUsageTitle: String {
         let usage = localAIUsage.snapshot
         guard usage.totalRequests > 0 else {
-            return AppLocalization.string(
-                "아직 실행 기록 없음"
-            )
+            return base
         }
-        return AppLocalization.format(
-            "%ld회 완료 · %@",
+
+        let activity = AppLocalization.format(
+            "오늘 %ld회 완료 · %@",
             usage.completedRequests,
-            localAIUsageDuration(
-                usage.inferenceSeconds
-            )
+            localAIUsageDuration(usage.inferenceSeconds)
+        )
+        return "\(base) \(activity)"
+    }
+
+    private var rivoDescription: String {
+        AppLocalization.format(
+            "연결 상태: %@",
+            rivoHomeStatusTitle
         )
     }
 
-    private var localAIUsageDetail:
-        String?
-    {
-        let usage = localAIUsage.snapshot
-        guard usage.totalRequests > 0 else {
-            return nil
+    private var rivoHomeStatusTitle: String {
+        switch rivoRemoteManager.state {
+        case .inactive:
+            return AppLocalization.string("연결 안 됨")
+        default:
+            return rivoRemoteManager.state.title
         }
-        return AppLocalization.format(
-            "%ld자 생성 · 실패 %ld · 취소 %ld",
-            usage.generatedCharacters,
-            usage.failedRequests,
-            usage.cancelledRequests
-        )
     }
 
-    private func localAIUsageDuration(
-        _ seconds: Double
-    ) -> String {
+    private var rivoStatusColor: Color {
+        switch rivoRemoteManager.state {
+        case .ready:
+            return VisionCraftUI.success
+        case .permissionDenied,
+             .unsupported,
+             .bluetoothOff,
+             .failed:
+            return .red
+        case .preparing,
+             .scanning,
+             .connecting,
+             .discovering:
+            return VisionCraftUI.warning
+        case .inactive,
+             .disconnected:
+            return VisionCraftUI.primary
+        }
+    }
+
+    private func localAIUsageDuration(_ seconds: Double) -> String {
         if seconds < 60 {
             return AppLocalization.format(
                 "%ld초 처리",
@@ -568,49 +244,6 @@ struct HomeView: View {
         )
     }
 
-    private var rivoHomeStatusTitle: String {
-        switch rivoRemoteManager.state {
-        case .inactive:
-            return AppLocalization.string(
-                "연결 안 됨"
-            )
-        default:
-            return rivoRemoteManager.state.title
-        }
-    }
-
-    private var rivoStatusColor: Color {
-        switch rivoRemoteManager.state {
-        case .ready:
-            return .green
-        case .permissionDenied,
-             .unsupported,
-             .bluetoothOff,
-             .failed:
-            return .red
-        case .preparing,
-             .scanning,
-             .connecting,
-             .discovering:
-            return .orange
-        case .inactive,
-             .disconnected:
-            return .secondary
-        }
-    }
-
-    private var isRivoTransitioning: Bool {
-        switch rivoRemoteManager.state {
-        case .preparing,
-             .scanning,
-             .connecting,
-             .discovering:
-            return true
-        default:
-            return false
-        }
-    }
-
     private func handleFileImport(
         _ result: Result<[URL], Error>
     ) {
@@ -619,10 +252,9 @@ struct HomeView: View {
                 guard let sourceURL = try result.get().first else {
                     return
                 }
-                appRouter.route = try await
-                    LocalFileOpening.route(
-                        for: sourceURL
-                    )
+                appRouter.route = try await LocalFileOpening.route(
+                    for: sourceURL
+                )
             } catch {
                 fileImportError = error.localizedDescription
             }

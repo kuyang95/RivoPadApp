@@ -111,6 +111,8 @@ struct ReaderLibraryView: View {
                 }
             }
         }
+        .listStyle(.insetGrouped)
+        .visionCraftListScreen()
         .navigationTitle("독서")
         .fileImporter(
             isPresented: $isImporterPresented,

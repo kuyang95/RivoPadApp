@@ -177,6 +177,9 @@ struct LLMContentView: View {
 
     var body: some View {
         ZStack {
+            VisionCraftUI.background
+                .ignoresSafeArea()
+
             VStack(spacing: 8) {
                 if let source = webSource {
                     webSourceBanner(source)
@@ -215,6 +218,8 @@ struct LLMContentView: View {
                             )
                     }
                     .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
                     .defaultScrollAnchor(.bottom)
                 }
 
@@ -410,6 +415,7 @@ struct LLMContentView: View {
                 .accessibilityElement(children: .combine)
             }
         }
+        .visionCraftNavigationScreen()
         .navigationTitle(navigationTitle)
         .navigationBarTitleDisplayMode(.inline)
         .confirmationDialog(

@@ -17,6 +17,8 @@ struct RivoRemoteView: View {
             eventSection
             limitationsSection
         }
+        .listStyle(.insetGrouped)
+        .visionCraftListScreen()
         .navigationTitle("Rivo 리모컨")
         .task {
             manager.activateAndScan()
