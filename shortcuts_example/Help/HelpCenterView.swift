@@ -259,6 +259,7 @@ private struct HelpManualView: View {
                 )
             }
         }
+        .visionCraftListScreen()
         .navigationTitle("사용 설명서")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(
@@ -453,6 +454,7 @@ private struct HelpReleaseNotesView:
                 }
             }
         }
+        .visionCraftListScreen()
         .navigationTitle("변경 내역")
         .navigationBarTitleDisplayMode(.inline)
     }

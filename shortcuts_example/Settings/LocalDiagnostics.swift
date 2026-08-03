@@ -542,6 +542,7 @@ struct LocalDiagnosticsView: View {
             }
             exportSection
         }
+        .visionCraftListScreen()
         .navigationTitle(
             "진단 및 개인정보"
         )

@@ -72,7 +72,8 @@ struct WebQuestionView: View {
                     .frame(
                         maxWidth: .infinity
                     )
-                    .padding(.vertical, 36)
+                    .padding(24)
+                    .visionCraftSurfaceCard(cornerRadius: 20)
                 }
             }
             .padding(20)
@@ -84,6 +85,7 @@ struct WebQuestionView: View {
                 maxWidth: .infinity
             )
         }
+        .visionCraftNavigationScreen()
         .navigationTitle(
             "웹페이지 질문"
         )
@@ -161,7 +163,8 @@ struct WebQuestionView: View {
                 "https://example.com",
                 text: $viewModel.urlText
             )
-            .textFieldStyle(.roundedBorder)
+            .textFieldStyle(.plain)
+            .visionCraftInputSurface()
             .textInputAutocapitalization(
                 .never
             )
@@ -243,6 +246,8 @@ struct WebQuestionView: View {
             }
             .controlSize(.large)
         }
+        .padding(16)
+        .visionCraftSurfaceCard(cornerRadius: 16)
     }
 
     private func loadedContentSection(
@@ -340,15 +345,7 @@ struct WebQuestionView: View {
             }
         }
         .padding(16)
-        .background(
-            Color.secondary.opacity(0.08)
-        )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 16,
-                style: .continuous
-            )
-        )
+        .visionCraftSurfaceCard(cornerRadius: 16)
     }
 
     private var questionSection:
@@ -370,7 +367,8 @@ struct WebQuestionView: View {
                 text: $viewModel.question,
                 axis: .vertical
             )
-            .textFieldStyle(.roundedBorder)
+            .textFieldStyle(.plain)
+            .visionCraftInputSurface()
             .lineLimit(2...6)
 
             Button(
@@ -396,5 +394,7 @@ struct WebQuestionView: View {
                 "웹 본문을 신뢰하지 않는 참고 자료로 구분해 로컬 AI에 전달합니다."
             )
         }
+        .padding(16)
+        .visionCraftSurfaceCard(cornerRadius: 16)
     }
 }

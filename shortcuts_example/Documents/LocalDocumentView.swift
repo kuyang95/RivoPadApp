@@ -333,6 +333,7 @@ struct LocalDocumentView: View {
         }
         .navigationTitle(viewModel.fileName)
         .navigationBarTitleDisplayMode(.inline)
+        .visionCraftNavigationScreen()
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("읽기", systemImage: "speaker.wave.2") {
@@ -492,7 +493,8 @@ struct LocalDocumentView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .padding()
+                .padding(16)
+                .background(VisionCraftUI.surface)
                 .accessibilityHint(
                     "PDF 원본과 추출된 텍스트 보기를 전환합니다."
                 )
@@ -534,18 +536,20 @@ struct LocalDocumentView: View {
             if let feedback {
                 Text(feedback)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(VisionCraftUI.secondaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(VisionCraftUI.surface)
                     .accessibilityLabel(feedback)
             } else if !viewModel.status.isEmpty {
                 Text(viewModel.status)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(VisionCraftUI.secondaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(VisionCraftUI.surface)
             }
         }
     }
@@ -1105,7 +1109,10 @@ struct LocalDocumentView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(.bar)
+        .background(VisionCraftUI.surface)
+        .overlay(alignment: .top) {
+            Divider().overlay(VisionCraftUI.outline)
+        }
         .accessibilityElement(
             children: .contain
         )
@@ -1123,6 +1130,8 @@ struct LocalDocumentView: View {
                 )
         }
         .buttonStyle(.bordered)
+        .buttonBorderShape(.roundedRectangle(radius: 12))
+        .tint(VisionCraftUI.primary)
         .accessibilityLabel(
             AppLocalization.string(
                 title
@@ -1219,7 +1228,7 @@ struct LocalDocumentView: View {
         .padding(.horizontal)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity)
-        .background(.bar)
+        .background(VisionCraftUI.surface)
     }
 
     private var settingsSheet: some View {
@@ -1320,6 +1329,7 @@ struct LocalDocumentView: View {
                     }
                 }
             }
+            .visionCraftListScreen()
             .navigationTitle("문서 보기 설정")
             .toolbar {
                 ToolbarItem(
@@ -1774,7 +1784,8 @@ struct LocalDocumentView: View {
                 text: $question,
                 axis: .vertical
             )
-            .textFieldStyle(.roundedBorder)
+            .textFieldStyle(.plain)
+            .visionCraftInputSurface()
             .lineLimit(1 ... 4)
             .submitLabel(.send)
             .onSubmit {
@@ -1785,6 +1796,9 @@ struct LocalDocumentView: View {
                 askQuestion()
             }
             .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.roundedRectangle(radius: 14))
+            .tint(VisionCraftUI.primary)
+            .frame(minHeight: 52)
             .disabled(
                 question.trimmingCharacters(
                     in: .whitespacesAndNewlines
@@ -1794,8 +1808,12 @@ struct LocalDocumentView: View {
                     ).isEmpty
             )
         }
-        .padding()
-        .background(.bar)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .background(VisionCraftUI.surface)
+        .overlay(alignment: .top) {
+            Divider().overlay(VisionCraftUI.outline)
+        }
     }
 
     private func askQuestion() {

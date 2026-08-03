@@ -266,6 +266,51 @@ private struct VisionCraftListScreenModifier: ViewModifier {
     }
 }
 
+private struct VisionCraftSurfaceCardModifier: ViewModifier {
+    let cornerRadius: CGFloat
+    let outlineOpacity: Double
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                VisionCraftUI.surface,
+                in: RoundedRectangle(
+                    cornerRadius: cornerRadius,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: cornerRadius,
+                    style: .continuous
+                )
+                .stroke(
+                    VisionCraftUI.outline.opacity(outlineOpacity),
+                    lineWidth: 1
+                )
+            }
+    }
+}
+
+private struct VisionCraftInputSurfaceModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                VisionCraftUI.surfaceVariant.opacity(0.58),
+                in: RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(VisionCraftUI.outline.opacity(0.85), lineWidth: 1)
+            }
+    }
+}
+
 extension View {
     func visionCraftNavigationScreen() -> some View {
         modifier(VisionCraftNavigationScreenModifier())
@@ -273,5 +318,21 @@ extension View {
 
     func visionCraftListScreen() -> some View {
         modifier(VisionCraftListScreenModifier())
+    }
+
+    func visionCraftSurfaceCard(
+        cornerRadius: CGFloat = 16,
+        outlineOpacity: Double = 0.8
+    ) -> some View {
+        modifier(
+            VisionCraftSurfaceCardModifier(
+                cornerRadius: cornerRadius,
+                outlineOpacity: outlineOpacity
+            )
+        )
+    }
+
+    func visionCraftInputSurface() -> some View {
+        modifier(VisionCraftInputSurfaceModifier())
     }
 }

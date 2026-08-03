@@ -756,6 +756,7 @@ private struct AppFontSelectionView:
                     )
                 }
             }
+            .visionCraftListScreen()
             .navigationTitle(
                 "앱 글꼴 선택"
             )

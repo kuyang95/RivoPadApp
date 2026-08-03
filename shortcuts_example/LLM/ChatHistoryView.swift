@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ChatHistoryView: View {
+    @EnvironmentObject private var appRouter: AppRouter
     @State private var conversations:
         [StoredChatConversation] = []
     @State private var searchText = ""
@@ -36,7 +37,7 @@ struct ChatHistoryView: View {
                     systemImage:
                         "bubble.left.and.bubble.right",
                     description: Text(
-                        "오른쪽 위의 새 대화 버튼으로 시작하세요."
+                        "새 대화 버튼으로 시작하세요."
                     )
                 )
             } else if
@@ -70,20 +71,35 @@ struct ChatHistoryView: View {
             featureToolbar
         }
         .safeAreaInset(edge: .bottom) {
-            if let errorDescription {
-                Text(errorDescription)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-                    .frame(
-                        maxWidth: .infinity,
-                        alignment: .leading
-                    )
-                    .padding()
-                    .background(.bar)
-                    .accessibilityLabel(
-                        "오류: \(errorDescription)"
-                    )
+            VStack(alignment: .trailing, spacing: 10) {
+                if let errorDescription {
+                    Text(errorDescription)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .visionCraftSurfaceCard(cornerRadius: 14)
+                        .accessibilityLabel("오류: \(errorDescription)")
+                }
+
+                HStack {
+                    Spacer()
+                    Button {
+                        appRouter.route = .localChat(conversationID: nil)
+                    } label: {
+                        Label("새 대화", systemImage: "plus")
+                            .font(.headline)
+                            .padding(.horizontal, 8)
+                            .frame(minHeight: 48)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.capsule)
+                    .tint(VisionCraftUI.primary)
+                    .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
+                }
             }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 8)
         }
         .alert(
             "대화 제목 수정",
@@ -166,18 +182,29 @@ struct ChatHistoryView: View {
                 ForEach(
                     filteredConversations
                 ) { conversation in
-                    NavigationLink(
-                        value:
-                            AppRoute.localChat(
-                                conversationID:
-                                    conversation
-                                    .id
-                            )
-                    ) {
-                        conversationRow(
-                            conversation
+                    Button {
+                        appRouter.route = .localChat(
+                            conversationID: conversation.id
                         )
+                    } label: {
+                        HStack(spacing: 12) {
+                            conversationRow(conversation)
+                            Spacer(minLength: 8)
+                            Image(systemName: "chevron.right")
+                                .font(.headline)
+                                .foregroundStyle(VisionCraftUI.secondaryText)
+                                .accessibilityHidden(true)
+                        }
+                        .padding(14)
+                        .contentShape(Rectangle())
+                        .visionCraftSurfaceCard(cornerRadius: 12, outlineOpacity: 0.6)
                     }
+                    .buttonStyle(.plain)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(
+                        .init(top: 5, leading: 20, bottom: 5, trailing: 20)
+                    )
                     .accessibilityHint(
                         "저장된 로컬 AI 대화를 엽니다."
                     )
@@ -357,25 +384,6 @@ struct ChatHistoryView: View {
             }
             .accessibilityHint(
                 "M4 로컬 AI 번역 화면을 엽니다."
-            )
-        }
-        ToolbarItem(
-            placement: .primaryAction
-        ) {
-            NavigationLink(
-                value:
-                    AppRoute.localChat(
-                        conversationID: nil
-                    )
-            ) {
-                Label(
-                    "새 대화",
-                    systemImage:
-                        "square.and.pencil"
-                )
-            }
-            .accessibilityHint(
-                "빈 로컬 AI 대화를 시작합니다."
             )
         }
     }

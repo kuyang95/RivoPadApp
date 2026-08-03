@@ -63,6 +63,7 @@ struct WebSearchView: View {
             )
             .frame(maxWidth: .infinity)
         }
+        .visionCraftNavigationScreen()
         .navigationTitle("웹 검색")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -121,15 +122,12 @@ struct WebSearchView: View {
             .font(.footnote)
         }
         .padding(16)
-        .background(
-            Color.indigo.opacity(0.09)
-        )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 16,
-                style: .continuous
-            )
-        )
+        .background(VisionCraftUI.primary.opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(VisionCraftUI.primary.opacity(0.25), lineWidth: 1)
+        }
     }
 
     private var querySection:
@@ -151,7 +149,8 @@ struct WebSearchView: View {
                 text: $viewModel.query,
                 axis: .vertical
             )
-            .textFieldStyle(.roundedBorder)
+            .textFieldStyle(.plain)
+            .visionCraftInputSurface()
             .lineLimit(2...5)
             .submitLabel(.search)
             .onSubmit {
@@ -225,6 +224,8 @@ struct WebSearchView: View {
                 )
             }
         }
+        .padding(16)
+        .visionCraftSurfaceCard(cornerRadius: 16)
     }
 
     private func errorView(
@@ -254,7 +255,8 @@ struct WebSearchView: View {
             )
         )
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 36)
+        .padding(24)
+        .visionCraftSurfaceCard(cornerRadius: 20)
     }
 
     private func resultsSection(
@@ -344,15 +346,7 @@ struct WebSearchView: View {
                 .textSelection(.enabled)
         }
         .padding(14)
-        .background(
-            Color.secondary.opacity(0.08)
-        )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 14,
-                style: .continuous
-            )
-        )
+        .visionCraftSurfaceCard(cornerRadius: 14)
         .accessibilityElement(
             children: .combine
         )
@@ -399,5 +393,7 @@ struct WebSearchView: View {
                 response.results.isEmpty
             )
         }
+        .padding(16)
+        .visionCraftSurfaceCard(cornerRadius: 16)
     }
 }

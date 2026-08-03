@@ -99,6 +99,7 @@ struct DocumentScanRootView: View {
                 preparingOverlay
             }
         }
+        .tint(VisionCraftUI.primary)
         .background(Color.black)
         .fileExporter(
             isPresented: $isExporting,
@@ -259,12 +260,7 @@ struct DocumentScanRootView: View {
                 .controlSize(.large)
             }
             .padding(24)
-            .background(
-                Color(
-                    uiColor:
-                        .systemBackground
-                )
-            )
+            .background(VisionCraftUI.background)
         }
     }
 
@@ -333,10 +329,10 @@ struct DocumentScanRootView: View {
                             .listRowBackground(
                                 selectedPageID
                                     == page.id
-                                    ? Color
-                                        .accentColor
+                                    ? VisionCraftUI
+                                        .primary
                                         .opacity(0.14)
-                                    : Color.clear
+                                    : VisionCraftUI.surface
                             )
                             .accessibilityAddTraits(
                                 selectedPageID
@@ -355,6 +351,8 @@ struct DocumentScanRootView: View {
                         )
                     }
                     .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .background(VisionCraftUI.background)
                     .onChange(
                         of: selectedPageID
                     ) { _, pageID in
@@ -416,12 +414,7 @@ struct DocumentScanRootView: View {
             .controlSize(.large)
             .padding(20)
         }
-        .background(
-            Color(
-                uiColor:
-                    .systemBackground
-            )
-        )
+        .background(VisionCraftUI.background)
     }
 
     private func pageRow(

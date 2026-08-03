@@ -74,10 +74,7 @@ struct TranslationView: View {
             .scrollContentBackground(
                 .hidden
             )
-            .background(
-                Color.secondary
-                    .opacity(0.08)
-            )
+            .background(VisionCraftUI.surface)
             .clipShape(
                 RoundedRectangle(
                     cornerRadius: 14,
@@ -90,8 +87,7 @@ struct TranslationView: View {
                     style: .continuous
                 )
                 .stroke(
-                    Color.secondary
-                        .opacity(0.2)
+                    VisionCraftUI.outline.opacity(0.85)
                 )
             }
             .frame(
@@ -117,6 +113,7 @@ struct TranslationView: View {
                     .buttonStyle(
                         .borderedProminent
                     )
+                    .buttonBorderShape(.roundedRectangle(radius: 14))
                     .tint(.red)
                 } else {
                     Button(
@@ -136,6 +133,8 @@ struct TranslationView: View {
                     .buttonStyle(
                         .borderedProminent
                     )
+                    .buttonBorderShape(.roundedRectangle(radius: 14))
+                    .tint(VisionCraftUI.primary)
                     .disabled(
                         !viewModel
                         .canTranslate
@@ -162,6 +161,9 @@ struct TranslationView: View {
             resultSection
         }
         .padding(20)
+        .frame(maxWidth: 820)
+        .frame(maxWidth: .infinity)
+        .visionCraftNavigationScreen()
         .navigationTitle("로컬 번역")
         .navigationBarTitleDisplayMode(
             .inline
@@ -252,6 +254,8 @@ struct TranslationView: View {
             .pickerStyle(.segmented)
             .disabled(viewModel.isBusy)
         }
+        .padding(14)
+        .visionCraftSurfaceCard(cornerRadius: 16)
     }
 
     private var resultSection:
@@ -326,16 +330,7 @@ struct TranslationView: View {
                 )
                 .padding(14)
             }
-            .background(
-                Color.secondary
-                    .opacity(0.08)
-            )
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 14,
-                    style: .continuous
-                )
-            )
+            .visionCraftSurfaceCard(cornerRadius: 14)
             .accessibilityLabel(
                 viewModel.result.isEmpty
                     ? AppLocalization.string(

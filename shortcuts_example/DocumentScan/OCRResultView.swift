@@ -50,6 +50,7 @@ struct OCRResultView: View {
                 .transition(.opacity)
             }
         }
+        .tint(VisionCraftUI.primary)
         .safeAreaInset(edge: .top) {
             if hasRequestedOCR,
                !vm.isExtracting {

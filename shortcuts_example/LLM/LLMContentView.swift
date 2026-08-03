@@ -319,7 +319,9 @@ struct LLMContentView: View {
                             .frame(width: 28, height: 28)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(stt.isRecording ? .red : .indigo)
+                    .buttonBorderShape(.roundedRectangle(radius: 14))
+                    .controlSize(.large)
+                    .tint(stt.isRecording ? .red : VisionCraftUI.primary)
                     .disabled(
                         !vm.isReadyForInput
                             || vm.isGenerating
@@ -349,7 +351,9 @@ struct LLMContentView: View {
                         text: $vm.input,
                         axis: .vertical
                     )
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
+                        .visionCraftInputSurface()
+                        .frame(minHeight: 52)
                         .lineLimit(1 ... 6)
                         .disabled(
                             vm.isLoadingModel
@@ -368,6 +372,8 @@ struct LLMContentView: View {
                             vm.stop()
                         }
                         .buttonStyle(.borderedProminent)
+                        .buttonBorderShape(.roundedRectangle(radius: 14))
+                        .controlSize(.large)
                         .tint(.red)
                         .accessibilityHint(
                             "현재 생성 중인 답변을 중지합니다."
@@ -377,11 +383,20 @@ struct LLMContentView: View {
                             vm.sendUserMessage()
                         }
                         .buttonStyle(.borderedProminent)
+                        .buttonBorderShape(.roundedRectangle(radius: 14))
+                        .controlSize(.large)
+                        .tint(VisionCraftUI.primary)
                         .disabled(!vm.canSend)
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 8)
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
+                .padding(.bottom, 22)
+                .background(VisionCraftUI.surface)
+                .overlay(alignment: .top) {
+                    Divider()
+                        .overlay(VisionCraftUI.outline)
+                }
             }
 
             if vm.isLoadingModel
@@ -629,8 +644,11 @@ struct LLMContentView: View {
                 systemImage: systemImage
             )
             .font(.subheadline.bold())
+            .frame(minHeight: 42)
         }
         .buttonStyle(.bordered)
+        .buttonBorderShape(.roundedRectangle(radius: 12))
+        .tint(VisionCraftUI.primary)
     }
 
     private func attachmentBanner(
@@ -641,7 +659,7 @@ struct LLMContentView: View {
                 systemName:
                     "paperclip.circle.fill"
             )
-            .foregroundStyle(.indigo)
+            .foregroundStyle(VisionCraftUI.primary)
             VStack(
                 alignment: .leading,
                 spacing: 2
@@ -657,9 +675,7 @@ struct LLMContentView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(
-            Color.indigo.opacity(0.08)
-        )
+        .visionCraftSurfaceCard(cornerRadius: 14)
         .accessibilityElement(
             children: .combine
         )
@@ -879,8 +895,12 @@ struct LLMContentView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(
-            Color.secondary.opacity(0.08)
+            VisionCraftUI.surface
         )
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(VisionCraftUI.outline.opacity(0.7), lineWidth: 1)
+        }
         .accessibilityElement(
             children: .contain
         )
@@ -899,6 +919,8 @@ struct LLMContentView: View {
                 )
         }
         .buttonStyle(.bordered)
+        .buttonBorderShape(.roundedRectangle(radius: 12))
+        .tint(VisionCraftUI.primary)
         .accessibilityLabel(
             AppLocalization.string(title)
         )
@@ -953,15 +975,12 @@ struct LLMContentView: View {
             .font(.subheadline.bold())
         }
         .padding(12)
-        .background(
-            Color.indigo.opacity(0.09)
-        )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 14,
-                style: .continuous
-            )
-        )
+        .background(VisionCraftUI.primary.opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(VisionCraftUI.primary.opacity(0.25), lineWidth: 1)
+        }
         .padding(.horizontal, 12)
     }
 
@@ -973,7 +992,7 @@ struct LLMContentView: View {
                 systemName:
                     "link.circle.fill"
             )
-            .foregroundStyle(.indigo)
+            .foregroundStyle(VisionCraftUI.primary)
 
             VStack(
                 alignment: .leading,
@@ -1009,9 +1028,10 @@ struct LLMContentView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(
-            Color.secondary.opacity(0.08)
-        )
+        .background(VisionCraftUI.surface)
+        .overlay(alignment: .bottom) {
+            Divider().overlay(VisionCraftUI.outline)
+        }
         .accessibilityElement(
             children: .combine
         )
@@ -1220,25 +1240,49 @@ private struct MessageRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .bottom) {
+        HStack(alignment: .top) {
             if m.role == "user" {
                 Spacer()
-                bubble
+                messageStack
             } else {
-                bubble
+                messageStack
                 Spacer()
             }
         }
+        .padding(.leading, m.role == "user" ? 72 : 8)
+        .padding(.trailing, m.role == "user" ? 8 : 32)
     }
 
     @ViewBuilder
+    private var messageStack: some View {
+        VStack(
+            alignment: m.role == "user" ? .trailing : .leading,
+            spacing: 6
+        ) {
+            Text(
+                AppLocalization.string(
+                    m.role == "user" ? "사용자" : "AI"
+                )
+            )
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(
+                m.role == "user"
+                    ? VisionCraftUI.secondaryText
+                    : VisionCraftUI.primary
+            )
+
+            bubble
+        }
+    }
+
     private var bubble: some View {
-        VStack(alignment: m.role == "user" ? .trailing : .leading) {
+        VStack(alignment: m.role == "user" ? .trailing : .leading, spacing: 8) {
             if let img = m.image {
                 Image(uiImage: img)
                     .resizable()
                     .scaledToFit()
                     .frame(maxWidth: 260)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .accessibilityLabel(
                         AppLocalization.string(
                             "첨부 이미지"
@@ -1248,17 +1292,32 @@ private struct MessageRow: View {
 
             if !m.text.isEmpty {
                 Text(m.text)
+                    .font(.title)
+                    .lineSpacing(5)
+                    .foregroundStyle(
+                        m.role == "user"
+                            ? Color.white
+                            : VisionCraftUI.primaryText
+                    )
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
             }
         }
-        .padding(12)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+        .frame(maxWidth: 680, alignment: m.role == "user" ? .trailing : .leading)
         .background(
             m.role == "user"
-                ? Color.accentColor.opacity(0.18)
-                : Color.secondary.opacity(0.12)
+                ? VisionCraftUI.primary
+                : VisionCraftUI.surface
         )
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            if m.role != "user" {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(VisionCraftUI.outline.opacity(0.75), lineWidth: 1)
+            }
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             AppLocalization.format(

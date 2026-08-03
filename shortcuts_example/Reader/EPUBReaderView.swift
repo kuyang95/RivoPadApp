@@ -710,6 +710,9 @@ struct EPUBReaderView: View {
                 )
         )
         .navigationBarTitleDisplayMode(.inline)
+        .tint(VisionCraftUI.primary)
+        .toolbarBackground(VisionCraftUI.background, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("목차", systemImage: "list.bullet") {
@@ -1260,9 +1263,15 @@ struct EPUBReaderView: View {
             }
         }
         .buttonStyle(.bordered)
-        .padding()
+        .buttonBorderShape(.roundedRectangle(radius: 12))
+        .tint(VisionCraftUI.primary)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
         .frame(maxWidth: .infinity)
-        .background(.bar)
+        .background(VisionCraftUI.surface)
+        .overlay(alignment: .top) {
+            Divider().overlay(VisionCraftUI.outline)
+        }
     }
 
     private var playbackTimelineDescription:
@@ -1494,6 +1503,7 @@ struct EPUBReaderView: View {
                     }
                 }
             }
+            .visionCraftListScreen()
             .navigationTitle("목차")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -1627,6 +1637,7 @@ struct EPUBReaderView: View {
                 text: $searchQuery,
                 prompt: "책에서 검색"
             )
+            .visionCraftListScreen()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("완료") {
@@ -1698,6 +1709,7 @@ struct EPUBReaderView: View {
                     }
                 }
             }
+            .visionCraftListScreen()
             .navigationTitle("독서 설정")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

@@ -133,6 +133,7 @@ struct SharedInboxView: View {
                 }
             }
         }
+        .visionCraftListScreen()
         .navigationTitle("공유 수신함")
         .task {
             viewModel.reload()
