@@ -223,7 +223,9 @@ struct LLMContentView: View {
                     .defaultScrollAnchor(.bottom)
                 }
 
-                quickPromptBar
+                if allowsFollowUpInput {
+                    quickPromptBar
+                }
 
                 if let error = voiceErrorDescription
                     ?? vm.attachmentErrorDescription
@@ -303,99 +305,101 @@ struct LLMContentView: View {
                     )
                 }
 
-                HStack(alignment: .bottom) {
-                    Button {
-                        if stt.isRecording {
-                            stt.finishRecording()
-                        } else {
-                            startVoiceInput()
-                        }
-                    } label: {
-                        Image(
-                            systemName: stt.isRecording
-                                ? "stop.fill"
-                                : "mic.fill"
-                        )
-                            .frame(width: 28, height: 28)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .buttonBorderShape(.roundedRectangle(radius: 14))
-                    .controlSize(.large)
-                    .tint(stt.isRecording ? .red : VisionCraftUI.primary)
-                    .disabled(
-                        !vm.isReadyForInput
-                            || vm.isGenerating
-                            || vm.isPreparingAttachment
-                            || (
-                                speechTask != nil
-                                    && !stt.isRecording
+                if allowsFollowUpInput {
+                    HStack(alignment: .bottom) {
+                        Button {
+                            if stt.isRecording {
+                                stt.finishRecording()
+                            } else {
+                                startVoiceInput()
+                            }
+                        } label: {
+                            Image(
+                                systemName: stt.isRecording
+                                    ? "stop.fill"
+                                    : "mic.fill"
                             )
-                    )
-                    .accessibilityLabel(
-                        AppLocalization.string(
-                            stt.isRecording
-                                ? "음성 입력 종료"
-                                : "음성으로 질문"
-                        )
-                    )
-                    .accessibilityHint(
-                        AppLocalization.string(
-                            stt.isRecording
-                                ? "인식을 마치고 질문을 전송합니다."
-                                : "온디바이스 한국어 음성 인식을 시작합니다."
-                        )
-                    )
-
-                    TextField(
-                        "메시지를 입력하세요",
-                        text: $vm.input,
-                        axis: .vertical
-                    )
-                        .textFieldStyle(.plain)
-                        .visionCraftInputSurface()
-                        .frame(minHeight: 52)
-                        .lineLimit(1 ... 6)
+                                .frame(width: 28, height: 28)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .buttonBorderShape(.roundedRectangle(radius: 14))
+                        .controlSize(.large)
+                        .tint(stt.isRecording ? .red : VisionCraftUI.primary)
                         .disabled(
-                            vm.isLoadingModel
-                                || vm.isInitialQueryRunning
+                            !vm.isReadyForInput
                                 || vm.isGenerating
                                 || vm.isPreparingAttachment
-                                || stt.isRecording
+                                || (
+                                    speechTask != nil
+                                        && !stt.isRecording
+                                )
                         )
-                        .submitLabel(.send)
-                        .onSubmit {
-                            vm.sendUserMessage()
-                        }
-
-                    if vm.isGenerating {
-                        Button("중지") {
-                            vm.stop()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .buttonBorderShape(.roundedRectangle(radius: 14))
-                        .controlSize(.large)
-                        .tint(.red)
+                        .accessibilityLabel(
+                            AppLocalization.string(
+                                stt.isRecording
+                                    ? "음성 입력 종료"
+                                    : "음성으로 질문"
+                            )
+                        )
                         .accessibilityHint(
-                            "현재 생성 중인 답변을 중지합니다."
+                            AppLocalization.string(
+                                stt.isRecording
+                                    ? "인식을 마치고 질문을 전송합니다."
+                                    : "온디바이스 한국어 음성 인식을 시작합니다."
+                            )
                         )
-                    } else {
-                        Button("전송") {
-                            vm.sendUserMessage()
+
+                        TextField(
+                            "메시지를 입력하세요",
+                            text: $vm.input,
+                            axis: .vertical
+                        )
+                            .textFieldStyle(.plain)
+                            .visionCraftInputSurface()
+                            .frame(minHeight: 52)
+                            .lineLimit(1 ... 6)
+                            .disabled(
+                                vm.isLoadingModel
+                                    || vm.isInitialQueryRunning
+                                    || vm.isGenerating
+                                    || vm.isPreparingAttachment
+                                    || stt.isRecording
+                            )
+                            .submitLabel(.send)
+                            .onSubmit {
+                                vm.sendUserMessage()
+                            }
+
+                        if vm.isGenerating {
+                            Button("중지") {
+                                vm.stop()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .buttonBorderShape(.roundedRectangle(radius: 14))
+                            .controlSize(.large)
+                            .tint(.red)
+                            .accessibilityHint(
+                                "현재 생성 중인 답변을 중지합니다."
+                            )
+                        } else {
+                            Button("전송") {
+                                vm.sendUserMessage()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .buttonBorderShape(.roundedRectangle(radius: 14))
+                            .controlSize(.large)
+                            .tint(VisionCraftUI.primary)
+                            .disabled(!vm.canSend)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .buttonBorderShape(.roundedRectangle(radius: 14))
-                        .controlSize(.large)
-                        .tint(VisionCraftUI.primary)
-                        .disabled(!vm.canSend)
                     }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 14)
-                .padding(.bottom, 22)
-                .background(VisionCraftUI.surface)
-                .overlay(alignment: .top) {
-                    Divider()
-                        .overlay(VisionCraftUI.outline)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
+                    .padding(.bottom, 22)
+                    .background(VisionCraftUI.surface)
+                    .overlay(alignment: .top) {
+                        Divider()
+                            .overlay(VisionCraftUI.outline)
+                    }
                 }
             }
 
@@ -779,6 +783,13 @@ struct LLMContentView: View {
         return content
     }
 
+    private var allowsFollowUpInput: Bool {
+        if case .webSearchQA = intent {
+            return false
+        }
+        return true
+    }
+
     private var webSearchResponse:
         WebSearchResponse?
     {
@@ -959,6 +970,23 @@ struct LLMContentView: View {
                         }
                     }
                 }
+                if let html = response
+                    .searchEntryPointHTML,
+                   !html.isEmpty {
+                    GoogleSearchEntryPointView(
+                        html: html
+                    )
+                    .frame(height: 64)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 10,
+                            style: .continuous
+                        )
+                    )
+                    .accessibilityHint(
+                        "Google에서 관련 검색을 이어갑니다."
+                    )
+                }
                 Text(
                     "검색 결과와 답변은 대화 기록에 저장하지 않습니다."
                 )
@@ -968,7 +996,10 @@ struct LLMContentView: View {
             .padding(.top, 8)
         } label: {
             Label(
-                "Brave 검색 출처 \(response.results.count)개",
+                AppLocalization.format(
+                    "Google 검색 출처 %lld개",
+                    response.results.count
+                ),
                 systemImage:
                     "checkmark.shield"
             )

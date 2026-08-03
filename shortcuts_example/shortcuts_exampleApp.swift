@@ -41,6 +41,7 @@ struct shortcuts_exampleApp: App {
         ] == nil else {
             return
         }
+        FirebaseRuntime.configureIfAvailable()
         AppBootstrap.prepareAppGroup()
         _ = TTSManager.shared
         _ = SoundEffectManager.shared

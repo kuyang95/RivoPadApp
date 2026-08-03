@@ -101,22 +101,22 @@ struct WebSearchView: View {
             spacing: 8
         ) {
             Label(
-                "검색어는 Brave Search로 보내고, 답변은 이 iPad의 M4에서 만듭니다.",
+                "웹 검색 질문은 Gemini와 Google Search로 전송됩니다.",
                 systemImage: "lock.shield"
             )
             .font(.headline)
 
             Text(
-                "Brave는 과금·장애 대응·남용 방지를 위해 검색어 로그를 최대 90일 보관할 수 있습니다. VisionCraft는 검색 결과와 답변을 대화 기록에 저장하지 않습니다."
+                "일반 채팅과 문서 분석은 M4에서 계속 로컬로 처리합니다. 웹 검색을 선택한 경우에만 Gemini가 Google Search에 근거한 답변을 만듭니다."
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
 
             Link(
-                "Brave 개인정보 안내",
+                "Google 개인정보처리방침",
                 destination: URL(
                     string:
-                        "https://api-dashboard.search.brave.com/privacy-policy"
+                        "https://policies.google.com/privacy"
                 )!
             )
             .font(.footnote)
@@ -178,7 +178,7 @@ struct WebSearchView: View {
                         )
                 } else {
                     Button(
-                        "출처 검색",
+                        "웹 검색",
                         systemImage:
                             "magnifyingglass"
                     ) {
@@ -193,6 +193,8 @@ struct WebSearchView: View {
                         .canSearch
                         || !configuration
                             .isEnabled
+                        || !configuration
+                            .isFirebaseConfigured
                     )
                 }
 
@@ -204,14 +206,18 @@ struct WebSearchView: View {
             }
             .controlSize(.large)
 
-            if !configuration.isEnabled {
+            if !configuration
+                .isFirebaseConfigured {
                 Label(
-                    AppLocalization.string(
-                        configuration
-                            .hasAPIKey
-                            ? "설정에서 온라인 웹 검색을 켜 주세요."
-                            : "설정에서 개인 Brave Search API 키를 저장해 주세요."
-                    ),
+                    "VisionCraft의 Firebase 연결 설정이 필요합니다.",
+                    systemImage:
+                        "exclamationmark.triangle"
+                )
+                .font(.footnote)
+                .foregroundStyle(.orange)
+            } else if !configuration.isEnabled {
+                Label(
+                    "설정에서 온라인 웹 검색을 켜 주세요.",
                     systemImage:
                         "exclamationmark.triangle"
                 )
@@ -284,6 +290,24 @@ struct WebSearchView: View {
                     )
             }
 
+            if let html = response
+                .searchEntryPointHTML,
+               !html.isEmpty {
+                GoogleSearchEntryPointView(
+                    html: html
+                )
+                .frame(height: 64)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 10,
+                        style: .continuous
+                    )
+                )
+                .accessibilityHint(
+                    "Google에서 관련 검색을 이어갑니다."
+                )
+            }
+
             ForEach(response.results) {
                 result in
                 resultCard(result)
@@ -340,10 +364,12 @@ struct WebSearchView: View {
                     )
             }
 
-            Text(result.snippet)
-                .font(.callout)
-                .lineLimit(6)
-                .textSelection(.enabled)
+            if !result.snippet.isEmpty {
+                Text(result.snippet)
+                    .font(.callout)
+                    .lineLimit(6)
+                    .textSelection(.enabled)
+            }
         }
         .padding(14)
         .visionCraftSurfaceCard(cornerRadius: 14)
@@ -363,20 +389,20 @@ struct WebSearchView: View {
             spacing: 12
         ) {
             Label(
-                "로컬 답변",
+                "Gemini 검색 답변",
                 systemImage: "sparkles"
             )
             .font(.headline)
 
             Text(
-                "위 출처만 참고 자료로 전달합니다. 검색 결과와 답변은 대화 기록에 저장하지 않습니다."
+                "Google Search에 근거한 답변과 출처를 표시합니다. 검색 결과와 답변은 VisionCraft 대화 기록에 저장하지 않습니다."
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
 
             Button(
-                "M4 로컬 AI로 답변",
-                systemImage: "cpu"
+                "답변 보기",
+                systemImage: "text.bubble"
             ) {
                 guard let route =
                         viewModel

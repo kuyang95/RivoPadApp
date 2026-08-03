@@ -43,7 +43,7 @@ nonisolated struct LocalDiagnosticSettingsSnapshot:
     let colorEnhancementEnabled: Bool
     let ocrCorrectionEnabled: Bool
     let webSearchEnabled: Bool
-    let webSearchAPIKeyStored: Bool
+    let webSearchFirebaseConfigured: Bool
 }
 
 nonisolated struct LocalDiagnosticReportSource:
@@ -204,9 +204,9 @@ nonisolated enum LocalDiagnosticReportBuilder {
                 "webSearchEnabled":
                     source.settings
                     .webSearchEnabled,
-                "webSearchAPIKeyStored":
+                "webSearchFirebaseConfigured":
                     source.settings
-                    .webSearchAPIKeyStored,
+                    .webSearchFirebaseConfigured,
             ],
             "metricKit": [
                 "source":
@@ -303,8 +303,8 @@ nonisolated enum LocalDiagnosticReportBuilder {
                         .ocrAutoCorrectionEnabled,
                     webSearchEnabled:
                         webSearch.isEnabled,
-                    webSearchAPIKeyStored:
-                        webSearch.hasAPIKey
+                    webSearchFirebaseConfigured:
+                        webSearch.isFirebaseConfigured
                 ),
             metricPayloads:
                 LocalMetricKitSnapshot

@@ -1,3 +1,4 @@
+import FirebaseAILogic
 import Foundation
 
 nonisolated struct WebSearchResult:
@@ -19,9 +20,29 @@ nonisolated struct WebSearchResponse:
     Sendable
 {
     let query: String
+    let answer: String
     let results: [WebSearchResult]
     let providerName: String
+    let searchEntryPointHTML: String?
     let searchedAt: Date
+}
+
+nonisolated struct GeminiGroundedSearchPayload:
+    Equatable,
+    Sendable
+{
+    struct Source:
+        Equatable,
+        Sendable
+    {
+        let title: String
+        let url: URL
+        let supportedText: String
+    }
+
+    let answer: String
+    let sources: [Source]
+    let searchEntryPointHTML: String?
 }
 
 nonisolated enum WebSearchError:
@@ -31,17 +52,13 @@ nonisolated enum WebSearchError:
     Sendable
 {
     case disabled
-    case missingAPIKey
+    case firebaseNotConfigured
     case emptyQuery
     case queryTooLong
     case invalidResponse
-    case invalidAPIKey
-    case paymentRequired
     case rateLimited
-    case httpStatus(Int)
-    case responseTooLarge(maximumBytes: Int)
-    case decodingFailed
     case noResults
+    case requestFailed
 
     var errorDescription: String? {
         switch self {
@@ -49,9 +66,9 @@ nonisolated enum WebSearchError:
             return AppLocalization.string(
                 "설정에서 온라인 웹 검색을 먼저 켜 주세요."
             )
-        case .missingAPIKey:
+        case .firebaseNotConfigured:
             return AppLocalization.string(
-                "설정에서 Brave Search API 키를 저장해 주세요."
+                "VisionCraft의 Firebase 연결 설정이 필요합니다."
             )
         case .emptyQuery:
             return AppLocalization.string(
@@ -65,37 +82,17 @@ nonisolated enum WebSearchError:
             return AppLocalization.string(
                 "검색 서버의 응답을 확인할 수 없습니다."
             )
-        case .invalidAPIKey:
-            return AppLocalization.string(
-                "Brave Search API 키가 유효하지 않습니다."
-            )
-        case .paymentRequired:
-            return AppLocalization.string(
-                "Brave Search 구독 또는 결제 상태를 확인해 주세요."
-            )
         case .rateLimited:
             return AppLocalization.string(
                 "웹 검색 요청 한도를 초과했습니다. 잠시 후 다시 시도해 주세요."
             )
-        case .httpStatus(let status):
-            return AppLocalization.format(
-                "검색 서버가 오류 상태 %lld를 반환했습니다.",
-                status
-            )
-        case .responseTooLarge(
-            let maximumBytes
-        ):
-            return AppLocalization.format(
-                "검색 결과가 %lld바이트 제한을 초과했습니다.",
-                maximumBytes
-            )
-        case .decodingFailed:
-            return AppLocalization.string(
-                "검색 결과 형식이 올바르지 않습니다."
-            )
         case .noResults:
             return AppLocalization.string(
                 "관련 검색 결과를 찾지 못했습니다."
+            )
+        case .requestFailed:
+            return AppLocalization.string(
+                "Gemini 웹 검색에 연결하지 못했습니다."
             )
         }
     }
@@ -126,25 +123,24 @@ nonisolated enum WebSearchQueryValidator {
         let wordCount = value.split {
             $0.isWhitespace
         }.count
-        guard value.count
-                <= maximumCharacters,
-              wordCount
-                <= maximumWords else {
-            throw WebSearchError
-                .queryTooLong
+        guard value.count <= maximumCharacters,
+              wordCount <= maximumWords else {
+            throw WebSearchError.queryTooLong
         }
         return value
     }
 }
 
 @MainActor
-final class BraveLLMContextSearchService:
+final class GeminiGoogleSearchService:
     WebSearchProviding
 {
-    static let maximumResponseBytes =
-        1_024 * 1_024
+    typealias Generator =
+        @MainActor @Sendable (String) async throws
+            -> GeminiGroundedSearchPayload
+
     static let shared =
-        BraveLLMContextSearchService(
+        GeminiGoogleSearchService(
             configuration:
                 WebSearchConfigurationStore
                 .shared
@@ -152,27 +148,32 @@ final class BraveLLMContextSearchService:
 
     private let configuration:
         any WebSearchConfigurationProviding
-    private let session: URLSession
-    private let localeIdentifier: String?
     private let now: @Sendable () -> Date
+    private let isFirebaseConfigured:
+        @MainActor @Sendable () -> Bool
+    private let generator: Generator
 
     init(
         configuration:
             any WebSearchConfigurationProviding,
-        session: URLSession? = nil,
-        localeIdentifier: String? = nil,
         now: @escaping @Sendable () -> Date = {
             Date()
-        }
+        },
+        isFirebaseConfigured:
+            @escaping @MainActor @Sendable () -> Bool = {
+                FirebaseRuntime.isConfigured
+            },
+        generator: Generator? = nil
     ) {
-        self.configuration =
-            configuration
-        self.session =
-            session
-            ?? Self.makeSession()
-        self.localeIdentifier =
-            localeIdentifier
+        self.configuration = configuration
         self.now = now
+        self.isFirebaseConfigured =
+            isFirebaseConfigured
+        self.generator = generator ?? {
+            try await Self.generate(
+                query: $0
+            )
+        }
     }
 
     func search(
@@ -181,445 +182,224 @@ final class BraveLLMContextSearchService:
         guard configuration.isEnabled else {
             throw WebSearchError.disabled
         }
-        guard let apiKey = try
-                configuration.apiKey()?
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                ),
-              !apiKey.isEmpty else {
+        guard isFirebaseConfigured() else {
             throw WebSearchError
-                .missingAPIKey
+                .firebaseNotConfigured
         }
         let query = try
             WebSearchQueryValidator
             .validated(rawQuery)
-        let request = try makeRequest(
-            query: query,
-            apiKey: apiKey
-        )
-        let data = try await fetch(request)
-        let response: BraveResponse
+
+        let payload: GeminiGroundedSearchPayload
         do {
-            response = try JSONDecoder()
-                .decode(
-                    BraveResponse.self,
-                    from: data
-                )
+            payload = try await generator(query)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as WebSearchError {
+            throw error
         } catch {
-            throw WebSearchError
-                .decodingFailed
+            let description = error
+                .localizedDescription
+                .lowercased()
+            if description.contains("429")
+                || description.contains(
+                    "rate limit"
+                ) {
+                throw WebSearchError.rateLimited
+            }
+            throw WebSearchError.requestFailed
         }
-        let results = makeResults(
-            from: response
-        )
-        guard !results.isEmpty else {
+
+        let answer = payload.answer
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+        guard !answer.isEmpty else {
+            throw WebSearchError
+                .invalidResponse
+        }
+        guard !payload.sources.isEmpty else {
             throw WebSearchError.noResults
         }
+
         return WebSearchResponse(
             query: query,
-            results: results,
-            providerName: "Brave Search",
+            answer: answer,
+            results: payload.sources
+                .enumerated()
+                .map { index, source in
+                    WebSearchResult(
+                        id: index + 1,
+                        title: source.title,
+                        url: source.url,
+                        snippet:
+                            source
+                            .supportedText,
+                        ageDescription: nil
+                    )
+                },
+            providerName:
+                "Gemini + Google Search",
+            searchEntryPointHTML:
+                payload
+                .searchEntryPointHTML,
             searchedAt: now()
         )
     }
 
-    private func makeRequest(
-        query: String,
-        apiKey: String
-    ) throws -> URLRequest {
-        guard let url = URL(
-            string:
-                "https://api.search.brave.com/res/v1/llm/context"
-        ) else {
-            throw WebSearchError
-                .invalidResponse
-        }
-        let locale =
-            SearchLocale(
-                identifier:
-                    localeIdentifier
-                    ?? AppLanguage.current()
-                        .effectiveLanguageCode
+    private static func generate(
+        query: String
+    ) async throws
+        -> GeminiGroundedSearchPayload
+    {
+        let model = FirebaseAI
+            .firebaseAI(
+                backend: .googleAI()
             )
-        let body: Data
-        do {
-            body = try JSONEncoder().encode(
-                BraveRequest(
-                    query: query,
-                    country:
-                        locale.country,
-                    searchLanguage:
-                        locale.language
-                )
-            )
-        } catch {
-            throw WebSearchError
-                .invalidResponse
-        }
-        var request = URLRequest(
-            url: url,
-            cachePolicy:
-                .reloadIgnoringLocalCacheData,
-            timeoutInterval: 30
-        )
-        request.httpMethod = "POST"
-        request.httpBody = body
-        request.setValue(
-            "application/json",
-            forHTTPHeaderField: "Accept"
-        )
-        request.setValue(
-            "application/json",
-            forHTTPHeaderField:
-                "Content-Type"
-        )
-        request.setValue(
-            apiKey,
-            forHTTPHeaderField:
-                "X-Subscription-Token"
-        )
-        return request
-    }
-
-    private func fetch(
-        _ request: URLRequest
-    ) async throws -> Data {
-        let (bytes, response) =
-            try await session.bytes(
-                for: request
-            )
-        guard let http =
-                response
-                as? HTTPURLResponse else {
-            throw WebSearchError
-                .invalidResponse
-        }
-        switch http.statusCode {
-        case 200...299:
-            break
-        case 401, 403:
-            throw WebSearchError
-                .invalidAPIKey
-        case 402:
-            throw WebSearchError
-                .paymentRequired
-        case 429:
-            throw WebSearchError
-                .rateLimited
-        default:
-            throw WebSearchError
-                .httpStatus(
-                    http.statusCode
-                )
-        }
-        if http.expectedContentLength
-            > Int64(
-                Self.maximumResponseBytes
-            ) {
-            throw WebSearchError
-                .responseTooLarge(
-                    maximumBytes:
-                        Self
-                        .maximumResponseBytes
-                )
-        }
-
-        var data = Data()
-        data.reserveCapacity(
-            min(
-                max(
-                    0,
-                    Int(
-                        http
-                        .expectedContentLength
+            .generativeModel(
+                modelName:
+                    "gemini-2.5-flash-lite",
+                generationConfig:
+                    GenerationConfig(
+                        temperature: 0.2,
+                        maxOutputTokens: 512
+                    ),
+                tools: [
+                    .googleSearch(),
+                ],
+                systemInstruction:
+                    ModelContent(
+                        role: "system",
+                        parts:
+                            systemInstruction
                     )
+            )
+        let response = try await model
+            .generateContent(
+                searchPrompt(query)
+            )
+        guard let answer = response.text?
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
                 ),
-                Self.maximumResponseBytes
-            )
-        )
-        for try await byte in bytes {
-            try Task.checkCancellation()
-            guard data.count
-                    < Self
-                    .maximumResponseBytes else {
-                throw WebSearchError
-                    .responseTooLarge(
-                        maximumBytes:
-                            Self
-                            .maximumResponseBytes
-                    )
-            }
-            data.append(byte)
-        }
-        guard !data.isEmpty else {
+              !answer.isEmpty,
+              let metadata = response
+                .candidates
+                .first?
+                .groundingMetadata else {
             throw WebSearchError
                 .invalidResponse
         }
-        return data
-    }
 
-    private func makeResults(
-        from response: BraveResponse
-    ) -> [WebSearchResult] {
+        var supportedTextByIndex =
+            [Int: [String]]()
+        for support in metadata
+            .groundingSupports {
+            let text = support.segment.text
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+            guard !text.isEmpty else {
+                continue
+            }
+            for index in support
+                .groundingChunkIndices {
+                supportedTextByIndex[
+                    index,
+                    default: []
+                ].append(text)
+            }
+        }
+
         var seenURLs = Set<URL>()
-        var results = [WebSearchResult]()
-
-        for item in response
-            .grounding?
-            .generic
-            ?? [] {
-            guard results.count < 5,
+        var sources = [
+            GeminiGroundedSearchPayload
+                .Source
+        ]()
+        for (index, chunk) in metadata
+            .groundingChunks
+            .enumerated() {
+            guard let web = chunk.web,
+                  let rawURL = web.uri,
                   let url = URL(
-                      string: item.url
+                      string: rawURL
                   ),
-                  let scheme =
-                      url.scheme?
-                      .lowercased(),
-                  scheme == "https"
-                    || scheme == "http",
+                  ["http", "https"]
+                    .contains(
+                        url.scheme?
+                            .lowercased()
+                            ?? ""
+                    ),
                   seenURLs.insert(url)
                     .inserted else {
                 continue
             }
-            let source =
-                response.sources?[
-                    item.url
-                ]
-            let fallbackTitle =
-                source?.title
-                ?? source?.hostname
+            let title = web.title?
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+            let displayTitle =
+                title.flatMap {
+                    $0.isEmpty ? nil : $0
+                }
                 ?? url.host
-                ?? item.url
-            let title = Self.bounded(
-                item.title ?? fallbackTitle,
-                maximumCharacters: 300
-            )
-            let snippets = item.snippets
-                .map {
-                    Self.bounded(
-                        $0,
-                        maximumCharacters:
-                            1_200
+                ?? rawURL
+            let supportedText =
+                Array(
+                    Set(
+                        supportedTextByIndex[
+                            index
+                        ] ?? []
                     )
-                }
-                .filter {
-                    !$0.isEmpty
-                }
-            guard !snippets.isEmpty else {
-                continue
-            }
-            let age = source?.age?
-                .filter {
-                    !$0.trimmingCharacters(
-                        in:
-                            .whitespacesAndNewlines
-                    ).isEmpty
-                }
-                .first
-            results.append(
-                WebSearchResult(
-                    id:
-                        results.count + 1,
-                    title:
-                        title.isEmpty
-                        ? fallbackTitle
-                        : title,
+                )
+                .sorted()
+                .joined(separator: " ")
+            sources.append(
+                .init(
+                    title: displayTitle,
                     url: url,
-                    snippet:
-                        snippets.joined(
-                            separator: "\n"
-                        ),
-                    ageDescription: age
+                    supportedText:
+                        supportedText
                 )
             )
         }
-        return results
-    }
 
-    private static func bounded(
-        _ value: String,
-        maximumCharacters: Int
-    ) -> String {
-        let normalized = value
-            .replacingOccurrences(
-                of: "\u{0000}",
-                with: ""
-            )
-            .trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-        guard normalized.count
-                > maximumCharacters else {
-            return normalized
-        }
-        return String(
-            normalized.prefix(
-                maximumCharacters
-            )
+        return GeminiGroundedSearchPayload(
+            answer: answer,
+            sources: sources,
+            searchEntryPointHTML:
+                metadata
+                .searchEntryPoint?
+                .renderedContent
         )
     }
 
-    private static func makeSession()
-        -> URLSession
+    private static var systemInstruction:
+        String
     {
-        let configuration =
-            URLSessionConfiguration
-            .ephemeral
-        configuration.urlCache = nil
-        configuration.requestCachePolicy =
-            .reloadIgnoringLocalCacheData
-        configuration.timeoutIntervalForRequest =
-            30
-        configuration.timeoutIntervalForResource =
-            30
-        return URLSession(
-            configuration: configuration
-        )
-    }
-}
-
-private extension
-    BraveLLMContextSearchService
-{
-    struct BraveResponse: Decodable {
-        let grounding: Grounding?
-        let sources:
-            [String: Source]?
-    }
-
-    struct BraveRequest: Encodable {
-        let query: String
-        let country: String
-        let searchLanguage: String
-        let count = 10
-        let maximumNumberOfURLs = 5
-        let maximumNumberOfTokens =
-            4_096
-        let maximumNumberOfSnippets = 20
-        let maximumNumberOfTokensPerURL =
-            1_024
-        let maximumNumberOfSnippetsPerURL =
-            4
-        let contextThresholdMode =
-            "balanced"
-
-        enum CodingKeys:
-            String,
-            CodingKey
-        {
-            case query = "q"
-            case country
-            case searchLanguage =
-                "search_lang"
-            case count
-            case maximumNumberOfURLs =
-                "maximum_number_of_urls"
-            case maximumNumberOfTokens =
-                "maximum_number_of_tokens"
-            case maximumNumberOfSnippets =
-                "maximum_number_of_snippets"
-            case maximumNumberOfTokensPerURL =
-                "maximum_number_of_tokens_per_url"
-            case maximumNumberOfSnippetsPerURL =
-                "maximum_number_of_snippets_per_url"
-            case contextThresholdMode =
-                "context_threshold_mode"
-        }
-    }
-
-    struct Grounding: Decodable {
-        let generic: [GroundingItem]?
-    }
-
-    struct GroundingItem: Decodable {
-        let url: String
-        let title: String?
-        let snippets: [String]
-    }
-
-    struct Source: Decodable {
-        let title: String?
-        let hostname: String?
-        let age: [String]?
-    }
-
-    struct SearchLocale {
-        let country: String
-        let language: String
-
-        init(identifier: String) {
-            let lowercased =
-                identifier.lowercased()
-            if lowercased.hasPrefix("ko") {
-                country = "kr"
-                language = "ko"
-            } else if lowercased
-                .hasPrefix("ja") {
-                country = "jp"
-                language = "ja"
-            } else {
-                country = "us"
-                language = "en"
-            }
-        }
-    }
-}
-
-nonisolated enum WebSearchPromptBuilder {
-    static let beginMarker =
-        "WEB_SEARCH_RESULTS_BEGIN"
-    static let endMarker =
-        "WEB_SEARCH_RESULTS_END"
-
-    static func prompt(
-        response: WebSearchResponse,
-        question: String,
-        currentDate: Date = Date()
-    ) -> String {
-        let timestamp =
-            ISO8601DateFormatter()
-            .string(from: currentDate)
-        let sources = response.results
-            .map { result in
-                """
-                [\(result.id)]
-                TITLE: \(neutralized(result.title))
-                URL: \(result.url.absoluteString)
-                EXCERPTS:
-                \(neutralized(result.snippet))
-                """
-            }
-            .joined(
-                separator: "\n\n"
-            )
-        return """
-        CURRENT_DATE: \(timestamp)
-        SEARCH_PROVIDER: \(response.providerName)
-        SEARCH_QUERY: \(response.query)
-
-        \(beginMarker)
-        \(sources)
-        \(endMarker)
-
-        QUESTION:
-        \(question)
+        """
+        너는 VisionCraft의 검색 도우미야. Google Search 결과에 근거해
+        최신 정보를 정확하고 간결하게 답해. 날짜나 시점이 중요하면
+        함께 말하고, 검색 결과가 불확실하거나 부족하면 그 한계를
+        분명히 밝혀. 답변은 \(AppLanguage.current().localAIResponseLanguageName)로 작성해.
         """
     }
 
-    private static func neutralized(
-        _ text: String
+    private static func searchPrompt(
+        _ query: String
     ) -> String {
-        text
-            .replacingOccurrences(
-                of: beginMarker,
-                with:
-                    "WEB_SEARCH_BOUNDARY_OPEN_TEXT"
-            )
-            .replacingOccurrences(
-                of: endMarker,
-                with:
-                    "WEB_SEARCH_BOUNDARY_CLOSE_TEXT"
-            )
+        let currentDate =
+            ISO8601DateFormatter()
+            .string(from: Date())
+        return """
+        CURRENT_DATE: \(currentDate)
+        Google Search를 사용해 다음 질문에 답해.
+
+        QUESTION:
+        \(query)
+        """
     }
 }

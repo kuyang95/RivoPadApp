@@ -18,6 +18,8 @@
 		9E5CC3012F80000200000001 /* actionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9E5CC3012F80000200000003 /* actionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9E5CC4012F80000300000001 /* rivoWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9E5CC4012F80000300000003 /* rivoWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9E71A0022F7D000100000001 /* StreamWebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = 9E71A0012F7D000100000001 /* StreamWebRTC */; };
+		9EFB00012FA1000100000001 /* FirebaseAILogic in Frameworks */ = {isa = PBXBuildFile; productRef = 9EFB00032FA1000100000003 /* FirebaseAILogic */; };
+		9EFB00022FA1000100000002 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = 9EFB00042FA1000100000004 /* FirebaseAppCheck */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -149,6 +151,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9EFB00012FA1000100000001 /* FirebaseAILogic in Frameworks */,
+				9EFB00022FA1000100000002 /* FirebaseAppCheck in Frameworks */,
 				9EA600022FA6000100000002 /* ZIPFoundation in Frameworks */,
 				9E03514A2F4BF88000D864AF /* MLXLLM in Frameworks */,
 				9E03514C2F4BF88000D864AF /* MLXLMCommon in Frameworks */,
@@ -227,6 +231,8 @@
 			);
 			name = shareExtension;
 			packageProductDependencies = (
+				9EFB00032FA1000100000003 /* FirebaseAILogic */,
+				9EFB00042FA1000100000004 /* FirebaseAppCheck */,
 			);
 			productName = shareExtension;
 			productReference = 9E5CC2012F80000100000003 /* shareExtension.appex */;
@@ -373,6 +379,7 @@
 			mainGroup = 9E901E8E2F2C4D010028581D;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				9EFB00002FA1000100000000 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				9EA600012FA6000100000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 				9E0351462F4BF88000D864AF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
 				9E5CA0012F6A000100000001 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */,
@@ -856,6 +863,7 @@
 		9E901EA32F2C4D030028581D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APP_ATTEST_ENVIRONMENT = development;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				AUTOMATION_APPLE_EVENTS = NO;
@@ -922,6 +930,7 @@
 		9E901EA42F2C4D030028581D /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APP_ATTEST_ENVIRONMENT = production;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				AUTOMATION_APPLE_EVENTS = NO;
@@ -1045,6 +1054,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		9EFB00002FA1000100000000 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.17.0;
+			};
+		};
 		9EA600012FA6000100000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/weichsel/ZIPFoundation.git";
@@ -1080,6 +1097,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		9EFB00032FA1000100000003 /* FirebaseAILogic */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9EFB00002FA1000100000000 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAILogic;
+		};
+		9EFB00042FA1000100000004 /* FirebaseAppCheck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9EFB00002FA1000100000000 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAppCheck;
+		};
 		9EA600032FA6000100000003 /* ZIPFoundation */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9EA600012FA6000100000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;

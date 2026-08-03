@@ -29,7 +29,7 @@ final class WebSearchViewModel:
         query = initialQuery ?? ""
         self.provider =
             provider
-            ?? BraveLLMContextSearchService
+            ?? GeminiGoogleSearchService
                 .shared
     }
 
@@ -64,7 +64,7 @@ final class WebSearchViewModel:
         response = nil
         errorDescription = nil
         status = AppLocalization.string(
-            "Brave에서 출처를 찾는 중"
+            "Google에서 최신 정보를 검색하는 중"
         )
         do {
             let result = try await

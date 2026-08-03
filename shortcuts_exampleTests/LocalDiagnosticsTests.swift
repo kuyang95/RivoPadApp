@@ -257,7 +257,7 @@ final class LocalDiagnosticsTests:
                         true,
                     webSearchEnabled:
                         false,
-                    webSearchAPIKeyStored:
+                    webSearchFirebaseConfigured:
                         false
                 ),
             metricPayloads:

@@ -110,7 +110,7 @@ struct HelpCenterView: View {
                         "square.and.arrow.down"
                 )
                 Label(
-                    "선택적 웹 검색을 켜면 검색어와 개인 API 키는 Brave로 보내고, 최종 AI 답변은 이 iPad에서 만듭니다.",
+                    "선택적 웹 검색을 켠 경우에만 질문을 Firebase AI Logic을 통해 Gemini와 Google Search로 보냅니다. 일반 AI 기능은 이 iPad에서 처리합니다.",
                     systemImage:
                         "globe.badge.chevron.backward"
                 )
