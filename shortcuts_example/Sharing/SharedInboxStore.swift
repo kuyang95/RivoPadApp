@@ -78,7 +78,7 @@ enum SharedInboxStoreError: LocalizedError {
 final class SharedInboxStore {
     static let shared = SharedInboxStore()
     static let appGroupIdentifier =
-        "group.com.rivo.shortcuts.example"
+        "group.net.rivo.visioncraft"
     static let directoryName = "ShareInbox"
     static let manifestFilename = "manifest.json"
     static let maximumPayloadBytes = 100 * 1_024 * 1_024

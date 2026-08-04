@@ -236,7 +236,7 @@ extension ShortcutEnvelope {
 
 nonisolated enum ShortcutBridge {
 
-    static let suiteName = "group.com.rivo.shortcuts.example"
+    static let suiteName = "group.net.rivo.visioncraft"
     static let lastKey = "shortcut_last_envelope_v1"
     private static let lockQ = DispatchQueue(label: "ShortcutBridge.lock")
 

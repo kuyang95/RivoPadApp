@@ -32,7 +32,7 @@ nonisolated struct RivoWidgetSnapshot:
 
 enum RivoWidgetStatusStore {
     static let suiteName =
-        "group.com.rivo.shortcuts.example"
+        "group.net.rivo.visioncraft"
     static let snapshotKey =
         "rivo.widget.snapshot.v1"
     static let widgetKind =

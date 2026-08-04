@@ -18,7 +18,7 @@ nonisolated final class VisionLinkCredentialStore:
 
     init(
         service: String =
-            "com.rivo.shortcuts-example.visionlink"
+            "net.rivo.visioncraft.visionlink"
     ) {
         self.service = service
     }

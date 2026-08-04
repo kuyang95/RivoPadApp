@@ -37,7 +37,7 @@ private enum ActionExtensionError: LocalizedError {
 
 final class ActionViewController: UIViewController {
     private static let appGroupIdentifier =
-        "group.com.rivo.shortcuts.example"
+        "group.net.rivo.visioncraft"
     private static let maximumTextCharacters =
         200_000
 

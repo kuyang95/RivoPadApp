@@ -57,7 +57,7 @@ final class LocalAIUsageStore:
         LocalAIUsageStore()
 
     static let suiteName =
-        "group.com.rivo.shortcuts.example"
+        "group.net.rivo.visioncraft"
     static let snapshotKey =
         "localAI.usage.today.v1"
     static let widgetKind =

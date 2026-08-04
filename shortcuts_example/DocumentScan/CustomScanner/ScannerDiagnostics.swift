@@ -19,7 +19,7 @@ nonisolated final class ScannerDiagnostics: @unchecked Sendable {
 
     private let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier
-            ?? "com.rivo.shortcuts-example",
+            ?? "net.rivo.visioncraft",
         category: "scanner.performance"
     )
     private let lock = NSLock()

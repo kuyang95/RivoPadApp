@@ -29,7 +29,7 @@ private struct ShareInboxManifest: Codable {
 
 final class ShareViewController: UIViewController {
     private static let appGroupIdentifier =
-        "group.com.rivo.shortcuts.example"
+        "group.net.rivo.visioncraft"
     private static let maximumPayloadBytes =
         100 * 1_024 * 1_024
     private static let maximumBatchPayloadBytes =

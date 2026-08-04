@@ -48,7 +48,7 @@ private struct RivoStatusEntry: TimelineEntry {
 
 private struct RivoStatusProvider: TimelineProvider {
     private static let suiteName =
-        "group.com.rivo.shortcuts.example"
+        "group.net.rivo.visioncraft"
     private static let snapshotKey =
         "rivo.widget.snapshot.v1"
 
@@ -834,7 +834,7 @@ private struct LocalAIUsageProvider:
     TimelineProvider
 {
     private static let suiteName =
-        "group.com.rivo.shortcuts.example"
+        "group.net.rivo.visioncraft"
     private static let snapshotKey =
         "localAI.usage.today.v1"
 
