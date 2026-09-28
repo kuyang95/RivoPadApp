@@ -176,8 +176,6 @@ extension OCRResultView {
                     return
                 }
 
-                SoundEffectManager.shared.play(.recording)
-
                 Task {
                     do {
                         let stream = try await vm.sttManager.startRecording()
@@ -262,6 +260,37 @@ extension OCRResultView {
             .accessibilityLabel("번역")
             .accessibilityHint(
                 "추출한 텍스트를 M4 로컬 AI 번역 화면에서 바로 번역합니다."
+            )
+            .disabled(
+                !hasExtractedText
+                    || vm.isExtracting
+                    || vm.isGeneratingAI
+                    || vm.sttManager
+                    .isRecording
+            )
+
+            Button {
+                openTextEditorViewer()
+            } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.black.opacity(0.65))
+                        .frame(height: 40)
+
+                    Text(
+                        AppLocalization.string(
+                            "텍스트뷰어"
+                        )
+                    )
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("텍스트뷰어")
+            .accessibilityHint(
+                "추출한 텍스트를 큰 글자 텍스트 편집뷰에서 읽고 고칩니다."
             )
             .disabled(
                 !hasExtractedText
@@ -371,6 +400,23 @@ extension OCRResultView {
         appRouter.route = .translation(
             initialText: source,
             automaticallyStarts: true
+        )
+    }
+
+    private func openTextEditorViewer() {
+        let text = vm.extractedText
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+        guard !text.isEmpty else {
+            return
+        }
+        ttsWorkItem?.cancel()
+        previewHoldWorkItem?.cancel()
+        TTSManager.shared.stop()
+        appRouter.route = .textEditorText(
+            title: AppLocalization.string("문서 스캔"),
+            text: text
         )
     }
 

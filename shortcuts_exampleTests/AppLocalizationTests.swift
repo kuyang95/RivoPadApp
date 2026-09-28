@@ -6,6 +6,57 @@ import XCTest
 final class AppLocalizationTests:
     XCTestCase
 {
+    func testHomeTextSourceHidesEmptyClipboard() {
+        XCTAssertNil(
+            HomeTextSourcePolicy
+                .availableClipboardText(nil)
+        )
+        XCTAssertNil(
+            HomeTextSourcePolicy
+                .availableClipboardText(
+                    " \n\t "
+                )
+        )
+        XCTAssertEqual(
+            HomeTextSourcePolicy
+                .availableClipboardText(
+                    "  읽을 텍스트  "
+                ),
+            "  읽을 텍스트  "
+        )
+    }
+
+    func testHomeTextSourceStringsFollowInAppLanguage() {
+        XCTAssertEqual(
+            AppLocalization.string(
+                "텍스트 편집뷰",
+                language: .english
+            ),
+            "Text Edit View"
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "이미지에서 텍스트 읽어오기",
+                language: .japanese
+            ),
+            "画像からテキストを読み取る"
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "이미지에서 텍스트를 찾지 못했습니다.",
+                language: .english
+            ),
+            "No text was found in the image."
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "사진을 불러오는 중…",
+                language: .japanese
+            ),
+            "写真を読み込み中…"
+        )
+    }
+
     func testExplicitAppLanguageSelectsBundle()
     {
         XCTAssertEqual(
@@ -738,6 +789,16 @@ final class AppLocalizationTests:
             ),
             "Document line 3 of 9"
         )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "글자 인식 완료 · 오타 교정 중"
+            ),
+            "Text recognized · Correcting typos"
+        )
+        XCTAssertEqual(
+            AppLocalization.string("텍스트만 보기"),
+            "View Text Only"
+        )
 
         defaults.set(
             AppLanguage.japanese.rawValue,
@@ -767,6 +828,16 @@ final class AppLocalizationTests:
                 1_234
             ),
             "2ページ・1,234文字"
+        )
+        XCTAssertEqual(
+            AppLocalization.string(
+                "글자 인식 완료 · 오타 교정 중"
+            ),
+            "文字認識完了・誤字を補正中"
+        )
+        XCTAssertEqual(
+            AppLocalization.string("텍스트만 보기"),
+            "テキストのみ表示"
         )
     }
 
@@ -927,8 +998,8 @@ final class AppLocalizationTests:
         )
         XCTAssertEqual(
             RivoRemoteControlCenter()
-                .items[2].title,
-            "Camera Magnifier"
+                .items[1].title,
+            "Camera"
         )
         let englishReaderControl =
             RivoRemoteControlCenter()
@@ -976,7 +1047,7 @@ final class AppLocalizationTests:
         )
         XCTAssertEqual(
             controlCenter.items[8].title,
-            "表示設定"
+            "設定"
         )
         controlCenter.dismissCommandMode()
         XCTAssertEqual(

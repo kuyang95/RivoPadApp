@@ -1,10 +1,80 @@
 import XCTest
+import UIKit
 
 @testable import shortcuts_example
 
+@MainActor
 final class OCRCorrectionTests:
     XCTestCase
 {
+    func testDisabledCorrectionDoesNotCallGemini() async
+    {
+        let service = GeminiOCRCorrectionService(
+            isFirebaseConfigured: { true },
+            generator: { _, _ in
+                XCTFail(
+                    "Disabled correction must not call Gemini"
+                )
+                return nil
+            }
+        )
+
+        let result = await service.correctResult(
+            image: makeTestImage(),
+            originalText: "안녕하새요",
+            isEnabled: false
+        )
+
+        XCTAssertEqual(result.text, "안녕하새요")
+        XCTAssertEqual(result.status, .notRequested)
+    }
+
+    func testCorrectionKeepsOriginalWhenFirebaseIsUnavailable() async
+    {
+        let service = GeminiOCRCorrectionService(
+            isFirebaseConfigured: { false },
+            generator: { _, _ in
+                XCTFail(
+                    "Unconfigured correction must not call Gemini"
+                )
+                return nil
+            }
+        )
+
+        let result = await service.correctResult(
+            image: makeTestImage(),
+            originalText: "안녕하새요",
+            isEnabled: true
+        )
+
+        XCTAssertEqual(result.text, "안녕하새요")
+        XCTAssertEqual(result.status, .unavailable)
+    }
+
+    func testEnabledCorrectionUsesGeminiResult() async
+    {
+        let service = GeminiOCRCorrectionService(
+            isFirebaseConfigured: { true },
+            requestTimeout: .seconds(1),
+            generator: { imageData, prompt in
+                XCTAssertFalse(imageData.isEmpty)
+                XCTAssertTrue(
+                    prompt.contains("안녕하새요")
+                )
+                return "안녕하세요"
+            }
+        )
+
+        let result = await service.correctResult(
+            image: makeTestImage(),
+            originalText: "안녕하새요",
+            isEnabled: true
+        )
+
+        XCTAssertEqual(result.text, "안녕하세요")
+        XCTAssertEqual(result.status, .corrected)
+    }
+
     func testPromptRequiresUsableBoundedText()
     {
         XCTAssertNil(
@@ -173,5 +243,24 @@ final class OCRCorrectionTests:
         XCTAssertTrue(
             prompt.contains("실제 이미지")
         )
+    }
+
+    private func makeTestImage() -> UIImage {
+        UIGraphicsImageRenderer(
+            size: CGSize(
+                width: 32,
+                height: 32
+            )
+        ).image { context in
+            UIColor.white.setFill()
+            context.fill(
+                CGRect(
+                    x: 0,
+                    y: 0,
+                    width: 32,
+                    height: 32
+                )
+            )
+        }
     }
 }

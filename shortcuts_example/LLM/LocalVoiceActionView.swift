@@ -115,7 +115,6 @@ struct LocalVoiceActionView: View {
             "말씀해 주세요."
         )
         TTSManager.shared.stop()
-        SoundEffectManager.shared.play(.recording)
 
         listeningTask = Task {
             defer {
@@ -267,6 +266,9 @@ struct LocalVoiceActionView: View {
                 )
             announce(status)
         case .webSearch(let question):
+            SoundEffectManager.shared.play(
+                .startingLLM
+            )
             route(
                 .webSearch(
                     initialQuery:
@@ -280,6 +282,9 @@ struct LocalVoiceActionView: View {
                     )
             )
         case .question(let question):
+            SoundEffectManager.shared.play(
+                .startingLLM
+            )
             route(
                 .voiceQuestion(question: question),
                 announcement:

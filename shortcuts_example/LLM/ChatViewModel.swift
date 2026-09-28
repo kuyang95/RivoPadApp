@@ -36,6 +36,8 @@ final class ChatViewModel: ObservableObject {
     @Published var isGenerating: Bool = false
     @Published var historyErrorDescription: String?
     @Published var contextNoticeDescription: String?
+    @Published private(set) var modelPreparationFailure:
+        LocalModelPreparationFailure?
     @Published private(set) var
         attachmentSummary:
             ChatAttachmentSummary?
@@ -60,6 +62,10 @@ final class ChatViewModel: ObservableObject {
     private var conversationUpdatedAt: Date
     private var conversationTitle: String?
     private let replayCharacterLimit: Int
+    private let webSearchConfiguration:
+        any WebSearchConfigurationProviding
+    private let webSearchProvider:
+        any WebSearchProviding
     private var needsContextReplay = false
     private var didPrepare = false
     private var textContexts:
@@ -69,6 +75,8 @@ final class ChatViewModel: ObservableObject {
 
     // ✅ 이미지 분석 모드일 때 고정 이미지(후속 질문에도 계속 같이 보냄)
     private var pinnedCIImages: [CIImage] = []
+    /// 이미지 설명 최초 지시문. 말풍선으로는 띄우지 않고 맥락으로만 쓴다.
+    private var visionSeedPrompt: String?
 
     // ✅ 한번 로드하면 재로드/모델 변경 방지
     private var didLoadOnce = false
@@ -104,8 +112,18 @@ final class ChatViewModel: ObservableObject {
         persistsHistory: Bool = false,
         replayCharacterLimit: Int? = nil,
         initialFileAttachment:
-            StoredChatFileAttachment? = nil
+            StoredChatFileAttachment? = nil,
+        webSearchConfiguration:
+            (any WebSearchConfigurationProviding)? = nil,
+        webSearchProvider:
+            (any WebSearchProviding)? = nil
     ) {
+        self.webSearchConfiguration =
+            webSearchConfiguration
+            ?? WebSearchConfigurationStore.shared
+        self.webSearchProvider =
+            webSearchProvider
+            ?? GeminiGoogleSearchService.shared
         self.llm = llm
         self.historyStore = historyStore
         self.attachmentStore =
@@ -161,6 +179,17 @@ final class ChatViewModel: ObservableObject {
         너는 \(responseLanguageName)로 답하는 이미지 분석 도우미야.
         제공된 이미지를 관찰해서 질문에 답해.
         보이지 않는 내용은 추측하지 말고, 확인 불가하다고 말해.
+        """
+    }
+
+    /// 첫 이미지 설명 전용. 안드로이드 VisionCraft 의 IMAGE_CAPTIONING 과
+    /// 같은 지침이고, 분량 기준만 4문장 이하로 둔다. 후속 질문은
+    /// systemForImageAnalysis 를 써서 길이 제한 없이 답한다.
+    private var systemForImageDescription: String {
+        """
+        너는 시각장애인 사용자를 돕는 \(responseLanguageName) 이미지 설명 도우미야.
+        4문장 이하로 주요 대상, 화면의 중요한 텍스트, 상황만 간결하게 설명해.
+        확실하지 않은 내용은 단정하지 마.
         """
     }
 
@@ -243,6 +272,36 @@ final class ChatViewModel: ObservableObject {
             return
         }
 
+        await finishPreparing(for: intent)
+    }
+
+    func retryModelPreparation(
+        for intent: ChatIntentInput
+    ) async {
+        guard !didLoadOnce,
+              !isLoadingModel else {
+            return
+        }
+        modelPreparationFailure = nil
+        guard await loadModel(for: intent) else {
+            return
+        }
+        await finishPreparing(for: intent)
+    }
+
+    func cancelModelPreparation() async {
+        guard isLoadingModel else {
+            return
+        }
+        await llm.unloadCurrentModel()
+        isLoadingModel = false
+        modelPreparationFailure = nil
+        status = ""
+    }
+
+    private func finishPreparing(
+        for intent: ChatIntentInput
+    ) async {
         switch intent {
         case .textChat:
             break
@@ -259,6 +318,7 @@ final class ChatViewModel: ObservableObject {
                 AppLocalization.string(
                     "공유 파일을 준비했습니다."
                 )
+            SoundEffectManager.shared.play(.complete)
         case .imageAnalysis,
              .capturedImageAnalysis,
              .documentQA,
@@ -276,11 +336,12 @@ final class ChatViewModel: ObservableObject {
 
         do {
             isLoadingModel = true
+            modelPreparationFailure = nil
 
             switch intent {
             case .imageAnalysis,
                  .capturedImageAnalysis:
-                try await llm.activateModel(.qwen3_vl_8b_4bit)
+                // 이미지 분석은 Gemini 가 처리하므로 내려받을 모델이 없다.
                 loadedKind = .vision
             case .textChat,
                  .voiceQuestion,
@@ -288,13 +349,10 @@ final class ChatViewModel: ObservableObject {
                  .sharedAttachmentQuestion:
                 if fileAttachment?.kind
                     == .image {
-                    try await llm.activateModel(
-                        .qwen3_vl_8b_4bit
-                    )
                     loadedKind = .vision
                 } else {
                     try await llm.activateModel(
-                        .qwen3_8b_4bit
+                        .preferredTextModel
                     )
                     loadedKind = .text
                 }
@@ -302,7 +360,7 @@ final class ChatViewModel: ObservableObject {
                  .documentQA,
                  .webPageQA,
                  .webSearchQA:
-                try await llm.activateModel(.qwen3_8b_4bit)
+                try await llm.activateModel(.preferredTextModel)
                 loadedKind = .text
             }
 
@@ -317,7 +375,9 @@ final class ChatViewModel: ObservableObject {
             status = AppLocalization.string(
                 "모델 로드 실패"
             )
-            historyErrorDescription = error.localizedDescription
+            modelPreparationFailure = .make(
+                from: error
+            )
             return false
         }
     }
@@ -349,6 +409,7 @@ final class ChatViewModel: ObservableObject {
 
                 } else {
                     print("❌ UIImage 변환 실패")
+                    SoundEffectManager.shared.play(.fail)
                     status =
                         AppLocalization.string(
                             "UIImage 변환 실패"
@@ -357,6 +418,7 @@ final class ChatViewModel: ObservableObject {
 
             } catch {
                 print("❌ Data load error:", error)
+                SoundEffectManager.shared.play(.fail)
                 status =
                     AppLocalization.format(
                         "이미지 로드 실패: %@",
@@ -403,26 +465,25 @@ final class ChatViewModel: ObservableObject {
     ) {
         let images = toCIImages([image])
         guard !images.isEmpty else {
+            SoundEffectManager.shared.play(.fail)
             status = AppLocalization.string(
                 "이미지 변환 실패"
             )
             return
         }
+        // 이미지 설명 지시문은 사용자가 직접 쓴 말이 아니라서 말풍선으로
+        // 띄우지 않는다. 다만 후속 질문에서 맥락이 끊기지 않도록 따로 든다.
         messages.append(
             .init(
                 role: "user",
                 image: image
             )
         )
-        messages.append(
-            .init(
-                role: "user",
-                text: question
-            )
-        )
+        visionSeedPrompt = question
         pinnedCIImages = images
         startImageAnalysis(
-            question: question
+            question: question,
+            isInitialDescription: true
         )
     }
 
@@ -553,10 +614,15 @@ final class ChatViewModel: ObservableObject {
         )
     }
 
-    private func startImageAnalysis(question: String) {
+    private func startImageAnalysis(
+        question: String,
+        isInitialDescription: Bool = false
+    ) {
         startStreamingResponse(
             mode: .vision,
-            system: systemForImageAnalysis,
+            system: isInitialDescription
+                ? systemForImageDescription
+                : systemForImageAnalysis,
             prompt: question
         )
     }
@@ -938,6 +1004,7 @@ final class ChatViewModel: ObservableObject {
                 ]
             )
         }
+        SoundEffectManager.shared.play(.complete)
     }
 
     private var hasAttachmentContext:
@@ -1089,6 +1156,11 @@ final class ChatViewModel: ObservableObject {
         messages.append(.init(role: "user", text: prompt, image: nil))
         conversationUpdatedAt = Date()
 
+        if shouldAnswerFromWeb(prompt) {
+            startGroundedWebAnswer(question: prompt)
+            return
+        }
+
         // ✅ 로드된 모델 종류에 따라 텍스트/비전 분기
         switch loadedKind {
         case .vision:
@@ -1169,7 +1241,165 @@ final class ChatViewModel: ObservableObject {
 
     private enum RunMode { case text, vision }
 
+    /// 로컬 모델은 conversationID 로 세션을 들고 있었지만 Gemini 는 매 요청에
+    /// 이전 대화를 실어 보내야 한다. 이번 턴의 사용자 메시지는 prompt 로 따로
+    /// 넘기므로 마지막 하나는 뺀다.
+    private var visionHistory: [GeminiVisionService.Turn] {
+        var turns = messages
+            .dropLast()
+            .compactMap {
+                message -> GeminiVisionService.Turn? in
+                let text = message.text
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                guard !text.isEmpty else {
+                    return nil
+                }
+                return GeminiVisionService.Turn(
+                    role: message.role == "assistant"
+                        ? .assistant
+                        : .user,
+                    text: text
+                )
+            }
+
+        // 화면에 띄우지 않은 최초 지시문을 되살린다. 이게 없으면 맥락이
+        // model 턴부터 시작해 Gemini 가 요청을 거부한다.
+        if let visionSeedPrompt,
+           turns.first?.role == .assistant {
+            turns.insert(
+                GeminiVisionService.Turn(
+                    role: .user,
+                    text: visionSeedPrompt
+                ),
+                at: 0
+            )
+        }
+        return turns
+    }
+
+    /// A question that only the live web can answer is sent to Gemini with
+    /// Google Search grounding instead of the local model — but only when the
+    /// user turned on both online web search and the automatic chat lookup.
+    /// Document and image turns keep their attached material local.
+    private func shouldAnswerFromWeb(_ prompt: String) -> Bool {
+        guard loadedKind != .vision,
+              !hasAttachmentContext,
+              pinnedCIImages.isEmpty else {
+            return false
+        }
+        let configuration = webSearchConfiguration
+        guard configuration.isEnabled,
+              configuration.isAutomaticChatSearchEnabled else {
+            return false
+        }
+        return ChatWebSearchRouter
+            .requiresCurrentInformation(prompt)
+    }
+
+    private func startGroundedWebAnswer(question: String) {
+        messages.append(.init(role: "assistant", text: "", image: nil))
+        let assistantIndex = messages.count - 1
+        let requestID = UUID()
+
+        generationRequestID = requestID
+        genTask?.cancel()
+        genTask = Task { [webSearchProvider] in
+            do {
+                guard generationRequestID == requestID else {
+                    throw CancellationError()
+                }
+                isGenerating = true
+                status = AppLocalization.string(
+                    "Google에서 최신 정보를 검색하는 중"
+                )
+                await persistConversation()
+
+                let response = try await webSearchProvider.search(
+                    query: question
+                )
+                try Task.checkCancellation()
+                guard generationRequestID == requestID,
+                      messages.indices.contains(assistantIndex) else {
+                    throw CancellationError()
+                }
+
+                messages[assistantIndex].text =
+                    Self.groundedAnswerText(response)
+                // The local model never saw this turn, so the next local
+                // answer has to replay the transcript to stay in context.
+                needsContextReplay = true
+                conversationUpdatedAt = Date()
+                status = AppLocalization.format(
+                    "검색 출처 %lld개",
+                    response.results.count
+                )
+                isInitialQueryRunning = false
+                isGenerating = false
+                generationRequestID = nil
+                SoundEffectManager.shared.play(.complete)
+                await persistConversation()
+            } catch is CancellationError {
+                guard generationRequestID == requestID else {
+                    return
+                }
+                conversationUpdatedAt = Date()
+                status = AppLocalization.string(
+                    "중지됨"
+                )
+                isInitialQueryRunning = false
+                isGenerating = false
+                generationRequestID = nil
+                await persistConversation()
+            } catch {
+                guard generationRequestID == requestID else {
+                    return
+                }
+                // Falling back to the local model keeps the conversation
+                // usable when the quota is spent or the network is down.
+                isGenerating = false
+                generationRequestID = nil
+                if messages.indices.contains(assistantIndex) {
+                    messages.remove(at: assistantIndex)
+                }
+                contextNoticeDescription = AppLocalization.format(
+                    "웹 검색에 실패해 M4 로컬 AI로 답변합니다. (%@)",
+                    error.localizedDescription
+                )
+                startStreamingResponse(
+                    mode: .text,
+                    system: systemForGeneralChat,
+                    prompt: question
+                )
+            }
+        }
+    }
+
+    private static func groundedAnswerText(
+        _ response: WebSearchResponse
+    ) -> String {
+        var text = response.answer
+        guard !response.results.isEmpty else {
+            return text
+        }
+        text += "\n\n"
+        text += AppLocalization.string("출처")
+        for (index, result) in response.results.enumerated() {
+            text += "\n\(index + 1). \(result.title) — "
+            text += result.url.absoluteString
+        }
+        return text
+    }
+
     private func startStreamingResponse(mode: RunMode, system: String, prompt: String) {
+        if case .vision = mode {
+            SoundEffectManager.shared.play(.waiting)
+        }
+        // 빈 assistant 자리를 넣기 전에 맥락을 확보한다.
+        let history = mode == .vision
+            ? visionHistory
+            : []
         messages.append(.init(role: "assistant", text: "", image: nil))
         let assistantIndex = messages.count - 1
         let requestID = UUID()
@@ -1201,12 +1431,13 @@ final class ChatViewModel: ObservableObject {
                         prompt: prompt
                     )
                 case .vision:
-                    stream = try await llm.streamVision(
-                        conversationID: conversationID,
-                        system: system,
-                        prompt: prompt,
-                        images: pinnedCIImages
-                    )
+                    stream = try await
+                        GeminiVisionService.stream(
+                            system: system,
+                            prompt: prompt,
+                            images: pinnedCIImages,
+                            history: history
+                        )
                 }
 
                 try await consumeStream50ms(
@@ -1224,6 +1455,7 @@ final class ChatViewModel: ObservableObject {
                 isInitialQueryRunning = false
                 isGenerating = false
                 generationRequestID = nil
+                SoundEffectManager.shared.play(.complete)
                 await persistConversation()
             } catch is CancellationError {
                 guard generationRequestID == requestID else {
@@ -1254,6 +1486,7 @@ final class ChatViewModel: ObservableObject {
                 isInitialQueryRunning = false
                 isGenerating = false
                 generationRequestID = nil
+                SoundEffectManager.shared.play(.fail)
                 await persistConversation()
             }
         }

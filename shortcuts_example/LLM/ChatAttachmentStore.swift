@@ -1467,7 +1467,7 @@ actor ChatAttachmentStore {
                 AppSettingsStore.shared
                     .ocrAutoCorrectionEnabled
             }
-        return await LocalOCRCorrectionService
+        return await GeminiOCRCorrectionService
             .shared
             .correct(
                 image: image,

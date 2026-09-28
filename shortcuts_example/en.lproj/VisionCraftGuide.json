@@ -1,0 +1,366 @@
+[
+  {
+    "id": "start",
+    "group": "feature",
+    "feature": "Getting started",
+    "situation": "Which feature should I try first?",
+    "icon": "hand.wave",
+    "action": "home",
+    "steps": [
+      "Choose Camera to magnify small objects, Document Scan to read a paper document, or Live Text Reading to hear text in front of you.",
+      "Open your files in Document Workspace. Use the DAISY/EPUB Player for EPUB and DAISY books.",
+      "Return to Home and try a feature. The By Feature tab in this guide also shows how to use each tool."
+    ],
+    "tip": "You can use every Home feature by touch without a remote. The app explains any required permission when you first use a feature."
+  },
+  {
+    "id": "camera",
+    "group": "feature",
+    "feature": "Camera",
+    "situation": "I want to magnify nearby text and objects",
+    "icon": "camera",
+    "action": "camera",
+    "steps": [
+      "Open Camera from Home and point it at the object you want to see.",
+      "Pinch out or use the zoom controls to magnify. If the image is blurry, adjust the distance and hold the iPad steady.",
+      "Turn on the torch in dim light and choose a color filter that makes the text easier to see."
+    ],
+    "tip": "The camera magnifies your surroundings. To magnify another app’s screen, use Zoom in iPad Accessibility settings."
+  },
+  {
+    "id": "scan",
+    "group": "feature",
+    "feature": "Document Scan",
+    "situation": "I want to read and save a paper document",
+    "icon": "doc.viewfinder",
+    "action": "scan",
+    "steps": [
+      "Open Document Scan from Home and fit the whole document in the camera view.",
+      "Hold the iPad steady and it captures on its own. If shake keeps blocking it, it announces and shoots anyway after 8 seconds, and turns the torch on in dim light. Check the edges and orientation in the result.",
+      "Recognize a page to read or copy its text. To keep several pages, add pages, review them, and save a PDF."
+    ],
+    "tip": "With OCR Auto Correction enabled on Home, the document image and recognized text are sent to Gemini for correction. Basic text recognition runs on the device; if correction fails, the original recognized text is kept."
+  },
+  {
+    "id": "live",
+    "group": "feature",
+    "feature": "Live Text Reading",
+    "situation": "I want to hear the text in front of me",
+    "icon": "text.viewfinder",
+    "action": "liveText",
+    "steps": [
+      "Open Live Text Reading from Home.",
+      "Point the camera so that the text is visible and hold the iPad steady for a moment.",
+      "Listen to the automatically recognized text. Move the camera slowly to read something else."
+    ],
+    "tip": "The reader avoids repeating the same sentence continuously. Use Document Scan to review and save a whole page."
+  },
+  {
+    "id": "image",
+    "group": "feature",
+    "feature": "Image Description",
+    "situation": "I want to know what is in a picture",
+    "icon": "sparkles",
+    "action": "image",
+    "steps": [
+      "Open Image Description from Home and take a picture of the scene.",
+      "When analysis finishes, read the description or listen to it.",
+      "Ask a follow-up question about the same picture. To use a saved photo, attach it to a new chat."
+    ],
+    "tip": "Image analysis sends the picture and question to Gemini and requires an internet connection. Descriptions can contain mistakes, so check important details."
+  },
+  {
+    "id": "chat",
+    "group": "feature",
+    "feature": "New Chat",
+    "situation": "I want to ask about a document or photo",
+    "icon": "bubble.left.and.bubble.right",
+    "action": "chat",
+    "steps": [
+      "Open New Chat from Home and enter a question. You can start without an attachment.",
+      "To ask about material, attach a document, photo, or clipboard text.",
+      "Ask something like “Summarize the key points,” then continue with follow-up questions."
+    ],
+    "tip": "Text conversations and questions about document text use on-device AI. Preparing a model for the first time may require a download. Analysis involving a photo uses Gemini and the internet."
+  },
+  {
+    "id": "history",
+    "group": "feature",
+    "feature": "Chat History",
+    "situation": "I want to continue an earlier conversation",
+    "icon": "clock.arrow.circlepath",
+    "action": "history",
+    "steps": [
+      "Open Chat History from Home.",
+      "Search by title or message content and select a conversation.",
+      "Read saved answers or continue asking questions. Start a different topic with New Chat on Home."
+    ],
+    "tip": "Deleted conversations cannot be reopened. Copy any answers you need before deleting a conversation."
+  },
+  {
+    "id": "text",
+    "group": "feature",
+    "feature": "Text Edit View",
+    "situation": "I want to read and edit copied text or text in a photo",
+    "icon": "text.alignleft",
+    "action": "textSource",
+    "steps": [
+      "Copy the text you want to read, then tap Text Edit View on Home.",
+      "Choose Clipboard. For a photo, choose Read Text from Image; for a file, choose Document.",
+      "Adjust the text size, line spacing, and colors, then use reading, editing, or copying."
+    ],
+    "tip": "The Clipboard option is hidden when the clipboard is empty. Copy the text in the other app and try again."
+  },
+  {
+    "id": "documents",
+    "group": "feature",
+    "feature": "Document Workspace",
+    "situation": "I want to open a file or create a document",
+    "icon": "folder",
+    "action": "documents",
+    "steps": [
+      "Open Document Workspace from Home.",
+      "Choose Import File to select a document in Files, or Create New Document to choose Excel, Word, or Hangul.",
+      "Use recent documents to reopen a file. Documents placed in On My iPad → VisionCraft in Files also appear in the app’s document folder."
+    ],
+    "tip": "Supported documents include PDF, text, Excel, Word, HWP, and HWPX. Open EPUB and DAISY in the dedicated player on Home. The original location of iCloud or USB documents must be accessible."
+  },
+  {
+    "id": "editing",
+    "group": "feature",
+    "feature": "Excel, Word, and Hangul editing",
+    "situation": "I want to change text or a table in a document",
+    "icon": "square.and.pencil",
+    "action": "documents",
+    "steps": [
+      "Open the document in Document Workspace. The editor depends on the file type.",
+      "In Excel, select a sheet and a row or cell. In Word, select a paragraph or table. In Hangul editing mode, select a paragraph or table cell.",
+      "Review the changes and use the screen’s save command. Use Export a Copy if you want to keep a separate original."
+    ],
+    "tip": "Editing support varies by format. Read-only or protected documents cannot be edited. Older Word or Excel files may offer conversion to an editable copy."
+  },
+  {
+    "id": "books",
+    "group": "feature",
+    "feature": "DAISY/EPUB Player",
+    "situation": "I want to listen to an ebook",
+    "icon": "book.closed",
+    "action": "books",
+    "steps": [
+      "Open the DAISY/EPUB Player from Home.",
+      "Choose Select Book File and select an EPUB or DAISY ZIP file.",
+      "Open the book and start playback. Choose a location in the table of contents and adjust viewing and reading settings."
+    ],
+    "tip": "You can resume from your reading position. Navigation, pages, and recorded audio vary by book; text without recorded audio is read using the iPad’s voice."
+  },
+  {
+    "id": "translation",
+    "group": "feature",
+    "feature": "On-Device Translation",
+    "situation": "I want to translate copied or recognized text",
+    "icon": "character.bubble",
+    "action": "translation",
+    "steps": [
+      "Tap Open On-Device Translation below, or open Translation from the AI chat screen.",
+      "Enter or paste the source text and choose Korean, English, or Japanese as the target language.",
+      "Translate, then copy or listen to the result. Translation from an OCR result passes the recognized text directly to this screen."
+    ],
+    "tip": "Translation uses on-device AI. Preparing the model for the first time may require an internet connection and free storage."
+  },
+  {
+    "id": "web",
+    "group": "feature",
+    "feature": "Web search and webpage questions",
+    "situation": "I want current information or help with a webpage",
+    "icon": "globe",
+    "action": "webSearch",
+    "steps": [
+      "For current information, open Web Search, review the privacy notice, and enable online search.",
+      "Enter a question and open the sources shown with the answer to check the information.",
+      "To ask about one page, enter its address in the webpage feature on the AI chat screen, or share it from Safari."
+    ],
+    "tip": "Web search sends questions to Gemini and Google Search. Webpage questions download the page over the internet, then use on-device AI to answer from its text."
+  },
+  {
+    "id": "voice",
+    "group": "feature",
+    "feature": "Voice commands",
+    "situation": "I want to open features by speaking",
+    "icon": "mic",
+    "action": "voice",
+    "steps": [
+      "Tap Start Voice Command below, or choose Voice Command in a VisionCraft Quick Launch widget.",
+      "Allow microphone and speech recognition access when prompted the first time.",
+      "Say a short request that names the feature, such as “Open camera,” “Scan a document,” or “Open reader,” and check the response."
+    ],
+    "tip": "Voice commands can open features within this app. They do not press buttons in other apps or automatically change system settings."
+  },
+  {
+    "id": "remote",
+    "group": "feature",
+    "feature": "Remote connection and controls",
+    "situation": "I want to control the app with a Rivo remote",
+    "icon": "dot.radiowaves.left.and.right",
+    "action": "remote",
+    "steps": [
+      "Turn on the remote, place it nearby, and tap Remote Connection on Home.",
+      "Tap Search for Rivo Remote, allow Bluetooth access, and select the discovered remote.",
+      "Wait for the connected status, then follow the button guide on the connection screen."
+    ],
+    "tip": "The app searches for Rivo Three and Mini. Button functions depend on the current screen and remote mode; check the connection screen’s instructions."
+  },
+  {
+    "id": "visionlink",
+    "group": "feature",
+    "feature": "Connect to Smartphone",
+    "situation": "I want to use my phone’s camera or files on iPad",
+    "icon": "desktopcomputer",
+    "action": "visionLink",
+    "steps": [
+      "Open Connect to Smartphone on Home and find the connection code.",
+      "Enter the iPad’s code in VisionLink on the phone.",
+      "Start camera sharing or file transfer on the phone and check the receiving screen on iPad."
+    ],
+    "tip": "Both devices need a network connection. Received files are available in Files → On My iPad → VisionCraft → VisionLink. Deleting a received file in this app also deletes that file there."
+  },
+  {
+    "id": "share",
+    "group": "feature",
+    "feature": "Import from other apps",
+    "situation": "I want to send material from Safari or Files",
+    "icon": "square.and.arrow.up",
+    "action": "settings",
+    "steps": [
+      "Tap Share for the item in Safari, Files, or Photos.",
+      "Choose VisionCraft in the share sheet. If it is not visible, look under More.",
+      "Return to VisionCraft to open the material. In All Settings → Sharing from Other Apps, choose whether to start with AI Chat or Voice Question."
+    ],
+    "tip": "This does not automatically read another app’s entire screen. To read visible text, copy it or take a screenshot and import it into Text Edit View."
+  },
+  {
+    "id": "widgets",
+    "group": "feature",
+    "feature": "Widgets, Siri, and Shortcuts",
+    "situation": "I want faster access to my favorite features",
+    "icon": "square.grid.2x2",
+    "action": "home",
+    "steps": [
+      "Touch and hold an empty area of the iPad Home Screen, then choose Add Widget from the edit menu.",
+      "Add a VisionCraft Quick Launch widget. Edit the widget to choose Camera, Document Scan, Voice Command, or another feature.",
+      "Tap the widget to launch it. You can also find VisionCraft actions in Shortcuts and build your own sequence."
+    ],
+    "tip": "Add multiple widgets to make a shortcut for each feature. VisionCraft Quick Launch is also available when adding a control in Control Center."
+  },
+  {
+    "id": "settings",
+    "group": "feature",
+    "feature": "Text, speech, and colors",
+    "situation": "I want to adjust text and sound for me",
+    "icon": "slider.horizontal.3",
+    "action": "settings",
+    "steps": [
+      "In the settings near the bottom of Home, turn sound effects and voice feedback on or off independently.",
+      "Choose the speech rate and language under Voice and Language, and an app font under Display and Font.",
+      "Adjust Text Viewer size, line spacing, and colors, then check a reading screen. Open All Settings for more options."
+    ],
+    "tip": "Automatic voice feedback is separate from reading you start yourself. Turning off voice feedback does not disable manual document or book reading."
+  },
+  {
+    "id": "accessibility",
+    "group": "feature",
+    "feature": "iPad Accessibility",
+    "situation": "I want to magnify other apps or use VoiceOver",
+    "icon": "accessibility",
+    "action": "home",
+    "steps": [
+      "Open the iPad Settings app and go to Accessibility.",
+      "Configure Zoom to magnify the screen, or VoiceOver to navigate screen items by speech.",
+      "Return to VisionCraft. With VoiceOver on, touch once to hear an item and double-tap to activate it."
+    ],
+    "tip": "VisionCraft does not place a menu over other apps or directly change VoiceOver or system rotation lock. Bring text from other apps using copy, sharing, or screenshots."
+  },
+  {
+    "id": "connection",
+    "group": "problem",
+    "feature": "Troubleshooting",
+    "situation": "My remote will not connect",
+    "icon": "antenna.radiowaves.left.and.right",
+    "action": "remote",
+    "steps": [
+      "Check the remote’s power and charge level, and place it near the iPad.",
+      "Make sure iPad Bluetooth is on, then search again from Remote Connection in the app.",
+      "If access was denied, open All Settings → Open VisionCraft Permission Settings, check Bluetooth access, and try again."
+    ],
+    "tip": "If a connection attempt is already in progress, read its status first. Also check the pairing and button instructions for your remote model."
+  },
+  {
+    "id": "sound",
+    "group": "problem",
+    "feature": "Troubleshooting",
+    "situation": "I cannot hear reading or button feedback",
+    "icon": "speaker.wave.2",
+    "action": "settings",
+    "steps": [
+      "Check that reading or playback is not paused.",
+      "Raise the iPad volume and check in Control Center whether audio is being sent to headphones or another device.",
+      "If only button announcements are missing, check voice feedback. If only effects are missing, check sound effect feedback."
+    ],
+    "tip": "Document reading, automatic voice feedback, and effects are separate. Use the speech-rate preview in All Settings to check audio."
+  },
+  {
+    "id": "recognition",
+    "group": "problem",
+    "feature": "Troubleshooting",
+    "situation": "Text recognition is wrong or misses text",
+    "icon": "viewfinder",
+    "action": "scan",
+    "steps": [
+      "Fit all the text in the camera view and hold the iPad steady.",
+      "Reduce glare and shadows and flatten the page. Adjust the distance for small text and capture again.",
+      "Compare the recognized text with the original and correct it in Text Edit View if needed."
+    ],
+    "tip": "Handwriting, crumpled paper, and complex tables can reduce accuracy. Check numbers and important details against the original even with OCR correction enabled."
+  },
+  {
+    "id": "ai",
+    "group": "problem",
+    "feature": "Troubleshooting",
+    "situation": "AI answers or image descriptions are not working",
+    "icon": "exclamationmark.bubble",
+    "action": "chat",
+    "steps": [
+      "If prompted to prepare local AI, finish the model download and check available iPad storage.",
+      "For image descriptions and web search, check the internet connection and follow any usage or error message on screen.",
+      "Make sure the attachment opens correctly and try splitting your question into shorter requests."
+    ],
+    "tip": "Text AI and online image analysis or web search use different processing. If a problem continues, check the error message along with diagnostics in All Settings."
+  },
+  {
+    "id": "permissions",
+    "group": "problem",
+    "feature": "Troubleshooting",
+    "situation": "A permission message prevents a feature from starting",
+    "icon": "hand.raised",
+    "action": "permissions",
+    "steps": [
+      "Check which permission is requested. Camera, microphone, speech recognition, and Bluetooth access are separate.",
+      "Tap Open VisionCraft Permission Settings below. If an option is missing, also check Privacy & Security in iPad Settings.",
+      "Return to the app and try the feature again."
+    ],
+    "tip": "Photos and files are chosen through the iPad’s pickers. Android accessibility-service and display-over-other-apps permissions are not required."
+  },
+  {
+    "id": "files",
+    "group": "problem",
+    "feature": "Troubleshooting",
+    "situation": "I cannot open a document or book",
+    "icon": "doc.badge.ellipsis",
+    "action": "documents",
+    "steps": [
+      "Make sure the file has finished downloading. A USB storage device must remain connected for documents on it.",
+      "Reselect documents in Document Workspace, and EPUB or DAISY books in the DAISY/EPUB Player.",
+      "Try another file. If only one file fails, obtain a fresh copy from its provider."
+    ],
+    "tip": "Password-protected, DRM-protected, or damaged files may not open. Changing a filename extension does not convert the file format."
+  }
+]

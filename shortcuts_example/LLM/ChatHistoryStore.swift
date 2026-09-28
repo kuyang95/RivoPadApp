@@ -436,10 +436,10 @@ nonisolated enum ChatContextWindowPolicy {
     static func replayCharacterLimit(
         for memoryTier: DeviceMemoryTier
     ) -> Int {
-        // Leave room in the 4K/8K rotating KV cache for the
-        // system prompt, the new question, and generated output.
+        // Reserve context space for the system prompt, new question,
+        // and generated output when replaying stored conversations.
         switch memoryTier {
-        case .standard:
+        case .standard, .balanced:
             return 2_800
         case .expanded:
             return 6_400

@@ -8,6 +8,7 @@ struct WebSearchView: View {
     @StateObject private var viewModel:
         WebSearchViewModel
     @State private var didAutoSearch = false
+    @State private var showsWebSearchConsent = false
 
     private let autoSearch: Bool
     private let speaksAnswer: Bool
@@ -107,7 +108,7 @@ struct WebSearchView: View {
             .font(.headline)
 
             Text(
-                "일반 채팅과 문서 분석은 M4에서 계속 로컬로 처리합니다. 웹 검색을 선택한 경우에만 Gemini가 Google Search에 근거한 답변을 만듭니다."
+                "AI 대화와 문서 질문 답변은 M4에서 처리합니다. 이미지 분석은 사진을 Gemini로 보내 처리합니다. 웹 검색을 선택하면 Gemini가 Google Search에 근거한 답변을 만들고, OCR 오타 자동 교정을 켜면 문서 이미지와 OCR 원문을 Gemini로 보냅니다."
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -217,17 +218,35 @@ struct WebSearchView: View {
                 .foregroundStyle(.orange)
             } else if !configuration.isEnabled {
                 Label(
-                    "설정에서 온라인 웹 검색을 켜 주세요.",
+                    "온라인 웹 검색이 꺼져 있습니다.",
                     systemImage:
                         "exclamationmark.triangle"
                 )
                 .font(.footnote)
                 .foregroundStyle(.orange)
 
-                NavigationLink(
-                    "웹 검색 설정 열기",
-                    value: AppRoute.settings
-                )
+                Button(
+                    "온라인 웹 검색 켜기",
+                    systemImage: "globe"
+                ) {
+                    showsWebSearchConsent = true
+                }
+                .buttonStyle(.bordered)
+                .confirmationDialog(
+                    "온라인 웹 검색을 켤까요?",
+                    isPresented:
+                        $showsWebSearchConsent,
+                    titleVisibility: .visible
+                ) {
+                    Button("동의하고 켜기") {
+                        configuration.setEnabled(true)
+                    }
+                    Button("취소", role: .cancel) {}
+                } message: {
+                    Text(
+                        "웹 검색을 선택하면 질문이 Gemini와 Google Search로 전송됩니다. 이미지 분석은 사진을 Gemini로 전송해 처리합니다. OCR 오타 자동 교정을 켜면 문서 이미지와 OCR 원문도 Gemini로 전송됩니다. AI 대화와 문서 질문 답변은 M4에서 처리합니다."
+                    )
+                }
             }
         }
         .padding(16)

@@ -66,7 +66,7 @@ final class OCRResultViewModel: ObservableObject {
 
     // MARK: - Public: Model loading
     func ensureModelLoaded() async throws {
-        try await llmService.activateModel(.qwen3_8b_4bit)
+        try await llmService.activateModel(.preferredTextModel)
         RVLogger.d("✅ ready: \(llmService.loadedModel.displayName)")
     }
 
@@ -104,6 +104,7 @@ final class OCRResultViewModel: ObservableObject {
             AppLocalization.string(
                 "텍스트 추출중"
             )
+        SoundEffectManager.shared.play(.startingLLM)
         startThinkingAnimation()
 
         guard image.cgImage != nil else {
@@ -147,7 +148,7 @@ final class OCRResultViewModel: ObservableObject {
                     )
             }
             extractedText =
-                await LocalOCRCorrectionService
+                await GeminiOCRCorrectionService
                 .shared
                 .correct(
                     image: image,
@@ -157,6 +158,9 @@ final class OCRResultViewModel: ObservableObject {
                 )
             stopThinkingAnimation()
             isExtracting = false
+            if !boxes.isEmpty {
+                SoundEffectManager.shared.play(.complete)
+            }
         }
     }
 
@@ -242,11 +246,13 @@ final class OCRResultViewModel: ObservableObject {
             try await consumeAIStream(stream)
             aiStatus =
                 AppLocalization.string("완료")
+            SoundEffectManager.shared.play(.complete)
         } catch {
             aiStatus = AppLocalization.format(
                 "QA 실패: %@",
                 error.localizedDescription
             )
+            SoundEffectManager.shared.play(.fail)
         }
 
         stopThinkingAnimation()

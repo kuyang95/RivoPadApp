@@ -58,8 +58,6 @@ extension OCRTopBarView {
                 return
             }
 
-            SoundEffectManager.shared.play(.recording)
-
             Task {
 
                 do {

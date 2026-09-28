@@ -78,6 +78,7 @@ final class OCRProcessingViewController: UIViewController {
     private func runOCR() {
         guard !isProcessing else { return }
         isProcessing = true
+        SoundEffectManager.shared.play(.startingLLM)
 
         DocumentTextExtractor().extractSentenceBoxes(from: image) { [weak self] result in
             DispatchQueue.main.async {
@@ -90,6 +91,7 @@ final class OCRProcessingViewController: UIViewController {
 
                 switch result {
                 case .success(let boxes):
+                    SoundEffectManager.shared.play(.complete)
                     let viewer = DocumentViewerViewController(image: self.image, sentenceBoxes: boxes)
                     self.navigationController?.pushViewController(viewer, animated: true)
 

@@ -26,50 +26,22 @@ struct ChatHistoryView: View {
     }
 
     var body: some View {
-        Group {
+        ZStack {
+            VisionCraftUI.background
+                .ignoresSafeArea()
+
             if isLoading {
                 ProgressView(
-                    "대화 기록을 불러오는 중"
+                    "데이터 불러오는 중"
                 )
             } else if conversations.isEmpty {
-                ContentUnavailableView(
-                    "저장된 대화가 없습니다",
-                    systemImage:
-                        "bubble.left.and.bubble.right",
-                    description: Text(
-                        "새 대화 버튼으로 시작하세요."
-                    )
-                )
-            } else if
-                filteredConversations
-                .isEmpty {
-                ContentUnavailableView(
-                    "검색 결과가 없습니다",
-                    systemImage:
-                        "magnifyingglass",
-                    description: Text(
-                        "다른 제목이나 메시지 내용으로 검색해 보세요."
-                    )
-                )
+                emptyHistoryCard
             } else {
                 conversationList
             }
         }
         .visionCraftNavigationScreen()
-        .navigationTitle("AI 대화")
-        .searchable(
-            text: $searchText,
-            placement:
-                .navigationBarDrawer(
-                    displayMode: .always
-                ),
-            prompt:
-                "제목 또는 메시지 검색"
-        )
-        .toolbar {
-            managementToolbar
-            featureToolbar
-        }
+        .navigationTitle("대화기록")
         .safeAreaInset(edge: .bottom) {
             VStack(alignment: .trailing, spacing: 10) {
                 if let errorDescription {
@@ -93,8 +65,14 @@ struct ChatHistoryView: View {
                             .frame(minHeight: 48)
                     }
                     .buttonStyle(.borderedProminent)
-                    .buttonBorderShape(.capsule)
-                    .tint(VisionCraftUI.primary)
+                    .buttonBorderShape(
+                        .roundedRectangle(
+                            radius: 16
+                        )
+                    )
+                    .tint(
+                        VisionCraftUI.primary
+                    )
                     .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
                 }
             }
@@ -146,27 +124,6 @@ struct ChatHistoryView: View {
                 "목록에 표시할 대화 제목을 최대 120자로 입력하세요."
             )
         }
-        .confirmationDialog(
-            "모든 대화를 삭제할까요?",
-            isPresented:
-                $showsDeleteAllDialog,
-            titleVisibility: .visible
-        ) {
-            Button(
-                "전체 삭제",
-                role: .destructive
-            ) {
-                deleteAll()
-            }
-            Button(
-                "취소",
-                role: .cancel
-            ) {}
-        } message: {
-            Text(
-                "삭제한 대화는 다시 불러올 수 없습니다."
-            )
-        }
         .onAppear {
             Task {
                 await reload()
@@ -177,112 +134,93 @@ struct ChatHistoryView: View {
     private var conversationList:
         some View
     {
-        List {
-            Section {
-                ForEach(
-                    filteredConversations
-                ) { conversation in
-                    Button {
-                        appRouter.route = .localChat(
-                            conversationID: conversation.id
-                        )
-                    } label: {
-                        HStack(spacing: 12) {
-                            conversationRow(conversation)
-                            Spacer(minLength: 8)
-                            Image(systemName: "chevron.right")
-                                .font(.headline)
-                                .foregroundStyle(VisionCraftUI.secondaryText)
-                                .accessibilityHidden(true)
-                        }
-                        .padding(14)
-                        .contentShape(Rectangle())
-                        .visionCraftSurfaceCard(cornerRadius: 12, outlineOpacity: 0.6)
-                    }
-                    .buttonStyle(.plain)
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(
-                        .init(top: 5, leading: 20, bottom: 5, trailing: 20)
+        ScrollView {
+            LazyVStack(
+                alignment: .leading,
+                spacing: 10
+            ) {
+                Text(
+                    AppLocalization.format(
+                        "대화 %lld개",
+                        conversations.count
                     )
-                    .accessibilityHint(
-                        "저장된 로컬 AI 대화를 엽니다."
-                    )
-                    .swipeActions(
-                        edge: .leading,
-                        allowsFullSwipe: false
-                    ) {
-                        Button {
-                            beginRenaming(
-                                conversation
-                            )
-                        } label: {
-                            Label(
-                                "제목 수정",
-                                systemImage:
-                                    "pencil"
-                            )
-                        }
-                        .tint(.indigo)
-                    }
-                    .swipeActions(
-                        edge: .trailing
-                    ) {
-                        Button(
-                            role: .destructive
-                        ) {
-                            delete(
-                                ids: [
-                                    conversation.id,
-                                ]
-                            )
-                        } label: {
-                            Label(
-                                "삭제",
-                                systemImage:
-                                    "trash"
-                            )
-                        }
-                    }
-                    .contextMenu {
-                        Button {
-                            beginRenaming(
-                                conversation
-                            )
-                        } label: {
-                            Label(
-                                "제목 수정",
-                                systemImage:
-                                    "pencil"
-                            )
-                        }
-                        Button(
-                            role: .destructive
-                        ) {
-                            delete(
-                                ids: [
-                                    conversation.id,
-                                ]
-                            )
-                        } label: {
-                            Label(
-                                "삭제",
-                                systemImage:
-                                    "trash"
-                            )
-                        }
-                    }
-                }
-                .onDelete(
-                    perform:
-                        deleteFilteredRows
                 )
-            } header: {
-                Text(resultCountDescription)
+                .font(.headline)
+                .foregroundStyle(
+                    VisionCraftUI.primaryText
+                )
+
+                ForEach(
+                    conversations
+                ) { conversation in
+                    HStack(spacing: 12) {
+                        Button {
+                            appRouter.route = .localChat(
+                                conversationID:
+                                    conversation.id
+                            )
+                        } label: {
+                            conversationRow(conversation)
+                                .frame(
+                                    maxWidth: .infinity,
+                                    alignment: .leading
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(
+                            "저장된 로컬 AI 대화를 엽니다."
+                        )
+
+                        Button {
+                            beginRenaming(
+                                conversation
+                            )
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.title3)
+                                .foregroundStyle(
+                                    VisionCraftUI.secondaryText
+                                )
+                                .frame(
+                                    width: 48,
+                                    height: 48
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("제목 수정")
+
+                        Button(
+                            role: .destructive
+                        ) {
+                            delete(
+                                ids: [
+                                    conversation.id,
+                                ]
+                            )
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.title3)
+                                .foregroundStyle(
+                                    VisionCraftUI.secondaryText
+                                )
+                                .frame(
+                                    width: 48,
+                                    height: 48
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("삭제")
+                    }
+                    .padding(14)
+                    .visionCraftSurfaceCard(
+                        cornerRadius: 12,
+                        outlineOpacity: 0.6
+                    )
+                }
             }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
         }
-        .listStyle(.insetGrouped)
-        .visionCraftListScreen()
         .disabled(isMutating)
         .overlay {
             if isMutating {
@@ -297,6 +235,48 @@ struct ChatHistoryView: View {
                     )
             }
         }
+    }
+
+    private var emptyHistoryCard: some View {
+        VStack(spacing: 12) {
+            Image(
+                systemName:
+                    "bubble.left.and.bubble.right"
+            )
+            .font(.system(size: 38))
+            .foregroundStyle(
+                VisionCraftUI.primary
+            )
+            Text("대화 기록이 없습니다")
+                .font(.title3.bold())
+                .foregroundStyle(
+                    VisionCraftUI.primaryText
+                )
+            Text(
+                "AI 새 채팅을 시작하면 여기에 저장됩니다."
+            )
+            .foregroundStyle(
+                VisionCraftUI.secondaryText
+            )
+            .multilineTextAlignment(.center)
+
+            Button("새 대화") {
+                appRouter.route =
+                    .localChat(
+                        conversationID: nil
+                    )
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity)
+        .visionCraftSurfaceCard(
+            cornerRadius: 16,
+            outlineOpacity: 0.6
+        )
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
     }
 
     @ToolbarContentBuilder
@@ -422,31 +402,27 @@ struct ChatHistoryView: View {
     ) -> some View {
         VStack(
             alignment: .leading,
-            spacing: 6
+            spacing: 4
         ) {
             Text(conversation.title)
-                .font(.headline)
+                .font(.body)
+                .foregroundStyle(
+                    VisionCraftUI.primaryText
+                )
                 .lineLimit(1)
-            Text(conversation.preview)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-            HStack(spacing: 10) {
-                Text(
-                    conversation.updatedAt
-                        .formatted(
-                            date: .abbreviated,
-                            time: .shortened
-                        )
-                )
-                Text(
-                    "메시지 \(conversation.messages.count)개"
-                )
-            }
+            Text(
+                conversation.updatedAt
+                    .formatted(
+                        date: .numeric,
+                        time: .shortened
+                    )
+            )
             .font(.caption)
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(
+                VisionCraftUI.secondaryText
+            )
+            .lineLimit(1)
         }
-        .padding(.vertical, 4)
     }
 
     private func reload(

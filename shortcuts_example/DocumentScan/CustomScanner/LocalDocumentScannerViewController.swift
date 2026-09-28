@@ -3,10 +3,33 @@ import CoreImage
 import CoreMedia
 import UIKit
 
+nonisolated enum ScannerInterfaceOrientationRotation {
+    static func degrees(
+        for orientation: UIInterfaceOrientation
+    ) -> Int? {
+        switch orientation {
+        case .portrait:
+            return 90
+        case .portraitUpsideDown:
+            return 270
+        case .landscapeLeft:
+            return 180
+        case .landscapeRight:
+            return 0
+        case .unknown:
+            return nil
+        @unknown default:
+            return nil
+        }
+    }
+}
+
 nonisolated private struct ScannerAnalysisPayload: Sendable {
     let modelInput: ScannerPreparedTensor
     let transform: ScannerViewportTransform
     let sharpness: Double
+    let meanLuminance: Double
+    let guidanceSample: ScannerRGBAImage
     let preprocessingMilliseconds: Double
     let preprocessingBackend: UVDocWarpBackend
     let generation: Int
@@ -75,6 +98,7 @@ final class LocalDocumentScannerViewController: UIViewController {
                 .setAutomaticCaptureEnabled(
                     automaticCaptureEnabled
                 )
+            updateControls()
         }
     }
     var curvedPageCorrectionEnabled = true
@@ -92,6 +116,9 @@ final class LocalDocumentScannerViewController: UIViewController {
     private struct PendingCapture {
         let ticket: UUID
         let viewport: ScannerViewportConfiguration
+        /// A forced shutter bypasses the focus-lock and blur gates, so a page
+        /// always comes out once the corners have been stable long enough.
+        let isForced: Bool
         let previewDetection: DocumentDetection?
         let previewTransform: ScannerViewportTransform?
         let previewSharpness: Double
@@ -167,6 +194,14 @@ final class LocalDocumentScannerViewController: UIViewController {
     private var pendingCapture: PendingCapture?
     private var manualFocusTickets = Set<UUID>()
     private var sessionInterrupted = false
+    /// Monotonic time when the auto shutter first got blocked while the
+    /// corners were already stable; nil when nothing is blocking.
+    private var gateBlockedSince: TimeInterval?
+    private var forcedCaptureRequested = false
+    private var darkAnalysisFrameCount = 0
+    private var torchOn = false
+    private var torchUnavailable = false
+    private var postCaptureWarmUpTask: Task<Void, Never>?
     private var interruptionStartedAt: TimeInterval?
     private var recoveryStartedAt: TimeInterval?
     private var pageRemovalNoDocumentFrames = 0
@@ -195,15 +230,32 @@ final class LocalDocumentScannerViewController: UIViewController {
     private let statusLabel: UILabel = {
         let label = UILabel()
         label.text = AppLocalization.string(
-            "로컬 문서 인식 모델을 준비하는 중입니다."
+            "문서를 찾고 있습니다..."
         )
         label.textColor = .white
-        label.font = .preferredFont(forTextStyle: .headline)
+        label.font = .systemFont(
+            ofSize: 17,
+            weight: .bold
+        )
         label.textAlignment = .center
-        label.numberOfLines = 2
-        label.backgroundColor = UIColor.black.withAlphaComponent(0.58)
-        label.layer.cornerRadius = 12
+        label.numberOfLines = 1
+        label.adjustsFontSizeToFitWidth = true
+        label.minimumScaleFactor = 0.8
+        label.backgroundColor = UIColor(
+            red: 37 / 255,
+            green: 37 / 255,
+            blue: 37 / 255,
+            alpha: 0.15
+        )
+        label.layer.cornerRadius = 22
         label.layer.masksToBounds = true
+        label.layer.borderWidth = 1
+        label.layer.borderColor = UIColor(
+            red: 124 / 255,
+            green: 158 / 255,
+            blue: 1,
+            alpha: 0.2
+        ).cgColor
         label.translatesAutoresizingMaskIntoConstraints = false
         label.isAccessibilityElement = true
         label.accessibilityTraits = .updatesFrequently
@@ -223,19 +275,20 @@ final class LocalDocumentScannerViewController: UIViewController {
         return label
     }()
 
+    /// Android dropped the manual shutter entirely because it ran the same
+    /// gates as the auto shutter. The timeout capture covers that now, so the
+    /// button is only needed when automatic capture is unavailable: the user
+    /// turned it off, or the detector failed to load.
     private lazy var shutterButton: UIButton = {
         var configuration = UIButton.Configuration.filled()
         configuration.title =
             AppLocalization.string("촬영")
-        configuration.baseBackgroundColor = .white
-        configuration.baseForegroundColor = .black
-        configuration.cornerStyle = .capsule
-        configuration.contentInsets = NSDirectionalEdgeInsets(
-            top: 16,
-            leading: 34,
-            bottom: 16,
-            trailing: 34
+        configuration.baseBackgroundColor = UIColor(
+            white: 1,
+            alpha: 0.14
         )
+        configuration.baseForegroundColor = .white
+        configuration.cornerStyle = .large
         let button = UIButton(configuration: configuration)
         button.titleLabel?.font = .preferredFont(
             forTextStyle: .headline
@@ -252,7 +305,7 @@ final class LocalDocumentScannerViewController: UIViewController {
             )
         button.accessibilityHint =
             AppLocalization.string(
-                "자동 촬영을 기다리지 않고 현재 문서를 촬영합니다."
+                "지금 보이는 문서를 바로 촬영합니다."
             )
         return button
     }()
@@ -262,7 +315,13 @@ final class LocalDocumentScannerViewController: UIViewController {
         configuration.title =
             AppLocalization.string("닫기")
         configuration.baseForegroundColor = .white
-        configuration.cornerStyle = .capsule
+        configuration.baseBackgroundColor = .clear
+        configuration.cornerStyle = .large
+        configuration.background.strokeColor = UIColor(
+            white: 1,
+            alpha: 0.22
+        )
+        configuration.background.strokeWidth = 1
         let button = UIButton(configuration: configuration)
         button.addTarget(
             self,
@@ -332,6 +391,10 @@ final class LocalDocumentScannerViewController: UIViewController {
     private var lastAnnouncedText: String?
     private var lastAnnouncementTime: TimeInterval = 0
     private var isViewActive = false
+    private var scanCueTask: Task<Void, Never>?
+    private var guidanceSpeechPolicy = DocumentGuidanceSpeechPolicy()
+    // Own this speech so leaving the scanner never cancels OCR/result speech.
+    private let guidanceSynthesizer = AVSpeechSynthesizer()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -355,6 +418,7 @@ final class LocalDocumentScannerViewController: UIViewController {
         with coordinator: any UIViewControllerTransitionCoordinator
     ) {
         super.viewWillTransition(to: size, with: coordinator)
+        stopFramingGuidance()
         coordinator.animate(alongsideTransition: { [weak self] _ in
             self?.view.layoutIfNeeded()
         }, completion: { [weak self] _ in
@@ -368,6 +432,8 @@ final class LocalDocumentScannerViewController: UIViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         isViewActive = false
+        stopFramingGuidance()
+        stopScanCaptureCue()
         frameAdmission.invalidateViewport()
         gateEvaluator.reset()
         latestLiveDetection = nil
@@ -412,8 +478,10 @@ final class LocalDocumentScannerViewController: UIViewController {
     deinit {
         detectorLoadTask?.cancel()
         dewarperPrewarmTask?.cancel()
+        postCaptureWarmUpTask?.cancel()
         focusTask?.cancel()
         processingTask?.cancel()
+        scanCueTask?.cancel()
         previewRotationObservation?.invalidate()
         NotificationCenter.default.removeObserver(self)
         motionMonitor.stop()
@@ -425,18 +493,18 @@ final class LocalDocumentScannerViewController: UIViewController {
 
         let controls = UIStackView(
             arrangedSubviews: [
-                cancelButton,
-                nextPageButton,
-                shutterButton
+                shutterButton,
+                cancelButton
             ]
         )
         controls.axis = .horizontal
-        controls.alignment = .center
-        controls.distribution = .equalSpacing
+        controls.alignment = .fill
+        controls.distribution = .fillEqually
+        controls.spacing = 12
         controls.translatesAutoresizingMaskIntoConstraints = false
 
+        // 촬영/닫기 버튼은 카메라 위에 바로 놓는다. 감싸는 패널은 두지 않는다.
         view.addSubview(statusLabel)
-        view.addSubview(backendLabel)
         view.addSubview(controls)
         view.addSubview(processingOverlay)
         processingOverlay.addSubview(activityIndicator)
@@ -444,29 +512,18 @@ final class LocalDocumentScannerViewController: UIViewController {
         NSLayoutConstraint.activate([
             statusLabel.topAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.topAnchor,
-                constant: 16
+                constant: 92
             ),
-            statusLabel.centerXAnchor.constraint(
-                equalTo: view.centerXAnchor
+            statusLabel.leadingAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.leadingAnchor,
+                constant: 24
             ),
-            statusLabel.widthAnchor.constraint(
-                lessThanOrEqualTo: view.widthAnchor,
-                multiplier: 0.9
+            statusLabel.trailingAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.trailingAnchor,
+                constant: -24
             ),
             statusLabel.heightAnchor.constraint(
-                greaterThanOrEqualToConstant: 52
-            ),
-
-            backendLabel.topAnchor.constraint(
-                equalTo: statusLabel.bottomAnchor,
-                constant: 8
-            ),
-            backendLabel.centerXAnchor.constraint(
-                equalTo: view.centerXAnchor
-            ),
-            backendLabel.widthAnchor.constraint(
-                lessThanOrEqualTo: view.widthAnchor,
-                multiplier: 0.9
+                equalToConstant: 48
             ),
 
             controls.leadingAnchor.constraint(
@@ -479,7 +536,10 @@ final class LocalDocumentScannerViewController: UIViewController {
             ),
             controls.bottomAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.bottomAnchor,
-                constant: -20
+                constant: -34
+            ),
+            controls.heightAnchor.constraint(
+                equalToConstant: 52
             ),
 
             processingOverlay.leadingAnchor.constraint(
@@ -539,6 +599,7 @@ final class LocalDocumentScannerViewController: UIViewController {
                 detector = loadedDetector
                 detectorLoadErrorDescription = nil
                 updateBackendLabel()
+                updateControls()
                 if case .searching = stateMachine.state {
                     setStatus(
                         AppLocalization.string(
@@ -570,6 +631,20 @@ final class LocalDocumentScannerViewController: UIViewController {
         }
 
         let documentProcessor = processor
+        // The paper-edge refiner and the colour enhancer are plain CPU passes
+        // whose first run pays for cold code paths and allocator growth. Run
+        // them on synthetic pages while the preview is starting.
+        postCaptureWarmUpTask = Task {
+            [documentProcessor, scannerDiagnostics] in
+            let startedAt = ProcessInfo.processInfo.systemUptime
+            await documentProcessor.warmUpPostCaptureStages()
+            scannerDiagnostics.logDuration(
+                "postCaptureWarmUp",
+                milliseconds: ScannerDiagnostics.milliseconds(
+                    since: startedAt
+                )
+            )
+        }
         guard curvedPageCorrectionEnabled
         else {
             dewarperPrewarmTask = nil
@@ -663,10 +738,17 @@ final class LocalDocumentScannerViewController: UIViewController {
         case .clearDetectionOverlay:
             clearOverlay()
             gateEvaluator.reset()
+            gateBlockedSince = nil
+            // A forced shutter only ever runs from .lockFocus to
+            // .capturePhoto, neither of which clears the overlay, so an
+            // aborted focus lock or capture lands here and must not leave
+            // the next automatic shutter marked as forced.
+            forcedCaptureRequested = false
         case .updateGuidance(let guidance):
-            setStatus(text(for: guidance), announce: true)
+            setStatus(text(for: guidance))
+            updateFramingGuidance(guidance)
         case .stopGuidance:
-            break
+            stopFramingGuidance()
         case .lockFocus(let ticket):
             if manualCaptureTicketsPending {
                 manualFocusTickets.insert(ticket)
@@ -691,15 +773,6 @@ final class LocalDocumentScannerViewController: UIViewController {
     private var manualCaptureTicketsPending = false
 
     private func updateControls() {
-        let canCapture: Bool
-        switch stateMachine.state {
-        case .searching, .guiding, .stabilizing:
-            canCapture = true
-        default:
-            canCapture = false
-        }
-        shutterButton.isEnabled =
-            canCapture && isViewActive && !sessionInterrupted
         let isAwaitingPageRemoval: Bool
         if case .awaitingPageRemoval =
             stateMachine.state {
@@ -707,8 +780,17 @@ final class LocalDocumentScannerViewController: UIViewController {
         } else {
             isAwaitingPageRemoval = false
         }
+        let canCapture: Bool
+        switch stateMachine.state {
+        case .searching, .guiding, .stabilizing:
+            canCapture = true
+        default:
+            canCapture = false
+        }
         shutterButton.isHidden =
-            isAwaitingPageRemoval
+            isAwaitingPageRemoval || !needsManualShutter
+        shutterButton.isEnabled =
+            canCapture && isViewActive && !sessionInterrupted
         nextPageButton.isHidden =
             !isAwaitingPageRemoval
         nextPageButton.isEnabled =
@@ -836,6 +918,7 @@ final class LocalDocumentScannerViewController: UIViewController {
             details: "reason=\(reasonCode ?? -1) running=\(session.isRunning)"
         )
         sessionInterrupted = true
+        stopFramingGuidance()
         frameAdmission.invalidateViewport()
         gateEvaluator.reset()
         latestLiveDetection = nil
@@ -1041,6 +1124,9 @@ final class LocalDocumentScannerViewController: UIViewController {
     }
 
     private func startCamera() {
+        gateBlockedSince = nil
+        darkAnalysisFrameCount = 0
+        forcedCaptureRequested = false
         motionMonitor.start()
         let cameraSession = session
         sessionQueue.async {
@@ -1061,6 +1147,11 @@ final class LocalDocumentScannerViewController: UIViewController {
     }
 
     private func stopCamera() {
+        stopFramingGuidance()
+        stopScanCaptureCue()
+        turnOffTorch()
+        gateBlockedSince = nil
+        forcedCaptureRequested = false
         interruptionStartedAt = nil
         recoveryStartedAt = nil
         motionMonitor.stop()
@@ -1077,11 +1168,30 @@ final class LocalDocumentScannerViewController: UIViewController {
         guard view.bounds.width > 0, view.bounds.height > 0 else {
             return
         }
-        let angle = rotationCoordinator?
-            .videoRotationAngleForHorizonLevelPreview ?? 0
-        let cardinal = ScannerViewportTransform.cardinalDegrees(
-            Int(angle.rounded())
+        let horizonFallback = ScannerViewportTransform.cardinalDegrees(
+            Int(
+                (
+                    rotationCoordinator?
+                        .videoRotationAngleForHorizonLevelPreview ?? 0
+                ).rounded()
+            )
         )
+        let interfaceOrientation = view.window?
+            .windowScene?
+            .interfaceOrientation ?? .unknown
+        let cardinal = ScannerInterfaceOrientationRotation.degrees(
+            for: interfaceOrientation
+        ) ?? horizonFallback
+        if cardinal != frameAdmission
+            .currentConfiguration()?
+            .previewRotationDegrees {
+            diagnostics.logEvent(
+                "interfaceRotationChanged",
+                details: "interface=\(interfaceOrientation.rawValue) "
+                    + "rotation=\(cardinal) "
+                    + "horizonFallback=\(horizonFallback)"
+            )
+        }
         if let connection = previewLayer.connection,
            connection.isVideoRotationAngleSupported(CGFloat(cardinal)) {
             connection.videoRotationAngle = CGFloat(cardinal)
@@ -1151,9 +1261,13 @@ final class LocalDocumentScannerViewController: UIViewController {
                 deviceStill: deviceStill,
                 focusReady: focusReady
             )
+            let sensorGuidance = sensorGates.framingGuidance
+                ?? (detection == nil
+                    ? PartialDocumentFramingGuidance.evaluate(payload.guidanceSample)
+                    : nil)
             let gates = CaptureGateSnapshot(
                 detection: sensorGates.detection,
-                framingGuidance: sensorGates.framingGuidance.map {
+                framingGuidance: sensorGuidance.map {
                     ScannerViewportTransform.displayGuidance(
                         for: $0,
                         rotationDegrees: payload.transform.rotationDegrees
@@ -1184,7 +1298,30 @@ final class LocalDocumentScannerViewController: UIViewController {
             }
 
             updateStatus(for: gates)
+            updateScanCaptureCue(
+                fullyVisible:
+                    gates.detection != nil
+                    && gates.framingGuidance == nil
+            )
+            updateTorchForScene(meanLuminance: payload.meanLuminance)
+            if shouldForceCapture(for: gates) {
+                var reason = "still=\(gates.deviceStill)"
+                reason += " sharp=\(gates.sharpEnough)"
+                reason += " focus=\(gates.focusReady)"
+                reason += " laplacian="
+                reason += String(format: "%.1f", payload.sharpness)
+                requestForcedCapture(
+                    reason: reason,
+                    announcement: AppLocalization.string(
+                        "흔들림이 있어 그대로 촬영합니다."
+                    )
+                )
+                return
+            }
             send(.frameEvaluated(gates))
+            if !acceptsAnalysisFrames {
+                stopScanCaptureCue()
+            }
         } catch {
             diagnostics.logDuration(
                 "liveLCNetFailure",
@@ -1200,10 +1337,128 @@ final class LocalDocumentScannerViewController: UIViewController {
             gateEvaluator.reset()
             latestLiveDetection = nil
             clearOverlay()
+            stopFramingGuidance()
+            stopScanCaptureCue()
             setStatus(
                 AppLocalization.string(
-                    "문서를 다시 찾는 중입니다. 수동 촬영도 가능합니다."
+                    "문서를 다시 찾는 중입니다."
                 )
+            )
+        }
+    }
+
+    /// Android's auto-shutter escape hatch: once the corners have been
+    /// stable but the stillness / sharpness / focus gates have blocked for
+    /// ``forcedCaptureTimeoutSeconds``, waiting longer will not produce a
+    /// better frame, so announce it and shoot with the gates bypassed.
+    private func shouldForceCapture(
+        for gates: CaptureGateSnapshot
+    ) -> Bool {
+        guard gates.detection != nil,
+              gates.framingGuidance == nil,
+              gates.cornersStable,
+              !gates.allGatesPass,
+              automaticCaptureEnabled else {
+            gateBlockedSince = nil
+            return false
+        }
+        let now = ProcessInfo.processInfo.systemUptime
+        guard let blockedSince = gateBlockedSince else {
+            gateBlockedSince = now
+            return false
+        }
+        return now - blockedSince
+            >= configuration.forcedCaptureTimeoutSeconds
+    }
+
+    private func requestForcedCapture(
+        reason: String,
+        announcement: String
+    ) {
+        switch stateMachine.state {
+        case .searching, .guiding, .stabilizing:
+            break
+        default:
+            return
+        }
+        gateBlockedSince = nil
+        forcedCaptureRequested = true
+        manualCaptureTicketsPending = true
+        diagnostics.logEvent("forcedCapture", details: reason)
+        setStatus(announcement, announce: true)
+        send(.manualCaptureRequested)
+    }
+
+    /// Turns the torch on when the analysis frames stay dark. Dim light is
+    /// the main reason the absolute sharpness gate blocks a steady hand, so
+    /// lighting the page fixes the cause instead of the symptom. The torch
+    /// stays on until the camera stops.
+    private func updateTorchForScene(meanLuminance: Double) {
+        guard !torchOn, !torchUnavailable else {
+            return
+        }
+        if meanLuminance < configuration.torchMeanLuminanceThreshold {
+            darkAnalysisFrameCount += 1
+        } else {
+            darkAnalysisFrameCount = 0
+        }
+        guard darkAnalysisFrameCount
+            >= configuration.torchDarkFrameCount else {
+            return
+        }
+        guard let device = captureDevice,
+              device.hasTorch,
+              device.isTorchAvailable else {
+            torchUnavailable = true
+            diagnostics.logEvent(
+                "torchUnavailable",
+                details: "meanLuma="
+                    + String(format: "%.0f", meanLuminance)
+            )
+            return
+        }
+        do {
+            try device.lockForConfiguration()
+            try device.setTorchModeOn(
+                level: AVCaptureDevice.maxAvailableTorchLevel
+            )
+            device.unlockForConfiguration()
+            torchOn = true
+            diagnostics.logEvent(
+                "torchOn",
+                details: "meanLuma="
+                    + String(format: "%.0f", meanLuminance)
+            )
+            setStatus(
+                AppLocalization.string(
+                    "어두워서 손전등을 켭니다."
+                ),
+                announce: true
+            )
+        } catch {
+            torchUnavailable = true
+            diagnostics.logEvent(
+                "torchFailed",
+                details: error.localizedDescription
+            )
+        }
+    }
+
+    private func turnOffTorch() {
+        darkAnalysisFrameCount = 0
+        guard torchOn, let device = captureDevice else {
+            torchOn = false
+            return
+        }
+        torchOn = false
+        do {
+            try device.lockForConfiguration()
+            device.torchMode = .off
+            device.unlockForConfiguration()
+        } catch {
+            diagnostics.logEvent(
+                "torchOffFailed",
+                details: error.localizedDescription
             )
         }
     }
@@ -1408,8 +1663,9 @@ final class LocalDocumentScannerViewController: UIViewController {
                 return
             }
             let manual = manualFocusTickets.contains(ticket)
-            guard !device.isAdjustingFocus,
-                  manual || motionMonitor.isStill() else {
+            guard forcedCaptureRequested
+                || (!device.isAdjustingFocus
+                    && (manual || motionMonitor.isStill())) else {
                 outcome = "unstable"
                 manualFocusTickets.remove(ticket)
                 restoreContinuousFocus()
@@ -1435,6 +1691,14 @@ final class LocalDocumentScannerViewController: UIViewController {
                 send(.focusLocked(ticket: ticket))
             } catch {
                 outcome = "configurationFailed"
+                if forcedCaptureRequested {
+                    // A forced shutter must produce a page even when the lens
+                    // is still hunting, so fire without the focus lock.
+                    outcome = "forcedWithoutLock"
+                    focusTask = nil
+                    send(.focusLocked(ticket: ticket))
+                    return
+                }
                 manualFocusTickets.remove(ticket)
                 restoreContinuousFocus()
                 focusTask = nil
@@ -1453,14 +1717,10 @@ final class LocalDocumentScannerViewController: UIViewController {
         let live = latestLiveDetection.flatMap {
             $0.generation == viewport.generation ? $0 : nil
         }
-        let captureRotation = ScannerViewportTransform.cardinalDegrees(
-            Int(
-                (
-                    rotationCoordinator?
-                        .videoRotationAngleForHorizonLevelCapture ?? 0
-                ).rounded()
-            )
-        )
+        // The viewport is driven by UIWindowScene.interfaceOrientation.
+        // Reuse that same snapshot for the final raster so a device held flat
+        // above a page cannot fall back to the gravity-based horizon angle.
+        let captureRotation = viewport.previewRotationDegrees
         let uncompressedFormats = photoOutput.availablePhotoPixelFormatTypes
         let preferredFormats: [OSType] = [
             kCVPixelFormatType_32BGRA,
@@ -1484,9 +1744,12 @@ final class LocalDocumentScannerViewController: UIViewController {
         settings.flashMode = .off
         settings.photoQualityPrioritization = .speed
         let requestedAt = ProcessInfo.processInfo.systemUptime
+        let forced = forcedCaptureRequested
+        forcedCaptureRequested = false
         pendingCapture = PendingCapture(
             ticket: ticket,
             viewport: viewport,
+            isForced: forced,
             previewDetection: live?.detection,
             previewTransform: live?.transform,
             previewSharpness: live?.sharpness ?? 0,
@@ -1500,7 +1763,8 @@ final class LocalDocumentScannerViewController: UIViewController {
         diagnostics.logEvent(
             "photoRequested",
             details: "ticket=\(ticket.uuidString.prefix(8)) "
-                + "pixelFormat=\(requestedPixelFormat ?? 0)"
+                + "pixelFormat=\(requestedPixelFormat ?? 0) "
+                + "captureRotation=\(captureRotation)"
         )
         diagnostics.logResource("photoRequested", ticket: ticket)
         setStatus(
@@ -1508,6 +1772,9 @@ final class LocalDocumentScannerViewController: UIViewController {
                 "문서를 촬영합니다."
             ),
             announce: true
+        )
+        SoundEffectManager.shared.play(
+            .cameraShot2
         )
         photoOutput.capturePhoto(with: settings, delegate: self)
     }
@@ -1594,7 +1861,20 @@ final class LocalDocumentScannerViewController: UIViewController {
                     < capture.previewSharpness
                     * scannerConfiguration
                         .capturedToPreviewSharpnessRatio {
-                    throw LocalDocumentScannerError.captureTooBlurry
+                    guard capture.isForced else {
+                        throw LocalDocumentScannerError.captureTooBlurry
+                    }
+                    scannerDiagnostics.logEvent(
+                        "forcedCaptureBlurryKept",
+                        details: "ticket=\(ticket.uuidString.prefix(8)) "
+                            + "captured="
+                            + String(format: "%.0f", prepared.sharpness)
+                            + " preview="
+                            + String(
+                                format: "%.0f",
+                                capture.previewSharpness
+                            )
+                    )
                 }
 
                 stageStartedAt = ProcessInfo.processInfo.systemUptime
@@ -1620,16 +1900,20 @@ final class LocalDocumentScannerViewController: UIViewController {
                         + (prepared.modelInput == nil ? "detector" : "prepared")
                 )
                 try Task.checkCancellation()
+                var captureCornerDeviation: Double?
                 if let previewDetection = capture.previewDetection,
                    let previewTransform = capture.previewTransform,
                    let stillDetection {
+                    let comparison = ScannerFOVComparison.compare(
+                        liveQuad: previewDetection.quad,
+                        liveTransform: previewTransform,
+                        stillQuad: stillDetection.quad,
+                        stillTransform: prepared.transform
+                    )
+                    captureCornerDeviation = comparison
+                        .maximumCornerErrorPercentOfPreviewDiagonal
                     scannerDiagnostics.logFOV(
-                        ScannerFOVComparison.compare(
-                            liveQuad: previewDetection.quad,
-                            liveTransform: previewTransform,
-                            stillQuad: stillDetection.quad,
-                            stillTransform: prepared.transform
-                        ),
+                        comparison,
                         liveTransform: previewTransform,
                         stillTransform: prepared.transform,
                         ticket: ticket
@@ -1641,8 +1925,29 @@ final class LocalDocumentScannerViewController: UIViewController {
                             + "stillDetected=\(stillDetection != nil)"
                     )
                 }
-                let detection =
-                    stillDetection ?? capture.previewDetection
+                // The preview corners survived the multi-frame stability gate,
+                // so they are what the user framed. The capture-time detection
+                // is a single shot on a bigger image and can jump onto a
+                // nearby edge (table, book cover, card panel); when the two
+                // disagree by more than the allowed deviation, keep the
+                // preview corners.
+                let detection: DocumentDetection?
+                if let previewDetection = capture.previewDetection,
+                   let deviation = captureCornerDeviation,
+                   deviation
+                    > scannerConfiguration
+                        .captureCornerMaximumDeviationPercent {
+                    detection = previewDetection
+                    scannerDiagnostics.logEvent(
+                        "captureCornersRejected",
+                        details: "ticket=\(ticket.uuidString.prefix(8)) "
+                            + "maxDev="
+                            + String(format: "%.1f%%", deviation)
+                            + " → preview"
+                    )
+                } else {
+                    detection = stillDetection ?? capture.previewDetection
+                }
                 let output: CIImage
                 stageStartedAt = ProcessInfo.processInfo.systemUptime
                 if let detection {
@@ -1898,6 +2203,80 @@ final class LocalDocumentScannerViewController: UIViewController {
         UIAccessibility.post(notification: .announcement, argument: text)
     }
 
+    private func updateFramingGuidance(_ guidance: DocumentFramingGuidance) {
+        guard isViewActive, !sessionInterrupted,
+              AppSettingsStore.shared.voiceFeedbackEnabled else {
+            stopFramingGuidance()
+            return
+        }
+        let effects = guidanceSpeechPolicy.update(
+            guidance,
+            at: ProcessInfo.processInfo.systemUptime,
+            isSpeaking: guidanceSynthesizer.isSpeaking
+        )
+        for effect in effects {
+            switch effect {
+            case .stop:
+                guidanceSynthesizer.stopSpeaking(at: .immediate)
+            case .speak(let direction):
+                let utterance = AVSpeechUtterance(string: text(for: direction))
+                utterance.voice = AVSpeechSynthesisVoice(
+                    language: AppLanguage.current().speechLanguageCode
+                )
+                utterance.rate = AppSettingsStore.shared.speechRate.avSpeechRate
+                guidanceSynthesizer.speak(utterance)
+                diagnostics.logEvent(
+                    "framingGuidanceSpoken",
+                    details: "direction=\(direction.rawValue)"
+                )
+            }
+        }
+    }
+
+    private func stopFramingGuidance() {
+        guidanceSpeechPolicy = DocumentGuidanceSpeechPolicy()
+        guidanceSynthesizer.stopSpeaking(at: .immediate)
+    }
+
+    private func updateScanCaptureCue(
+        fullyVisible: Bool
+    ) {
+        guard fullyVisible,
+              isViewActive,
+              acceptsAnalysisFrames else {
+            stopScanCaptureCue()
+            return
+        }
+        guard scanCueTask == nil else {
+            return
+        }
+
+        SoundEffectManager.shared.play(
+            .docScanGuideBeep
+        )
+        scanCueTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(
+                    for: .milliseconds(700)
+                )
+                guard !Task.isCancelled,
+                      let self,
+                      self.isViewActive,
+                      self.acceptsAnalysisFrames else {
+                    return
+                }
+                SoundEffectManager.shared.play(
+                    .docScanGuideBeep
+                )
+            }
+        }
+    }
+
+    private func stopScanCaptureCue() {
+        scanCueTask?.cancel()
+        scanCueTask = nil
+    }
+
     private func text(
         for guidance: DocumentFramingGuidance
     ) -> String {
@@ -1958,7 +2337,7 @@ final class LocalDocumentScannerViewController: UIViewController {
         case .close:
             didTapCancel()
         case .capture:
-            didTapShutter()
+            requestRemoteCapture()
         case .previousPage,
              .rotatePage,
              .nextPage,
@@ -2016,15 +2395,31 @@ final class LocalDocumentScannerViewController: UIViewController {
         send(.start)
     }
 
+    /// The auto shutter cannot run without the detector, and the user can
+    /// turn it off, so those two cases still need a button on screen.
+    private var needsManualShutter: Bool {
+        !automaticCaptureEnabled || detector == nil
+    }
+
+    /// Manual and remote captures take the same forced path as the timeout
+    /// shutter, so pressing either always produces a page instead of silently
+    /// losing to the stillness and focus gates.
     @objc private func didTapShutter() {
-        switch stateMachine.state {
-        case .searching, .guiding, .stabilizing:
-            break
-        default:
-            return
-        }
-        manualCaptureTicketsPending = true
-        send(.manualCaptureRequested)
+        requestForcedCapture(
+            reason: "source=manual",
+            announcement: AppLocalization.string(
+                "문서를 촬영합니다."
+            )
+        )
+    }
+
+    private func requestRemoteCapture() {
+        requestForcedCapture(
+            reason: "source=remote",
+            announcement: AppLocalization.string(
+                "문서를 촬영합니다."
+            )
+        )
     }
 
     @objc private func didTapCancel() {
@@ -2035,6 +2430,7 @@ final class LocalDocumentScannerViewController: UIViewController {
         pendingCapture = nil
         manualFocusTickets.removeAll()
         manualCaptureTicketsPending = false
+        forcedCaptureRequested = false
         restoreContinuousFocus()
         send(.cancel)
         onCancel?()
@@ -2144,6 +2540,12 @@ extension LocalDocumentScannerViewController:
                 modelInput: modelInput,
                 transform: transform,
                 sharpness: sharpness,
+                meanLuminance: AndroidScannerFrameQuality.meanLuminance(
+                    of: sharpnessSample
+                ),
+                // Reuse the bounded viewport sample; no full camera frame is
+                // retained or copied for partial-page guidance.
+                guidanceSample: sharpnessSample,
                 preprocessingMilliseconds:
                     ScannerDiagnostics.milliseconds(
                         since: preprocessingStartedAt

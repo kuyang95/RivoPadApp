@@ -234,15 +234,13 @@ final class VisionLinkLocalRemoteFeatureService:
     func describeImage(
         at url: URL
     ) async throws -> String {
-        try ensureLocalAIAvailable()
+        // 이미지 설명은 Gemini 로 나가므로 로컬 AI 점유 여부를 보지 않는다.
         let cgImage =
             try await VisionLinkReceivedImageLoader.load(
                 at: url,
                 maximumEdge: 2_048
             )
-        let conversationID = LLMConversationID()
         return try await collectVisionResponse(
-            conversationID: conversationID,
             system: """
             너는 시각장애 사용자를 위한 이미지 설명 도우미야.
             이미지에 실제로 보이는 핵심 대상, 글자, 위치 관계를
@@ -312,29 +310,19 @@ final class VisionLinkLocalRemoteFeatureService:
     }
 
     private func collectVisionResponse(
-        conversationID: LLMConversationID,
         system: String,
         prompt: String,
         image: CIImage
     ) async throws -> String {
-        do {
-            let stream = try await llmService.streamVision(
-                conversationID: conversationID,
+        // 이미지 분석은 Gemini 가 처리하므로 로컬 세션을 열지 않는다.
+        let stream = try await
+            GeminiVisionService.stream(
                 system: system,
                 prompt: prompt,
                 images: [image]
             )
-            let result = try await Self.collect(stream)
-            await llmService.resetConversation(
-                conversationID
-            )
-            return try Self.validatedResult(result)
-        } catch {
-            await llmService.resetConversation(
-                conversationID
-            )
-            throw error
-        }
+        let result = try await Self.collect(stream)
+        return try Self.validatedResult(result)
     }
 
     private static func collect(

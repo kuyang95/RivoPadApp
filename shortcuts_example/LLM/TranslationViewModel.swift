@@ -112,6 +112,7 @@ final class TranslationViewModel:
         status = AppLocalization.string(
             "M4 로컬 AI로 번역하는 중"
         )
+        SoundEffectManager.shared.play(.waiting)
         isTranslating = true
         defer {
             isTranslating = false
@@ -128,6 +129,7 @@ final class TranslationViewModel:
             status = AppLocalization.string(
                 "번역 완료"
             )
+            SoundEffectManager.shared.play(.complete)
         } catch is CancellationError {
             status = AppLocalization.string(
                 "번역을 중지했습니다."
@@ -138,6 +140,7 @@ final class TranslationViewModel:
             status = AppLocalization.string(
                 "번역 실패"
             )
+            SoundEffectManager.shared.play(.fail)
         }
     }
 

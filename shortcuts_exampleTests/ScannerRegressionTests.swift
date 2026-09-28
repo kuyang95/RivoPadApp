@@ -7,6 +7,93 @@ import XCTest
 @testable import shortcuts_example
 
 final class ScannerRegressionTests: XCTestCase {
+    func testPerspectiveCropUsesAndroidCaptureInset() {
+        let corners = AndroidPerspectiveMath.pixelCorners(
+            from: DocumentQuad(
+                topLeft: NormalizedPoint(x: 0.1, y: 0.2),
+                topRight: NormalizedPoint(x: 0.9, y: 0.2),
+                bottomRight: NormalizedPoint(x: 0.9, y: 0.8),
+                bottomLeft: NormalizedPoint(x: 0.1, y: 0.8)
+            ),
+            imageWidth: 1_000,
+            imageHeight: 800
+        )
+
+        XCTAssertEqual(
+            AndroidPerspectiveMath.captureInsetFraction,
+            0.015
+        )
+        XCTAssertEqual(corners[0].x, 106, accuracy: 0.001)
+        XCTAssertEqual(corners[0].y, 163.6, accuracy: 0.001)
+        XCTAssertEqual(corners[1].x, 894, accuracy: 0.001)
+        XCTAssertEqual(corners[1].y, 163.6, accuracy: 0.001)
+        XCTAssertEqual(corners[2].x, 894, accuracy: 0.001)
+        XCTAssertEqual(corners[2].y, 636.4, accuracy: 0.001)
+        XCTAssertEqual(corners[3].x, 106, accuracy: 0.001)
+        XCTAssertEqual(corners[3].y, 636.4, accuracy: 0.001)
+    }
+
+    func testScannerUsesInterfaceOrientationForDocumentRotation() {
+        XCTAssertEqual(
+            ScannerInterfaceOrientationRotation.degrees(for: .portrait),
+            90
+        )
+        XCTAssertEqual(
+            ScannerInterfaceOrientationRotation.degrees(
+                for: .portraitUpsideDown
+            ),
+            270
+        )
+        XCTAssertEqual(
+            ScannerInterfaceOrientationRotation.degrees(for: .landscapeLeft),
+            180
+        )
+        XCTAssertEqual(
+            ScannerInterfaceOrientationRotation.degrees(for: .landscapeRight),
+            0
+        )
+        XCTAssertNil(
+            ScannerInterfaceOrientationRotation.degrees(for: .unknown)
+        )
+    }
+
+    func testDocumentReviewFitsPortraitPageInsideLandscapeScreen() {
+        let result = DocumentReviewImageLayout.fittedSize(
+            imageSize: CGSize(width: 1_000, height: 1_500),
+            availableSize: CGSize(width: 1_200, height: 700)
+        )
+
+        XCTAssertEqual(result.width, 466.666_667, accuracy: 0.001)
+        XCTAssertEqual(result.height, 700, accuracy: 0.001)
+    }
+
+    func testDocumentReviewFitsLandscapePageInsidePortraitScreen() {
+        let result = DocumentReviewImageLayout.fittedSize(
+            imageSize: CGSize(width: 1_600, height: 900),
+            availableSize: CGSize(width: 700, height: 1_100)
+        )
+
+        XCTAssertEqual(result.width, 700, accuracy: 0.001)
+        XCTAssertEqual(result.height, 393.75, accuracy: 0.001)
+    }
+
+    func testDocumentReviewRejectsInvalidDimensions() {
+        XCTAssertEqual(
+            DocumentReviewImageLayout.fittedSize(
+                imageSize: .zero,
+                availableSize: CGSize(width: 1_200, height: 700)
+            ),
+            .zero
+        )
+        XCTAssertEqual(
+            DocumentReviewImageLayout.fittedSize(
+                imageSize: CGSize(width: 1_000, height: 1_500),
+                availableSize: .zero
+            ),
+            .zero
+        )
+    }
+
     func testOCRServicePreservesEmptyImageFallback()
         async throws
     {
@@ -1231,29 +1318,6 @@ final class ScannerRegressionTests: XCTestCase {
         XCTAssertLessThanOrEqual(
             maximumDifference,
             (1.0 / 255.0) + Float.ulpOfOne
-        )
-    }
-
-    func testMetalDocumentColorMatchesAndroidCPUReference() throws {
-        guard MTLCreateSystemDefaultDevice() != nil else {
-            throw XCTSkip("Metal is unavailable on this test destination")
-        }
-        let source = try patternedImage(width: 37, height: 29)
-        let parameters = AndroidDocumentColorMath.parameters(for: source)
-        let cpu = AndroidDocumentColorMath.enhance(
-            source,
-            parameters: parameters
-        )
-        let metal = try AndroidMetalImageSampler().enhanceDocument(
-            source,
-            parameters: parameters
-        )
-
-        XCTAssertEqual(metal.width, cpu.width)
-        XCTAssertEqual(metal.height, cpu.height)
-        XCTAssertLessThanOrEqual(
-            maximumChannelDifference(metal.bytes, cpu.bytes),
-            1
         )
     }
 

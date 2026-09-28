@@ -1,0 +1,18 @@
+Pods/
+shortcuts_example/GoogleService-Info.plist
+backend/**/node_modules/
+backend/**/.wrangler/
+backend/**/.dev.vars
+backend/**/.dev.vars.*
+!backend/**/.dev.vars.example
+
+# Codex/Claude test artifacts (never commit, never checkpoint)
+tmp/
+outputs/
+output/
+.build/
+/.build*.log
+.DS_Store
+**/__pycache__/
+*.pyc
+*.xcuserstate

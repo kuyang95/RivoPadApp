@@ -45,14 +45,28 @@ final class TTSManager:
         rate: Float? = nil,
         completion: (() -> Void)? = nil
     ) {
+        speak(
+            text,
+            language:
+                AppLanguage.current()
+                .speechLanguageCode,
+            rate: rate,
+            completion: completion
+        )
+    }
+
+    func speak(
+        _ text: String,
+        language: String,
+        rate: Float? = nil,
+        completion: (() -> Void)? = nil
+    ) {
         stop()
 
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice =
             AVSpeechSynthesisVoice(
-                language:
-                    AppLanguage.current()
-                    .speechLanguageCode
+                language: language
             )
         utterance.rate = min(
             max(

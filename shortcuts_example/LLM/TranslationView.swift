@@ -122,11 +122,6 @@ struct TranslationView: View {
                             "character.book.closed"
                     ) {
                         tts.stop()
-                        SoundEffectManager
-                            .shared
-                            .play(
-                                .startingLLM
-                            )
                         viewModel
                             .startTranslation()
                     }
@@ -196,9 +191,6 @@ struct TranslationView: View {
             shouldSpeakAutomaticResult =
                 true
             tts.stop()
-            SoundEffectManager.shared.play(
-                .startingLLM
-            )
             viewModel.startTranslation()
         }
         .onChange(

@@ -91,12 +91,9 @@ nonisolated enum HWP5TextExtractor {
                 | (1 << 8) // certificate encryption
                 | (1 << 10) // certificate DRM
                 | (1 << 13) // privacy protection
-        let encryptionVersion =
-            try header.hwpUInt32(at: 44)
         guard properties
                 & unsupportedSecurityFlags
-                == 0,
-              encryptionVersion == 0
+                == 0
         else {
             throw ChatAttachmentError
                 .encryptedHWP
@@ -339,9 +336,11 @@ nonisolated enum HWP5TextExtractor {
                 index += 1
             }
         }
-        return String(
-            decoding: output,
-            as: UTF16.self
+        return HanyangPUANormalizer.normalize(
+            String(
+                decoding: output,
+                as: UTF16.self
+            )
         )
         .replacingOccurrences(
             of: "\r\n",
@@ -356,7 +355,7 @@ nonisolated enum HWP5TextExtractor {
         )
     }
 
-    private static func inflateRawDeflate(
+    static func inflateRawDeflate(
         _ compressed: Data,
         maximumBytes: Int
     ) throws -> Data {
@@ -443,8 +442,11 @@ nonisolated enum HWP5TextExtractor {
                         )
                     }
                     if status == Z_STREAM_END {
-                        guard stream.avail_in
-                                == 0 else {
+                        guard stream.avail_in == 0
+                                || hasValidCompressionTrailer(
+                                    stream: stream,
+                                    output: output
+                                ) else {
                             throw ChatAttachmentError
                                 .invalidHWP
                         }
@@ -460,6 +462,51 @@ nonisolated enum HWP5TextExtractor {
                     }
                 }
             }
+    }
+
+    /// Some HWP 5 writers append an eight-byte CRC32 and uncompressed-size
+    /// trailer after an otherwise headerless DEFLATE stream. HWPLib emits
+    /// zero when it does not calculate the optional checksum. Accept only
+    /// that exact legacy form or a verified CRC32, and always verify size so
+    /// arbitrary trailing bytes remain invalid.
+    private static func hasValidCompressionTrailer(
+        stream: z_stream,
+        output: Data
+    ) -> Bool {
+        guard stream.avail_in == 8,
+              let trailer = stream.next_in else {
+            return false
+        }
+        let expectedCRC =
+            UInt32(trailer[0])
+            | UInt32(trailer[1]) << 8
+            | UInt32(trailer[2]) << 16
+            | UInt32(trailer[3]) << 24
+        let expectedSize =
+            UInt32(trailer[4])
+            | UInt32(trailer[5]) << 8
+            | UInt32(trailer[6]) << 16
+            | UInt32(trailer[7]) << 24
+
+        var checksum = crc32(0, nil, 0)
+        output.withUnsafeBytes { rawOutput in
+            let bytes = rawOutput.bindMemory(
+                to: Bytef.self
+            )
+            if let base = bytes.baseAddress {
+                checksum = crc32(
+                    checksum,
+                    base,
+                    uInt(bytes.count)
+                )
+            }
+        }
+        let checksumMatches =
+            expectedCRC == 0
+            || UInt32(truncatingIfNeeded: checksum)
+                == expectedCRC
+        return checksumMatches
+            && UInt32(truncatingIfNeeded: output.count) == expectedSize
     }
 }
 

@@ -81,6 +81,40 @@ final class RivoRemoteProtocolTests: XCTestCase {
         )
     }
 
+    func testDeviceSelectionShowsOnlyStrongestValidSignal() {
+        let weak = RivoDiscoveredDevice(
+            id: UUID(),
+            name: "Weak Rivo",
+            type: .three,
+            discoverySource: .serviceUUID,
+            signalStrength: -82
+        )
+        let strong = RivoDiscoveredDevice(
+            id: UUID(),
+            name: "Strong Rivo",
+            type: .mini,
+            discoverySource: .advertisedName,
+            signalStrength: -41
+        )
+        let unavailable = RivoDiscoveredDevice(
+            id: UUID(),
+            name: "Unavailable RSSI",
+            type: .three,
+            discoverySource: .peripheralName,
+            signalStrength: 127
+        )
+
+        XCTAssertEqual(
+            RivoDeviceSelectionPolicy.strongestDevice(
+                in: [weak, unavailable, strong]
+            ),
+            strong
+        )
+        XCTAssertNil(
+            RivoDeviceSelectionPolicy.strongestDevice(in: [])
+        )
+    }
+
     func testRestorationPrefersSavedDeviceAndMapsEveryState()
     {
         let saved = UUID()
@@ -732,7 +766,7 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         )
     }
 
-    func testQuickMenuNavigationSelectsReader() {
+    func testQuickMenuNavigationSelectsReaderFromWidgetPage() {
         let controlCenter = RivoRemoteControlCenter()
 
         XCTAssertNil(
@@ -742,13 +776,20 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         )
         XCTAssertTrue(controlCenter.isMenuPresented)
 
+        controlCenter.focusItem(at: 3)
+
         XCTAssertNil(
             controlCenter.receive(
-                button(.six, action: .pressed)
+                button(.five, action: .pressed)
             )
         )
-        XCTAssertEqual(controlCenter.selectedIndex, 1)
+        XCTAssertEqual(
+            controlCenter.currentPage,
+            .widgets
+        )
+        XCTAssertTrue(controlCenter.isMenuPresented)
 
+        controlCenter.focusItem(at: 4)
         XCTAssertEqual(
             controlCenter.receive(
                 button(.five, action: .pressed)
@@ -756,6 +797,111 @@ final class RivoRemoteControlCenterTests: XCTestCase {
             .navigate(.reader)
         )
         XCTAssertFalse(controlCenter.isMenuPresented)
+    }
+
+    func testQuickMenuFolderStackUsesStarForBackThenClose() {
+        let controlCenter = RivoRemoteControlCenter()
+
+        _ = controlCenter.receive(
+            button(.l1, action: .pressed)
+        )
+        XCTAssertEqual(
+            controlCenter.items.map(\.id),
+            [
+                "home.tools",
+                "home.camera",
+                "home.appDisplay",
+                "home.widgets",
+            ]
+        )
+
+        _ = controlCenter.receive(
+            button(.five, action: .pressed)
+        )
+        XCTAssertEqual(controlCenter.currentPage, .tools)
+        XCTAssertTrue(controlCenter.canGoBackInMenu)
+        XCTAssertTrue(controlCenter.isMenuPresented)
+
+        _ = controlCenter.receive(
+            button(.star, action: .pressed)
+        )
+        XCTAssertEqual(controlCenter.currentPage, .home)
+        XCTAssertFalse(controlCenter.canGoBackInMenu)
+        XCTAssertTrue(controlCenter.isMenuPresented)
+
+        _ = controlCenter.receive(
+            button(.star, action: .pressed)
+        )
+        XCTAssertFalse(controlCenter.isMenuPresented)
+    }
+
+    func testCameraMenuEntersAndroidContrastSubmenu() {
+        let controlCenter = RivoRemoteControlCenter()
+        controlCenter.updateActiveScreen(.magnifier)
+
+        XCTAssertEqual(controlCenter.currentPage, .camera)
+        _ = controlCenter.receive(
+            button(.l1, action: .pressed)
+        )
+        controlCenter.focusItem(at: 3)
+        XCTAssertNil(
+            controlCenter.receive(
+                button(.five, action: .pressed)
+            )
+        )
+        XCTAssertEqual(
+            controlCenter.currentPage,
+            .cameraContrast
+        )
+        XCTAssertEqual(
+            controlCenter.items.map(\.title),
+            [
+                "원래 색상",
+                "대비 색상",
+                "글자 두께",
+            ]
+        )
+
+        controlCenter.focusItem(at: 2)
+        XCTAssertEqual(
+            controlCenter.receive(
+                button(.two, action: .pressed)
+            ),
+            .screen(
+                .magnifier,
+                .magnifier(.increaseThreshold)
+            )
+        )
+        XCTAssertTrue(controlCenter.isMenuPresented)
+    }
+
+    func testAppDisplayMenuExposesOnlySupportedIPadActions() {
+        let controlCenter = RivoRemoteControlCenter()
+        _ = controlCenter.receive(
+            button(.l1, action: .pressed)
+        )
+        controlCenter.focusItem(at: 2)
+        _ = controlCenter.receive(
+            button(.five, action: .pressed)
+        )
+
+        XCTAssertEqual(controlCenter.currentPage, .appDisplay)
+        XCTAssertEqual(
+            controlCenter.items.map(\.id),
+            [
+                "display.invert",
+                "display.brightness",
+                "display.orientation",
+                "display.settings",
+            ]
+        )
+        controlCenter.focusItem(at: 1)
+        XCTAssertEqual(
+            controlCenter.receive(
+                button(.two, action: .pressed)
+            ),
+            .appBrightness(.increase)
+        )
     }
 
     func testQuickMenuMatchesAndroidReaderMenu() {
@@ -768,15 +914,15 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         XCTAssertEqual(
             controlCenter.items.map(\.title),
             [
-                "독서 닫기",
-                "재생 또는 일시정지",
-                "이전 위치",
-                "다음 위치",
-                "이전 탐색 단위",
-                "다음 탐색 단위",
+                "뒤로",
+                "재생/일시정지",
+                "이전",
+                "다음",
+                "이동 단위 이전",
+                "이동 단위 다음",
                 "목차",
                 "본문 검색",
-                "보기 설정",
+                "설정",
             ]
         )
 
@@ -809,9 +955,9 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         XCTAssertEqual(
             controlCenter.items.map(\.title),
             [
-                "닫기",
-                "원본 색상",
-                "색상 대비",
+                "뒤로",
+                "원래 색상",
+                "대비 색상",
                 "글자 크기",
                 "줄 간격",
             ]
@@ -874,20 +1020,17 @@ final class RivoRemoteControlCenterTests: XCTestCase {
             controlCenter.items.map(\.id),
             [
                 "camera.back",
-                "camera.capture",
+                "camera.tools",
                 "camera.zoom",
-                "camera.color",
-                "camera.threshold",
-                "camera.brightness",
-                "camera.invert",
+                "camera.contrast",
+                "camera.appDisplay",
                 "camera.switch",
                 "camera.torch",
-                "camera.focus",
             ]
         )
         XCTAssertEqual(
             controlCenter.items[1].title,
-            "사진 저장"
+            "도구"
         )
 
         _ = controlCenter.receive(
@@ -926,14 +1069,14 @@ final class RivoRemoteControlCenterTests: XCTestCase {
             .liveTextReader
         )
         XCTAssertEqual(
-            controlCenter.items[1].title,
-            "읽기 일시정지 또는 재개"
+            controlCenter.items[6].title,
+            "라이트"
         )
         XCTAssertEqual(
-            controlCenter.items[1].command,
+            controlCenter.items[6].command,
             .screen(
                 .liveTextReader,
-                .magnifier(.capture)
+                .magnifier(.toggleTorch)
             )
         )
     }
@@ -977,7 +1120,7 @@ final class RivoRemoteControlCenterTests: XCTestCase {
     func testQuickMenuScreenChangeResetsSelection() {
         let controlCenter =
             RivoRemoteControlCenter()
-        controlCenter.focusItem(at: 5)
+        controlCenter.focusItem(at: 3)
 
         controlCenter.updateActiveScreen(
             .publicationReader
@@ -996,8 +1139,7 @@ final class RivoRemoteControlCenterTests: XCTestCase {
 
         XCTAssertEqual(
             controlCenter.items.first?.id,
-            RivoQuickDestination
-                .aiChat.rawValue
+            "home.tools"
         )
     }
 
@@ -1013,18 +1155,18 @@ final class RivoRemoteControlCenterTests: XCTestCase {
                 )
             )
         )
-        controlCenter.focusItem(at: 5)
+        controlCenter.focusItem(at: 3)
 
         XCTAssertTrue(
             controlCenter.isMenuPresented
         )
         XCTAssertEqual(
             controlCenter.selectedIndex,
-            5
+            3
         )
         XCTAssertTrue(
             controlCenter.feedback.contains(
-                controlCenter.items[5].title
+                controlCenter.items[3].title
             )
         )
     }
@@ -1088,9 +1230,13 @@ final class RivoRemoteControlCenterTests: XCTestCase {
             )
 
         XCTAssertTrue(menuDecision.consumed)
+        XCTAssertNil(menuDecision.command)
         XCTAssertEqual(
-            menuDecision.command,
-            .navigate(.aiChat)
+            controlCenter.currentPage,
+            .tools
+        )
+        XCTAssertTrue(
+            controlCenter.isMenuPresented
         )
     }
 

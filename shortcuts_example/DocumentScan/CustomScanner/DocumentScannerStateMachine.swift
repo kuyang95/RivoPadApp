@@ -140,14 +140,18 @@ nonisolated struct DocumentScannerStateMachine: Sendable {
     private mutating func handleFrame(
         _ gates: CaptureGateSnapshot
     ) -> [DocumentScanEffect] {
+        if let guidance = gates.framingGuidance {
+            state = .guiding(guidance)
+            // A partial page can guide framing, but is never a detection that
+            // permits automatic capture or a four-corner overlay.
+            return gates.detection == nil
+                ? [.clearDetectionOverlay, .updateGuidance(guidance)]
+                : [.updateGuidance(guidance)]
+        }
+
         guard gates.detection != nil else {
             state = .searching
             return [.stopGuidance, .clearDetectionOverlay]
-        }
-
-        if let guidance = gates.framingGuidance {
-            state = .guiding(guidance)
-            return [.updateGuidance(guidance)]
         }
 
         guard gates.allGatesPass else {

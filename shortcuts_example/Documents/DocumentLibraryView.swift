@@ -7,112 +7,127 @@ import UniformTypeIdentifiers
 final class DocumentLibraryViewModel:
     ObservableObject
 {
-    @Published private(set) var folderName:
-        String?
-    @Published private(set) var items:
+    static let maximumAppFolderItems = 500
+
+    @Published private(set) var recentDocuments:
+        [RecentOriginalDocument] = []
+    @Published private(set) var appFolderDocuments:
         [AuthorizedDocumentItem] = []
-    @Published private(set) var isLoading =
+    @Published private(set) var isAppFolderTruncated =
         false
-    @Published private(set) var isTruncated =
-        false
-    @Published var searchQuery = ""
     @Published var errorDescription: String?
 
-    private let library:
-        AuthorizedDocumentLibrary
+    /// 앱 샌드박스의 Documents 폴더. 파일 앱에서는
+    /// 나의 iPad > VisionCraft 로 보이는 위치와 같다.
+    let appFolderURL: URL?
+
+    private let recentStore:
+        RecentOriginalDocumentStore
     private var didLoad = false
+    private var isRefreshingAppFolder = false
 
     init(
-        library:
-            AuthorizedDocumentLibrary =
-                .shared
+        recentStore:
+            RecentOriginalDocumentStore =
+                .shared,
+        appFolderURL: URL? =
+            FileManager.default.urls(
+                for: .documentDirectory,
+                in: .userDomainMask
+            ).first
     ) {
-        self.library = library
-    }
-
-    var filteredItems:
-        [AuthorizedDocumentItem] {
-        AuthorizedDocumentSearch.filter(
-            items,
-            query: searchQuery
-        )
+        self.recentStore = recentStore
+        self.appFolderURL = appFolderURL
     }
 
     func load() async {
-        guard !didLoad else {
-            return
-        }
+        guard !didLoad else { return }
         didLoad = true
-        folderName = await library.folderName()
-        guard folderName != nil else {
-            return
-        }
-        await refresh()
+        await refreshAll()
     }
 
-    func authorize(
-        _ folderURL: URL
-    ) async {
-        await performScan {
-            try await library.authorize(
-                folderURL: folderURL
+    func refreshAll() async {
+        await refreshRecentDocuments()
+        await refreshAppFolderDocuments()
+    }
+
+    func refreshRecentDocuments() async {
+        recentDocuments = await recentStore
+            .documents()
+    }
+
+    func refreshAppFolderDocuments() async {
+        guard let appFolderURL,
+              !isRefreshingAppFolder else { return }
+        isRefreshingAppFolder = true
+        defer { isRefreshingAppFolder = false }
+        let maximum = Self.maximumAppFolderItems
+        let result = await Task.detached(
+            priority: .userInitiated
+        ) {
+            try? AuthorizedDocumentSearch.scan(
+                rootURL: appFolderURL,
+                maximumResults: maximum
             )
-        }
-        folderName = await library.folderName()
+        }.value
+        appFolderDocuments = result?.items ?? []
+        isAppFolderTruncated =
+            result?.isTruncated ?? false
     }
 
-    func refresh() async {
-        await performScan {
-            try await library.refresh()
-        }
+    func appFolderDocumentURL(
+        for item: AuthorizedDocumentItem
+    ) -> URL? {
+        appFolderURL?.appendingPathComponent(
+            item.relativePath
+        )
     }
 
-    func importDocument(
-        _ item: AuthorizedDocumentItem
-    ) async -> URL? {
-        isLoading = true
-        defer {
-            isLoading = false
-        }
-        do {
-            return try await library
-                .importDocument(
-                    relativePath:
-                        item.relativePath
-                )
-        } catch {
-            errorDescription =
-                error.localizedDescription
-            return nil
-        }
-    }
-
-    func forgetFolder() async {
-        await library.forgetFolder()
-        folderName = nil
-        items = []
-        searchQuery = ""
-        isTruncated = false
-        errorDescription = nil
-    }
-
-    private func performScan(
-        _ operation:
-            () async throws
-                -> AuthorizedDocumentSearchResult
+    func removeRecentDocument(
+        _ item: RecentOriginalDocument
     ) async {
-        isLoading = true
-        errorDescription = nil
-        defer {
-            isLoading = false
+        await recentStore.remove(id: item.id)
+        await refreshRecentDocuments()
+    }
+}
+
+private enum NewDocumentKind: String, Identifiable {
+    case excel
+    case word
+    case hangul
+
+    var id: String { rawValue }
+
+    var contentType: UTType {
+        switch self {
+        case .excel:
+            return VisionCraftFileTypes.xlsx
+        case .word:
+            return VisionCraftFileTypes.docx
+        case .hangul:
+            return VisionCraftFileTypes.hwpx
         }
-        do {
-            let result = try await operation()
-            items = result.items
-            isTruncated = result.isTruncated
-        } catch {
-            errorDescription =
-                error.localizedDescription
+    }
+
+    var defaultFilename: String {
+        switch self {
+        case .excel:
+            return AppLocalization.string("새 스프레드시트") + ".xlsx"
+        case .word:
+            return AppLocalization.string("새 Word 문서") + ".docx"
+        case .hangul:
+            return AppLocalization.string("새 한글 문서") + ".hwpx"
+        }
+    }
+
+    func makeData() throws -> Data {
+        switch self {
+        case .excel:
+            return try ExcelWorkbookDocument.blankWorkbookData()
+        case .word:
+            return try LegacyDOCXConverter.convert(text: "")
+        case .hangul:
+            return try LegacyHWPXConverter.convert(text: "")
         }
     }
 }
@@ -122,238 +137,151 @@ struct DocumentLibraryView: View {
         AppRouter
     @StateObject private var viewModel =
         DocumentLibraryViewModel()
-    @State private var isFolderPickerPresented =
-        false
     @State private var isFilePickerPresented =
         false
-    @State private var confirmsForget = false
+    @State private var isNewDocumentTypePickerPresented =
+        false
+    @State private var isNewDocumentExporterPresented =
+        false
+    @State private var newDocumentKind =
+        NewDocumentKind.excel
+    @State private var newDocument:
+        NewOfficeFileDocument?
 
     var body: some View {
         List {
             Section {
                 Button {
-                    isFilePickerPresented = true
+                    isNewDocumentTypePickerPresented = true
                 } label: {
                     Label(
-                        "파일 하나 선택",
-                        systemImage:
-                        "doc.badge.plus"
+                        "새 문서 만들기",
+                        systemImage: "square.and.pencil"
                     )
                 }
                 .accessibilityHint(
-                    "Files에서 파일 하나를 바로 선택해 엽니다."
+                    "Excel, Word 또는 한글 문서 형식을 선택해 새 문서를 만듭니다."
                 )
 
                 Button {
-                    openClipboardText()
+                    isFilePickerPresented = true
                 } label: {
                     Label(
-                        "클립보드 열기",
+                        "파일 불러오기",
                         systemImage:
-                            "doc.on.clipboard"
+                            "doc.badge.plus"
                     )
                 }
                 .accessibilityHint(
-                    "사용자가 복사한 텍스트를 편집하고 읽을 수 있는 문서로 엽니다."
+                    "파일 앱에서 문서 하나를 선택해 원본 위치에서 엽니다."
                 )
+                .fileImporter(
+                    isPresented:
+                        $isFilePickerPresented,
+                    allowedContentTypes:
+                        VisionCraftFileTypes.documents,
+                    allowsMultipleSelection: false
+                ) { result in
+                    handleFilePickerResult(result)
+                }
             } footer: {
                 Text(
-                    "사진·EPUB·문서 파일 또는 복사한 텍스트를 바로 열 수 있습니다."
+                    "새 Excel, Word, 한글 문서를 만들거나 기존 문서를 불러올 수 있습니다."
                 )
             }
 
-            Section("허용된 폴더") {
-                if let folderName =
-                        viewModel.folderName {
-                    Label(
-                        folderName,
-                        systemImage: "folder"
-                    )
-                    Button {
-                        isFolderPickerPresented =
-                            true
-                    } label: {
-                        Label(
-                            "폴더 다시 선택",
-                            systemImage:
-                                "folder.badge.plus"
-                        )
+            if !viewModel.recentDocuments.isEmpty {
+                Section {
+                    ForEach(
+                        viewModel.recentDocuments
+                    ) { item in
+                        recentDocumentRow(item)
                     }
-                    Button {
-                        Task {
-                            await viewModel.refresh()
-                        }
-                    } label: {
-                        Label(
-                            "문서 목록 새로고침",
-                            systemImage:
-                                "arrow.clockwise"
-                        )
-                    }
-                    .disabled(viewModel.isLoading)
-                    Button(
-                        role: .destructive
-                    ) {
-                        confirmsForget = true
-                    } label: {
-                        Label(
-                            "폴더 권한 지우기",
-                            systemImage:
-                                "folder.badge.minus"
-                        )
-                    }
-                } else {
+                } header: {
+                    Text("최근에 연 문서")
+                } footer: {
                     Text(
-                        "iPadOS에서는 사용자가 허용한 폴더 안에서만 문서를 검색할 수 있습니다."
+                        "처음 선택한 원본 파일을 다시 열며, 지원되는 수정 내용은 원본에 저장합니다."
                     )
-                    .foregroundStyle(.secondary)
-                    Button {
-                        isFolderPickerPresented =
-                            true
-                    } label: {
-                        Label(
-                            "검색할 폴더 선택",
-                            systemImage:
-                                "folder.badge.plus"
-                        )
-                    }
                 }
             }
 
-            if viewModel.folderName != nil {
-                Section(
-                    "최근 문서"
-                ) {
-                    if viewModel.isLoading {
-                        HStack {
-                            Spacer()
-                            ProgressView(
-                                "문서 검색 중…"
-                            )
-                            Spacer()
-                        }
-                    } else if
-                        viewModel.items.isEmpty
-                    {
-                        Text(
-                            "선택한 폴더에서 지원되는 문서를 찾지 못했습니다."
-                        )
-                        .foregroundStyle(
-                            .secondary
-                        )
-                    } else if viewModel
-                        .filteredItems.isEmpty
-                    {
-                        Text(
-                            "검색 결과가 없습니다."
-                        )
-                        .foregroundStyle(
-                            .secondary
-                        )
+            if viewModel.appFolderURL != nil {
+                Section {
+                    if viewModel.appFolderDocuments.isEmpty {
+                        Text("아직 앱 문서 폴더에 문서가 없습니다.")
+                            .foregroundStyle(.secondary)
                     } else {
                         ForEach(
-                            viewModel
-                                .filteredItems
-                        ) {
-                            item in
-                            documentRow(item)
+                            viewModel.appFolderDocuments
+                        ) { item in
+                            appFolderDocumentRow(item)
                         }
                     }
-
-                    if viewModel.isTruncated {
-                        Label(
-                            "문서가 많아 최근 5,000개만 표시합니다.",
-                            systemImage:
-                                "exclamationmark.triangle"
+                } header: {
+                    Text("앱 문서 폴더")
+                } footer: {
+                    if viewModel.isAppFolderTruncated {
+                        Text(
+                            AppLocalization.format(
+                                "문서가 많아 최근 수정된 %lld개만 표시합니다.",
+                                DocumentLibraryViewModel
+                                    .maximumAppFolderItems
+                            )
                         )
-                        .foregroundStyle(.orange)
+                    } else {
+                        Text(
+                            "파일 앱의 나의 iPad > VisionCraft 폴더와 같은 위치입니다. 파일 앱, USB, AirDrop으로 넣은 문서가 여기에 표시됩니다."
+                        )
                     }
                 }
             }
         }
         .listStyle(.insetGrouped)
         .visionCraftListScreen()
-        .navigationTitle("파일과 문서")
-        .searchable(
-            text: $viewModel.searchQuery,
-            prompt: "파일 이름 또는 폴더 검색"
-        )
+        .navigationTitle("문서 작업")
+        .refreshable {
+            await viewModel.refreshAll()
+        }
+        .confirmationDialog(
+            "새 문서 만들기",
+            isPresented: $isNewDocumentTypePickerPresented,
+            titleVisibility: .visible
+        ) {
+            Button {
+                prepareNewDocument(.excel)
+            } label: {
+                Label("Excel (.xlsx)", systemImage: "tablecells")
+            }
+            Button {
+                prepareNewDocument(.word)
+            } label: {
+                Label("Word (.docx)", systemImage: "doc.text")
+            }
+            Button {
+                prepareNewDocument(.hangul)
+            } label: {
+                Label("한글 (.hwpx)", systemImage: "doc.richtext")
+            }
+            Button("취소", role: .cancel) {}
+        } message: {
+            Text("만들 문서 형식을 선택하세요.")
+        }
+        .fileExporter(
+            isPresented: $isNewDocumentExporterPresented,
+            document: newDocument,
+            contentType: newDocumentKind.contentType,
+            defaultFilename: newDocumentKind.defaultFilename
+        ) { result in
+            handleNewDocumentExportResult(result)
+        }
         .task {
             await viewModel.load()
         }
-        .fileImporter(
-            isPresented:
-                $isFolderPickerPresented,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) {
-            result in
+        .onAppear {
             Task {
-                do {
-                    guard let folderURL =
-                            try result.get()
-                            .first else {
-                        return
-                    }
-                    await viewModel.authorize(
-                        folderURL
-                    )
-                } catch {
-                    viewModel
-                        .errorDescription =
-                        error.localizedDescription
-                }
+                await viewModel.refreshAll()
             }
-        }
-        .fileImporter(
-            isPresented:
-                $isFilePickerPresented,
-            allowedContentTypes:
-                VisionCraftFileTypes.openable,
-            allowsMultipleSelection: false
-        ) {
-            result in
-            Task {
-                do {
-                    guard let sourceURL =
-                            try result.get()
-                            .first else {
-                        return
-                    }
-                    appRouter.route =
-                        try await
-                            LocalFileOpening
-                            .route(
-                                for: sourceURL
-                            )
-                } catch {
-                    viewModel
-                        .errorDescription =
-                        error.localizedDescription
-                }
-            }
-        }
-        .confirmationDialog(
-            "저장된 폴더 권한을 지울까요?",
-            isPresented: $confirmsForget
-        ) {
-            Button(
-                "폴더 권한 지우기",
-                role: .destructive
-            ) {
-                Task {
-                    await viewModel
-                        .forgetFolder()
-                }
-            }
-            Button(
-                "취소",
-                role: .cancel
-            ) {}
-        } message: {
-            Text(
-                "원본 파일은 삭제하지 않고 VisionCraft가 기억한 폴더 접근 권한과 목록만 지웁니다."
-            )
         }
         .alert(
             "문서를 열 수 없습니다",
@@ -362,117 +290,229 @@ struct DocumentLibraryView: View {
                     viewModel
                         .errorDescription != nil
                 },
-                set: {
-                    isPresented in
+                set: { isPresented in
                     if !isPresented {
                         viewModel
-                            .errorDescription =
-                            nil
+                            .errorDescription = nil
                     }
                 }
             )
         ) {
-            Button(
-                "확인",
-                role: .cancel
-            ) {
-                viewModel.errorDescription =
-                    nil
+            Button("확인", role: .cancel) {
+                viewModel.errorDescription = nil
             }
         } message: {
-            Text(
-                viewModel.errorDescription
-                ?? ""
-            )
+            Text(viewModel.errorDescription ?? "")
         }
     }
 
-    private func documentRow(
-        _ item: AuthorizedDocumentItem
-    ) -> some View {
-        Button {
-            Task {
-                guard let importedURL =
-                        await viewModel
-                        .importDocument(item)
+    private func prepareNewDocument(
+        _ kind: NewDocumentKind
+    ) {
+        do {
+            newDocumentKind = kind
+            newDocument = NewOfficeFileDocument(
+                data: try kind.makeData()
+            )
+            isNewDocumentExporterPresented = true
+        } catch {
+            viewModel.errorDescription = error.localizedDescription
+        }
+    }
+
+    private func handleNewDocumentExportResult(
+        _ result: Result<URL, Error>
+    ) {
+        newDocument = nil
+        Task {
+            do {
+                let fileURL = try result.get()
+                appRouter.route = try await
+                    PersistentOriginalDocumentOpening.documentLibraryRoute(
+                        for: fileURL
+                    )
+                await viewModel.refreshRecentDocuments()
+            } catch {
+                let nsError = error as NSError
+                guard nsError.code != NSUserCancelledError else {
+                    return
+                }
+                viewModel.errorDescription = error.localizedDescription
+            }
+        }
+    }
+
+    private func handleFilePickerResult(
+        _ result: Result<[URL], Error>
+    ) {
+        Task {
+            do {
+                guard let sourceURL =
+                        try result.get().first
                 else {
                     return
                 }
                 appRouter.route =
-                    .localDocument(
-                        fileURL: importedURL
+                    try await
+                        PersistentOriginalDocumentOpening
+                    .documentLibraryRoute(
+                        for: sourceURL
                     )
+                await viewModel
+                    .refreshRecentDocuments()
+            } catch {
+                viewModel.errorDescription =
+                    error.localizedDescription
             }
+        }
+    }
+
+    private func openAppFolderDocument(
+        _ item: AuthorizedDocumentItem
+    ) {
+        guard let sourceURL =
+                viewModel.appFolderDocumentURL(
+                    for: item
+                )
+        else {
+            return
+        }
+        Task {
+            do {
+                appRouter.route =
+                    try await
+                        PersistentOriginalDocumentOpening
+                    .documentLibraryRoute(
+                        for: sourceURL
+                    )
+                await viewModel
+                    .refreshRecentDocuments()
+            } catch {
+                viewModel.errorDescription =
+                    error.localizedDescription
+            }
+        }
+    }
+
+    private func appFolderSubtitle(
+        _ item: AuthorizedDocumentItem
+    ) -> String {
+        let folder = (item.relativePath as NSString)
+            .deletingLastPathComponent
+        var parts: [String] = [
+            folder.isEmpty
+                ? AppLocalization.string("앱 문서 폴더")
+                : folder
+        ]
+        if let fileSize = item.fileSize {
+            parts.append(
+                ByteCountFormatter.string(
+                    fromByteCount: fileSize,
+                    countStyle: .file
+                )
+            )
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func appFolderDocumentRow(
+        _ item: AuthorizedDocumentItem
+    ) -> some View {
+        Button {
+            openAppFolderDocument(item)
         } label: {
             HStack(spacing: 14) {
-                Text(
-                    item.pathExtension
-                        .uppercased()
-                )
-                .font(
-                    .caption
-                    .bold()
-                )
-                .foregroundStyle(.white)
-                .frame(
-                    width: 52,
-                    height: 42
-                )
-                .background(
-                    Color.indigo
-                )
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: 9,
-                        style: .continuous
-                    )
-                )
+                documentTypeBadge(item.pathExtension)
 
                 VStack(
                     alignment: .leading,
                     spacing: 4
                 ) {
                     Text(item.name)
-                        .foregroundStyle(
-                            .primary
-                        )
+                        .foregroundStyle(.primary)
                         .lineLimit(2)
-                    Text(item.relativePath)
+                    Text(appFolderSubtitle(item))
                         .font(.caption)
-                        .foregroundStyle(
-                            .secondary
-                        )
-                        .lineLimit(2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
                 Spacer()
+                if let modificationDate =
+                    item.modificationDate
+                {
+                    Text(
+                        modificationDate,
+                        format: .dateTime
+                            .year()
+                            .month()
+                            .day()
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            "\(item.name), \(appFolderSubtitle(item))"
+        )
+        .accessibilityHint(
+            "앱 문서 폴더의 문서를 원본 위치에서 엽니다."
+        )
+    }
+
+    private func documentTypeBadge(
+        _ pathExtension: String
+    ) -> some View {
+        Text(
+            pathExtension.isEmpty
+                ? "문서"
+                : pathExtension.uppercased()
+        )
+        .font(.caption.bold())
+        .foregroundStyle(.white)
+        .frame(width: 52, height: 42)
+        .background(Color.indigo)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 9,
+                style: .continuous
+            )
+        )
+    }
+
+    private func recentDocumentRow(
+        _ item: RecentOriginalDocument
+    ) -> some View {
+        Button {
+            appRouter.route = .originalDocument(
+                documentID: item.id
+            )
+        } label: {
+            HStack(spacing: 14) {
+                documentTypeBadge(item.pathExtension)
+
                 VStack(
-                    alignment: .trailing,
+                    alignment: .leading,
                     spacing: 4
                 ) {
-                    if let modificationDate =
-                            item.modificationDate {
-                        Text(
-                            modificationDate,
-                            format:
-                                .dateTime
-                                .year()
-                                .month()
-                                .day()
-                        )
-                    }
-                    if let fileSize =
-                            item.fileSize {
-                        Text(
-                            ByteCountFormatter
-                                .string(
-                                    fromByteCount:
-                                        fileSize,
-                                    countStyle:
-                                        .file
-                                )
-                        )
-                    }
+                    Text(item.displayName)
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                    Text(item.locationName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
+                Spacer()
+                Text(
+                    item.lastOpenedAt,
+                    format: .dateTime
+                        .year()
+                        .month()
+                        .day()
+                )
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             }
@@ -480,32 +520,50 @@ struct DocumentLibraryView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(
-            "\(item.name), \(item.pathExtension.uppercased())"
+            "\(item.displayName), \(item.locationName)"
         )
         .accessibilityHint(
-            "문서를 앱 안으로 복사해 엽니다."
+            "탐색기를 열지 않고 원본 문서를 다시 엽니다."
         )
+        .swipeActions(edge: .trailing) {
+            Button(
+                "최근 목록에서 제거",
+                role: .destructive
+            ) {
+                Task {
+                    await viewModel
+                        .removeRecentDocument(item)
+                }
+            }
+        }
+    }
+}
+
+private struct NewOfficeFileDocument: FileDocument {
+    static var readableContentTypes: [UTType] {
+        [
+            VisionCraftFileTypes.xlsx,
+            VisionCraftFileTypes.docx,
+            VisionCraftFileTypes.hwpx,
+        ]
     }
 
-    private func openClipboardText() {
-        guard let text =
-                UIPasteboard.general.string,
-              !text.trimmingCharacters(
-                  in: .whitespacesAndNewlines
-              ).isEmpty else {
-            viewModel.errorDescription =
-                AppLocalization.string(
-                    "클립보드가 비어 있습니다."
-                )
-            return
+    let data: Data
+
+    init(data: Data) {
+        self.data = data
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents else {
+            throw CocoaError(.fileReadCorruptFile)
         }
-        appRouter.route =
-            .localTextDocument(
-                title:
-                    AppLocalization.string(
-                        "클립보드 텍스트"
-                    ),
-                text: text
-            )
+        self.data = data
+    }
+
+    func fileWrapper(
+        configuration: WriteConfiguration
+    ) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: data)
     }
 }

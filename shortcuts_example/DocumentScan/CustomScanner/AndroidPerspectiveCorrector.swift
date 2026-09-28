@@ -17,11 +17,17 @@ nonisolated enum ScannerPerspectiveError: Error, Equatable, Sendable {
 }
 
 nonisolated enum AndroidPerspectiveMath {
+    /// VisionCraft Android shrinks capture-time LCNet corners by 1.5% toward
+    /// the centroid before the perspective warp. UVDoc is sensitive to the
+    /// page boundary it receives, so keep this value shared by every iOS
+    /// perspective-correction path instead of relying on a caller override.
+    static let captureInsetFraction: Float = 0.015
+
     static func pixelCorners(
         from quad: DocumentQuad,
         imageWidth: Int,
         imageHeight: Int,
-        insetFraction: Float = 0.015
+        insetFraction: Float = captureInsetFraction
     ) -> [ScannerPixelPoint] {
         let source = quad.points.map {
             ScannerPixelPoint(
@@ -287,6 +293,36 @@ nonisolated enum AndroidPerspectiveMath {
         )
     }
 
+    /// Maps points from the warped output back into source coordinates.
+    ///
+    /// `warpedPoints` use the output image's pixel-edge coordinates
+    /// (0 … width, 0 … height), the same space ``PaperEdgeRefiner`` returns,
+    /// so a refined quad can be re-warped from the source image instead of
+    /// resampling the already-warped page a second time.
+    static func sourcePoints(
+        for warpedPoints: [ScannerPixelPoint],
+        orderedCorners: [ScannerPixelPoint],
+        outputSize: ScannerPixelSize
+    ) throws -> [ScannerPixelPoint] {
+        guard orderedCorners.count == 4,
+              outputSize.width > 0,
+              outputSize.height > 0 else {
+            throw ScannerPerspectiveError.invalidQuad
+        }
+        let homography = try UnitSquareHomography(
+            topLeft: orderedCorners[0],
+            topRight: orderedCorners[1],
+            bottomRight: orderedCorners[2],
+            bottomLeft: orderedCorners[3]
+        )
+        return try warpedPoints.map { point in
+            try homography.map(
+                x: point.x / Float(outputSize.width),
+                y: point.y / Float(outputSize.height)
+            )
+        }
+    }
+
     private static func distance(
         _ first: ScannerPixelPoint,
         _ second: ScannerPixelPoint
@@ -413,10 +449,39 @@ nonisolated enum AndroidPerspectiveMath {
     }
 }
 
+nonisolated struct PaperEdgeRefinementOutcome: Equatable, Sendable {
+    let applied: Bool
+    let refinedEdges: String
+    let maximumShiftFraction: Float
+    let milliseconds: Double
+
+    static func skipped(milliseconds: Double) -> Self {
+        Self(
+            applied: false,
+            refinedEdges: "",
+            maximumShiftFraction: 0,
+            milliseconds: milliseconds
+        )
+    }
+
+    var traceDetails: String {
+        applied
+            ? "paperEdges=\(refinedEdges) "
+                + "shift=" + String(
+                    format: "%.2f%%",
+                    maximumShiftFraction * 100
+                )
+                + " refineMs=" + String(format: "%.1f", milliseconds)
+            : "paperEdges=none refineMs="
+                + String(format: "%.1f", milliseconds)
+    }
+}
+
 actor AndroidPerspectiveCorrector: DocumentPerspectiveCorrecting {
     private let imageBridge = ScannerCIImageBridge()
     private let metalSampler: AndroidMetalImageSampler?
     private(set) var lastWarpBackend: UVDocWarpBackend?
+    private(set) var lastPaperEdgeRefinement: PaperEdgeRefinementOutcome?
 
     init(preferMetalWarp: Bool = true) {
         metalSampler = preferMetalWarp
@@ -442,7 +507,8 @@ actor AndroidPerspectiveCorrector: DocumentPerspectiveCorrecting {
 
     func correctPixels(
         _ source: ScannerRGBAImage,
-        using quad: DocumentQuad
+        using quad: DocumentQuad,
+        refinePaperEdges: Bool = true
     ) throws -> ScannerRGBAImage {
         let corners = AndroidPerspectiveMath.pixelCorners(
             from: quad,
@@ -452,31 +518,109 @@ actor AndroidPerspectiveCorrector: DocumentPerspectiveCorrecting {
         let outputSize = AndroidPerspectiveMath.outputSize(
             for: corners
         )
-        let corrected: ScannerRGBAImage
+        let corrected = try warp(
+            source,
+            orderedCorners: corners,
+            outputSize: outputSize
+        )
+        guard refinePaperEdges else {
+            lastPaperEdgeRefinement = nil
+            return corrected
+        }
+
+        let startedAt = ProcessInfo.processInfo.systemUptime
+        guard let refinement = PaperEdgeRefiner.refine(corrected),
+              let refinedCorners = sourceCorners(
+                  for: refinement,
+                  orderedCorners: corners,
+                  outputSize: outputSize,
+                  sourceWidth: source.width,
+                  sourceHeight: source.height
+              ) else {
+            lastPaperEdgeRefinement = .skipped(
+                milliseconds: ScannerDiagnostics.milliseconds(
+                    since: startedAt
+                )
+            )
+            return corrected
+        }
+
+        // Re-warp from the source so the page is resampled only once.
+        let refinedSize = AndroidPerspectiveMath.outputSize(
+            for: refinedCorners
+        )
+        let refined = try warp(
+            source,
+            orderedCorners: refinedCorners,
+            outputSize: refinedSize
+        )
+        lastPaperEdgeRefinement = PaperEdgeRefinementOutcome(
+            applied: true,
+            refinedEdges: refinement.refinedEdges,
+            maximumShiftFraction: refinement.maximumShiftFraction,
+            milliseconds: ScannerDiagnostics.milliseconds(since: startedAt)
+        )
+        return refined
+    }
+
+    /// Maps the refiner's warped-space quad back into source coordinates and
+    /// applies the same 1.5% inset the first warp used.
+    private func sourceCorners(
+        for refinement: PaperEdgeRefinerResult,
+        orderedCorners: [ScannerPixelPoint],
+        outputSize: ScannerPixelSize,
+        sourceWidth: Int,
+        sourceHeight: Int
+    ) -> [ScannerPixelPoint]? {
+        guard let mapped = try? AndroidPerspectiveMath.sourcePoints(
+            for: refinement.corners,
+            orderedCorners: orderedCorners,
+            outputSize: outputSize
+        ) else {
+            return nil
+        }
+        let clamped = mapped.map { point in
+            ScannerPixelPoint(
+                x: min(max(point.x, 0), Float(sourceWidth - 1)),
+                y: min(max(point.y, 0), Float(sourceHeight - 1))
+            )
+        }
+        return AndroidPerspectiveMath.insetCorners(
+            AndroidPerspectiveMath.orderCorners(clamped),
+            fraction: AndroidPerspectiveMath.captureInsetFraction
+        )
+    }
+
+    private func warp(
+        _ source: ScannerRGBAImage,
+        orderedCorners: [ScannerPixelPoint],
+        outputSize: ScannerPixelSize
+    ) throws -> ScannerRGBAImage {
         if let metalSampler {
             do {
-                corrected = try metalSampler.perspectiveWarp(
+                let warped = try metalSampler.perspectiveWarp(
                     source,
-                    orderedCorners: corners,
+                    orderedCorners: orderedCorners,
                     outputSize: outputSize
                 )
                 lastWarpBackend = .metal
+                return warped
             } catch {
-                corrected = try AndroidPerspectiveMath.warp(
+                let warped = try AndroidPerspectiveMath.warp(
                     source,
-                    orderedCorners: corners,
+                    orderedCorners: orderedCorners,
                     outputSize: outputSize
                 )
                 lastWarpBackend = .cpu
+                return warped
             }
-        } else {
-            corrected = try AndroidPerspectiveMath.warp(
-                source,
-                orderedCorners: corners,
-                outputSize: outputSize
-            )
-            lastWarpBackend = .cpu
         }
-        return corrected
+        let warped = try AndroidPerspectiveMath.warp(
+            source,
+            orderedCorners: orderedCorners,
+            outputSize: outputSize
+        )
+        lastWarpBackend = .cpu
+        return warped
     }
 }

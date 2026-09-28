@@ -12,6 +12,9 @@ nonisolated enum
             "xls",
             "hwp",
             "hwpx",
+            "doc",
+            "docx",
+            "docs",
         ]
 
     static func extract(
@@ -39,6 +42,10 @@ nonisolated enum
             case "hwpx":
                 maximumBytes =
                     HWPXTextExtractor
+                    .maximumDocumentBytes
+            case "doc", "docx", "docs":
+                maximumBytes =
+                    WordDocumentTextExtractor
                     .maximumDocumentBytes
             default:
                 throw ChatAttachmentError
@@ -85,6 +92,9 @@ nonisolated enum
                     .extract(from: data)
             case "hwpx":
                 return try HWPXTextExtractor
+                    .extract(from: data)
+            case "doc", "docx", "docs":
+                return try WordDocumentTextExtractor
                     .extract(from: data)
             default:
                 throw ChatAttachmentError

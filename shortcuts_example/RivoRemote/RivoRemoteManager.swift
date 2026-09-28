@@ -234,6 +234,15 @@ nonisolated struct RivoReconnectBackoff:
 }
 
 nonisolated enum RivoDeviceSelectionPolicy {
+    static func strongestDevice(
+        in devices: [RivoDiscoveredDevice]
+    ) -> RivoDiscoveredDevice? {
+        devices.max { lhs, rhs in
+            rankedSignal(lhs.signalStrength)
+                < rankedSignal(rhs.signalStrength)
+        }
+    }
+
     static func reconnectIdentifier(
         pending: UUID?,
         saved: UUID?
@@ -248,6 +257,10 @@ nonisolated enum RivoDeviceSelectionPolicy {
     ) -> Bool {
         !requiresManualSelection
             && identifier == saved
+    }
+
+    private static func rankedSignal(_ signal: Int) -> Int {
+        signal == 127 ? Int.min : signal
     }
 }
 
@@ -557,6 +570,12 @@ final class RivoRemoteManager:
 
     var lastInput: RivoRemoteInput? {
         recentEvents.first?.input
+    }
+
+    var strongestDiscoveredDevice: RivoDiscoveredDevice? {
+        RivoDeviceSelectionPolicy.strongestDevice(
+            in: discoveredDevices
+        )
     }
 
     var canReturnToSavedDevice: Bool {

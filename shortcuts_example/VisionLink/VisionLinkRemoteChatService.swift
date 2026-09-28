@@ -351,10 +351,13 @@ final class VisionLinkLocalRemoteChatService:
         request: VisionLinkChatRequest,
         context: VisionLinkConversationContext
     ) async throws -> String {
-        guard !llmService.isGenerating,
-              !llmService.isLoading else {
-            throw VisionLinkRemoteFeatureError
-                .localAIBusy
+        // 이미지 요청은 Gemini 로 나가므로 로컬 AI 점유 상태와 무관하다.
+        if context.attachment?.kind != .image {
+            guard !llmService.isGenerating,
+                  !llmService.isLoading else {
+                throw VisionLinkRemoteFeatureError
+                    .localAIBusy
+            }
         }
 
         let prompt =
@@ -362,6 +365,8 @@ final class VisionLinkLocalRemoteChatService:
                 request: request,
                 context: context
             )
+        let playsTextResponseEffect =
+            context.attachment == nil
         let conversationID = LLMConversationID()
         do {
             let stream:
@@ -373,10 +378,9 @@ final class VisionLinkLocalRemoteChatService:
                     at: attachment.fileURL,
                     maximumEdge: 2_048
                 )
-                stream = try await llmService
-                    .streamVision(
-                        conversationID:
-                            conversationID,
+                // 이미지 분석은 Gemini 가 처리한다.
+                stream = try await
+                    GeminiVisionService.stream(
                         system:
                             Self.systemPrompt,
                         prompt: prompt,
@@ -409,11 +413,22 @@ final class VisionLinkLocalRemoteChatService:
                 throw VisionLinkRemoteFeatureError
                     .emptyResult
             }
+            if playsTextResponseEffect {
+                SoundEffectManager.shared.play(.complete)
+            }
             return trimmed
+        } catch is CancellationError {
+            await llmService.resetConversation(
+                conversationID
+            )
+            throw CancellationError()
         } catch {
             await llmService.resetConversation(
                 conversationID
             )
+            if playsTextResponseEffect {
+                SoundEffectManager.shared.play(.fail)
+            }
             throw error
         }
     }

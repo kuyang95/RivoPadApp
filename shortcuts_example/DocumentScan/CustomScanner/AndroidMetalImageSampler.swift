@@ -68,20 +68,6 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         let h: Float
     }
 
-    private struct ColorUniforms {
-        let sourceWidth: UInt32
-        let sourceHeight: UInt32
-        let outputWidth: UInt32
-        let outputHeight: UInt32
-        let blackPoint: Float
-        let toneRange: Float
-        let redScale: Float
-        let greenScale: Float
-        let blueScale: Float
-        let gamma: Float
-        let saturationBoost: Float
-    }
-
     private struct CameraSampleUniforms {
         let sourceWidth: UInt32
         let sourceHeight: UInt32
@@ -162,8 +148,6 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         "androidRotateRGBA8"
     private static let perspectiveKernelName =
         "androidPerspectiveWarpRGBA8"
-    private static let colorKernelName =
-        "androidDocumentColorEnhanceRGBA8"
     private static let stretchedTensorKernelName =
         "androidStretchedRGBTensorNCHW"
     private static let cameraTensorKernelName =
@@ -177,7 +161,6 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
     private let resizePipeline: any MTLComputePipelineState
     private let rotationPipeline: any MTLComputePipelineState
     private let perspectivePipeline: any MTLComputePipelineState
-    private let colorPipeline: any MTLComputePipelineState
     private let stretchedTensorPipeline: any MTLComputePipelineState
     private let cameraTensorPipeline: any MTLComputePipelineState
     private let cameraResizePipeline: any MTLComputePipelineState
@@ -224,11 +207,6 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
             device: device,
             library: library
         )
-        let colorPipeline = try Self.makePipeline(
-            named: Self.colorKernelName,
-            device: device,
-            library: library
-        )
         let stretchedTensorPipeline = try Self.makePipeline(
             named: Self.stretchedTensorKernelName,
             device: device,
@@ -251,7 +229,6 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
         self.resizePipeline = resizePipeline
         self.rotationPipeline = rotationPipeline
         self.perspectivePipeline = perspectivePipeline
-        self.colorPipeline = colorPipeline
         self.stretchedTensorPipeline = stretchedTensorPipeline
         self.cameraTensorPipeline = cameraTensorPipeline
         self.cameraResizePipeline = cameraResizePipeline
@@ -360,32 +337,6 @@ nonisolated final class AndroidMetalImageSampler: @unchecked Sendable {
             outputWidth: outputSize.width,
             outputHeight: outputSize.height,
             pipeline: perspectivePipeline,
-            uniforms: &uniforms
-        )
-    }
-
-    func enhanceDocument(
-        _ source: ScannerRGBAImage,
-        parameters: AndroidDocumentColorParameters
-    ) throws -> ScannerRGBAImage {
-        var uniforms = try ColorUniforms(
-            sourceWidth: checkedDimension(source.width),
-            sourceHeight: checkedDimension(source.height),
-            outputWidth: checkedDimension(source.width),
-            outputHeight: checkedDimension(source.height),
-            blackPoint: Float(parameters.blackPoint),
-            toneRange: parameters.toneRange,
-            redScale: parameters.redScale,
-            greenScale: parameters.greenScale,
-            blueScale: parameters.blueScale,
-            gamma: Float(parameters.gamma),
-            saturationBoost: parameters.saturationBoost
-        )
-        return try execute(
-            source,
-            outputWidth: source.width,
-            outputHeight: source.height,
-            pipeline: colorPipeline,
             uniforms: &uniforms
         )
     }

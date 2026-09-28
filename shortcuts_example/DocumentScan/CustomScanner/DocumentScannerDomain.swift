@@ -142,6 +142,24 @@ nonisolated struct CustomDocumentScannerConfiguration: Equatable, Sendable {
     var outputLongEdgePixels = 2_400
     var jpegQuality = 0.95
 
+    /// Auto-shutter escape hatch. Once the corners have been stable but the
+    /// stillness / sharpness / focus gates have blocked for this long,
+    /// waiting longer will not produce a better frame, so the scanner
+    /// announces it and captures with those gates bypassed.
+    var forcedCaptureTimeoutSeconds = 8.0
+
+    /// Mean luminance (0–255) of the analysis frame below which the scene
+    /// counts as dark, and how many such frames turn the torch on.
+    var torchMeanLuminanceThreshold = 60.0
+    var torchDarkFrameCount = 6
+
+    /// Capture-time corners are dropped in favour of the stable preview
+    /// corners when any corner moves more than this percentage of the
+    /// preview diagonal. Legitimate differences (higher-resolution
+    /// re-detection, ~100 ms of drift before the shutter) are 1–2%; a
+    /// detection that jumped onto a table edge was 6–8%.
+    var captureCornerMaximumDeviationPercent = 4.0
+
     static let androidParitySeed = Self()
 }
 

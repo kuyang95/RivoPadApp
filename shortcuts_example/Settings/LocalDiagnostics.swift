@@ -778,8 +778,8 @@ struct LocalDiagnosticsView: View {
     private func memoryTierTitle(
         _ value: String
     ) -> String {
-        value == DeviceMemoryTier
-            .expanded.rawValue
+        [DeviceMemoryTier.balanced.rawValue,
+         DeviceMemoryTier.expanded.rawValue].contains(value)
             ? AppLocalization
                 .string("확장")
             : AppLocalization

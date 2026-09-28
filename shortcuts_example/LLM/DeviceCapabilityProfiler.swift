@@ -4,6 +4,7 @@ import os
 
 enum DeviceMemoryTier: String, Sendable {
     case standard
+    case balanced
     case expanded
 }
 
@@ -52,6 +53,12 @@ struct LocalInferencePolicy: Sendable {
             textMaxTokens = 768
             textMaxKVSize = 4_096
 
+        case .balanced:
+            tierLimit = 7 * gibibyte
+            reserve = 1_610_612_736 // 1.5 GiB
+            textMaxTokens = 1_024
+            textMaxKVSize = 4_096
+
         case .expanded:
             tierLimit = 8 * gibibyte
             reserve = 1_610_612_736 // 1.5 GiB
@@ -92,15 +99,20 @@ struct LocalInferencePolicy: Sendable {
 }
 
 enum DeviceCapabilityProfiler {
+    static func memoryTier(physicalMemory: UInt64) -> DeviceMemoryTier {
+        // Allow for memory reserved by the OS: advertised 12/16 GB devices
+        // can report less than exactly 12/16 GiB through ProcessInfo.
+        let gibibyte = UInt64(1_073_741_824)
+        if physicalMemory >= 14 * gibibyte { return .expanded }
+        if physicalMemory >= 10 * gibibyte { return .balanced }
+        return .standard
+    }
+
     static func snapshot() -> DeviceCapabilitySnapshot {
         let processInfo = ProcessInfo.processInfo
         let physicalMemory = processInfo.physicalMemory
 
-        // iPad Pro M4 has 8 GB and 16 GB variants. Using a threshold instead
-        // of a model-name table also handles future devices conservatively.
-        let expandedThreshold = UInt64(12) * 1_073_741_824
-        let memoryTier: DeviceMemoryTier =
-            physicalMemory >= expandedThreshold ? .expanded : .standard
+        let memoryTier = memoryTier(physicalMemory: physicalMemory)
 
         let availableMemory = UInt64(os_proc_available_memory())
         let metalWorkingSet = MTLCreateSystemDefaultDevice()?

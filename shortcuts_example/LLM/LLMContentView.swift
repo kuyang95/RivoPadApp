@@ -71,18 +71,29 @@ private extension ChatIntentInput {
             return false
         }
     }
+
+    var requiresLocalModel: Bool {
+        if case .webSearchQA = self {
+            return false
+        }
+        return true
+    }
 }
 
 struct LLMContentView: View {
     let intent: ChatIntentInput
     @StateObject private var vm: ChatViewModel
+    @ObservedObject private var localAI:
+        LLMService
     @StateObject private var answerSpeech =
         ChatAnswerSpeechController()
     @ObservedObject private var stt = STTManager.shared
     @EnvironmentObject private var remoteControl:
         RivoScreenRemoteControlCenter
+    @Environment(\.dismiss) private var dismiss
 
     @State private var didStart = false
+    @State private var welcomeMessageID = UUID()
     @State private var speechTask: Task<Void, Never>?
     @State private var voiceErrorDescription: String?
     @State private var shouldSpeakNextResponse = false
@@ -98,6 +109,9 @@ struct LLMContentView: View {
     init(intent: ChatIntentInput) {
         self.intent = intent
         let service = LLMService.shared
+        _localAI = ObservedObject(
+            wrappedValue: service
+        )
         let storedConversationID: UUID
         let persistsHistory: Bool
         switch intent {
@@ -180,7 +194,7 @@ struct LLMContentView: View {
             VisionCraftUI.background
                 .ignoresSafeArea()
 
-            VStack(spacing: 8) {
+            VStack(spacing: 0) {
                 if let source = webSource {
                     webSourceBanner(source)
                 }
@@ -195,29 +209,56 @@ struct LLMContentView: View {
                     attachmentBanner(summary)
                 }
 
-                if vm.messages.isEmpty, !vm.isLoadingModel {
+                if vm.messages.isEmpty, !vm.isLoadingModel, !showsWelcomeMessage {
                     ContentUnavailableView(
                         "새로운 대화",
                         systemImage: "bubble.left.and.bubble.right",
                         description: Text(
-                            "M4에서 로컬로 실행되는 AI에게 질문해 보세요."
+                            "AI에게 질문해 보세요"
                         )
                     )
                     .frame(maxHeight: .infinity)
                 } else {
-                    List(vm.messages) { message in
-                        MessageRow(message)
+                    List {
+                        Group {
+                            if showsWelcomeMessage {
+                                MessageRow(welcomeMessage) {
+                                    _ = answerSpeech.play(
+                                        messageID: welcomeMessageID,
+                                        text: welcomeMessage.text
+                                    )
+                                }
+                                .accessibilityIdentifier("local-chat-welcome")
+                            }
+
+                            ForEach(vm.messages) { message in
+                                MessageRow(
+                                    message,
+                                    isGenerating: vm.isGenerating
+                                ) {
+                                    _ = answerSpeech.play(
+                                        messageID: message.id,
+                                        text: message.text
+                                    )
+                                }
+                            }
+                        }
                             .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
                             .listRowInsets(
                                 .init(
-                                    top: 6,
-                                    leading: 12,
-                                    bottom: 6,
-                                    trailing: 12
+                                    top: 0,
+                                    leading: 0,
+                                    bottom: 0,
+                                    trailing: 0
                                 )
                             )
                     }
                     .listStyle(.plain)
+                    .listRowSpacing(0)
+                    .environment(\.defaultMinListRowHeight, 0)
+                    .contentMargins(.top, 20, for: .scrollContent)
+                    .contentMargins(.bottom, 12, for: .scrollContent)
                     .scrollContentBackground(.hidden)
                     .background(Color.clear)
                     .defaultScrollAnchor(.bottom)
@@ -259,13 +300,8 @@ struct LLMContentView: View {
                         .accessibilityLabel(
                             attachmentStatus
                         )
-                } else if !vm.status.isEmpty
-                            || vm.attachmentStatusDescription
-                                != nil {
-                    Text(
-                        vm.attachmentStatusDescription
-                            ?? vm.status
-                    )
+                } else if let status = visibleStatusDescription {
+                    Text(status)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -273,9 +309,7 @@ struct LLMContentView: View {
                         .accessibilityLabel(
                             AppLocalization.format(
                                 "AI 상태: %@",
-                                vm
-                                    .attachmentStatusDescription
-                                    ?? vm.status
+                                status
                             )
                         )
                 }
@@ -297,66 +331,20 @@ struct LLMContentView: View {
                     .padding(.horizontal, 12)
                 }
 
-                if let response =
-                        latestAssistantMessage,
-                   !vm.isGenerating {
-                    answerSpeechControls(
-                        for: response
-                    )
-                }
-
                 if allowsFollowUpInput {
-                    HStack(alignment: .bottom) {
-                        Button {
-                            if stt.isRecording {
-                                stt.finishRecording()
-                            } else {
-                                startVoiceInput()
-                            }
-                        } label: {
-                            Image(
-                                systemName: stt.isRecording
-                                    ? "stop.fill"
-                                    : "mic.fill"
-                            )
-                                .frame(width: 28, height: 28)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .buttonBorderShape(.roundedRectangle(radius: 14))
-                        .controlSize(.large)
-                        .tint(stt.isRecording ? .red : VisionCraftUI.primary)
-                        .disabled(
-                            !vm.isReadyForInput
-                                || vm.isGenerating
-                                || vm.isPreparingAttachment
-                                || (
-                                    speechTask != nil
-                                        && !stt.isRecording
-                                )
-                        )
-                        .accessibilityLabel(
-                            AppLocalization.string(
-                                stt.isRecording
-                                    ? "음성 입력 종료"
-                                    : "음성으로 질문"
-                            )
-                        )
-                        .accessibilityHint(
-                            AppLocalization.string(
-                                stt.isRecording
-                                    ? "인식을 마치고 질문을 전송합니다."
-                                    : "온디바이스 한국어 음성 인식을 시작합니다."
-                            )
-                        )
-
+                    HStack(
+                        alignment: .bottom,
+                        spacing: 12
+                    ) {
                         TextField(
                             "메시지를 입력하세요",
                             text: $vm.input,
                             axis: .vertical
                         )
                             .textFieldStyle(.plain)
-                            .visionCraftInputSurface()
-                            .frame(minHeight: 52)
+                            .font(.callout)
+                            .foregroundStyle(VisionCraftUI.primaryText)
+                            .visionCraftChatInputSurface()
                             .lineLimit(1 ... 6)
                             .disabled(
                                 vm.isLoadingModel
@@ -367,54 +355,95 @@ struct LLMContentView: View {
                             )
                             .submitLabel(.send)
                             .onSubmit {
-                                vm.sendUserMessage()
+                                sendTypedMessage()
                             }
+                            .accessibilityIdentifier("local-chat-input")
 
-                        if vm.isGenerating {
-                            Button("중지") {
-                                vm.stop()
+                        Button {
+                            if answerSpeech.isSpeaking {
+                                answerSpeech.stop()
+                            } else if stt.isRecording {
+                                stt.finishRecording()
+                            } else {
+                                startVoiceInput()
                             }
-                            .buttonStyle(.borderedProminent)
-                            .buttonBorderShape(.roundedRectangle(radius: 14))
-                            .controlSize(.large)
-                            .tint(.red)
-                            .accessibilityHint(
-                                "현재 생성 중인 답변을 중지합니다."
+                        } label: {
+                            Image(
+                                systemName:
+                                    answerSpeech.isSpeaking
+                                    || stt.isRecording
+                                    ? "stop.fill"
+                                    : "mic.fill"
                             )
-                        } else {
-                            Button("전송") {
-                                vm.sendUserMessage()
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(VisionCraftUI.onAccent)
+                            .frame(width: 52, height: 52)
+                            .background {
+                                if answerSpeech.isSpeaking || stt.isRecording {
+                                    Circle().fill(Color.red)
+                                } else {
+                                    Circle().fill(VisionCraftChatUI.accent)
+                                }
                             }
-                            .buttonStyle(.borderedProminent)
-                            .buttonBorderShape(.roundedRectangle(radius: 14))
-                            .controlSize(.large)
-                            .tint(VisionCraftUI.primary)
-                            .disabled(!vm.canSend)
                         }
+                        .buttonStyle(.plain)
+                        .disabled(
+                            !answerSpeech.isSpeaking
+                            && (
+                                !vm.isReadyForInput
+                                || vm.isGenerating
+                                || vm.isPreparingAttachment
+                                || (
+                                    speechTask != nil
+                                    && !stt.isRecording
+                                )
+                            )
+                        )
+                        .accessibilityLabel(
+                            AppLocalization.string(
+                                answerSpeech.isSpeaking
+                                ? "읽기 정지"
+                                : stt.isRecording
+                                ? "음성 입력 종료"
+                                : "마이크"
+                            )
+                        )
+
+                        Button {
+                            sendTypedMessage()
+                        } label: {
+                            Text("전송")
+                                .font(.headline)
+                                .lineLimit(1)
+                                .foregroundStyle(VisionCraftUI.onAccent)
+                                .padding(.horizontal, 16)
+                                .frame(minWidth: 64, minHeight: 52)
+                                .background {
+                                    if canSendTypedMessage {
+                                        Capsule().fill(VisionCraftChatUI.accent)
+                                    } else {
+                                        Capsule().fill(Color.secondary)
+                                    }
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!canSendTypedMessage)
+                        .accessibilityIdentifier("local-chat-send")
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 14)
                     .padding(.bottom, 22)
-                    .background(VisionCraftUI.surface)
-                    .overlay(alignment: .top) {
-                        Divider()
-                            .overlay(VisionCraftUI.outline)
-                    }
+                    .visionCraftChatComposerSurface()
                 }
             }
 
-            if vm.isLoadingModel
-                || vm.isInitialQueryRunning
+            if vm.isInitialQueryRunning
                 || vm.isPreparingAttachment {
                 Color.black.opacity(0.4).ignoresSafeArea()
                 VStack(spacing: 16) {
                     ProgressView().progressViewStyle(.circular)
                     Text(
-                        vm.isLoadingModel
-                            ? AppLocalization.string(
-                                "로컬 모델을 불러오는 중"
-                            )
-                            : vm.isPreparingAttachment
+                        vm.isPreparingAttachment
                             ? (
                                 vm.attachmentStatusDescription
                                 ?? AppLocalization.string(
@@ -433,9 +462,42 @@ struct LLMContentView: View {
                 .shadow(radius: 10)
                 .accessibilityElement(children: .combine)
             }
+
+            if showsModelPreparationPage {
+                VisionCraftUI.background
+                    .ignoresSafeArea()
+                LocalModelPreparationView(
+                    phase:
+                        localAI
+                        .modelPreparationPhase,
+                    model:
+                        localAI
+                        .modelBeingPrepared,
+                    failure:
+                        vm
+                        .modelPreparationFailure,
+                    onRetry: {
+                        Task {
+                            await vm
+                                .retryModelPreparation(
+                                    for: intent
+                                )
+                        }
+                    },
+                    onDefer: {
+                        dismiss()
+                    }
+                )
+            }
         }
         .visionCraftNavigationScreen()
-        .navigationTitle(navigationTitle)
+        .navigationTitle(
+            showsModelPreparationPage
+                ? AppLocalization.string(
+                    "AI 모델 다운로드"
+                )
+                : navigationTitle
+        )
         .navigationBarTitleDisplayMode(.inline)
         .confirmationDialog(
             "대화에 첨부",
@@ -536,7 +598,15 @@ struct LLMContentView: View {
             speechTask = nil
             stt.cancelRecording()
             answerSpeech.stop()
-            vm.closeConversation()
+            if vm.isLoadingModel {
+                Task {
+                    await vm
+                        .cancelModelPreparation()
+                    vm.closeConversation()
+                }
+            } else {
+                vm.closeConversation()
+            }
         }
         .onChange(of: vm.isGenerating) { wasGenerating, isGenerating in
             if isGenerating {
@@ -572,6 +642,44 @@ struct LLMContentView: View {
         }
     }
 
+    private var showsModelPreparationPage: Bool {
+        intent.requiresLocalModel
+            && (
+                !didStart
+                    || vm.isLoadingModel
+                    || vm.modelPreparationFailure
+                        != nil
+            )
+    }
+
+    private var showsWelcomeMessage: Bool {
+        if case .textChat(conversationID: nil) = intent {
+            return true
+        }
+        return false
+    }
+
+    // The introductory UI message is not part of the model's conversation context.
+    private var welcomeMessage: ChatViewModel.Msg {
+        .init(
+            id: welcomeMessageID,
+            role: "assistant",
+            text: AppLocalization.string("대화를 시작합니다. 무엇이든 말씀해주세요.")
+        )
+    }
+
+    private var visibleStatusDescription: String? {
+        if let attachmentStatus = vm.attachmentStatusDescription {
+            return attachmentStatus
+        }
+        let routineStatuses = ["준비됨", "완료", "답변 생성 중…"]
+            .map { AppLocalization.string($0) }
+        guard !vm.status.isEmpty, !routineStatuses.contains(vm.status) else {
+            return nil
+        }
+        return vm.status
+    }
+
     private var quickPromptBar:
         some View
     {
@@ -581,17 +689,14 @@ struct LLMContentView: View {
         ) {
             HStack(spacing: 8) {
                 quickPromptButton(
-                    title: "첨부",
-                    systemImage:
-                        "paperclip"
+                    title: "첨부"
                 ) {
                     isAttachmentMenuPresented =
                         true
                 }
                 quickPromptButton(
                     title: "요약",
-                    systemImage:
-                        "text.alignleft"
+                    minimumWidth: 96
                 ) {
                     vm.sendQuickPrompt(
                         AppLocalization.string(
@@ -599,30 +704,10 @@ struct LLMContentView: View {
                         )
                     )
                 }
-                quickPromptButton(
-                    title: "정보 목록",
-                    systemImage:
-                        "list.bullet"
-                ) {
-                    vm.sendQuickPrompt(
-                        AppLocalization.string(
-                            "핵심 정보를 항목별로 나열해 주세요."
-                        )
-                    )
-                }
-                quickPromptButton(
-                    title: "다음 행동",
-                    systemImage:
-                        "arrow.right.circle"
-                ) {
-                    vm.sendQuickPrompt(
-                        AppLocalization.string(
-                            "다음으로 무엇을 하면 좋을지 알려 주세요."
-                        )
-                    )
-                }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 20)
+            .padding(.top, 4)
+            .padding(.bottom, 10)
         }
         .disabled(
             !vm.isReadyForInput
@@ -637,22 +722,24 @@ struct LLMContentView: View {
 
     private func quickPromptButton(
         title: String,
-        systemImage: String,
+        minimumWidth: CGFloat = 78,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            Label(
-                AppLocalization.string(
-                    title
-                ),
-                systemImage: systemImage
-            )
-            .font(.subheadline.bold())
-            .frame(minHeight: 42)
+            Text(AppLocalization.string(title))
+                .font(.subheadline.bold())
+                .foregroundStyle(VisionCraftUI.primaryText)
+                .padding(.horizontal, 18)
+                .frame(minWidth: minimumWidth, minHeight: 48)
+                .background(
+                    VisionCraftUI.surfaceVariant,
+                    in: RoundedRectangle(
+                        cornerRadius: 14,
+                        style: .continuous
+                    )
+                )
         }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.roundedRectangle(radius: 12))
-        .tint(VisionCraftUI.primary)
+        .buttonStyle(.plain)
     }
 
     private func attachmentBanner(
@@ -781,6 +868,18 @@ struct LLMContentView: View {
             return nil
         }
         return content
+    }
+
+    private var canSendTypedMessage: Bool {
+        vm.canSend
+            && !vm.isInitialQueryRunning
+            && !stt.isRecording
+            && speechTask == nil
+    }
+
+    private func sendTypedMessage() {
+        guard canSendTypedMessage else { return }
+        vm.sendUserMessage()
     }
 
     private var allowsFollowUpInput: Bool {
@@ -1265,43 +1364,44 @@ struct LLMContentView: View {
 
 private struct MessageRow: View {
     let m: ChatViewModel.Msg
+    let isGenerating: Bool
+    let onSpeak: () -> Void
+    @ScaledMetric(relativeTo: .body) private var messageFontSize = 32
 
-    init(_ m: ChatViewModel.Msg) {
+    init(
+        _ m: ChatViewModel.Msg,
+        isGenerating: Bool = false,
+        onSpeak: @escaping () -> Void
+    ) {
         self.m = m
+        self.isGenerating = isGenerating
+        self.onSpeak = onSpeak
     }
 
     var body: some View {
-        HStack(alignment: .top) {
+        HStack(alignment: .top, spacing: 0) {
             if m.role == "user" {
-                Spacer()
+                Spacer(minLength: 0)
                 messageStack
             } else {
                 messageStack
-                Spacer()
+                Spacer(minLength: 0)
             }
         }
-        .padding(.leading, m.role == "user" ? 72 : 8)
-        .padding(.trailing, m.role == "user" ? 8 : 32)
+        .padding(.leading, m.role == "user" ? 72 : 20)
+        .padding(.trailing, m.role == "user" ? 20 : 32)
+        .padding(.vertical, isTyping ? 8 : m.role == "user" ? 5 : 6)
+    }
+
+    private var isTyping: Bool {
+        isGenerating && m.role != "user" && m.text.isEmpty && m.image == nil
     }
 
     @ViewBuilder
     private var messageStack: some View {
-        VStack(
-            alignment: m.role == "user" ? .trailing : .leading,
-            spacing: 6
-        ) {
-            Text(
-                AppLocalization.string(
-                    m.role == "user" ? "사용자" : "AI"
-                )
-            )
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(
-                m.role == "user"
-                    ? VisionCraftUI.secondaryText
-                    : VisionCraftUI.primary
-            )
-
+        if isTyping {
+            VisionCraftChatTypingIndicator()
+        } else {
             bubble
         }
     }
@@ -1323,32 +1423,20 @@ private struct MessageRow: View {
 
             if !m.text.isEmpty {
                 Text(m.text)
-                    .font(.title)
-                    .lineSpacing(5)
+                    .font(.system(size: messageFontSize))
+                    .lineSpacing(messageFontSize * (m.role == "user" ? 0.35 : 0.4))
                     .foregroundStyle(
                         m.role == "user"
-                            ? Color.white
+                            ? VisionCraftUI.onAccent
                             : VisionCraftUI.primaryText
                     )
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
             }
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, m.role == "user" ? 20 : 18)
         .padding(.vertical, 14)
-        .frame(maxWidth: 680, alignment: m.role == "user" ? .trailing : .leading)
-        .background(
-            m.role == "user"
-                ? VisionCraftUI.primary
-                : VisionCraftUI.surface
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            if m.role != "user" {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(VisionCraftUI.outline.opacity(0.75), lineWidth: 1)
-            }
-        }
+        .visionCraftChatBubble(isUser: m.role == "user")
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             AppLocalization.format(
@@ -1361,5 +1449,11 @@ private struct MessageRow: View {
                 m.text
             )
         )
+        .accessibilityHint(
+            AppLocalization.string(
+                "두 번 탭하면 메시지를 읽습니다."
+            )
+        )
+        .onTapGesture(perform: onSpeak)
     }
 }

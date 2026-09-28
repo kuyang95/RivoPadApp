@@ -77,6 +77,7 @@ final class WebSearchViewModel:
                 "검색 출처 %lld개",
                 result.results.count
             )
+            SoundEffectManager.shared.play(.complete)
         } catch is CancellationError {
             status = AppLocalization.string(
                 "웹 검색을 중지했습니다."
@@ -87,6 +88,7 @@ final class WebSearchViewModel:
             )
             errorDescription =
                 error.localizedDescription
+            SoundEffectManager.shared.play(.fail)
         }
         isSearching = false
     }

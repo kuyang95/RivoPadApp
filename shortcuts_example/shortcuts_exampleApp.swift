@@ -27,6 +27,11 @@ struct shortcuts_exampleApp: App {
         RivoScreenRemoteControlCenter()
     @StateObject private var visionLinkManager =
         VisionLinkManager()
+    @AppStorage("display.app.interfaceInverted")
+    private var isAppInterfaceInverted = false
+    @AppStorage("display.app.orientation")
+    private var appDisplayOrientation =
+        AppDisplayOrientation.automatic.rawValue
 
     @State private var path = NavigationPath()   // ✅ App이 path 관리
     @State private var didHandleDirectScannerLaunch = false
@@ -41,6 +46,11 @@ struct shortcuts_exampleApp: App {
         ] == nil else {
             return
         }
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--local-llm-benchmark") {
+            return
+        }
+        #endif
         FirebaseRuntime.configureIfAvailable()
         AppBootstrap.prepareAppGroup()
         _ = TTSManager.shared
@@ -55,14 +65,16 @@ struct shortcuts_exampleApp: App {
                 HomeView()
                     .environmentObject(shortcutRouter)
                     .navigationDestination(for: AppRoute.self) { event in
-                        switch event {
+                        Group {
+                            switch event {
                         case .settings:
                             AppSettingsView()
                         case .help:
-                            HelpCenterView(
+                            HelpGuideView(
                                 language:
                                     appSettings
-                                    .appLanguage
+                                    .appLanguage,
+                                onAction: openHelpGuideAction
                             )
                         case .chatHistory:
                             ChatHistoryView()
@@ -272,7 +284,31 @@ struct shortcuts_exampleApp: App {
                         case .documentLibrary:
                             DocumentLibraryView()
                         case .localDocument(let fileURL):
-                            LocalDocumentView(fileURL: fileURL)
+                            Group {
+                                let pathExtension = fileURL
+                                    .pathExtension.lowercased()
+                                if pathExtension == "xlsx" {
+                                    ExcelWorkbookView(fileURL: fileURL)
+                                } else if pathExtension == "xls" {
+                                    LegacyXLSConversionView(
+                                        fileURL: fileURL
+                                    )
+                                } else if [
+                                    "hwp", "hwpx",
+                                ].contains(pathExtension) {
+                                    HWPDocumentView(
+                                        fileURL: fileURL
+                                    )
+                                } else if [
+                                    "doc", "docx", "docs",
+                                ].contains(pathExtension) {
+                                    WordDocumentView(
+                                        fileURL: fileURL
+                                    )
+                                } else {
+                                    LocalDocumentView(fileURL: fileURL)
+                                }
+                            }
                                 .onAppear {
                                     rivoScreenRemoteControlCenter
                                         .activate(
@@ -283,8 +319,26 @@ struct shortcuts_exampleApp: App {
                                     rivoScreenRemoteControlCenter
                                         .deactivate(
                                             .localDocumentReader
-                                        )
+                                    )
                                 }
+                        case .originalDocument(
+                            let documentID
+                        ):
+                            OriginalDocumentHostView(
+                                documentID: documentID
+                            )
+                            .onAppear {
+                                rivoScreenRemoteControlCenter
+                                    .activate(
+                                        .localDocumentReader
+                                    )
+                            }
+                            .onDisappear {
+                                rivoScreenRemoteControlCenter
+                                    .deactivate(
+                                        .localDocumentReader
+                                    )
+                            }
                         case .localTextDocument(
                             let title,
                             let text
@@ -292,6 +346,74 @@ struct shortcuts_exampleApp: App {
                             LocalDocumentView(
                                 title: title,
                                 text: text
+                            )
+                            .onAppear {
+                                rivoScreenRemoteControlCenter
+                                    .activate(
+                                        .localDocumentReader
+                                    )
+                            }
+                            .onDisappear {
+                                rivoScreenRemoteControlCenter
+                                    .deactivate(
+                                        .localDocumentReader
+                                    )
+                                }
+                        case .imageTextDocument(let image):
+                            ImageTextDocumentView(
+                                image: image
+                            )
+                            .onAppear {
+                                rivoScreenRemoteControlCenter
+                                    .activate(
+                                        .localDocumentReader
+                                    )
+                            }
+                            .onDisappear {
+                                rivoScreenRemoteControlCenter
+                                    .deactivate(
+                                        .localDocumentReader
+                                    )
+                            }
+                        case .textEditorDocument(let fileURL):
+                            TextEditorViewerView(
+                                fileURL: fileURL
+                            )
+                            .onAppear {
+                                rivoScreenRemoteControlCenter
+                                    .activate(
+                                        .localDocumentReader
+                                    )
+                            }
+                            .onDisappear {
+                                rivoScreenRemoteControlCenter
+                                    .deactivate(
+                                        .localDocumentReader
+                                    )
+                            }
+                        case .textEditorText(
+                            let title,
+                            let text
+                        ):
+                            TextEditorViewerView(
+                                title: title,
+                                text: text
+                            )
+                            .onAppear {
+                                rivoScreenRemoteControlCenter
+                                    .activate(
+                                        .localDocumentReader
+                                    )
+                            }
+                            .onDisappear {
+                                rivoScreenRemoteControlCenter
+                                    .deactivate(
+                                        .localDocumentReader
+                                    )
+                            }
+                        case .textEditorImage(let image):
+                            TextEditorViewerView(
+                                image: image
                             )
                             .onAppear {
                                 rivoScreenRemoteControlCenter
@@ -355,11 +477,8 @@ struct shortcuts_exampleApp: App {
                                     rivoScreenRemoteControlCenter
                                         .deactivate(.magnifier)
                                 }
-                                .toolbar(
-                                    .hidden,
-                                    for: .navigationBar
-                                )
                                 .ignoresSafeArea()
+                                .visionCraftCameraScreen()
                         case .liveTextReader:
                             MagnifierView(mode: .liveTextReader)
                                 .onAppear {
@@ -374,11 +493,8 @@ struct shortcuts_exampleApp: App {
                                             .liveTextReader
                                         )
                                 }
-                                .toolbar(
-                                    .hidden,
-                                    for: .navigationBar
-                                )
                                 .ignoresSafeArea()
+                                .visionCraftCameraScreen()
                         case .imageDescriptionCamera:
                             MagnifierView(
                                 mode:
@@ -396,11 +512,14 @@ struct shortcuts_exampleApp: App {
                                         .magnifier
                                     )
                             }
-                            .toolbar(
-                                .hidden,
-                                for: .navigationBar
-                            )
                             .ignoresSafeArea()
+                            .visionCraftCameraScreen()
+                        case .photoReview:
+                            PhotoReviewView()
+                        case .cameraAskAI:
+                            MagnifierView(mode: .askAI)
+                                .ignoresSafeArea()
+                                .visionCraftCameraScreen()
                         case .capturedImageAnalysis(
                             let image,
                             let question
@@ -440,14 +559,15 @@ struct shortcuts_exampleApp: App {
                                             .documentScanner
                                         )
                                 }
-                                .toolbar(.hidden, for: .navigationBar)
-                                .ignoresSafeArea()
                         case .OCRResult (let image):
                             OCRResultView(image: image)
+                            }
                         }
+                        .visionCraftRouteBackButton()
                     }
                     .navigationDestination(for: ShortcutRouter.IntentEvent.self) { event in
-                        switch event {
+                        Group {
+                            switch event {
                         case .documentQA(let document, let question, _):
                             LLMContentView(intent: .documentQA(document: document, question: question))
                                 .onAppear {
@@ -511,7 +631,9 @@ struct shortcuts_exampleApp: App {
                               } else {
                                   EmptyView()
                               }
+                            }
                         }
+                        .visionCraftRouteBackButton()
                     }
                
             }
@@ -523,17 +645,25 @@ struct shortcuts_exampleApp: App {
             )
             .environmentObject(visionLinkManager)
             .overlay {
-                if rivoRemoteControlCenter.isMenuPresented {
-                    RivoQuickMenuOverlay(
-                        controlCenter: rivoRemoteControlCenter,
-                        onCommand: performRivoRemoteCommand
-                    )
-                } else if rivoRemoteControlCenter
-                            .isCommandModeActive {
-                    RivoCommandModeOverlay(
-                        controlCenter:
-                            rivoRemoteControlCenter
-                    )
+                ZStack {
+                    if isAppInterfaceInverted {
+                        Color.white
+                            .blendMode(.difference)
+                            .ignoresSafeArea()
+                            .allowsHitTesting(false)
+                    }
+                    if rivoRemoteControlCenter.isMenuPresented {
+                        RivoQuickMenuOverlay(
+                            controlCenter: rivoRemoteControlCenter,
+                            onCommand: performRivoRemoteCommand
+                        )
+                    } else if rivoRemoteControlCenter
+                                .isCommandModeActive {
+                        RivoCommandModeOverlay(
+                            controlCenter:
+                                rivoRemoteControlCenter
+                        )
+                    }
                 }
             }
             .animation(
@@ -544,6 +674,9 @@ struct shortcuts_exampleApp: App {
                             .isCommandModeActive
             )
             .task {
+                #if DEBUG
+                if await LocalLLMBenchmark.runIfRequested() { return }
+                #endif
                 visionLinkManager
                     .setApplicationActive(
                         scenePhase == .active
@@ -681,6 +814,19 @@ struct shortcuts_exampleApp: App {
     }
 
     private func handleIncomingURL(_ url: URL) {
+        if url.isFileURL {
+            Task { @MainActor in
+                do {
+                    let route = try await
+                        PersistentOriginalDocumentOpening
+                        .route(for: url)
+                    replaceNavigation(with: route)
+                } catch {
+                    sharedInboxError = error.localizedDescription
+                }
+            }
+            return
+        }
         if url.scheme?.lowercased() == "rivopad",
            url.host?.lowercased()
             == "share-inbox" {
@@ -972,15 +1118,18 @@ struct shortcuts_exampleApp: App {
             )
         }
 
+        if pathExtension == "xlsx" {
+            let importedURL = try await
+                LocalDocumentImportService.shared
+                .importDocument(from: url)
+            return .localDocument(
+                fileURL: importedURL
+            )
+        }
+
         let attachment:
             StoredChatFileAttachment
         switch pathExtension {
-        case "xlsx":
-            attachment = try await
-                ChatAttachmentStore.shared
-                .importSpreadsheet(
-                    from: url
-                )
         case "xls":
             attachment = try await
                 ChatAttachmentStore.shared
@@ -1054,6 +1203,12 @@ struct shortcuts_exampleApp: App {
             replaceNavigation(with: .voiceAction)
         case .stopSpeech:
             TTSManager.shared.stop()
+        case .toggleAppInterfaceInversion:
+            isAppInterfaceInverted.toggle()
+        case .appBrightness(let action):
+            adjustAppBrightness(action)
+        case .appOrientation(let action):
+            updateAppOrientation(action)
         case .home:
             path = NavigationPath()
         case .back:
@@ -1074,6 +1229,8 @@ struct shortcuts_exampleApp: App {
             switch destination {
             case .aiChat:
                 route = .localChat(conversationID: nil)
+            case .aiChatHistory:
+                route = .chatHistory
             case .reader:
                 route = .readerLibrary
             case .translation:
@@ -1103,12 +1260,125 @@ struct shortcuts_exampleApp: App {
                     .imageDescriptionCamera
             case .scanner:
                 route = .documentScanning
+            case .textSource:
+                path = NavigationPath()
+                appRouter.requestTextSource()
+                return
+            case .settings:
+                route = .settings
             case .remoteSettings:
                 route = .rivoRemote
             }
             path = NavigationPath()
             path.append(route)
         }
+    }
+
+    private func openHelpGuideAction(_ action: HelpGuideAction) {
+        let route: AppRoute
+        switch action {
+        case .home:
+            path = NavigationPath()
+            return
+        case .textSource:
+            path = NavigationPath()
+            Task { @MainActor in
+                await Task.yield()
+                appRouter.requestTextSource()
+            }
+            return
+        case .permissions:
+            if let url = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(url)
+            }
+            return
+        case .camera: route = .magnifier
+        case .scan: route = .documentScanning
+        case .liveText: route = .liveTextReader
+        case .image: route = .imageDescriptionCamera
+        case .chat: route = .localChat(conversationID: nil)
+        case .history: route = .chatHistory
+        case .documents: route = .documentLibrary
+        case .books: route = .readerLibrary
+        case .translation: route = .translation(initialText: nil)
+        case .webSearch:
+            route = .webSearch(initialQuery: nil, autoSearch: false, speaksAnswer: false)
+        case .voice: route = .voiceAction
+        case .remote: route = .rivoRemote
+        case .visionLink: route = .visionLink
+        case .settings: route = .settings
+        }
+        path.append(route)
+    }
+
+    private func adjustAppBrightness(
+        _ action: RivoQuickValueAction
+    ) {
+        guard let screen = UIApplication.shared
+            .connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: {
+                $0.activationState == .foregroundActive
+            })?
+            .screen else {
+            return
+        }
+        let current = screen.brightness
+        switch action {
+        case .decrease:
+            screen.brightness =
+                max(current - 0.1, 0.05)
+        case .reset:
+            screen.brightness = 0.5
+        case .increase:
+            screen.brightness =
+                min(current + 0.1, 1)
+        }
+    }
+
+    private func updateAppOrientation(
+        _ action: RivoQuickOrientationAction
+    ) {
+        let orientations =
+            AppDisplayOrientation.allCases
+        let current =
+            AppDisplayOrientation(
+                rawValue: appDisplayOrientation
+            ) ?? .automatic
+        let updated: AppDisplayOrientation
+        switch action {
+        case .automatic:
+            updated = .automatic
+        case .previous:
+            let index = orientations
+                .firstIndex(of: current) ?? 0
+            updated = orientations[
+                (index - 1 + orientations.count)
+                    % orientations.count
+            ]
+        case .next:
+            let index = orientations
+                .firstIndex(of: current) ?? 0
+            updated = orientations[
+                (index + 1) % orientations.count
+            ]
+        }
+        appDisplayOrientation = updated.rawValue
+
+        guard let scene = UIApplication.shared
+            .connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: {
+                $0.activationState == .foregroundActive
+            }) else {
+            return
+        }
+        let preferences =
+            UIWindowScene.GeometryPreferences.iOS(
+                interfaceOrientations:
+                    updated.interfaceOrientations
+            )
+        scene.requestGeometryUpdate(preferences)
     }
 
     private func routeRivoRemoteInput(
@@ -1142,5 +1412,27 @@ struct shortcuts_exampleApp: App {
     ) {
         path = NavigationPath()
         path.append(route)
+    }
+}
+
+private enum AppDisplayOrientation:
+    String,
+    CaseIterable
+{
+    case portrait
+    case automatic
+    case landscape
+
+    var interfaceOrientations:
+        UIInterfaceOrientationMask
+    {
+        switch self {
+        case .portrait:
+            return .portrait
+        case .automatic:
+            return .all
+        case .landscape:
+            return .landscape
+        }
     }
 }

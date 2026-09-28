@@ -2,6 +2,38 @@ import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
 
+private enum ScanReviewDialog {
+    case save
+    case actions
+}
+
+enum DocumentReviewImageLayout {
+    static func fittedSize(
+        imageSize: CGSize,
+        availableSize: CGSize
+    ) -> CGSize {
+        guard imageSize.width.isFinite,
+              imageSize.height.isFinite,
+              availableSize.width.isFinite,
+              availableSize.height.isFinite,
+              imageSize.width > 0,
+              imageSize.height > 0,
+              availableSize.width > 0,
+              availableSize.height > 0 else {
+            return .zero
+        }
+
+        let scale = min(
+            availableSize.width / imageSize.width,
+            availableSize.height / imageSize.height
+        )
+        return CGSize(
+            width: imageSize.width * scale,
+            height: imageSize.height * scale
+        )
+    }
+}
+
 struct DocumentScanRootView: View {
     private enum Phase {
         case camera
@@ -39,6 +71,17 @@ struct DocumentScanRootView: View {
         String?
     @State private var showsDiscardConfirmation =
         false
+    @State private var recognizedText = ""
+    @State private var recognizedLines: [OCRRecognizedLine] = []
+    @State private var isRecognizingText = false
+    @State private var isCorrectingText = false
+    @State private var recognitionTask:
+        Task<Void, Never>?
+    @State private var isShowingRecognizedText = false
+    @State private var scanDialog: ScanReviewDialog?
+    @State private var reviewStatusMessage: String?
+    @State private var showsCameraModes = false
+    @State private var isLeavingForCameraMode = false
 
     init() {
         let session =
@@ -65,7 +108,7 @@ struct DocumentScanRootView: View {
                     cameraRemoteEvent,
                 command: scannerCommand,
                 isActive:
-                    phase == .camera,
+                    phase == .camera && !isLeavingForCameraMode,
                 automaticCaptureEnabled:
                     settings
                     .documentScanAutomaticCaptureEnabled,
@@ -76,6 +119,7 @@ struct DocumentScanRootView: View {
                     reviewCapturedPage,
                 onCancel: handleScannerCancel
             )
+            .ignoresSafeArea()
             .opacity(
                 phase == .camera ? 1 : 0
             )
@@ -95,12 +139,71 @@ struct DocumentScanRootView: View {
                 pageReview
             }
 
+            if phase == .camera {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button {
+                            showsCameraModes = true
+                        } label: {
+                            Label(
+                                AppLocalization.format("모드: %@", AppLocalization.string("문서 스캔")),
+                                systemImage: "slider.horizontal.3"
+                            )
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .frame(minHeight: 64)
+                            .background(Color(red: 40 / 255, green: 53 / 255, blue: 70 / 255),
+                                        in: RoundedRectangle(cornerRadius: 20))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(Color(red: 240 / 255, green: 244 / 255, blue: 250 / 255), lineWidth: 2.5)
+                            }
+                        }
+                        .accessibilityLabel(AppLocalization.format("모드, %@", AppLocalization.string("문서 스캔")))
+                    }
+                    Spacer()
+                }
+                .padding(.top, 12)
+                .padding(.trailing, 16)
+            }
+
             if isPreparingDocument {
                 preparingOverlay
+            }
+
+            scanDialogOverlay
+
+            if showsCameraModes {
+                CameraMoreOptionsDialog(
+                    currentMode: nil,
+                    onBasic: { openCameraMode(.magnifier) },
+                    onDocumentScan: { showsCameraModes = false },
+                    onLiveTextReader: { openCameraMode(.liveTextReader) },
+                    onImageAnalysis: { openCameraMode(.imageDescriptionCamera) },
+                    onAskAI: { openCameraMode(.cameraAskAI) },
+                    onPhotoReview: { openCameraMode(.photoReview) },
+                    onDismiss: { showsCameraModes = false }
+                )
             }
         }
         .tint(VisionCraftUI.primary)
         .background(Color.black)
+        .visionCraftCameraScreen()
+        .visionCraftHandlesBackNavigation()
+        .toolbar {
+            if #available(iOS 26.0, *) {
+                ToolbarItem(placement: .topBarLeading) {
+                    scanBackButton
+                }
+                .sharedBackgroundVisibility(.hidden)
+            } else {
+                ToolbarItem(placement: .topBarLeading) {
+                    scanBackButton
+                }
+            }
+        }
         .fileExporter(
             isPresented: $isExporting,
             document: exportDocument,
@@ -168,6 +271,31 @@ struct DocumentScanRootView: View {
             _, _ in
             normalizeSelectedPage()
         }
+        .onDisappear {
+            recognitionTask?.cancel()
+            TTSManager.shared.stop()
+        }
+        .onAppear {
+            isLeavingForCameraMode = false
+        }
+    }
+
+    private func openCameraMode(_ route: AppRoute) {
+        showsCameraModes = false
+        isLeavingForCameraMode = true
+        appRouter.route = route
+    }
+
+    private var scanBackButton: some View {
+        VisionCraftBackButton(
+            style: phase == .camera ? .overlay : .standard
+        ) {
+            if phase == .capturedPageReview {
+                returnToCamera()
+            } else {
+                dismiss()
+            }
+        }
     }
 
     @ViewBuilder
@@ -175,93 +303,573 @@ struct DocumentScanRootView: View {
         some View
     {
         if let pendingImage {
-            VStack(spacing: 20) {
-                HStack {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 4
-                    ) {
-                        Text("촬영 결과")
-                            .font(.title.bold())
-                        Text(
-                            "저장된 페이지 \(session.pages.count)개"
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    Text("스캔된 문서")
+                        .font(
+                            .system(
+                                size: 22,
+                                weight: .bold
+                            )
                         )
                         .foregroundStyle(
-                            .secondary
+                            VisionCraftUI.primaryText
                         )
-                    }
                     Spacer()
-                }
 
-                Image(
-                    uiImage: pendingImage
-                )
-                .resizable()
-                .scaledToFit()
-                .accessibilityLabel(
-                    "보정된 문서 미리보기"
-                )
+                    Button {
+                        guard !recognizedText
+                            .trimmingCharacters(
+                                in: .whitespacesAndNewlines
+                            )
+                            .isEmpty else {
+                            reviewStatusMessage =
+                                AppLocalization.string(
+                                    "인식된 텍스트가 없습니다"
+                                )
+                            return
+                        }
+                        isShowingRecognizedText.toggle()
+                    } label: {
+                        Label(
+                            AppLocalization.string(
+                                isShowingRecognizedText
+                                ? "이미지 보기"
+                                : "텍스트만 보기"
+                            ),
+                            systemImage:
+                                isShowingRecognizedText
+                                ? "photo"
+                                : "doc.text"
+                        )
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(VisionCraftUI.primary)
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 48)
+                        .background(
+                            VisionCraftUI.primary
+                                .opacity(0.12),
+                            in: Capsule()
+                        )
+                        .overlay {
+                            Capsule()
+                                .stroke(
+                                    VisionCraftUI.primary
+                                        .opacity(0.32),
+                                    lineWidth: 1
+                                )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        AppLocalization.string(
+                            isShowingRecognizedText
+                            ? "이미지 보기"
+                            : "텍스트만 보기"
+                        )
+                    )
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 24)
+                .padding(.bottom, 8)
+
+                ZStack {
+                    if isShowingRecognizedText {
+                        ScrollView {
+                            Text(recognizedText)
+                                .font(.system(size: 24))
+                                .lineSpacing(6)
+                                .foregroundStyle(
+                                    VisionCraftUI.primaryText
+                                )
+                                .textSelection(.enabled)
+                                .frame(
+                                    maxWidth: .infinity,
+                                    alignment: .leading
+                                )
+                                .padding(20)
+                        }
+                        .background(
+                            VisionCraftUI.surface
+                        )
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: 16,
+                                style: .continuous
+                            )
+                        )
+                    } else {
+                        GeometryReader { geometry in
+                            let previewSize =
+                                DocumentReviewImageLayout
+                                .fittedSize(
+                                    imageSize: pendingImage.size,
+                                    availableSize: geometry.size
+                                )
+
+                            Image(uiImage: pendingImage)
+                                .resizable()
+                                .scaledToFit()
+                                .accessibilityLabel(
+                                    "보정된 문서 미리보기"
+                                )
+                                .frame(
+                                    width: previewSize.width,
+                                    height: previewSize.height
+                                )
+                                .background(Color.black)
+                                .overlay {
+                                    scanReviewTextBoxes
+                                }
+                                .clipShape(
+                                    RoundedRectangle(
+                                        cornerRadius: 16,
+                                        style: .continuous
+                                    )
+                                )
+
+                                .frame(
+                                    width: geometry.size.width,
+                                    height: geometry.size.height,
+                                    alignment: .center
+                                )
+                        }
+                    }
+
+                    if let recognitionProgressMessage {
+                        VStack(spacing: 4) {
+                            Text(
+                                recognitionProgressMessage
+                            )
+                            .font(.headline)
+
+                            if isCorrectingText {
+                                Text(
+                                    "인식된 원문은 지금 사용할 수 있습니다"
+                                )
+                                .font(.subheadline)
+                            }
+                        }
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 14)
+                            .background(
+                                Color.black.opacity(0.7),
+                                in: Capsule()
+                            )
+                            .accessibilityAddTraits(
+                                .updatesFrequently
+                            )
+                    }
+                }
                 .frame(
                     maxWidth: .infinity,
                     maxHeight: .infinity
                 )
-                .background(Color.black)
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: 16,
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+
+                HStack(spacing: 10) {
+                    scanReviewActionButton(
+                        title: "저장",
+                        isPrimary: false
+                    ) {
+                        scanDialog = .save
+                    }
+
+                    scanReviewActionButton(
+                        title: "작업",
+                        isPrimary: true
+                    ) {
+                        scanDialog = .actions
+                    }
+                }
+                .padding(.vertical, 12)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+            }
+            .background(VisionCraftUI.background)
+            .overlay(alignment: .top) {
+                if let reviewStatusMessage {
+                    Text(reviewStatusMessage)
+                        .font(.subheadline.bold())
+                        .foregroundStyle(VisionCraftHomeUI.onPrimary)
+                        .padding(.horizontal, 18)
+                        .frame(minHeight: 48)
+                        .background(
+                            VisionCraftUI.primary.opacity(0.88),
+                            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        )
+                        .padding(.top, 84)
+                        .task(
+                            id: reviewStatusMessage
+                        ) {
+                            try? await Task.sleep(
+                                for: .seconds(5)
+                            )
+                            guard self
+                                .reviewStatusMessage
+                                == reviewStatusMessage
+                            else {
+                                return
+                            }
+                            self.reviewStatusMessage = nil
+                        }
+                }
+            }
+        }
+    }
+
+    private var scanReviewTextBoxes: some View {
+        Canvas { context, size in
+            let color = Color(
+                red: 50.0 / 255,
+                green: 150.0 / 255,
+                blue: 1
+            )
+            let imageBounds = CGRect(origin: .zero, size: size)
+
+            for line in recognizedLines {
+                let box = line.boundingBox
+                // OCR 좌하단 정규화 좌표를 미리보기의 좌상단 좌표로 변환한다.
+                let rect = CGRect(
+                    x: box.minX * size.width,
+                    y: (1 - box.maxY) * size.height,
+                    width: box.width * size.width,
+                    height: box.height * size.height
+                ).intersection(imageBounds)
+                guard !rect.isNull, !rect.isEmpty else {
+                    continue
+                }
+
+                let path = Path(roundedRect: rect, cornerRadius: 2)
+                context.fill(
+                    path,
+                    with: .color(color.opacity(60.0 / 255))
+                )
+                context.stroke(
+                    path,
+                    with: .color(color.opacity(180.0 / 255)),
+                    lineWidth: 1
+                )
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private var recognitionProgressMessage: String? {
+        if isRecognizingText {
+            return AppLocalization.string(
+                "기본 글자 인식 중 · 보통 몇 초 걸립니다"
+            )
+        }
+        if isCorrectingText {
+            return AppLocalization.string(
+                "글자 인식 완료 · 오타 교정 중"
+            )
+        }
+        return nil
+    }
+
+    private func scanReviewActionButton(
+        title: String,
+        isPrimary: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(AppLocalization.string(title))
+                .visionCraftAndroidText(16, weight: .semibold)
+                .foregroundStyle(
+                    isPrimary ? VisionCraftUI.onAccent : VisionCraftUI.primaryText
+                )
+                .frame(maxWidth: .infinity, minHeight: 64)
+                .background(
+                    isPrimary ? VisionCraftUI.accent : VisionCraftUI.surface,
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(
+                            isPrimary ? VisionCraftUI.accent : VisionCraftUI.outline,
+                            lineWidth: 1.5
+                        )
+                }
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var scanDialogOverlay: some View {
+        if let scanDialog {
+            ZStack {
+                Color.black.opacity(0.52)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        self.scanDialog = nil
+                    }
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 8
+                ) {
+                    Text(
+                        scanDialog == .save
+                        ? "저장 방식 선택"
+                        : "작업 선택"
+                    )
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(
+                        VisionCraftUI.primaryText
+                    )
+                    .padding(.bottom, 12)
+
+                    if scanDialog == .save {
+                        scanDialogButton(
+                            "사진으로 저장",
+                            isPrimary: true,
+                            action: saveReviewPhoto
+                        )
+                        scanDialogButton(
+                            "PDF로 저장",
+                            action: saveReviewPDF
+                        )
+                        scanDialogButton(
+                            "텍스트를 클립보드에 저장",
+                            action: copyReviewText
+                        )
+                    } else {
+                        scanDialogButton(
+                            "이 문서로 AI와대화",
+                            isPrimary: true,
+                            isEnabled: recognizedReviewText != nil
+                        ) {
+                            openDocumentChat()
+                        }
+                        scanDialogButton(
+                            "번역",
+                            isEnabled: recognizedReviewText != nil
+                        ) {
+                            openReviewTranslation()
+                        }
+                        scanDialogButton(
+                            "텍스트뷰어로 보기",
+                            isEnabled: recognizedReviewText != nil
+                        ) {
+                            openReviewTextViewer()
+                        }
+                        scanDialogButton(
+                            "이미지 설명"
+                        ) {
+                            openReviewImageDescription()
+                        }
+                        scanDialogButton(
+                            "텍스트 읽기",
+                            isEnabled: recognizedReviewText != nil
+                        ) {
+                            readReviewText()
+                        }
+                    }
+
+                    scanDialogButton("닫기") {
+                        self.scanDialog = nil
+                    }
+                    .padding(.top, 4)
+                }
+                .padding(24)
+                .frame(maxWidth: 560)
+                .background(
+                    VisionCraftUI.surface,
+                    in: RoundedRectangle(
+                        cornerRadius: 28,
                         style: .continuous
                     )
                 )
-
-                HStack(spacing: 12) {
-                    Button(
-                        "재촬영",
-                        systemImage:
-                            "arrow.counterclockwise"
-                    ) {
-                        retakePage()
-                    }
-                    .buttonStyle(.bordered)
-
-                    if session.pages.isEmpty {
-                        Button(
-                            "한 장 OCR",
-                            systemImage:
-                                "text.viewfinder"
-                        ) {
-                            openSinglePageOCR()
-                        }
-                        .buttonStyle(.bordered)
-                    }
-
-                    Button(
-                        "페이지 추가",
-                        systemImage:
-                            "doc.badge.plus"
-                    ) {
-                        saveAndContinue()
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(
-                        !session.canAddPage
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 28,
+                        style: .continuous
                     )
-
-                    Button(
-                        "검토 완료",
-                        systemImage:
-                            "checkmark.circle"
-                    ) {
-                        saveAndFinish()
-                    }
-                    .buttonStyle(
-                        .borderedProminent
+                    .stroke(
+                        VisionCraftUI.outline,
+                        lineWidth: 1.5
                     )
                 }
-                .controlSize(.large)
+                .padding(.horizontal, 24)
             }
-            .padding(24)
-            .background(VisionCraftUI.background)
+            .zIndex(200)
         }
+    }
+
+    private func scanDialogButton(
+        _ title: String,
+        isPrimary: Bool = false,
+        isEnabled: Bool = true,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(AppLocalization.string(title))
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(
+                    isPrimary
+                    ? VisionCraftUI.onAccent
+                    : VisionCraftUI.primaryText
+                )
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: 56
+                )
+                .background(
+                    isPrimary
+                    ? VisionCraftUI.accent
+                    : VisionCraftUI.surface,
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(
+                            isPrimary ? VisionCraftUI.accent : VisionCraftUI.outline,
+                            lineWidth: 1.5
+                        )
+                }
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.45)
+    }
+
+    private var recognizedReviewText: String? {
+        let text = recognizedText
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+        return text.isEmpty ? nil : text
+    }
+
+    private func openDocumentChat() {
+        guard let text = requireRecognizedReviewText() else { return }
+        scanDialog = nil
+        TTSManager.shared.stop()
+        appRouter.route = .sharedTextQuestion(
+            text: text,
+            automaticallyStartsVoiceInput: false
+        )
+    }
+
+    private func openReviewTranslation() {
+        guard let text = requireRecognizedReviewText() else { return }
+        scanDialog = nil
+        TTSManager.shared.stop()
+        appRouter.route = .translation(
+            initialText: text,
+            automaticallyStarts: true
+        )
+    }
+
+    private func openReviewTextViewer() {
+        guard let text = requireRecognizedReviewText() else { return }
+        scanDialog = nil
+        TTSManager.shared.stop()
+        appRouter.route = .textEditorText(
+            title: AppLocalization.string("스캔된 문서"),
+            text: text
+        )
+    }
+
+    private func openReviewImageDescription() {
+        guard let pendingImage else { return }
+        scanDialog = nil
+        TTSManager.shared.stop()
+        appRouter.route = .capturedImageAnalysis(
+            image: pendingImage,
+            question: LocalImageDescriptionPrompt.defaultQuestion(
+                language: AppLanguage.current()
+            )
+        )
+    }
+
+    private func readReviewText() {
+        guard let text = requireRecognizedReviewText() else { return }
+        scanDialog = nil
+        TTSManager.shared.speak(text)
+    }
+
+    private func requireRecognizedReviewText() -> String? {
+        guard let text = recognizedReviewText else {
+            scanDialog = nil
+            reviewStatusMessage = AppLocalization.string(
+                "인식된 텍스트가 없습니다"
+            )
+            return nil
+        }
+        return text
+    }
+
+    private func saveReviewPhoto() {
+        guard let pendingImage else {
+            return
+        }
+        scanDialog = nil
+        Task {
+            do {
+                let capture = try MagnifierPhotoCapture(
+                    image: pendingImage
+                )
+                try await MagnifierPhotoSaveService()
+                    .saveToPhotoLibrary(capture)
+                reviewStatusMessage =
+                    AppLocalization.string(
+                        "사진이 저장되었습니다"
+                    )
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func saveReviewPDF() {
+        guard let pendingImage else {
+            return
+        }
+        scanDialog = nil
+        let pageBounds = CGRect(
+            origin: .zero,
+            size: pendingImage.size
+        )
+        let renderer = UIGraphicsPDFRenderer(
+            bounds: pageBounds
+        )
+        let data = renderer.pdfData { context in
+            context.beginPage()
+            pendingImage.draw(in: pageBounds)
+        }
+        exportDocument = ScannedPDFFileDocument(
+            data: data
+        )
+        isExporting = true
+    }
+
+    private func copyReviewText() {
+        let text = recognizedText
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+        guard !text.isEmpty else {
+            scanDialog = nil
+            reviewStatusMessage =
+                AppLocalization.string(
+                    "인식된 텍스트가 없습니다"
+                )
+            return
+        }
+        UIPasteboard.general.string = text
+        scanDialog = nil
+        reviewStatusMessage =
+            AppLocalization.string(
+                "텍스트를 클립보드에 저장했습니다"
+            )
     }
 
     private var pageReview: some View {
@@ -578,36 +1186,37 @@ struct DocumentScanRootView: View {
         }
         switch action {
         case .close:
+            returnToCamera()
             announceRemoteFeedback(
                 AppLocalization.string(
                     "재촬영"
                 )
             )
-            retakePage()
         case .capture:
             announceRemoteFeedback(
                 AppLocalization.string(
-                    "검토 완료"
+                    "저장"
                 )
             )
-            saveAndFinish()
+            scanDialog = .save
         case .addPage:
             announceRemoteFeedback(
                 AppLocalization.string(
-                    "페이지 추가"
+                    "작업"
                 )
             )
-            saveAndContinue()
+            scanDialog = .actions
         case .openDocument:
-            guard session.pages.isEmpty else {
-                return
-            }
             announceRemoteFeedback(
                 AppLocalization.string(
-                    "한 장 OCR"
+                    isShowingRecognizedText
+                    ? "이미지 보기"
+                    : "텍스트만 보기"
                 )
             )
-            openSinglePageOCR()
+            if !recognizedText.isEmpty {
+                isShowingRecognizedText.toggle()
+            }
         case .previousPage,
              .rotatePage,
              .nextPage:
@@ -753,17 +1362,183 @@ struct DocumentScanRootView: View {
     private func reviewCapturedPage(
         _ image: UIImage
     ) {
+        recognitionTask?.cancel()
         pendingImage = image
+        recognizedText = ""
+        recognizedLines = []
+        isRecognizingText = false
+        isCorrectingText = false
+        isShowingRecognizedText = false
+        reviewStatusMessage = nil
+        scanDialog = nil
         phase = .capturedPageReview
         UIAccessibility.post(
             notification:
                 .screenChanged,
-            argument: "촬영 결과"
+            argument: "스캔된 문서"
         )
+        recognizeReviewText(in: image)
     }
 
-    private func retakePage() {
+    private func recognizeReviewText(
+        in image: UIImage
+    ) {
+        recognitionTask?.cancel()
+        isRecognizingText = true
+        isCorrectingText = false
+        SoundEffectManager.shared.play(
+            .startingLLM
+        )
+        TTSManager.shared.speakFeedback(
+            AppLocalization.string(
+                "글자 인식중입니다"
+            )
+        )
+
+        recognitionTask = Task {
+            do {
+                let lines = try await OCRService
+                    .shared
+                    .recognizeLines(
+                        from: image
+                    )
+                guard pendingImage === image else {
+                    return
+                }
+                isRecognizingText = false
+                let originalText = lines
+                    .map(\.text)
+                    .joined(separator: "\n")
+
+                guard !originalText
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        )
+                        .isEmpty else {
+                    let message =
+                        AppLocalization.string(
+                            "인식된 텍스트가 없습니다"
+                        )
+                    recognizedText = ""
+                    reviewStatusMessage = message
+                    TTSManager.shared.speakFeedback(
+                        message
+                    )
+                    return
+                }
+
+                recognizedText = originalText
+                recognizedLines = lines
+                guard settings
+                    .ocrAutoCorrectionEnabled else {
+                    let message =
+                        AppLocalization.string(
+                            "글자 인식을 완료했습니다"
+                        )
+                    reviewStatusMessage = message
+                    SoundEffectManager.shared.play(.complete)
+                    TTSManager.shared.speakFeedback(
+                        message
+                    )
+                    return
+                }
+
+                isCorrectingText = true
+                TTSManager.shared.speakFeedback(
+                    AppLocalization.string(
+                        "글자 인식을 완료했습니다. 오타 교정 중입니다. 원문은 지금 사용할 수 있습니다."
+                    )
+                )
+                let correctionResult = await
+                    GeminiOCRCorrectionService
+                    .shared
+                    .correctResult(
+                        image: image,
+                        originalText:
+                            originalText,
+                        isEnabled: true
+                    )
+                guard pendingImage === image else {
+                    return
+                }
+                isCorrectingText = false
+                recognizedText =
+                    correctionResult.text
+
+                switch correctionResult.status {
+                case .notRequested:
+                    reviewStatusMessage =
+                        AppLocalization.string(
+                            "글자 인식을 완료했습니다"
+                        )
+                case .corrected:
+                    reviewStatusMessage =
+                        AppLocalization.string(
+                            "오타 교정을 완료했습니다"
+                        )
+                case .unchanged:
+                    reviewStatusMessage =
+                        AppLocalization.string(
+                            "오타 확인을 완료했습니다. 원문을 그대로 표시합니다."
+                        )
+                case .unavailable:
+                    reviewStatusMessage =
+                        AppLocalization.string(
+                            "글자 인식을 완료했습니다. 오타 교정을 사용할 수 없어 원문을 표시합니다."
+                        )
+                case .quotaExceeded:
+                    reviewStatusMessage =
+                        AppLocalization.string(
+                            "글자 인식을 완료했습니다. 오늘의 클라우드 AI 토큰을 모두 사용해 원문을 표시합니다."
+                        )
+                case .failed:
+                    reviewStatusMessage =
+                        AppLocalization.string(
+                            "글자 인식을 완료했습니다. 오타 교정을 완료하지 못해 원문을 표시합니다."
+                        )
+                case .cancelled:
+                    break
+                }
+                if correctionResult.status
+                    != .cancelled,
+                   let reviewStatusMessage {
+                    SoundEffectManager.shared.play(.complete)
+                    TTSManager.shared.speakFeedback(
+                        reviewStatusMessage
+                    )
+                }
+            } catch {
+                guard pendingImage === image else {
+                    return
+                }
+                let message =
+                    AppLocalization.string(
+                        "인식된 텍스트가 없습니다"
+                    )
+                recognizedText = ""
+                recognizedLines = []
+                isRecognizingText = false
+                isCorrectingText = false
+                reviewStatusMessage = message
+                TTSManager.shared.speakFeedback(
+                    message
+                )
+            }
+        }
+    }
+
+    private func returnToCamera() {
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        TTSManager.shared.stop()
         pendingImage = nil
+        recognizedText = ""
+        recognizedLines = []
+        isRecognizingText = false
+        isCorrectingText = false
+        isShowingRecognizedText = false
+        scanDialog = nil
+        reviewStatusMessage = nil
         scannerCommand = .resume(
             id: UUID()
         )
