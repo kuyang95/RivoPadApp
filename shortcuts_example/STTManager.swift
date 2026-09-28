@@ -24,7 +24,7 @@ final class STTManager: ObservableObject {
     @Published private(set) var amplitude: Float = 0
 
     // MARK: - Auto Stop Tuning
-    private let silenceDurationRMS: TimeInterval = 4.0
+    private let silenceDurationRMS: TimeInterval = 3.5
     private let rmsThreshold: Float = 0.005
 
     // “텍스트가 더 이상 업데이트 안 됨” 기준 (말 끝 감지에 매우 강력)

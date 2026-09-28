@@ -11,7 +11,7 @@ struct VisionCraftDialogCard<Content: View>: View {
     let title: String
     var message: String? = nil
     var cancelTitle: String = "취소"
-    var maxWidth: CGFloat = 480
+    var maxWidth: CGFloat = 560
     var usesHomeStyle = false
     let onDismiss: () -> Void
     @ViewBuilder let content: () -> Content
@@ -20,7 +20,7 @@ struct VisionCraftDialogCard<Content: View>: View {
         title: String,
         message: String? = nil,
         cancelTitle: String = "취소",
-        maxWidth: CGFloat = 480,
+        maxWidth: CGFloat = 560,
         usesHomeStyle: Bool = false,
         onDismiss: @escaping () -> Void,
         @ViewBuilder content: @escaping () -> Content
@@ -57,30 +57,10 @@ struct VisionCraftDialogCard<Content: View>: View {
                 }
                 .padding(.top, 16)
 
-                if usesHomeStyle {
-                    HStack {
-                        Spacer()
-                        Button(AppLocalization.string(cancelTitle), action: onDismiss)
-                            .buttonStyle(VisionCraftAndroidButtonStyle())
-                    }
+                Button(AppLocalization.string(cancelTitle), action: onDismiss)
+                    .frame(maxWidth: .infinity)
+                    .buttonStyle(VisionCraftAndroidButtonStyle())
                     .padding(.top, 16)
-                } else {
-                    Button(
-                        AppLocalization.string(cancelTitle),
-                        action: onDismiss
-                    )
-                    .font(.headline)
-                    .foregroundStyle(VisionCraftUI.primary)
-                    .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(
-                        VisionCraftUI.surfaceVariant.opacity(0.55),
-                        in: RoundedRectangle(
-                            cornerRadius: 12,
-                            style: .continuous
-                        )
-                    )
-                    .padding(.top, 16)
-                }
             }
             .padding(20)
             .frame(maxWidth: maxWidth)
@@ -102,7 +82,7 @@ private struct VisionCraftDialogSurfaceModifier: ViewModifier {
             content.visionCraftHomeDialogSurface()
         } else {
             content
-                .visionCraftSurfaceCard(cornerRadius: 24, outlineOpacity: 1)
+                .visionCraftSurfaceCard(cornerRadius: 28, outlineOpacity: 1)
                 .shadow(color: .black.opacity(0.22), radius: 24, y: 12)
         }
     }
@@ -129,6 +109,8 @@ struct VisionCraftDialogOptionRow: View {
     let systemImage: String
     var isPrimary = false
     var isEnabled = true
+    var badge: String? = nil
+    var showsIconTile = true
     let action: () -> Void
 
     init(
@@ -137,6 +119,8 @@ struct VisionCraftDialogOptionRow: View {
         systemImage: String,
         isPrimary: Bool = false,
         isEnabled: Bool = true,
+        badge: String? = nil,
+        showsIconTile: Bool = true,
         action: @escaping () -> Void
     ) {
         self.title = title
@@ -144,28 +128,38 @@ struct VisionCraftDialogOptionRow: View {
         self.systemImage = systemImage
         self.isPrimary = isPrimary
         self.isEnabled = isEnabled
+        self.badge = badge
+        self.showsIconTile = showsIconTile
         self.action = action
     }
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 14) {
-                VisionCraftIconTile(
-                    systemImage: systemImage,
-                    foreground: iconForeground,
-                    background: iconBackground,
-                    size: 44,
-                    iconSize: 22
-                )
+                if showsIconTile {
+                    VisionCraftIconTile(
+                        systemImage: systemImage,
+                        foreground: iconForeground,
+                        background: iconBackground,
+                        size: 52,
+                        iconSize: 28
+                    )
+                } else {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 28))
+                        .foregroundStyle(VisionCraftHomeUI.icon)
+                        .frame(width: 28, height: 28)
+                        .accessibilityHidden(true)
+                }
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(AppLocalization.string(title))
-                        .font(.headline)
+                        .visionCraftAndroidText(18, weight: .semibold, relativeTo: .headline)
                         .foregroundStyle(titleColor)
                         .multilineTextAlignment(.leading)
                     if let subtitle {
                         Text(AppLocalization.string(subtitle))
-                            .font(.subheadline)
+                            .visionCraftAndroidText(16)
                             .foregroundStyle(subtitleColor)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
@@ -174,28 +168,37 @@ struct VisionCraftDialogOptionRow: View {
 
                 Spacer(minLength: 8)
 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(
-                        VisionCraftUI.secondaryText.opacity(
-                            isEnabled ? 1 : 0.4
+                if let badge {
+                    Text(AppLocalization.string(badge))
+                        .visionCraftAndroidText(16, weight: .bold)
+                        .foregroundStyle(VisionCraftUI.background)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(VisionCraftUI.accent, in: RoundedRectangle(cornerRadius: 10))
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(
+                            VisionCraftUI.secondaryText.opacity(
+                                isEnabled ? 1 : 0.4
+                            )
                         )
-                    )
-                    .accessibilityHidden(true)
+                        .accessibilityHidden(true)
+                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
             .background(
                 rowBackground,
                 in: RoundedRectangle(
-                    cornerRadius: 14,
+                    cornerRadius: 22,
                     style: .continuous
                 )
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(rowStroke, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(rowStroke, lineWidth: 1.5)
             }
             .contentShape(Rectangle())
         }
@@ -209,16 +212,14 @@ struct VisionCraftDialogOptionRow: View {
         guard isEnabled else {
             return VisionCraftUI.secondaryText.opacity(0.5)
         }
-        return isPrimary ? .white : VisionCraftUI.primary
+        return VisionCraftUI.accent
     }
 
     private var iconBackground: Color {
         guard isEnabled else {
             return VisionCraftUI.surfaceVariant.opacity(0.6)
         }
-        return isPrimary
-            ? VisionCraftUI.primary
-            : VisionCraftUI.primary.opacity(0.14)
+        return VisionCraftUI.accent.opacity(0.14)
     }
 
     private var titleColor: Color {
@@ -232,16 +233,12 @@ struct VisionCraftDialogOptionRow: View {
     }
 
     private var rowBackground: Color {
-        if isPrimary, isEnabled {
-            return VisionCraftUI.primary.opacity(0.10)
-        }
-        return VisionCraftUI.surfaceVariant.opacity(0.45)
+        return VisionCraftUI.surface
     }
 
     private var rowStroke: Color {
-        if isPrimary, isEnabled {
-            return VisionCraftUI.primary.opacity(0.45)
-        }
-        return VisionCraftUI.outline.opacity(0.9)
+        return isPrimary && isEnabled
+            ? VisionCraftUI.accent
+            : VisionCraftUI.outline
     }
 }

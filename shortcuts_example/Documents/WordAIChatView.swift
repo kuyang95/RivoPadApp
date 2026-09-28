@@ -425,16 +425,16 @@ struct WordAIChatPanel: View {
             } label: {
                 Group {
                     if chat.isSending {
-                        ProgressView().tint(.white)
+                        ProgressView().tint(VisionCraftUI.onAccent)
                     } else {
                         Image(systemName: "arrow.up")
                             .font(.body.weight(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(VisionCraftUI.onAccent)
                     }
                 }
-                .frame(width: 46, height: 46)
+                .frame(width: 52, height: 52)
                 .background(
-                    VisionCraftUI.primary,
+                    VisionCraftUI.accent,
                     in: RoundedRectangle(cornerRadius: 13)
                 )
             }
@@ -460,16 +460,16 @@ struct WordAIChatPanel: View {
         } label: {
             Group {
                 if speechTask != nil && !stt.isRecording {
-                    ProgressView().tint(.white)
+                    ProgressView().tint(ownsVoiceRecording ? Color.white : VisionCraftUI.onAccent)
                 } else {
                     Image(systemName: ownsVoiceRecording ? "stop.fill" : "mic.fill")
                         .font(.body.weight(.bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(ownsVoiceRecording ? Color.white : VisionCraftUI.onAccent)
                 }
             }
-            .frame(width: 46, height: 46)
+            .frame(width: 52, height: 52)
             .background(
-                ownsVoiceRecording ? Color.red : VisionCraftUI.primary,
+                ownsVoiceRecording ? Color.red : VisionCraftUI.accent,
                 in: RoundedRectangle(cornerRadius: 13)
             )
         }

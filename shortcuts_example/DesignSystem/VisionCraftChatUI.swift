@@ -2,12 +2,7 @@ import SwiftUI
 
 /// Chat-specific shapes and colors shared with Android's a_chat.xml drawables.
 enum VisionCraftChatUI {
-    static let accent = Color(red: 124 / 255, green: 158 / 255, blue: 1)
-    static let gradient = LinearGradient(
-        colors: [Color(red: 90 / 255, green: 127 / 255, blue: 230 / 255), accent],
-        startPoint: .bottomTrailing,
-        endPoint: .topLeading
-    )
+    static let accent = VisionCraftUI.accent
 
     static func bubbleShape(isUser: Bool) -> UnevenRoundedRectangle {
         UnevenRoundedRectangle(
@@ -33,12 +28,12 @@ extension View {
         background {
             if isUser {
                 VisionCraftChatUI.bubbleShape(isUser: true)
-                    .fill(VisionCraftChatUI.gradient)
+                    .fill(VisionCraftChatUI.accent)
             } else {
                 VisionCraftChatUI.bubbleShape(isUser: false)
                     .fill(VisionCraftUI.surface)
                 VisionCraftChatUI.bubbleShape(isUser: false)
-                    .strokeBorder(VisionCraftUI.outline, lineWidth: 1)
+                    .strokeBorder(VisionCraftUI.outline, lineWidth: 1.5)
             }
         }
     }
@@ -50,8 +45,6 @@ extension View {
             .background {
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
                     .fill(VisionCraftUI.surfaceVariant)
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .strokeBorder(VisionCraftUI.outline, lineWidth: 1)
             }
     }
 
@@ -59,8 +52,6 @@ extension View {
         background {
             VisionCraftChatUI.composerShape
                 .fill(VisionCraftUI.surface)
-            VisionCraftChatUI.composerShape
-                .strokeBorder(VisionCraftUI.outline, lineWidth: 1)
         }
     }
 }
@@ -75,7 +66,7 @@ struct VisionCraftChatTypingIndicator: View {
             .frame(width: 120, height: 4)
             .overlay(alignment: .leading) {
                 Capsule()
-                    .fill(VisionCraftUI.primary)
+                    .fill(VisionCraftUI.accent)
                     .frame(width: 30, height: 4)
                     .offset(x: isAnimating && !reduceMotion ? 90 : 0)
                     .animation(

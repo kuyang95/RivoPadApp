@@ -388,10 +388,10 @@ struct ExcelAIChatPanel: View {
                         : "mic.fill"
                 )
                 .font(.body.weight(.bold))
-                .foregroundStyle(.white)
-                .frame(width: 46, height: 46)
+                .foregroundStyle(stt.isRecording ? Color.white : VisionCraftUI.onAccent)
+                .frame(width: 52, height: 52)
                 .background(
-                    stt.isRecording ? Color.red : VisionCraftUI.primary,
+                    stt.isRecording ? Color.red : VisionCraftUI.accent,
                     in: RoundedRectangle(
                         cornerRadius: 13,
                         style: .continuous
@@ -409,10 +409,10 @@ struct ExcelAIChatPanel: View {
             } label: {
                 Image(systemName: "arrow.up")
                     .font(.body.weight(.bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 46, height: 46)
+                    .foregroundStyle(VisionCraftUI.onAccent)
+                    .frame(width: 52, height: 52)
                     .background(
-                        VisionCraftUI.primary,
+                        VisionCraftUI.accent,
                         in: RoundedRectangle(
                             cornerRadius: 13,
                             style: .continuous

@@ -4,10 +4,22 @@ import UniformTypeIdentifiers
 import PhotosUI
 
 struct HomeView: View {
+    init() {
+        // 이전 설치에서 저장된 목록형 설정 때문에 새 2×2 홈이 가려지는 것을
+        // 한 번만 바로잡는다. 이후 사용자가 선택한 목록형은 그대로 유지한다.
+        let defaults = UserDefaults.standard
+        let migrationKey = "visioncraft.home.gridFirstShown.v1"
+        if !defaults.bool(forKey: migrationKey) {
+            defaults.set(HomeLayoutMode.grid.rawValue, forKey: "visioncraft.home.layout")
+            defaults.set(true, forKey: migrationKey)
+        }
+    }
+
     @EnvironmentObject private var appRouter: AppRouter
     @EnvironmentObject private var rivoRemoteManager: RivoRemoteManager
     @ObservedObject private var settings = AppSettingsStore.shared
     @ObservedObject private var appFonts = AppFontCatalogStore.shared
+    @AppStorage("visioncraft.home.layout") private var homeLayoutModeRaw = HomeLayoutMode.grid.rawValue
 
     @State private var documentAppearance =
         LocalDocumentAppearanceStore().load()
@@ -23,26 +35,42 @@ struct HomeView: View {
     @State private var isTextSourceDialogPresented = false
     @State private var textViewClipboardText: String?
     @State private var showsFontSelection = false
+    @State private var showsAllSettings = false
+    @State private var openCategory: VisionCraftHomeCategory?
+    @State private var hasConversations = false
 
     var body: some View {
         ZStack {
             VisionCraftHomeUI.background
                 .ignoresSafeArea()
 
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    androidParityHomeContent
-                    updateContent
+            GeometryReader { geometry in
+                ScrollView {
+                    if homeLayoutMode == .grid {
+                        categoryHomeContent(availableSize: geometry.size)
+                    } else {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            androidParityHomeContent
+                            updateContent
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.top, 44)
+                        .padding(.bottom, 32)
+                        .frame(maxWidth: .infinity)
+                    }
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-                .padding(.bottom, 32)
-                .frame(maxWidth: .infinity)
+                .id(homeLayoutMode)
+                .accessibilityHidden(isHomeDialogPresented)
+                .allowsHitTesting(!isHomeDialogPresented)
             }
-            .accessibilityHidden(isHomeDialogPresented)
-            .allowsHitTesting(!isHomeDialogPresented)
 
-            if let selectionDialog {
+            if let openCategory {
+                VisionCraftHomeCategoryDialog(category: openCategory) {
+                    self.openCategory = nil
+                }
+            }
+
+            if let selectionDialog, !showsAllSettings {
                 VisionCraftSelectionDialog(
                     title: selectionDialog.title,
                     options: selectionDialog.options,
@@ -131,14 +159,16 @@ struct HomeView: View {
         } message: {
             Text(fileImportError ?? "")
         }
-        .sheet(isPresented: $showsFontSelection) {
-            AppFontSelectionView(
-                catalog: appFonts,
-                languageCode:
-                    settings.appLanguage
-                    .effectiveLanguageCode
-            )
+        .sheet(isPresented: Binding(
+            get: { showsFontSelection && !showsAllSettings },
+            set: { if !$0 { showsFontSelection = false } }
+        )) {
+            fontSelectionSheet
         }
+        .fullScreenCover(isPresented: $showsAllSettings) {
+            allSettingsScreen
+        }
+        .onAppear(perform: refreshChatHistoryAvailability)
         .onChange(of: documentAppearance) { _, value in
             LocalDocumentAppearanceStore().save(value)
         }
@@ -172,7 +202,48 @@ struct HomeView: View {
     }
 
     private var isHomeDialogPresented: Bool {
-        selectionDialog != nil || isTextSourceDialogPresented || isLoadingTextViewPhoto
+        selectionDialog != nil || openCategory != nil || isTextSourceDialogPresented || isLoadingTextViewPhoto
+    }
+
+    private var homeLayoutMode: HomeLayoutMode {
+        HomeLayoutMode(rawValue: homeLayoutModeRaw) ?? .grid
+    }
+
+    private var homeCategories: [VisionCraftHomeCategory] {
+        [
+            VisionCraftHomeCategory(id: "ai", title: "AI 대화", tone: .ai, artName: "HomeTileAIChat", items: chatActions),
+            // Android MainScreen: 카테고리 타일은 카메라 기능 하나만 담아 바로 연다.
+            // 다른 카메라 기능은 카메라 화면의 더보기에서 이동할 수 있다.
+            VisionCraftHomeCategory(id: "camera", title: "카메라", tone: .camera, artName: "HomeTileCamera", items: Array(cameraActions.prefix(1))),
+            VisionCraftHomeCategory(id: "reading", title: "텍스트 · 문서", tone: .reading, artName: "HomeTileReading", items: readingActions),
+            VisionCraftHomeCategory(id: "link", title: "비전링크", tone: .link, artName: "HomeTilePhoneLink", items: connectionActions),
+        ]
+    }
+
+    private func categoryHomeContent(availableSize: CGSize) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            homeTitleRow
+            sectionSpacer(height: 16)
+            VisionCraftHomeGuideEntry {
+                appRouter.route = .help
+            }
+            Spacer(minLength: 20)
+            VisionCraftHomeCategoryGrid(
+                categories: homeCategories,
+                columns: availableSize.width > availableSize.height ? 4 : 2
+            ) { category in
+                if category.items.count == 1 {
+                    category.items[0].action()
+                } else {
+                    openCategory = category
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, minHeight: max(0, availableSize.height - 76), alignment: .topLeading)
+        .padding(.horizontal, 24)
+        .padding(.top, 44)
+        .padding(.bottom, 32)
     }
 
     @ViewBuilder
@@ -185,7 +256,7 @@ struct HomeView: View {
         }
 
         sectionSpacer(height: 28)
-        VisionCraftHomeSectionHeader(title: "AI 챗", tone: .ai)
+        VisionCraftHomeSectionHeader(title: "AI 대화", tone: .ai)
         VisionCraftHomeActionList(items: chatActions)
 
         sectionSpacer(height: 28)
@@ -201,24 +272,79 @@ struct HomeView: View {
         VisionCraftHomeActionList(items: connectionActions)
 
         sectionSpacer(height: 28)
+        homeSettingsContent
+    }
+
+    @ViewBuilder
+    private var homeSettingsContent: some View {
         VisionCraftHomeSectionHeader(title: "설정", tone: .settings)
         mainFeedbackSettings
-
         sectionSpacer(height: 20)
         voiceAndLanguageSettings
-
         sectionSpacer(height: 20)
         appearanceSettings
-
         sectionSpacer(height: 20)
         quickMenuSettings
-
         sectionSpacer(height: 20)
         documentViewerSettings
-
         sectionSpacer(height: 20)
-        VisionCraftHomeActionList(
-            items: advancedSettingsActions
+        VisionCraftHomeActionList(items: advancedSettingsActions)
+    }
+
+    private var allSettingsScreen: some View {
+        ZStack {
+            VisionCraftHomeUI.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack {
+                        Button {
+                            showsAllSettings = false
+                        } label: {
+                            Image(systemName: "arrow.left")
+                                .font(.system(size: 24, weight: .medium))
+                                .foregroundStyle(VisionCraftHomeUI.text)
+                                .frame(width: 48, height: 48)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(AppLocalization.string("뒤로"))
+                        Text(AppLocalization.string("모든 설정"))
+                            .visionCraftAndroidText(24, weight: .bold, relativeTo: .title2)
+                            .foregroundStyle(VisionCraftHomeUI.text)
+                            .accessibilityAddTraits(.isHeader)
+                            .padding(.leading, 4)
+                        Spacer(minLength: 0)
+                    }
+                    sectionSpacer(height: 20)
+                    homeSettingsContent
+                    if homeLayoutMode == .grid {
+                        updateContent
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
+                .padding(.bottom, 32)
+            }
+            if let selectionDialog {
+                VisionCraftSelectionDialog(
+                    title: selectionDialog.title,
+                    options: selectionDialog.options,
+                    selectedID: selectedID(for: selectionDialog),
+                    onSelect: { select($0, for: selectionDialog) },
+                    onDismiss: { self.selectionDialog = nil }
+                )
+            }
+        }
+        .tint(VisionCraftUI.primary)
+        .sheet(isPresented: $showsFontSelection) {
+            fontSelectionSheet
+        }
+    }
+
+    private var fontSelectionSheet: some View {
+        AppFontSelectionView(
+            catalog: appFonts,
+            languageCode: settings.appLanguage.effectiveLanguageCode
         )
     }
 
@@ -294,6 +420,13 @@ struct HomeView: View {
                         ),
                     action: {
                         showsFontSelection = true
+                    }
+                )
+                VisionCraftSettingValueTile(
+                    label: "홈 화면 구성",
+                    value: AppLocalization.string(homeLayoutMode.title),
+                    action: {
+                        selectionDialog = .homeLayout
                     }
                 )
             }
@@ -388,16 +521,15 @@ struct HomeView: View {
                 }
             }
             .padding(20)
-            .background(
-                VisionCraftHomeUI.surface,
-                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
-            )
+            .visionCraftHomeSurface()
 
             HStack(spacing: 8) {
                 Button("이전 업데이트 기록보기") {
+                    showsAllSettings = false
                     appRouter.route = .help
                 }
                 Button("매뉴얼 보기", systemImage: "line.3.horizontal") {
+                    showsAllSettings = false
                     appRouter.route = .help
                 }
             }
@@ -414,11 +546,11 @@ struct HomeView: View {
     }
 
     private var chatActions: [VisionCraftActionItem] {
-        [
+        var actions = [
             VisionCraftActionItem(
                 id: "new-chat",
                 icon: "doc.text",
-                title: "새 채팅",
+                title: "새 대화",
                 description:
                     "문서, 클립보드, 사진을 첨부해 새 대화를 시작합니다.",
                 action: {
@@ -427,17 +559,27 @@ struct HomeView: View {
                     )
                 }
             ),
-            VisionCraftActionItem(
+        ]
+        if hasConversations {
+            actions.append(VisionCraftActionItem(
                 id: "chat-history",
                 icon: "clock.arrow.circlepath",
                 title: "대화기록",
                 description:
-                    "저장된 대화를 검색하고 다시 엽니다.",
+                    "이전 AI 대화를 다시 엽니다.",
                 action: {
                     appRouter.route = .chatHistory
                 }
-            ),
-        ]
+            ))
+        }
+        return actions
+    }
+
+    private func refreshChatHistoryAvailability() {
+        Task {
+            let conversations = try? await ChatHistoryStore.shared.allConversations()
+            hasConversations = !(conversations?.isEmpty ?? true)
+        }
     }
 
     private var cameraActions: [VisionCraftActionItem] {
@@ -475,11 +617,20 @@ struct HomeView: View {
             VisionCraftActionItem(
                 id: "describe-image",
                 icon: "sparkles",
-                title: "이미지 설명",
+                title: "이미지 분석",
                 description:
-                    "사진을 촬영하고 AI가 보이는 장면을 설명합니다.",
+                    "사진 속 내용을 AI가 설명해줍니다.",
                 action: {
                     appRouter.route = .imageDescriptionCamera
+                }
+            ),
+            VisionCraftActionItem(
+                id: "photo-review",
+                icon: "photo.on.rectangle",
+                title: "사진 분석",
+                description: "저장된 사진을 골라 글자 인식, 번역, 설명, AI 대화를 합니다.",
+                action: {
+                    appRouter.route = .photoReview
                 }
             ),
         ]
@@ -490,7 +641,7 @@ struct HomeView: View {
             VisionCraftActionItem(
                 id: "text-view",
                 icon: "text.alignleft",
-                title: "텍스트 편집뷰",
+                title: "텍스트",
                 description:
                     "큰 글자로 읽고, 바로 고치고, 복사합니다.",
                 action: {
@@ -559,6 +710,18 @@ struct HomeView: View {
                     appRouter.route = .rivoRemote
                 }
             )
+            Button {
+                showsAllSettings = true
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 25, weight: .medium))
+                    .foregroundStyle(VisionCraftHomeUI.icon)
+                    .frame(width: 52, height: 52)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(AppLocalization.string("모든 설정"))
+            .accessibilityIdentifier("home.all-settings")
         }
     }
 
@@ -572,6 +735,7 @@ struct HomeView: View {
                 description:
                     "스캐너, 공유, 독서와 연결 설정을 엽니다.",
                 action: {
+                    showsAllSettings = false
                     appRouter.route = .settings
                 }
             ),
@@ -696,6 +860,8 @@ struct HomeView: View {
             return String(documentAppearance.colorIndex)
         case .quickMenuColor:
             return String(settings.rivoQuickMenuColorIndex)
+        case .homeLayout:
+            return homeLayoutModeRaw
         }
     }
 
@@ -727,6 +893,10 @@ struct HomeView: View {
         case .quickMenuColor:
             if let value = Int(option.id) {
                 settings.rivoQuickMenuColorIndex = value
+            }
+        case .homeLayout:
+            if let value = HomeLayoutMode(rawValue: option.id) {
+                homeLayoutModeRaw = value.rawValue
             }
         }
         selectionDialog = nil
@@ -911,6 +1081,7 @@ private enum HomeSelectionDialog: String, Identifiable {
     case documentLineHeight
     case documentColor
     case quickMenuColor
+    case homeLayout
 
     var id: String {
         rawValue
@@ -930,6 +1101,8 @@ private enum HomeSelectionDialog: String, Identifiable {
             return "텍스트뷰어 색 조합"
         case .quickMenuColor:
             return "리모컨 조작 메뉴 색 조합"
+        case .homeLayout:
+            return "홈 화면 구성"
         }
     }
 
@@ -967,6 +1140,22 @@ private enum HomeSelectionDialog: String, Identifiable {
                         title: theme.displayName
                     )
                 }
+        case .homeLayout:
+            return HomeLayoutMode.allCases.map {
+                VisionCraftSelectionOption(id: $0.rawValue, title: AppLocalization.string($0.title))
+            }
+        }
+    }
+}
+
+private enum HomeLayoutMode: String, CaseIterable {
+    case list
+    case grid
+
+    var title: String {
+        switch self {
+        case .list: "목록형"
+        case .grid: "카테고리형"
         }
     }
 }

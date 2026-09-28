@@ -11,6 +11,7 @@ nonisolated enum MagnifierCameraMode: Sendable {
     case magnifier
     case liveTextReader
     case imageDescription
+    case askAI
 }
 
 nonisolated struct LiveTextOCRQuality:
@@ -928,6 +929,10 @@ final class MagnifierViewController:
     var onCapture: ((UIImage) -> Void)?
     var onOpenDocumentScan: (() -> Void)?
     var onOpenLiveTextReader: (() -> Void)?
+    var onOpenImageAnalysisMode: (() -> Void)?
+    var onOpenBasicMode: (() -> Void)?
+    var onOpenPhotoReview: (() -> Void)?
+    var onOpenAskAIMode: (() -> Void)?
     var onDescribeImage: ((UIImage) -> Void)?
 
     private let mode: MagnifierCameraMode
@@ -1164,6 +1169,12 @@ final class MagnifierViewController:
     private func setupLiveTextReaderUI() {
         // 문서 스캔과 같은 구성: 상단 상태 캡슐 + 하단 닫기 버튼.
         // 라벨과 버튼을 감싸는 패널은 두지 않는다.
+        configureModeButton()
+        moreButton.accessibilityIdentifier = "camera.more"
+        moreButton.accessibilityHint = AppLocalization.string(
+            "문서 스캔, 실시간 문자 읽기, 이미지 분석, AI 질문하기, 사진 분석 모드를 엽니다."
+        )
+        view.addSubview(moreButton)
         statusLabel.textColor = .white
         statusLabel.font = .systemFont(
             ofSize: 17,
@@ -1210,9 +1221,18 @@ final class MagnifierViewController:
         view.addSubview(closeButton)
 
         NSLayoutConstraint.activate([
-            statusLabel.topAnchor.constraint(
+            moreButton.topAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.topAnchor,
-                constant: 18
+                constant: 12
+            ),
+            moreButton.trailingAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.trailingAnchor,
+                constant: -16
+            ),
+            moreButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 64),
+            statusLabel.topAnchor.constraint(
+                equalTo: moreButton.bottomAnchor,
+                constant: 12
             ),
             statusLabel.leadingAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.leadingAnchor,
@@ -1249,18 +1269,13 @@ final class MagnifierViewController:
         view.addSubview(gridOverlay)
         configureGridOverlay()
 
-        if mode == .magnifier {
-            configureCircularCameraButton(
-                moreButton,
-                systemImage: "ellipsis",
-                accessibilityLabel: "더보기",
-                action: #selector(moreTapped),
-                size: 56
-            )
+        if mode != .liveTextReader {
+            configureModeButton()
             moreButton.accessibilityIdentifier = "camera.more"
             moreButton.accessibilityHint = AppLocalization.string(
-                "문서 스캔, 실시간 문자 읽기, 이미지 설명을 엽니다."
+                "문서 스캔, 실시간 문자 읽기, 이미지 분석, AI 질문하기, 사진 분석 모드를 엽니다."
             )
+            view.addSubview(moreButton)
         }
         configureCircularCameraButton(
             gridButton,
@@ -1293,9 +1308,6 @@ final class MagnifierViewController:
                 captureButton,
             ]
         )
-        if mode == .magnifier {
-            actionStack.insertArrangedSubview(moreButton, at: 0)
-        }
         actionStack.translatesAutoresizingMaskIntoConstraints = false
         actionStack.axis = .vertical
         actionStack.alignment = .center
@@ -1323,7 +1335,7 @@ final class MagnifierViewController:
             multiplier: 0.6,
             constant: 0
         )
-        // 버튼이 늘어나도 작은 화면에서 더보기가 상단 밖으로 밀리지 않는다.
+        // 모드 버튼은 뒤로가기와 겹치지 않도록 오른쪽 위에 따로 둔다.
         shutterVerticalPosition.priority = .defaultHigh
         NSLayoutConstraint.activate([
             actionStack.topAnchor.constraint(
@@ -1346,6 +1358,60 @@ final class MagnifierViewController:
                 equalTo: view.centerYAnchor
             ),
         ])
+        if mode != .liveTextReader {
+            NSLayoutConstraint.activate([
+                moreButton.topAnchor.constraint(
+                    equalTo: view.safeAreaLayoutGuide.topAnchor,
+                    constant: 12
+                ),
+                moreButton.trailingAnchor.constraint(
+                    equalTo: view.safeAreaLayoutGuide.trailingAnchor,
+                    constant: -16
+                ),
+                moreButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 64),
+            ])
+        }
+    }
+
+    private func configureModeButton() {
+        moreButton.translatesAutoresizingMaskIntoConstraints = false
+        var configuration = UIButton.Configuration.filled()
+        let modeName: String
+        switch mode {
+        case .magnifier: modeName = "기본"
+        case .imageDescription: modeName = "이미지 분석"
+        case .askAI: modeName = "AI 질문하기"
+        case .liveTextReader: modeName = "실시간 문자 읽기"
+        }
+        configuration.title = AppLocalization.format("모드: %@", AppLocalization.string(modeName))
+        configuration.image = UIImage(systemName: "slider.horizontal.3")
+        configuration.imagePadding = 10
+        configuration.baseBackgroundColor = UIColor(
+            red: 40 / 255,
+            green: 53 / 255,
+            blue: 70 / 255,
+            alpha: 1
+        )
+        configuration.baseForegroundColor = .white
+        configuration.contentInsets = NSDirectionalEdgeInsets(
+            top: 8,
+            leading: 16,
+            bottom: 8,
+            trailing: 12
+        )
+        moreButton.configuration = configuration
+        moreButton.titleLabel?.font = .systemFont(ofSize: 18, weight: .semibold)
+        moreButton.layer.cornerRadius = 20
+        moreButton.layer.borderWidth = 2.5
+        moreButton.layer.borderColor = UIColor(
+            red: 240 / 255,
+            green: 244 / 255,
+            blue: 250 / 255,
+            alpha: 1
+        ).cgColor
+        moreButton.clipsToBounds = true
+        moreButton.accessibilityLabel = AppLocalization.format("모드, %@", AppLocalization.string(modeName))
+        moreButton.addTarget(self, action: #selector(moreTapped), for: .touchUpInside)
     }
 
     private func configureGridOverlay() {
@@ -1452,14 +1518,14 @@ final class MagnifierViewController:
         captureButton.layer.shadowOpacity = 0.45
         captureButton.layer.shadowRadius = 9
         captureButton.layer.shadowOffset = CGSize(width: 0, height: 3)
-        if mode == .imageDescription {
+        if mode == .imageDescription || mode == .askAI {
             captureButton.setImage(
-                UIImage(systemName: "sparkles"),
+                UIImage(systemName: mode == .askAI ? "bubble.left.and.bubble.right" : "sparkles"),
                 for: .normal
             )
             captureButton.tintColor = .black
             captureButton.accessibilityLabel =
-                AppLocalization.string("이미지 설명")
+                AppLocalization.string(mode == .askAI ? "AI 질문하기" : "이미지 설명")
         } else {
             captureButton.setImage(nil, for: .normal)
             captureButton.accessibilityLabel =
@@ -1855,6 +1921,8 @@ final class MagnifierViewController:
                     AppLocalization.string(
                         "7 이미지 설명"
                     )
+            case .askAI:
+                seventhKeyAction = AppLocalization.string("7 AI 질문하기")
             }
             announceRemoteStatus(
                 showGuide
@@ -2208,11 +2276,17 @@ final class MagnifierViewController:
     }
 
     @objc private func moreTapped() {
-        guard mode == .magnifier,
-              !isOpeningCameraTool,
+        guard !isOpeningCameraTool,
               presentedViewController == nil else { return }
 
         let dialog = CameraMoreOptionsDialog(
+            currentMode: mode,
+            onBasic: { [weak self] in
+                self?.dismissMoreOptions { [weak self] in
+                    guard let self else { return }
+                    self.openCameraTool(self.onOpenBasicMode)
+                }
+            },
             onDocumentScan: { [weak self] in
                 self?.dismissMoreOptions { [weak self] in
                     guard let self else { return }
@@ -2225,10 +2299,22 @@ final class MagnifierViewController:
                     self.openCameraTool(self.onOpenLiveTextReader)
                 }
             },
-            onImageDescription: { [weak self] in
+            onImageAnalysis: { [weak self] in
                 self?.dismissMoreOptions { [weak self] in
                     guard let self else { return }
-                    self.captureForImageDescription(self.onDescribeImage)
+                    self.openCameraTool(self.onOpenImageAnalysisMode)
+                }
+            },
+            onAskAI: { [weak self] in
+                self?.dismissMoreOptions { [weak self] in
+                    guard let self else { return }
+                    self.openCameraTool(self.onOpenAskAIMode)
+                }
+            },
+            onPhotoReview: { [weak self] in
+                self?.dismissMoreOptions { [weak self] in
+                    guard let self else { return }
+                    self.openCameraTool(self.onOpenPhotoReview)
                 }
             },
             onDismiss: { [weak self] in
@@ -2304,6 +2390,8 @@ final class MagnifierViewController:
             saveCurrentFrameToPhotos()
         case .imageDescription:
             captureForImageDescription(onCapture)
+        case .askAI:
+            captureForImageDescription(onCapture)
         }
     }
 
@@ -2321,6 +2409,8 @@ final class MagnifierViewController:
             return AppLocalization.string(
                 "이미지 설명"
             )
+        case .askAI:
+            return AppLocalization.string("AI 질문하기")
         }
     }
 
@@ -2332,6 +2422,8 @@ final class MagnifierViewController:
             return "pause.fill"
         case .imageDescription:
             return "sparkles"
+        case .askAI:
+            return "bubble.left.and.bubble.right"
         }
     }
 

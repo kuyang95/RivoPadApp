@@ -512,7 +512,7 @@ final class LocalDocumentScannerViewController: UIViewController {
         NSLayoutConstraint.activate([
             statusLabel.topAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.topAnchor,
-                constant: 18
+                constant: 92
             ),
             statusLabel.leadingAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.leadingAnchor,

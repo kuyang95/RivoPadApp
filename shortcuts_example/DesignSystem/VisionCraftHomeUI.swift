@@ -1,34 +1,47 @@
 import SwiftUI
 import UIKit
 
-/// Home-only palette from Android's VcSoftHome. Other screens keep their own surfaces.
+/// Shared soft UI palette from Android VisionCraft.
 enum VisionCraftHomeUI {
-    static let background = color(0xFFFFFF, 0x000000)
-    static let surface = color(0xFAFAFA, 0x171717)
+    static let background = VisionCraftUI.background
+    static let surface = VisionCraftUI.surface
+    static let surfaceVariant = VisionCraftUI.surfaceVariant
     static let highlight = color(0xFFFFFF, 0x2B2B2B)
     static let shadow = color(0xCCD1D9, 0x000000)
-    static let text = color(0x283546, 0xF0F4FA)
-    static let secondaryText = color(0x536176, 0xBBC6D7)
-    static let icon = color(0x526580, 0xC9D5E7)
-    static let outline = color(0xDDE2E9, 0x39414D)
-    static let connected = color(0x247548, 0x83D4A1)
-    static let connecting = color(0x8B6517, 0xE8C978)
+    static let text = VisionCraftUI.primaryText
+    static let secondaryText = VisionCraftUI.secondaryText
+    static let icon = VisionCraftUI.icon
+    static let outline = VisionCraftUI.outline
+    static let accent = VisionCraftUI.accent
+    static let connected = VisionCraftUI.success
+    static let connecting = VisionCraftUI.warning
     static let guideSurface = color(0xFFF9EF, 0x211D18)
     static let guideAccent = color(0x885024, 0xF3C9A4)
     static let guideSecondaryText = color(0x6F604F, 0xD4C4AF)
     static let guideArrow = color(0xFFE1C9, 0x483326)
-    static let onPrimary = color(0xFFFFFF, 0x0F0F0F)
+    // Android VcHomeTileArt: neutral tint blended with the home surface.
+    static let tileArtBackground = color(0xE6E8EA, 0xDBE2EC)
+    static let onPrimary = color(0xFFFFFF, 0x171717)
     static let switchOn = color(0x34C759, 0x34C759)
     static let switchOff = color(0xB8BDC7, 0xB8BDC7)
+    static let logoAccents: [Color] = [
+        color(0xB5403C, 0xF2A09B),
+        color(0xB2611F, 0xEFB07F),
+        color(0x917511, 0xE6C45C),
+        color(0x4A7A2C, 0xA6D68A),
+        color(0x356AA8, 0x9EC5FF),
+        color(0x7655B4, 0xC6B1F5),
+    ]
 
     enum SectionTone {
-        case ai, camera, reading, settings, updates
+        case ai, camera, reading, link, settings, updates
 
         var color: Color {
             switch self {
             case .ai: VisionCraftHomeUI.color(0x7655B4, 0xC6B1F5)
             case .camera: VisionCraftHomeUI.color(0x356AA8, 0x9EC5FF)
             case .reading: VisionCraftHomeUI.color(0x28765A, 0x99D8BA)
+            case .link: VisionCraftHomeUI.color(0x2A7A86, 0x8FD6E0)
             case .settings: VisionCraftHomeUI.color(0x976026, 0xE7BE80)
             case .updates: VisionCraftHomeUI.color(0x69778B, 0xB7C5D9)
             }
@@ -45,6 +58,118 @@ enum VisionCraftHomeUI {
                 alpha: 1
             )
         })
+    }
+}
+
+struct VisionCraftHomeCategory: Identifiable {
+    let id: String
+    let title: String
+    let tone: VisionCraftHomeUI.SectionTone
+    let artName: String
+    let items: [VisionCraftActionItem]
+}
+
+/// Android VcHomeCategoryGrid: two columns, 16pt gap, 4:5 tile ratio.
+struct VisionCraftHomeCategoryGrid: View {
+    let categories: [VisionCraftHomeCategory]
+    let columns: Int
+    let onOpen: (VisionCraftHomeCategory) -> Void
+
+    var body: some View {
+        LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: columns),
+            spacing: 16
+        ) {
+            ForEach(categories) { category in
+                Button {
+                    onOpen(category)
+                } label: {
+                    GeometryReader { geometry in
+                        VStack(spacing: 10) {
+                            GeometryReader { artGeometry in
+                                let side = max(0, min(artGeometry.size.width - 48, artGeometry.size.height - 8))
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: side * 0.225, style: .continuous)
+                                        .fill(VisionCraftHomeUI.tileArtBackground)
+                                        .frame(width: side, height: side)
+                                    Image(category.artName)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: side * 0.7, height: side * 0.7)
+                                }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                            Text(AppLocalization.string(category.title))
+                                .font(.system(size: min(geometry.size.width * 0.17, 94), weight: .bold))
+                                .minimumScaleFactor(0.65)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.center)
+                                .foregroundStyle(VisionCraftHomeUI.text)
+                                .frame(maxWidth: .infinity)
+                                .padding(.horizontal, 18)
+                        }
+                        .padding(.top, 18)
+                        .padding(.bottom, 16)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    .aspectRatio(4.0 / 5.0, contentMode: .fit)
+                    .visionCraftHomeSurface(outlined: false)
+                    .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                }
+                .buttonStyle(VisionCraftHomePressStyle())
+                .accessibilityLabel("\(AppLocalization.string(category.title)). \(category.items.map { AppLocalization.string($0.title) }.joined(separator: ", "))")
+                .accessibilityIdentifier("home.category.\(category.id)")
+            }
+        }
+    }
+}
+
+struct VisionCraftHomeCategoryDialog: View {
+    let category: VisionCraftHomeCategory
+    let onDismiss: () -> Void
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                VisionCraftDialogScrim(onTap: onDismiss)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        VisionCraftHomeSectionHeader(title: category.title, tone: category.tone)
+                        VisionCraftHomeActionList(items: category.items.map { item in
+                            VisionCraftActionItem(
+                                id: item.id,
+                                icon: item.icon,
+                                title: item.title,
+                                description: item.description,
+                                accent: item.accent,
+                                action: {
+                                    onDismiss()
+                                    item.action()
+                                }
+                            )
+                        }, useLogoAccents: true)
+                        Button(AppLocalization.string("닫기"), action: onDismiss)
+                            .frame(maxWidth: .infinity)
+                            .buttonStyle(VisionCraftAndroidButtonStyle())
+                            .padding(.top, 24)
+                    }
+                    .padding(24)
+                }
+                .frame(maxWidth: 560, maxHeight: geometry.size.height - 48)
+                .background(VisionCraftHomeUI.background, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .strokeBorder(VisionCraftHomeUI.outline, lineWidth: 1.5)
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+        .accessibilityAddTraits(.isModal)
+        .accessibilityAction(.escape, onDismiss)
+        .zIndex(100)
     }
 }
 
@@ -70,17 +195,29 @@ struct VisionCraftHomeSectionHeader: View {
 
 struct VisionCraftHomeActionList: View {
     let items: [VisionCraftActionItem]
+    var useLogoAccents = false
 
     var body: some View {
         VStack(spacing: 16) {
-            ForEach(items) { item in
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                 Button(action: item.action) {
                     HStack(spacing: 16) {
-                        Image(systemName: item.icon)
-                            .font(.system(size: 28, weight: .regular))
-                            .foregroundStyle(VisionCraftHomeUI.icon)
-                            .frame(width: 28, height: 28)
-                            .accessibilityHidden(true)
+                        if useLogoAccents {
+                            let accent = VisionCraftHomeUI.logoAccents[index % VisionCraftHomeUI.logoAccents.count]
+                            VisionCraftIconTile(
+                                systemImage: item.icon,
+                                foreground: accent,
+                                background: accent.opacity(0.14),
+                                size: 52,
+                                iconSize: 28
+                            )
+                        } else {
+                            Image(systemName: item.icon)
+                                .font(.system(size: 28))
+                                .foregroundStyle(VisionCraftHomeUI.icon)
+                                .frame(width: 28, height: 28)
+                                .accessibilityHidden(true)
+                        }
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(AppLocalization.string(item.title))
@@ -156,9 +293,10 @@ private struct VisionCraftHomeSurfaceModifier: ViewModifier {
     @Environment(\.colorSchemeContrast) private var contrast
     let cornerRadius: CGFloat
     let fill: Color?
+    let outlined: Bool
 
     func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius)
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         let surface = fill ?? VisionCraftHomeUI.surface
         let blur: CGFloat = pressed ? 2 : 5
         let offset: CGFloat = pressed ? 0.75 : 2
@@ -170,8 +308,11 @@ private struct VisionCraftHomeSurfaceModifier: ViewModifier {
                     .shadow(color: VisionCraftHomeUI.shadow, radius: blur, x: offset, y: offset)
                 shape.fill(surface)
                 shape.fill(VisionCraftHomeUI.shadow.opacity(pressed ? 0.14 : 0))
-                if contrast == .increased {
-                    shape.strokeBorder(VisionCraftHomeUI.secondaryText, lineWidth: 1.5)
+                if outlined {
+                    shape.strokeBorder(
+                        VisionCraftHomeUI.outline,
+                        lineWidth: contrast == .increased ? 2 : 1.5
+                    )
                 }
             }
         }
@@ -196,24 +337,27 @@ private extension EnvironmentValues {
     }
 }
 
+/// Basic outlined button; `filled` uses the ink action for navigation.
 struct VisionCraftAndroidButtonStyle: ButtonStyle {
-    var filled = true
+    var filled = false
+    var emphasized = false
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .visionCraftAndroidText(16, weight: .medium)
-            .foregroundStyle(filled ? VisionCraftHomeUI.onPrimary : VisionCraftUI.primary)
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        return configuration.label
+            .visionCraftAndroidText(16, weight: .semibold)
+            .foregroundStyle(emphasized ? VisionCraftUI.onAccent : (filled ? VisionCraftHomeUI.onPrimary : VisionCraftHomeUI.text))
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .frame(minHeight: 48)
+            .frame(minHeight: emphasized ? 64 : 52)
             .background {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(filled ? VisionCraftUI.primary : Color.clear)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.black.opacity(configuration.isPressed ? 0.10 : 0))
-                    }
+                shape.fill(emphasized ? VisionCraftHomeUI.accent : (filled ? VisionCraftHomeUI.text : VisionCraftHomeUI.surface))
+                    .shadow(color: VisionCraftHomeUI.shadow,
+                            radius: configuration.isPressed ? 2 : 5,
+                            x: configuration.isPressed ? 0.75 : 2,
+                            y: configuration.isPressed ? 0.75 : 2)
+                shape.strokeBorder(emphasized ? VisionCraftHomeUI.accent : VisionCraftHomeUI.outline, lineWidth: 1.5)
             }
+            .contentShape(shape)
     }
 }
 
@@ -234,11 +378,13 @@ private struct VisionCraftAndroidTextModifier: ViewModifier {
 extension View {
     func visionCraftHomeSurface(
         cornerRadius: CGFloat = 22,
-        fill: Color? = nil
+        fill: Color? = nil,
+        outlined: Bool = true
     ) -> some View {
         modifier(VisionCraftHomeSurfaceModifier(
             cornerRadius: cornerRadius,
-            fill: fill
+            fill: fill,
+            outlined: outlined
         ))
     }
 
@@ -252,9 +398,13 @@ extension View {
 
     func visionCraftHomeDialogSurface() -> some View {
         background {
-            RoundedRectangle(cornerRadius: 24)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(VisionCraftHomeUI.surface)
                 .shadow(color: .black.opacity(0.22), radius: 18, y: 8)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .strokeBorder(VisionCraftHomeUI.outline, lineWidth: 1.5)
+                }
         }
     }
 }

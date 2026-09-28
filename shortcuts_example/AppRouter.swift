@@ -94,6 +94,8 @@ enum AppRoute: Hashable {
     case magnifier
     case liveTextReader
     case imageDescriptionCamera
+    case cameraAskAI
+    case photoReview
     case capturedImageAnalysis(
         image: UIImage,
         question: String

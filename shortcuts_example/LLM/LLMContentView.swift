@@ -376,13 +376,13 @@ struct LLMContentView: View {
                                     : "mic.fill"
                             )
                             .font(.title3.weight(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(VisionCraftUI.onAccent)
                             .frame(width: 52, height: 52)
                             .background {
                                 if answerSpeech.isSpeaking || stt.isRecording {
                                     Circle().fill(Color.red)
                                 } else {
-                                    Circle().fill(VisionCraftChatUI.gradient)
+                                    Circle().fill(VisionCraftChatUI.accent)
                                 }
                             }
                         }
@@ -415,12 +415,12 @@ struct LLMContentView: View {
                             Text("전송")
                                 .font(.headline)
                                 .lineLimit(1)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(VisionCraftUI.onAccent)
                                 .padding(.horizontal, 16)
                                 .frame(minWidth: 64, minHeight: 52)
                                 .background {
                                     if canSendTypedMessage {
-                                        Capsule().fill(VisionCraftChatUI.gradient)
+                                        Capsule().fill(VisionCraftChatUI.accent)
                                     } else {
                                         Capsule().fill(Color.secondary)
                                     }
@@ -728,26 +728,16 @@ struct LLMContentView: View {
         Button(action: action) {
             Text(AppLocalization.string(title))
                 .font(.subheadline.bold())
-                .foregroundStyle(VisionCraftUI.primary)
+                .foregroundStyle(VisionCraftUI.primaryText)
                 .padding(.horizontal, 18)
-                .frame(minWidth: minimumWidth, minHeight: 42)
+                .frame(minWidth: minimumWidth, minHeight: 48)
                 .background(
-                    VisionCraftChatUI.accent.opacity(26 / 255),
+                    VisionCraftUI.surfaceVariant,
                     in: RoundedRectangle(
-                        cornerRadius: 22,
+                        cornerRadius: 14,
                         style: .continuous
                     )
                 )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 22,
-                        style: .continuous
-                    )
-                    .stroke(
-                        VisionCraftChatUI.accent.opacity(68 / 255),
-                        lineWidth: 1
-                    )
-                }
         }
         .buttonStyle(.plain)
     }
@@ -1437,7 +1427,7 @@ private struct MessageRow: View {
                     .lineSpacing(messageFontSize * (m.role == "user" ? 0.35 : 0.4))
                     .foregroundStyle(
                         m.role == "user"
-                            ? Color.white
+                            ? VisionCraftUI.onAccent
                             : VisionCraftUI.primaryText
                     )
                     .fixedSize(horizontal: false, vertical: true)

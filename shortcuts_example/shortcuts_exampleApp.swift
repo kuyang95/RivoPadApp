@@ -514,6 +514,12 @@ struct shortcuts_exampleApp: App {
                             }
                             .ignoresSafeArea()
                             .visionCraftCameraScreen()
+                        case .photoReview:
+                            PhotoReviewView()
+                        case .cameraAskAI:
+                            MagnifierView(mode: .askAI)
+                                .ignoresSafeArea()
+                                .visionCraftCameraScreen()
                         case .capturedImageAnalysis(
                             let image,
                             let question

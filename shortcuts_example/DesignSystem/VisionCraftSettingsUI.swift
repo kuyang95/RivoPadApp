@@ -33,7 +33,7 @@ struct VisionCraftSettingsGroup<Content: View>: View {
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(VisionCraftHomeUI.secondaryText.opacity(0.5), lineWidth: 1)
+                        .strokeBorder(VisionCraftHomeUI.secondaryText.opacity(0.7), lineWidth: 1)
                 }
         }
     }
@@ -270,7 +270,7 @@ struct VisionCraftSelectionDialog: View {
                     ScrollView {
                         selectionOptions
                     }
-                    .frame(maxHeight: 520)
+                    .frame(maxHeight: 420)
                 }
 
                 HStack {
@@ -299,16 +299,22 @@ struct VisionCraftSelectionDialog: View {
                     HStack(spacing: 14) {
                         Text(option.title)
                             .visionCraftAndroidText(18, weight: option.id == selectedID ? .semibold : .regular)
-                            .foregroundStyle(option.id == selectedID ? VisionCraftUI.primary : VisionCraftHomeUI.text)
+                            .foregroundStyle(option.id == selectedID ? VisionCraftUI.accent : VisionCraftHomeUI.text)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
+                        if option.id == selectedID {
+                            Image(systemName: "circle.fill")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(VisionCraftUI.accent)
+                                .accessibilityHidden(true)
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 16)
                     .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
                     .background(
-                        VisionCraftUI.primary.opacity(option.id == selectedID ? 0.15 : 0),
+                        VisionCraftUI.accent.opacity(option.id == selectedID ? 0.15 : 0),
                         in: RoundedRectangle(cornerRadius: 12)
                     )
                     .contentShape(RoundedRectangle(cornerRadius: 14))

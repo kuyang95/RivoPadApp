@@ -1105,6 +1105,7 @@ struct EPUBReaderView: View {
                         || mediaOverlayPlayer
                             .isLoading
                     )
+                    .tint(VisionCraftUI.accent)
                     .accessibilityLabel(
                         "책 재생 위치"
                     )
@@ -1171,6 +1172,10 @@ struct EPUBReaderView: View {
                     .disabled(
                         mediaOverlayPlayer.isLoading
                     )
+                    .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.capsule)
+                    .tint(VisionCraftUI.accent)
+                    .controlSize(.large)
 
                     Button(
                         "다음 \(mediaOverlayPlayer.navigationUnitDescription)",
@@ -1214,7 +1219,7 @@ struct EPUBReaderView: View {
                                     mediaOverlayPlayer
                                         .playbackModeDescription
                                 )
-                                .font(.caption2)
+                                .font(.caption)
                             }
                             Text(
                                 mediaOverlayPlayer
@@ -1270,7 +1275,7 @@ struct EPUBReaderView: View {
         .frame(maxWidth: .infinity)
         .background(VisionCraftUI.surface)
         .overlay(alignment: .top) {
-            Divider().overlay(VisionCraftUI.outline)
+            Divider().overlay(VisionCraftUI.outline.opacity(0.7))
         }
     }
 

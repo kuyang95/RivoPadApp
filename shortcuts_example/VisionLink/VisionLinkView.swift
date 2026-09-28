@@ -129,20 +129,20 @@ struct VisionLinkView: View {
             ZStack {
                 Circle()
                     .fill(
-                        VisionCraftUI.primary
+                        VisionCraftUI.linkBlue
                             .opacity(0.14)
                     )
                     .frame(width: 88, height: 88)
                 Circle()
                     .fill(
-                        VisionCraftUI.primary
+                        VisionCraftUI.linkBlue
                             .opacity(0.24)
                     )
                     .frame(width: 64, height: 64)
                 Image(systemName: "link")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(
-                        VisionCraftUI.primary
+                        VisionCraftUI.linkBlue
                     )
             }
 
@@ -213,6 +213,7 @@ struct VisionLinkView: View {
                     manager.createNewCode()
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(VisionCraftUI.accent)
                 .controlSize(.large)
                 .padding(.top, 16)
             }
@@ -228,7 +229,7 @@ struct VisionLinkView: View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                VisionCraftUI.primary,
+                                VisionCraftUI.linkBlue,
                                 VisionCraftUI.success,
                             ],
                             startPoint: .leading,
@@ -241,7 +242,7 @@ struct VisionLinkView: View {
                     connectedNode(
                         "iphone",
                         color:
-                            VisionCraftUI.primary
+                            VisionCraftUI.linkBlue
                     )
                     Spacer()
                     connectedNode(
@@ -270,7 +271,7 @@ struct VisionLinkView: View {
                 "카메라 화면공유 · 파일보내기 · 비전크래프트 기능"
             )
             .font(.system(size: 14))
-            .foregroundStyle(VisionCraftUI.primary)
+            .foregroundStyle(VisionCraftUI.secondaryText)
             .multilineTextAlignment(.center)
             .padding(.top, 12)
 
@@ -299,9 +300,12 @@ struct VisionLinkView: View {
     ) -> some View {
         Image(systemName: image)
             .font(.system(size: 25, weight: .semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(color)
             .frame(width: 58, height: 58)
-            .background(color, in: Circle())
+            .background(color.opacity(0.20), in: Circle())
+            .overlay {
+                Circle().strokeBorder(color, lineWidth: 1)
+            }
     }
 
     private var connectionChip: some View {

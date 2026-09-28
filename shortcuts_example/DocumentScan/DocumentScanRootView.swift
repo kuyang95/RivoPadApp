@@ -80,6 +80,8 @@ struct DocumentScanRootView: View {
     @State private var isShowingRecognizedText = false
     @State private var scanDialog: ScanReviewDialog?
     @State private var reviewStatusMessage: String?
+    @State private var showsCameraModes = false
+    @State private var isLeavingForCameraMode = false
 
     init() {
         let session =
@@ -106,7 +108,7 @@ struct DocumentScanRootView: View {
                     cameraRemoteEvent,
                 command: scannerCommand,
                 isActive:
-                    phase == .camera,
+                    phase == .camera && !isLeavingForCameraMode,
                 automaticCaptureEnabled:
                     settings
                     .documentScanAutomaticCaptureEnabled,
@@ -137,11 +139,54 @@ struct DocumentScanRootView: View {
                 pageReview
             }
 
+            if phase == .camera {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button {
+                            showsCameraModes = true
+                        } label: {
+                            Label(
+                                AppLocalization.format("모드: %@", AppLocalization.string("문서 스캔")),
+                                systemImage: "slider.horizontal.3"
+                            )
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .frame(minHeight: 64)
+                            .background(Color(red: 40 / 255, green: 53 / 255, blue: 70 / 255),
+                                        in: RoundedRectangle(cornerRadius: 20))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(Color(red: 240 / 255, green: 244 / 255, blue: 250 / 255), lineWidth: 2.5)
+                            }
+                        }
+                        .accessibilityLabel(AppLocalization.format("모드, %@", AppLocalization.string("문서 스캔")))
+                    }
+                    Spacer()
+                }
+                .padding(.top, 12)
+                .padding(.trailing, 16)
+            }
+
             if isPreparingDocument {
                 preparingOverlay
             }
 
             scanDialogOverlay
+
+            if showsCameraModes {
+                CameraMoreOptionsDialog(
+                    currentMode: nil,
+                    onBasic: { openCameraMode(.magnifier) },
+                    onDocumentScan: { showsCameraModes = false },
+                    onLiveTextReader: { openCameraMode(.liveTextReader) },
+                    onImageAnalysis: { openCameraMode(.imageDescriptionCamera) },
+                    onAskAI: { openCameraMode(.cameraAskAI) },
+                    onPhotoReview: { openCameraMode(.photoReview) },
+                    onDismiss: { showsCameraModes = false }
+                )
+            }
         }
         .tint(VisionCraftUI.primary)
         .background(Color.black)
@@ -230,6 +275,15 @@ struct DocumentScanRootView: View {
             recognitionTask?.cancel()
             TTSManager.shared.stop()
         }
+        .onAppear {
+            isLeavingForCameraMode = false
+        }
+    }
+
+    private func openCameraMode(_ route: AppRoute) {
+        showsCameraModes = false
+        isLeavingForCameraMode = true
+        appRouter.route = route
     }
 
     private var scanBackButton: some View {
@@ -344,9 +398,6 @@ struct DocumentScanRootView: View {
                                 style: .continuous
                             )
                         )
-                        .overlay {
-                            scanReviewCardBorder
-                        }
                     } else {
                         GeometryReader { geometry in
                             let previewSize =
@@ -376,9 +427,7 @@ struct DocumentScanRootView: View {
                                         style: .continuous
                                     )
                                 )
-                                .overlay {
-                                    scanReviewCardBorder
-                                }
+
                                 .frame(
                                     width: geometry.size.width,
                                     height: geometry.size.height,
@@ -437,25 +486,7 @@ struct DocumentScanRootView: View {
                         scanDialog = .actions
                     }
                 }
-                .padding(12)
-                .background(
-                    VisionCraftUI.surface,
-                    in: RoundedRectangle(
-                        cornerRadius: 18,
-                        style: .continuous
-                    )
-                )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 18,
-                        style: .continuous
-                    )
-                    .stroke(
-                        VisionCraftUI.outline,
-                        lineWidth: 1
-                    )
-                }
-                .frame(height: 88)
+                .padding(.vertical, 12)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
             }
@@ -464,12 +495,12 @@ struct DocumentScanRootView: View {
                 if let reviewStatusMessage {
                     Text(reviewStatusMessage)
                         .font(.subheadline.bold())
-                        .foregroundStyle(.white)
+                        .foregroundStyle(VisionCraftHomeUI.onPrimary)
                         .padding(.horizontal, 18)
-                        .frame(minHeight: 44)
+                        .frame(minHeight: 48)
                         .background(
-                            Color.black.opacity(0.78),
-                            in: Capsule()
+                            VisionCraftUI.primary.opacity(0.88),
+                            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                         )
                         .padding(.top, 84)
                         .task(
@@ -529,17 +560,6 @@ struct DocumentScanRootView: View {
         .accessibilityHidden(true)
     }
 
-    private var scanReviewCardBorder: some View {
-        RoundedRectangle(
-            cornerRadius: 16,
-            style: .continuous
-        )
-        .stroke(
-            VisionCraftUI.outline,
-            lineWidth: 1
-        )
-    }
-
     private var recognitionProgressMessage: String? {
         if isRecognizingText {
             return AppLocalization.string(
@@ -561,40 +581,21 @@ struct DocumentScanRootView: View {
     ) -> some View {
         Button(action: action) {
             Text(AppLocalization.string(title))
-                .font(
-                    .system(
-                        size: isPrimary ? 14 : 15,
-                        weight: .bold
-                    )
-                )
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.8)
+                .visionCraftAndroidText(16, weight: .semibold)
                 .foregroundStyle(
-                    isPrimary
-                    ? Color.white
-                    : VisionCraftUI.primaryText
+                    isPrimary ? VisionCraftUI.onAccent : VisionCraftUI.primaryText
                 )
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: 64
-                )
+                .frame(maxWidth: .infinity, minHeight: 64)
                 .background(
-                    isPrimary
-                    ? VisionCraftUI.primary
-                    : VisionCraftUI.primary
-                        .opacity(0.12),
-                    in: Capsule()
+                    isPrimary ? VisionCraftUI.accent : VisionCraftUI.surface,
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                 )
                 .overlay {
-                    if !isPrimary {
-                        Capsule()
-                            .stroke(
-                                VisionCraftUI.primary
-                                    .opacity(0.4),
-                                lineWidth: 2
-                            )
-                    }
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(
+                            isPrimary ? VisionCraftUI.accent : VisionCraftUI.outline,
+                            lineWidth: 1.5
+                        )
                 }
         }
         .buttonStyle(.plain)
@@ -682,18 +683,18 @@ struct DocumentScanRootView: View {
                 .background(
                     VisionCraftUI.surface,
                     in: RoundedRectangle(
-                        cornerRadius: 24,
+                        cornerRadius: 28,
                         style: .continuous
                     )
                 )
                 .overlay {
                     RoundedRectangle(
-                        cornerRadius: 24,
+                        cornerRadius: 28,
                         style: .continuous
                     )
                     .stroke(
                         VisionCraftUI.outline,
-                        lineWidth: 1
+                        lineWidth: 1.5
                     )
                 }
                 .padding(.horizontal, 24)
@@ -713,7 +714,7 @@ struct DocumentScanRootView: View {
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(
                     isPrimary
-                    ? Color.white
+                    ? VisionCraftUI.onAccent
                     : VisionCraftUI.primaryText
                 )
                 .frame(
@@ -722,10 +723,17 @@ struct DocumentScanRootView: View {
                 )
                 .background(
                     isPrimary
-                    ? VisionCraftUI.primary
-                    : VisionCraftUI.surfaceVariant,
-                    in: Capsule()
+                    ? VisionCraftUI.accent
+                    : VisionCraftUI.surface,
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                 )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(
+                            isPrimary ? VisionCraftUI.accent : VisionCraftUI.outline,
+                            lineWidth: 1.5
+                        )
+                }
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
