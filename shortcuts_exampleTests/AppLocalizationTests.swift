@@ -998,7 +998,7 @@ final class AppLocalizationTests:
         )
         XCTAssertEqual(
             RivoRemoteControlCenter()
-                .items[1].title,
+                .items.first(where: { $0.id == "home.camera" })?.title,
             "Camera"
         )
         let englishReaderControl =
