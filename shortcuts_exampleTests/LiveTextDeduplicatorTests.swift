@@ -113,6 +113,23 @@ final class LiveTextDeduplicatorTests: XCTestCase {
         XCTAssertEqual(result.reason, "low_ocr_quality")
     }
 
+    func testRecognizedFullPageIsNotRejectedOnlyForSmallGlyphs() {
+        var deduplicator = LiveTextDeduplicator()
+        let result = deduplicator.evaluate(
+            String(repeating: "문서의 내용을 읽습니다. ", count: 12),
+            quality: LiveTextOCRQuality(
+                elementCount: 180,
+                medianGlyphHeight: 10,
+                below16Percentage: 92
+            ),
+            now: 1,
+            isSpeaking: false
+        )
+
+        XCTAssertEqual(result.disposition, .announce)
+        XCTAssertEqual(result.reason, "first_text")
+    }
+
     func testRichSceneAnchorSuppressesPartialRecognition() {
         var deduplicator = LiveTextDeduplicator()
         let richText =
@@ -210,13 +227,11 @@ final class LiveTextDeduplicatorTests: XCTestCase {
         XCTAssertEqual(newScene.reason, "new_text")
     }
 
-    func testVisionLineHeightsBecomeElementWeightedQuality() {
+    func testMLKitElementHeightsBecomeOCRQuality() {
         let quality = LiveTextDeduplicator.quality(
-            lineTexts: [
-                "하나 둘 셋 넷",
-                "다섯 여섯"
-            ],
-            linePixelHeights: [12, 30]
+            elementPixelHeights: [
+                12, 12, 12, 12, 30, 30
+            ]
         )
 
         XCTAssertEqual(quality.elementCount, 6)

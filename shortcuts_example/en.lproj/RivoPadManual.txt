@@ -5,7 +5,7 @@
 @chapter Getting Started
 @section Supported Devices and Local Processing
 @text This app provides the main VisionCraft features on Apple silicon iPads with a local-first design.
-@text AI chat and image descriptions use an MLX model on the M4, while OCR and document processing run on the iPad whenever possible.
+@text Text AI chat uses an MLX model on the M4. Basic OCR and document text extraction run on the iPad. Image descriptions send the photo and question to Gemini and require an internet connection.
 @text A network connection may be needed when preparing a model for the first time or connecting to a VisionLink server.
 @section Permissions
 @text Camera access is required for the camera, document scanning, and live text reading.
@@ -26,7 +26,7 @@
 @text Starting a new response, voice input, or another screen automatically stops speech from the previous response.
 @text Above the conversation input, you can attach PDF, TXT, XLSX, XLS, HWP, or HWPX documents, clipboard text, or a photo to the current conversation.
 @text TXT and clipboard contexts accumulate. A newly attached source file replaces the previous photo, PDF, XLSX, XLS, HWP, or HWPX source. Attachment state and source references are restored with conversation history.
-@text PDFs up to 14 MB and 100 pages are processed locally with PDFKit or Vision OCR. Photos up to 32 MB are resized to at most 2,048 pixels for the M4 vision model.
+@text PDFs up to 14 MB and 100 pages are processed locally with PDFKit or Vision OCR. Photos up to 32 MB are resized to at most 2,048 pixels for analysis by Gemini.
 @text XLSX files up to 20 MB are processed locally for strings, numbers, Boolean values, and cached formula results across multiple sheets. Encrypted, damaged, or excessively expanded archives are rejected.
 @text Excel 97–2003 XLS files up to 20 MB are processed locally for OLE/BIFF8 shared strings, numbers, Boolean values, and cached formula results. Encrypted files and older BIFF formats are not opened.
 @text HWP files up to 20 MB are decompressed locally from HWP 5.x body sections to extract paragraph text. Password-protected, distribution, DRM, and certificate-encrypted documents are not opened, and scripts or embedded objects are not executed.
@@ -47,7 +47,7 @@
 @text On the answer screen, you can review the source title and final URL and open the original page in Safari.
 @section Optional Web Search
 @text For questions that require current information, such as recent news, prices, or schedules, use Web Search on the AI Chat screen to find sources.
-@text No personal API key is required. In Settings, accept the privacy notice and enable online web search.
+@text No personal API key is required. On the web search screen, accept the privacy notice and enable online web search.
 @text Web-search questions are sent to Gemini through Firebase AI Logic, and Gemini produces an answer and sources grounded with Google Search.
 @text The screen shows Google-provided search suggestions and grounding sources. Regular chat, document analysis, and translation continue to use the M4 local model.
 @text Search sources and answers are not stored in VisionCraft conversation history or cached by the app. Google service privacy policies and terms apply.
@@ -74,32 +74,32 @@
 @text Similar recently read sentences and partial recognition of the same document are not repeated for up to 30 seconds. Three consecutive text-free scenes reset the scene.
 @text Monitor heat and battery use during long sessions.
 @section Image Description
-@text Select Image Description on the Home Camera card and take a photo. The M4 local vision model describes the scene, objects, text, and people’s actions in the selected response language.
+@text Select Image Description on the Home Camera card and take a photo. Gemini describes the scene, objects, text, and people’s actions in the selected response language. The photo and question are sent to the service, so an internet connection is required.
 @text You can also select Describe Image from OCR results opened from a Camera OCR capture, photo file, photo shared from another app, or scan. It analyzes the complete original photo and works even when the photo contains no text.
 @text The captured image is not automatically saved to a temporary file or Photos; it is passed directly from memory to the analysis screen.
 @text When the description is complete, the response is read automatically, and you can ask follow-up questions about the same photo in the input field.
 @section Custom Document Scanner
 @text Select Document Scan on the Home Camera card to directly open VisionCraft’s own AVFoundation camera instead of Apple’s system document scanner.
 @text It checks document corners, orientation, motion, and sharpness and captures automatically when the conditions are met.
-@text After capture, it applies perspective correction, curved-page correction, size normalization, and optional color enhancement.
+@text After capture, it applies perspective correction and size normalization, plus optional curved-page and color correction.
 @text If automatic document capture is off in Settings, corner and stability guidance remain active, but capture occurs only from the on-screen button or Rivo 7.
-@text If automatic curved-page correction is off, UVDoc model preparation and inference are skipped while LCNet corner detection and perspective correction remain active.
-@text Turning off automatic document color correction preserves corner, perspective, and curved-page correction.
-@text If OCR typo correction is enabled, M4 Qwen3-VL locally compares Vision OCR text from a single photo or an image-only PDF page against the actual image.
-@text If numbers, URLs, or line breaks change, or the result grows or shrinks excessively, the original text is kept. Vision OCR remains immediately available when AI is busy or model correction fails.
-@text Live camera OCR does not run Qwen3-VL correction on every frame, avoiding extra latency and heat.
+@text Curved-page correction is off by default to avoid bending already-flat pages. Turn it on only when needed; when off, UVDoc model preparation and inference are skipped while LCNet corner detection and perspective correction remain active.
+@text Turning off document color correction preserves corner and perspective correction, plus curved-page correction when that option is enabled.
+@text If OCR typo correction is enabled, the image and Vision OCR text from a single photo or an image-only PDF page are sent to Gemini through Firebase AI Logic for comparison and correction.
+@text The basic OCR text is shown first. The original is kept if Gemini is unavailable, does not finish within 20 seconds, or fails the safeguards for numbers, URLs, line breaks, and length.
+@text Live camera OCR does not run Gemini correction on every frame, avoiding extra latency and data transfer.
 @text Capture up to 20 pages in sequence, then retake, rotate, delete, and reorder them before saving a multipage PDF.
 @text With Rivo, use 4 to close and 7 to capture on the camera screen. On capture results, use 4 to retake, 9 to add a page, 7 to finish review, and 0 for single-page OCR on the first page. In page review, use 2/8 for previous/next, 5 to rotate, 9 to add a page, 0 to open as a document, and 7 to save a PDF.
 @text An unfinished capture session can be restored the next time the app opens.
 
 @chapter Documents and Reading
 @section PDF and Text
-@text From Files on the Home screen, choose one image, EPUB, PDF, TXT, XLSX, XLS, HWP, or HWPX file, or authorize a folder to search.
-@text Tap Open Clipboard on the Files screen to open copied text exactly as an in-memory document for editing, speech, copying, AI questions, and TXT or PDF export.
-@text Authorized folder access is stored as a security-scoped bookmark. PDF, TXT, XLSX, XLS, HWP, and HWPX files can be searched by name and relative folder path and are shown by most recent modification date.
-@text Under iPadOS policy, storage outside folders you approve cannot be searched. Removing folder access does not delete original files.
+@text In Open Documents on the Home screen, tap Import File to open one PDF, text, XLSX, XLS, HWP, or HWPX document in its original location. Photos and EPUB files are not supported on this screen.
+@text A document you select is added to Recently Opened Documents, so you can reopen it without the file browser. XLSX edits are saved to the selected original file rather than an internal app copy.
+@text The App Documents Folder list in Documents shows the documents in the Files app's My iPad > VisionCraft folder, so documents added through Files, USB, or AirDrop can be opened without the file browser.
 @text PDFs and text open in a large-text document screen with reading, editing, copying, and AI questions.
 @text XLSX, Excel 97–2003 XLS, HWP 5.x, and HWPX use safely extracted local text for document viewing, TTS, copying, editing, and AI questions.
+@text Open an Excel 97–2003 XLS file and tap Convert to XLSX at the top to choose a save location, then open the new XLSX in Recent Documents and the spreadsheet editor. The conversion carries over sheet names, cell values, and cached formula results only. Formula definitions, formatting, merged cells, row or column sizes, charts, images, and macros are not preserved, and the original XLS is not changed.
 @text If single-line landscape reading is enabled in document settings, portrait orientation keeps normal wrapping while landscape orientation shows the current logical line without wrapping and lets you move horizontally.
 @text Sentence speech tools play continuously from the currently visible line and highlight the spoken sentence. You can move to the previous sentence, repeat the current sentence, stop, or move to the next sentence.
 @text Move by line or page, jump to the beginning or end, and export as TXT or a multipage PDF.
@@ -127,8 +127,8 @@
 @section Control Inside VisionCraft
 @text Rivo buttons control the in-app quick menu, AI voice input, Magnifier, Live Reading, Scanner, Documents, and EPUB or DAISY screens.
 @text In Settings under In-App Quick Menu, choose between a vertical list of every item and a horizontal previous-current-next view, and select one of the same 16 high-contrast color combinations as Android. These settings apply only inside VisionCraft, not over other apps.
-@text In the Quick Menu, use 4/6 to move between items, 2/8 to adjust the selected value, and 5 to run it or apply its default, matching Android. Camera and Live Reading expose photo saving or reading pause, zoom, color, threshold, brightness, inversion, camera switching, flashlight, and focus; TXT/PDF exposes color, text size, and line spacing.
-@text While reading EPUB or DAISY, press L1 to open the reader-specific menu for closing the reader, play or pause, previous or next, navigation units, contents, text search, and appearance.
+@text The L1 Quick Menu opens with the same Home, Tools, App Display, and Widgets hierarchy as Android. Use 4/6 to move, 2/8 to adjust a value, and 5 to run it or apply its default. Star goes back from a submenu and closes the menu from Home; 0 returns to Home.
+@text Camera and Live Reading open the camera-specific menu and its Color submenu; TXT/PDF opens color, text size, and line-spacing controls. EPUB or DAISY opens a reader menu for Back, play or pause, previous or next, navigation units, contents, text search, and settings.
 @text Pressing R1 outside a feature screen enters command mode. 2 immediately translates the clipboard with the M4 local AI and reads the result; 3 opens live camera text reading; 4 opens Camera Magnifier; and 9 opens captured-image description.
 @text Press R1 twice to hear a guide to all command keys. After opening Camera, use R1 with 5, 6, 7, star, 0, and hash to switch cameras, control the torch, capture, and zoom.
 @text Available buttons differ by screen, and unsupported modes show an explanation of the iPad limitation.
@@ -146,7 +146,7 @@
 @text Before receiving, the app checks whether 64 MB of free space can remain. On reconnection, it removes unfinished partial files and feature temporary files older than 24 hours.
 @text Received clipboard text never overwrites the system clipboard automatically. You can copy it or open it in the text viewer for large text, editing, TTS, and Rivo document controls.
 @section Remote Features
-@text Remote image OCR, image description, image translation, and text translation run through local processors on the M4.
+@text Basic remote image OCR and text translation run on the M4. Image descriptions use Gemini. When OCR Auto Correction is enabled, the image and recognized text are also sent to Gemini.
 @text Remotely received photos apply EXIF orientation and are limited to a 2,048-pixel longest edge before use in OCR, image descriptions, and chat attachments.
 @text Remote AI chat supports conversation IDs and context from images, TXT, PDF, XLSX, Excel 97–2003 XLS, HWP 5.x, and HWPX attachments.
 @text Remote HWP, XLS, and XLSX apply the local parser’s 20 MB, encryption, corruption, and decompression limits and append only extracted text to the conversation.
@@ -175,15 +175,13 @@
 @chapter Settings and Accessibility
 @section Unified Settings
 @text From Settings on the Home screen, manage sound effects, automatic spoken guidance, TTS speed, scan auto-capture, UVDoc curve and color correction, OCR typo correction, app language and font, and document and reader defaults.
-@text Settings also shows the Firebase connection and manages network consent and enablement for optional web search. No personal API key is required.
+@text Consent and enablement for online web search are managed on the web search screen in AI chat. No personal API key is required.
 @text Reset Settings restores viewing and speech defaults only; it does not delete conversations, documents, or books.
 @text Choose System Settings, Korean, English, or Japanese as the app language. It immediately applies to screens and the default language for local translation and web search. System permission text and extension languages follow the VisionCraft app language in iPad Settings.
 @text App Font offers the system font, the default NanumSquareRound, and additional fonts for the current app language. Additional fonts download from the VisionCraft server only when selected.
 @text Downloaded fonts are retained in the app after file size and SHA-256 verification, so they work offline after the next launch. Select View License on an item to review its terms.
 @section Diagnostics and Privacy
-@text In Diagnostics & Privacy, review app and iPadOS versions, M4 memory, storage and thermal status, and the number of MetricKit payloads supplied by iPadOS.
-@text VisionCraft never sends Crashlytics, Analytics, or performance data to a server automatically. When support needs it, select Export Diagnostics Report and save the JSON file yourself.
-@text The app does not add conversations, photos, OCR or document contents, API keys, or your custom device name to a report. Review the file before sharing it.
+@text VisionCraft never sends Crashlytics, Analytics, or performance data to a server automatically.
 @section VoiceOver and Large Text
 @text All major buttons provide a functional name and hint and work with iPad VoiceOver and large text.
 @text Configure system VoiceOver, Zoom, color filters, and Accessibility Shortcut directly in iPad Settings.
@@ -194,11 +192,11 @@
 @text It cannot keep a Remote Ribbon over other apps or operate Home, Back, Recents, or Notification Center for you.
 @text VisionCraft cannot directly change system VoiceOver, brightness, rotation lock, or display color filters.
 @text Android features for TalkBack settings, rotation lock, global magnification, menus, and muting other apps cannot provide the same system behavior on iPadOS.
-@text The iPad AI uses an M4 local model, so there is no server quota like the Android Gemini daily usage widget. Instead, the Home screen and widget show today’s local processing activity and “No daily limit.”
+@text The M4 local model used for general AI chat and document questions has no daily limit. Features that use the Gemini service, including Word and Excel AI editing, OCR correction, image descriptions, and web search, share a limit of 1 million tokens per local calendar day on this iPad.
 @text The app cannot receive permanently after it is fully terminated or remain running from boot.
 @section iPad Alternatives
 @text Bring content from another app through the Share Extension, selected-text action, Files picker, or a screenshot you provide.
-@text The silent global screen capture from Android R1 commands is unavailable. Command 3 opens live camera OCR, and command 9 captures with the camera and runs M4 local image description.
+@text The silent global screen capture from Android R1 commands is unavailable. Command 3 opens live camera OCR, and command 9 captures with the camera and runs Gemini image description.
 @text On iPadOS 27 or later, full-display sharing that the user explicitly starts from the ScreenCaptureKit system picker can be considered as a future alternative. It is outside the current iPadOS 26.2 scope and cannot be started secretly by the app.
 @text Use widgets, Siri, Shortcuts, and the in-app Rivo quick menu for quick launch.
 @text For system accessibility control, use iPad Accessibility Shortcut or a Rivo HID or Switch Control firmware alternative.
@@ -210,6 +208,6 @@
 @text The first time you use Siri or a deep link, iPadOS may ask whether to open it in VisionCraft.
 @text While a model is preparing, keep the app in the foreground and check available storage and network status.
 @section When a Connection Fails
-@text For Rivo, check power and pairing, select Retry Now on the Rivo screen, and review Connection Diagnostics.
+@text For Rivo, check power and pairing, then select Reconnect Now on the Remote Connection screen.
 @text For VisionLink, check the pairing code, matching server environment, Wi-Fi changes, and the sending state of the other device.
 @text If the issue repeats, record the reproduction time together with the diagnostics shown on screen.

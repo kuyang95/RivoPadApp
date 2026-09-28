@@ -1,0 +1,423 @@
+{
+  "description": "Public HWP documents for the legacy viewer regression tests. 03 and 04 replace the previously device-only forms; the content-specific 02 and 05 assertions remain unchanged.",
+  "documents": [
+    {
+      "fileName": "01_국립국제교육원_별지제출자료서식.hwp",
+      "sourcePage": "https://www.niied.go.kr/web/main/nid/niied_recruit/1244",
+      "url": "https://www.niied.go.kr/web/main/file/download/uu/20250319Id_hgldLNn",
+      "devicePaths": [
+        "Documents/한글 문서/01_국립국제교육원_별지제출자료서식.hwp"
+      ],
+      "sha256": "9d0e605a27c1c97cfb9a069105d61785e577ccb260b64ceb0389b619e3338a8a"
+    },
+    {
+      "fileName": "02_충북대_한글논문샘플.hwp",
+      "sourcePage": "https://ricic.cbnu.ac.kr/ricic/index.php?document_srl=32788&mid=notice",
+      "url": "https://ricic.cbnu.ac.kr/ricic/?module=file&act=procFileDownload&file_srl=32791&sid=14bc2d23fc888134e5e7221ff6968e7d",
+      "devicePaths": [
+        "Documents/한글 문서/02_충북대_한글논문샘플.hwp"
+      ],
+      "sha256": "81a5ad7ad4c065afbb8732852879a6abc385909ec3bee6f4934a4b97678f62d1"
+    },
+    {
+      "fileName": "03_한글활용디자인공모전_공고문.hwp",
+      "sourcePage": "https://and.korea.ac.kr/kuand/reference/contest.do?articleNo=808827&mode=view",
+      "url": "https://and.korea.ac.kr/kuand/reference/contest.do?mode=download&articleNo=808827&attachNo=315067",
+      "devicePaths": [
+        "Documents/한글 문서/03_한글활용디자인공모전_공고문.hwp"
+      ],
+      "sha256": "8f2a6bfb42f937c7b6336e07bebb14d46479d79ade3447d23f3a26fc226a2ffd"
+    },
+    {
+      "fileName": "04_pyhwp_본문표그림.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/tree/master/tests/hwp5_tests/fixtures",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/sample-5017.hwp",
+      "devicePaths": [
+        "Documents/한글 문서/04_pyhwp_본문표그림.hwp",
+        "Documents/pyhwp-sample-5017.hwp"
+      ],
+      "sha256": "ff3faae938610fcfbedc21c27c507ca0cc038b44872b65d10fcad0b55af67ba2"
+    },
+    {
+      "fileName": "05_한글활용디자인공모전_신청서.hwp",
+      "sourcePage": "https://and.korea.ac.kr/kuand/reference/contest.do?articleNo=808827&mode=view",
+      "url": "https://and.korea.ac.kr/kuand/reference/contest.do?mode=download&articleNo=808827&attachNo=315065",
+      "devicePaths": [
+        "Documents/한글 문서/05_한글활용디자인공모전_신청서.hwp"
+      ],
+      "sha256": "4cfa973e1c2b266a9de868e86572b3a7f297cd60747c817a666a8816e005c03f"
+    },
+    {
+      "fileName": "V01-aligns.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/aligns.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/aligns.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V01-aligns.hwp",
+        "Documents/한글 문서/공개 기능 예제/V01-aligns.hwp"
+      ],
+      "sha256": "b101b4faff3c65f88ac9f8f583219cf5825d0747be85dbe45174dcd84207a3d1"
+    },
+    {
+      "fileName": "V02-borderfill.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/borderfill.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/borderfill.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V02-borderfill.hwp",
+        "Documents/V02-borderfill.hwp",
+        "Documents/한글 문서/공개 기능 예제/V02-borderfill.hwp"
+      ],
+      "sha256": "49dee926351d25dcfa3ec448c8955426623bbc68d4a2ee7f1575691e8fd352a6"
+    },
+    {
+      "fileName": "V03-charshape.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/charshape.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/charshape.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V03-charshape.hwp",
+        "Documents/한글 문서/공개 기능 예제/V03-charshape.hwp"
+      ],
+      "sha256": "8eb333ab110db6f91d7e426d507d41ca09cacd4d40d945188b5ec40663d7576b"
+    },
+    {
+      "fileName": "V04-table-position.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/table-position.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/table-position.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V04-table-position.hwp",
+        "Documents/한글 문서/공개 기능 예제/V04-table-position.hwp"
+      ],
+      "sha256": "b443c3cb5c641e31474f3de40e6e4d56e5f9ca7d1bed2dc5be9ee551029e3587"
+    },
+    {
+      "fileName": "V05-table.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/table.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/table.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V05-table.hwp",
+        "Documents/V05-table.hwp",
+        "Documents/한글 문서/공개 기능 예제/V05-table.hwp"
+      ],
+      "sha256": "df4746b82eea954a2aba36eb7dc51acf8cd975dced5e3331a1838932eaf123f9"
+    },
+    {
+      "fileName": "V06-table-caption.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/table-caption.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/table-caption.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V06-table-caption.hwp",
+        "Documents/한글 문서/공개 기능 예제/V06-table-caption.hwp"
+      ],
+      "sha256": "60c7e35ef7f65dc9cdc2f905e7da6cbb9a9facb94de62d500f39907ea3494ac7"
+    },
+    {
+      "fileName": "V07-charstyle.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/charstyle.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/charstyle.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V07-charstyle.hwp",
+        "Documents/V07-charstyle.hwp",
+        "Documents/한글 문서/공개 기능 예제/V07-charstyle.hwp"
+      ],
+      "sha256": "7e519978e920e9b5ebb8532a92a19713c1e5a25da5482bddd6ca5e5a6b93cdd3"
+    },
+    {
+      "fileName": "V08-footnote-endnote.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/footnote-endnote.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/footnote-endnote.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V08-footnote-endnote.hwp",
+        "Documents/한글 문서/공개 기능 예제/V08-footnote-endnote.hwp"
+      ],
+      "sha256": "4f580388ac5d320a4abe141d0886b7aff296a14a573c2ceac6dcc5fbda05b820"
+    },
+    {
+      "fileName": "V09-headerfooter.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/headerfooter.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/headerfooter.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V09-headerfooter.hwp",
+        "Documents/한글 문서/공개 기능 예제/V09-headerfooter.hwp"
+      ],
+      "sha256": "8dcc2edecf32b86724819de3265529d57200b502b9cc5dbc0378daa041c274c8"
+    },
+    {
+      "fileName": "V10-linespacing.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/linespacing.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/linespacing.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V10-linespacing.hwp",
+        "Documents/한글 문서/공개 기능 예제/V10-linespacing.hwp"
+      ],
+      "sha256": "0377946dd62dedfdbc5709c8b333c362d2d1dce44db6e7772371d76a7a12780f"
+    },
+    {
+      "fileName": "V11-lists-bullet.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/lists-bullet.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/lists-bullet.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V11-lists-bullet.hwp",
+        "Documents/한글 문서/공개 기능 예제/V11-lists-bullet.hwp"
+      ],
+      "sha256": "83e86b26dc3a153eed41613ee3701ca12735491b904f79b82edc27d5a2d98cce"
+    },
+    {
+      "fileName": "V12-lists.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/lists.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/lists.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V12-lists.hwp",
+        "Documents/한글 문서/공개 기능 예제/V12-lists.hwp"
+      ],
+      "sha256": "054ef256c43dc611987c7c3577e30c7288b981c042b6fceb6587abeff2e5edee"
+    },
+    {
+      "fileName": "V13-matrix.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/matrix.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/matrix.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V13-matrix.hwp",
+        "Documents/한글 문서/공개 기능 예제/V13-matrix.hwp"
+      ],
+      "sha256": "b3dc449fe5b3bdb5567f999c66b0609481016b2eeae2f4caa7d4f60e7a6515a9"
+    },
+    {
+      "fileName": "V14-multicolumns-in-common-controls.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/multicolumns-in-common-controls.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/multicolumns-in-common-controls.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V14-multicolumns-in-common-controls.hwp",
+        "Documents/한글 문서/공개 기능 예제/V14-multicolumns-in-common-controls.hwp"
+      ],
+      "sha256": "d8629e70108ce31ba8c5808403832272da1767d978197e366c7d3e5b768e0e94"
+    },
+    {
+      "fileName": "V15-multicolumns-layout.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/multicolumns-layout.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/multicolumns-layout.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V15-multicolumns-layout.hwp",
+        "Documents/한글 문서/공개 기능 예제/V15-multicolumns-layout.hwp"
+      ],
+      "sha256": "5312888f70a52168803e0dbdb9d6d3cdf54ae3b4ec7ae79f25a35f9c1cde67ff"
+    },
+    {
+      "fileName": "V16-multicolumns-widths.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/multicolumns-widths.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/multicolumns-widths.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V16-multicolumns-widths.hwp",
+        "Documents/한글 문서/공개 기능 예제/V16-multicolumns-widths.hwp"
+      ],
+      "sha256": "615ca8eec20e779ddcd2bef4b883ff310d9fba0a6e3b0e22d638ba5288d32e6e"
+    },
+    {
+      "fileName": "V17-pagedefs.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/pagedefs.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/pagedefs.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V17-pagedefs.hwp",
+        "Documents/한글 문서/공개 기능 예제/V17-pagedefs.hwp"
+      ],
+      "sha256": "9c4428dcc55b1d1872c2ae7e494f8bc8a080673a9c0a2965eb2f090a1635a81b"
+    },
+    {
+      "fileName": "V18-paragraph-split-page.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/paragraph-split-page.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/paragraph-split-page.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V18-paragraph-split-page.hwp",
+        "Documents/한글 문서/공개 기능 예제/V18-paragraph-split-page.hwp"
+      ],
+      "sha256": "d27fc44a27af756211d04f4e7d7f6a549adf9095a7708252b4e90f3eb5a3ef8d"
+    },
+    {
+      "fileName": "V19-parashape.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/parashape.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/parashape.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V19-parashape.hwp",
+        "Documents/한글 문서/공개 기능 예제/V19-parashape.hwp"
+      ],
+      "sha256": "1df75e74dff1b93f42ce88cfa0e362ae489756274eca0a2abcb2b34ddd7c9548"
+    },
+    {
+      "fileName": "V20-shapepict-scaled.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/shapepict-scaled.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/shapepict-scaled.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V20-shapepict-scaled.hwp",
+        "Documents/한글 문서/공개 기능 예제/V20-shapepict-scaled.hwp"
+      ],
+      "sha256": "daf292ab2d91fad74091fb6a6b1cc2c2a1c203c5f7736aac075598b75bbfd4a3"
+    },
+    {
+      "fileName": "V21-columns-2020.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/multicolumns.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/multicolumns.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V21-columns-2020.hwp",
+        "Documents/한글 문서/공개 기능 예제/V21-columns-2020.hwp"
+      ],
+      "note": "The local name is a historical test-harness alias; the source URL identifies the actual public replacement, not its creation year.",
+      "sha256": "b6798c22e2fab6467360b6a020050eba5db9b90daca7fc6520a158055ec949fa"
+    },
+    {
+      "fileName": "V22-rectangle-fill.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/shapecomponent-rect-fill.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/shapecomponent-rect-fill.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V22-rectangle-fill.hwp",
+        "Documents/한글 문서/공개 기능 예제/V22-rectangle-fill.hwp"
+      ],
+      "sha256": "db2be35b854a4ce9d1e53e874aad5b4e0892e1e88745353eda9801b5229003d9"
+    },
+    {
+      "fileName": "V23-shapecontainer.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/shapecontainer-2.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/shapecontainer-2.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V23-shapecontainer.hwp",
+        "Documents/한글 문서/공개 기능 예제/V23-shapecontainer.hwp"
+      ],
+      "sha256": "e7673768a6951a72d1799d33cd9cdb35e25b63a6d98f1e27a26e8b9e630e0931"
+    },
+    {
+      "fileName": "V24-textbox-2020.hwp",
+      "sourcePage": "https://github.com/neolord0/hwplib/blob/4dc9673942bb8d977405122c3fed758af104cccd/sample_hwp/basic/%EA%B8%80%EC%83%81%EC%9E%90.hwp",
+      "url": "https://raw.githubusercontent.com/neolord0/hwplib/4dc9673942bb8d977405122c3fed758af104cccd/sample_hwp/basic/%EA%B8%80%EC%83%81%EC%9E%90.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V24-textbox-2020.hwp",
+        "Documents/V24-textbox-2020.hwp",
+        "Documents/한글 문서/공개 기능 예제/V24-textbox-2020.hwp"
+      ],
+      "note": "The local name is a historical test-harness alias; the source URL identifies the actual public replacement, not its creation year.",
+      "sha256": "ea79f759223ad167ebbcca19e1a683c8e173a84aab3e89285dc237cec0bccbcd"
+    },
+    {
+      "fileName": "V25-group.hwp",
+      "sourcePage": "https://github.com/neolord0/hwplib/blob/4dc9673942bb8d977405122c3fed758af104cccd/sample_hwp/basic/%EB%AC%B6%EC%9D%8C.hwp",
+      "url": "https://raw.githubusercontent.com/neolord0/hwplib/4dc9673942bb8d977405122c3fed758af104cccd/sample_hwp/basic/%EB%AC%B6%EC%9D%8C.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V25-group.hwp",
+        "Documents/한글 문서/공개 기능 예제/V25-group.hwp"
+      ],
+      "sha256": "4a956097aaec93268eccb71058e067df58ca0eddaa020acb847337b551cc4477"
+    },
+    {
+      "fileName": "V26-equation-2020.hwp",
+      "sourcePage": "https://github.com/neolord0/hwplib/blob/4dc9673942bb8d977405122c3fed758af104cccd/sample_hwp/basic/%EC%88%98%EC%8B%9D.hwp",
+      "url": "https://raw.githubusercontent.com/neolord0/hwplib/4dc9673942bb8d977405122c3fed758af104cccd/sample_hwp/basic/%EC%88%98%EC%8B%9D.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V26-equation-2020.hwp",
+        "Documents/V26-equation-2020.hwp",
+        "Documents/한글 문서/공개 기능 예제/V26-equation-2020.hwp"
+      ],
+      "note": "The local name is a historical test-harness alias; the source URL identifies the actual public replacement, not its creation year.",
+      "sha256": "b58d59eeb903e2553a7d67049dbca3f639aedf7d8276875663775b0ac4404082"
+    },
+    {
+      "fileName": "V27-chart-2020.hwp",
+      "sourcePage": "https://github.com/edwardkim/rhwp/blob/e8800c8def63449808a4092798442652ed460552/samples/chart/%EC%84%B8%EB%A1%9C%EB%A7%89%EB%8C%80%ED%98%95/%EB%AC%B6%EC%9D%80%EC%84%B8%EB%A1%9C%EB%A7%89%EB%8C%80%ED%98%95.hwp",
+      "url": "https://raw.githubusercontent.com/edwardkim/rhwp/e8800c8def63449808a4092798442652ed460552/samples/chart/%EC%84%B8%EB%A1%9C%EB%A7%89%EB%8C%80%ED%98%95/%EB%AC%B6%EC%9D%80%EC%84%B8%EB%A1%9C%EB%A7%89%EB%8C%80%ED%98%95.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V27-chart-2020.hwp",
+        "Documents/V27-chart-2020.hwp",
+        "Documents/한글 문서/공개 기능 예제/V27-chart-2020.hwp"
+      ],
+      "note": "The local name is a historical test-harness alias; the source URL identifies the actual public replacement, not its creation year.",
+      "sha256": "12e8b4034cb236cc2fc20b777f90628825111e2ee8d8ec81e97f3fa60987d644"
+    },
+    {
+      "fileName": "V28-encrypted-negative.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/password-12345.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/password-12345.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V28-encrypted-negative.hwp",
+        "Documents/한글 문서/공개 기능 예제/V28-encrypted-negative.hwp"
+      ],
+      "sha256": "e86aac42e3efbcc2e06cc50e628705dce710bec0c252961b7d52c87e3c6b0660"
+    },
+    {
+      "fileName": "V29-tabdef.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/tabdef.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/tabdef.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V29-tabdef.hwp",
+        "Documents/한글 문서/공개 기능 예제/V29-tabdef.hwp"
+      ],
+      "sha256": "9c590dbad3e90bc8c4b972a6c4c1f70e31755abd125f88a9fa22e0a5d37fac44"
+    },
+    {
+      "fileName": "V30-underline-styles.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/underline-styles.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/underline-styles.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V30-underline-styles.hwp",
+        "Documents/한글 문서/공개 기능 예제/V30-underline-styles.hwp"
+      ],
+      "sha256": "ca5b1f8e3faf8f9e595bea07094874a9fa4cae91593a20c27211b5af7f1fa0b0"
+    },
+    {
+      "fileName": "V31-image.hwp",
+      "sourcePage": "https://github.com/neolord0/hwplib/blob/4dc9673942bb8d977405122c3fed758af104cccd/sample_hwp/basic/%EA%B7%B8%EB%A6%BC.hwp",
+      "url": "https://raw.githubusercontent.com/neolord0/hwplib/4dc9673942bb8d977405122c3fed758af104cccd/sample_hwp/basic/%EA%B7%B8%EB%A6%BC.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V31-image.hwp",
+        "Documents/한글 문서/공개 기능 예제/V31-image.hwp"
+      ],
+      "sha256": "c9d6726edce369955821a06d9a0f9b3887d733e9d99ee122b23299c6db4d2d92"
+    },
+    {
+      "fileName": "V32-polygon.hwp",
+      "sourcePage": "https://github.com/neolord0/hwplib/blob/4dc9673942bb8d977405122c3fed758af104cccd/sample_hwp/basic/%EB%8B%A4%EA%B0%81%ED%98%95.hwp",
+      "url": "https://raw.githubusercontent.com/neolord0/hwplib/4dc9673942bb8d977405122c3fed758af104cccd/sample_hwp/basic/%EB%8B%A4%EA%B0%81%ED%98%95.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V32-polygon.hwp",
+        "Documents/한글 문서/공개 기능 예제/V32-polygon.hwp"
+      ],
+      "sha256": "e199a457954b2c472c11c6c74a254b96a72f1c2ae7bee57564ead6e83accdb57"
+    },
+    {
+      "fileName": "V33-shapeline.hwp",
+      "sourcePage": "https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/shapeline.hwp",
+      "url": "https://raw.githubusercontent.com/mete0r/pyhwp/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/shapeline.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V33-shapeline.hwp",
+        "Documents/한글 문서/공개 기능 예제/V33-shapeline.hwp"
+      ],
+      "sha256": "f833e767f4fd654a49363a4483203028a4c17052c5fa4efcdb47435c470a3409"
+    },
+    {
+      "fileName": "V34-curves.hwp",
+      "sourcePage": "https://github.com/neolord0/hwplib/blob/4dc9673942bb8d977405122c3fed758af104cccd/sample_hwp/basic/%ED%98%B8-%EA%B3%A1%EC%84%A0.hwp",
+      "url": "https://raw.githubusercontent.com/neolord0/hwplib/4dc9673942bb8d977405122c3fed758af104cccd/sample_hwp/basic/%ED%98%B8-%EA%B3%A1%EC%84%A0.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V34-curves.hwp",
+        "Documents/V34-curves.hwp",
+        "Documents/한글 문서/공개 기능 예제/V34-curves.hwp"
+      ],
+      "sha256": "4440e988f9e8822081ce270797bb40ed36ddb71719a9b9e531d499b73924e466"
+    },
+    {
+      "fileName": "V35-background-page.hwp",
+      "sourcePage": "https://github.com/neolord0/hwplib/blob/4dc9673942bb8d977405122c3fed758af104cccd/sample_hwp/basic/%EB%B0%94%ED%83%95%EC%AA%BD.hwp",
+      "url": "https://raw.githubusercontent.com/neolord0/hwplib/4dc9673942bb8d977405122c3fed758af104cccd/sample_hwp/basic/%EB%B0%94%ED%83%95%EC%AA%BD.hwp",
+      "devicePaths": [
+        "Documents/.HWPValidation/V35-background-page.hwp",
+        "Documents/V35-background-page.hwp",
+        "Documents/한글 문서/공개 기능 예제/V35-background-page.hwp"
+      ],
+      "sha256": "eda125f82b5fa2745fa1cc195a01153b190b644b8fdddbdc76c98799c5d03b14"
+    },
+    {
+      "fileName": "Legacy-VtChart.hwp",
+      "sourcePage": "https://github.com/neolord0/hwplib/blob/4dc9673942bb8d977405122c3fed758af104cccd/sample_hwp/basic/%EC%B0%A8%ED%8A%B8.hwp",
+      "url": "https://raw.githubusercontent.com/neolord0/hwplib/4dc9673942bb8d977405122c3fed758af104cccd/sample_hwp/basic/%EC%B0%A8%ED%8A%B8.hwp",
+      "devicePaths": [
+        "Documents/한글 문서/추가 공개 예제/Legacy-VtChart.hwp"
+      ],
+      "note": "Legacy binary VtChart with no OOXML cache or preview. Retained as a known unsupported chart case; not substituted for the modern chart assertions.",
+      "sha256": "6f3692569f65a654a0f29cb7fd2c6a7b0f6b1867aa0f18dfcf16e295ffa0f821"
+    }
+  ]
+}

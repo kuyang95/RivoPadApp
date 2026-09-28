@@ -28,7 +28,7 @@ enum FirebaseRuntime {
             return
         }
 
-        #if DEBUG
+        #if targetEnvironment(simulator)
         AppCheck.setAppCheckProviderFactory(
             AppCheckDebugProviderFactory()
         )

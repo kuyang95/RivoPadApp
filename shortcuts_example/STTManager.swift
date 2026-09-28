@@ -69,24 +69,36 @@ final class STTManager: ObservableObject {
 
     // MARK: - Public API
     func startRecording(
-        requiresOnDeviceRecognition: Bool = false
+        requiresOnDeviceRecognition: Bool = false,
+        startEffect: SoundEffectManager.Effect = .record
     ) async throws -> AsyncStream<String> {
         log("▶️ startRecording() called. isRecording=\(isRecording) audioEngine.isRunning=\(audioEngine.isRunning)")
 
         guard !isRecording else { throw STTError.alreadyRecording }
+        SoundEffectManager.shared.play(startEffect)
 
         let permissionGranted = await requestPermission()
+        try Task.checkCancellation()
         log("🔐 Permission result: \(permissionGranted)")
-        guard permissionGranted else { throw STTError.permissionDenied }
+        guard permissionGranted else {
+            SoundEffectManager.shared.play(.fail)
+            throw STTError.permissionDenied
+        }
+        guard !isRecording else {
+            SoundEffectManager.shared.play(.fail)
+            throw STTError.alreadyRecording
+        }
 
         stopEngineIfNeeded()
 
         guard let recognizer = SFSpeechRecognizer(locale: locale),
               recognizer.isAvailable else {
+            SoundEffectManager.shared.play(.fail)
             throw STTError.recognizerUnavailable
         }
         guard !requiresOnDeviceRecognition
                 || recognizer.supportsOnDeviceRecognition else {
+            SoundEffectManager.shared.play(.fail)
             throw STTError.onDeviceRecognitionUnavailable
         }
         self.speechRecognizer = recognizer
@@ -109,11 +121,19 @@ final class STTManager: ObservableObject {
             var didEndAudio = false
             var didFinishStream = false
 
-            func finishOnce(_ text: String?) {
+            func finishOnce(
+                _ text: String?,
+                failed: Bool = false
+            ) {
                 guard !didFinishStream else { return }
                 didFinishStream = true
                 Task { @MainActor in
                     self.requestFinishHandler = nil
+                    SoundEffectManager.shared.play(
+                        failed
+                            ? .fail
+                            : .recordComplete
+                    )
                     if let text {
                         continuation.yield(text)
                     }
@@ -150,7 +170,8 @@ final class STTManager: ObservableObject {
                                     in: .whitespacesAndNewlines
                                 )
                             finishOnce(
-                                fallback.isEmpty ? nil : fallback
+                                fallback.isEmpty ? nil : fallback,
+                                failed: fallback.isEmpty
                             )
                         }
                     }
@@ -205,7 +226,7 @@ final class STTManager: ObservableObject {
                 self.log("✅ audioEngine.start() success. isRecording=true")
             } catch {
                 self.log("⛔️ audioEngine.start() failed: \(error.localizedDescription)")
-                finishOnce(nil)
+                finishOnce(nil, failed: true)
                 return
             }
 
@@ -232,7 +253,12 @@ final class STTManager: ObservableObject {
                     // endAudio 이후에 나오는 취소/기타 에러는 상황에 따라 final이 늦게 올 수도 있으니,
                     // 여기선 즉시 cancel하기보단 마무리로 종료
                     self.log("❌ recognition error: \((error as NSError).domain) \((error as NSError).code) \(error.localizedDescription)")
-                    finishOnce(lastPartialText.isEmpty ? nil : lastPartialText)
+                    finishOnce(
+                        lastPartialText.isEmpty
+                            ? nil
+                            : lastPartialText,
+                        failed: true
+                    )
                     return
                 }
             }

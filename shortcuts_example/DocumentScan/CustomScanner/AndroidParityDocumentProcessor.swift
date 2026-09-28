@@ -30,9 +30,7 @@ actor AndroidParityDocumentProcessor {
             metalSampler: metalImageSampler
         )
         self.dewarper = nil
-        self.enhancer = AndroidDocumentColorEnhancer(
-            metalSampler: metalImageSampler
-        )
+        self.enhancer = AndroidDocumentColorEnhancer()
         self.metalImageSampler = metalImageSampler
         self.outputLongEdgePixels = outputLongEdgePixels
         self.modelBundle = bundle
@@ -87,6 +85,14 @@ actor AndroidParityDocumentProcessor {
         }
     }
 
+    /// Runs the post-capture CPU stages once on small synthetic pages so the
+    /// first real capture does not pay for cold code paths and allocator
+    /// growth. Call it while the camera preview is starting.
+    func warmUpPostCaptureStages() {
+        PaperEdgeRefiner.warmUp()
+        AndroidDocumentColorMath.warmUp()
+    }
+
     /// Mirrors capture processing after the capture-time LCNet result:
     /// inset/perspective, upright rotation, UVDoc with graceful fallback,
     /// long-edge normalization, then optional document color enhancement.
@@ -123,6 +129,7 @@ actor AndroidParityDocumentProcessor {
         let perspectiveStage = trace?.beginStage("perspectiveCorrect")
         let correctedPixels: ScannerRGBAImage
         var perspectiveBackend = "custom"
+        var paperEdgeDetails: String?
         do {
             if let androidCorrector =
                 perspectiveCorrector as? AndroidPerspectiveCorrector {
@@ -133,6 +140,9 @@ actor AndroidParityDocumentProcessor {
                 perspectiveBackend =
                     await androidCorrector.lastWarpBackend?.rawValue
                     ?? "unknown"
+                paperEdgeDetails =
+                    await androidCorrector.lastPaperEdgeRefinement?
+                    .traceDetails
             } else {
                 let corrected = try await perspectiveCorrector.correct(
                     imageBridge.ciImage(from: source),
@@ -140,12 +150,17 @@ actor AndroidParityDocumentProcessor {
                 )
                 correctedPixels = try imageBridge.rgbaImage(from: corrected)
             }
-            perspectiveStage?.finish(
-                details: "input=\(source.width)x\(source.height) "
-                    + "output=\(correctedPixels.width)x"
-                    + "\(correctedPixels.height) "
-                    + "backend=\(perspectiveBackend) pixelNative=true"
-            )
+            var perspectiveDetails = "input="
+            perspectiveDetails += "\(source.width)x\(source.height)"
+            perspectiveDetails += " output="
+            perspectiveDetails += "\(correctedPixels.width)x"
+            perspectiveDetails += "\(correctedPixels.height)"
+            perspectiveDetails += " backend=\(perspectiveBackend)"
+            perspectiveDetails += " pixelNative=true"
+            if let paperEdgeDetails {
+                perspectiveDetails += " " + paperEdgeDetails
+            }
+            perspectiveStage?.finish(details: perspectiveDetails)
         } catch {
             perspectiveStage?.finish(
                 outcome: error is CancellationError
@@ -373,13 +388,24 @@ actor AndroidParityDocumentProcessor {
             )
             let performance = await androidEnhancer.lastPerformance
             let enhanced = imageBridge.ciImage(from: enhancedPixels)
-            let performanceDetails = performance.map {
-                " backend=\($0.backend.rawValue) "
-                    + "statisticsMs="
-                    + String(format: "%.2f", $0.statisticsMilliseconds)
-                    + " applyMs="
-                    + String(format: "%.2f", $0.applyMilliseconds)
-            } ?? ""
+            var performanceDetails = ""
+            if let performance {
+                performanceDetails = " backend="
+                performanceDetails += performance.backend.rawValue
+                performanceDetails += " statisticsMs="
+                performanceDetails += String(
+                    format: "%.2f",
+                    performance.statisticsMilliseconds
+                )
+                performanceDetails += " applyMs="
+                performanceDetails += String(
+                    format: "%.2f",
+                    performance.applyMilliseconds
+                )
+                performanceDetails += " phases=["
+                performanceDetails += performance.phaseSummary
+                performanceDetails += "]"
+            }
             enhanceStage?.finish(
                 details: "input=\(normalizedPixels.width)x"
                     + "\(normalizedPixels.height) "

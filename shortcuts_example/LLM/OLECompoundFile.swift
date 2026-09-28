@@ -60,6 +60,8 @@ nonisolated final class OLECompoundFile:
     private let miniFAT: [UInt32]
     private let streamEntries:
         [String: DirectoryEntry]
+    private let originalStreamPaths:
+        [String: String]
     private let rootMiniStream: Data
 
     init(
@@ -220,8 +222,15 @@ nonisolated final class OLECompoundFile:
                 .invalidFile
         }
         for sectorID in fatSectorIDs {
-            guard parsedFAT[Int(sectorID)]
-                    == Self.fatSector else {
+            // Some Apple-generated Word 97-2003 files mark their FAT sector
+            // as ENDOFCHAIN instead of FATSECT. The DIFAT remains the source
+            // of truth, so accepting that marker is safe and interoperable.
+            let marker = parsedFAT[
+                Int(sectorID)
+            ]
+            guard marker == Self.fatSector
+                    || marker
+                        == Self.endOfChain else {
                 throw OLECompoundFileError
                     .invalidFile
             }
@@ -392,6 +401,8 @@ nonisolated final class OLECompoundFile:
 
         var mapped:
             [String: DirectoryEntry] = [:]
+        var mappedOriginalPaths:
+            [String: String] = [:]
         var visited: Set<Int> = []
         try Self.walkDirectoryTree(
             root.child,
@@ -399,13 +410,22 @@ nonisolated final class OLECompoundFile:
             entries: parsedEntries,
             visited: &visited,
             depth: 0,
-            output: &mapped
+            output: &mapped,
+            originalPaths: &mappedOriginalPaths
         )
         streamEntries = mapped
+        originalStreamPaths = mappedOriginalPaths
     }
 
     var streamNames: [String] {
         streamEntries.keys.sorted()
+    }
+
+    /// Original spelling and casing from the CFB directory. Lookups remain
+    /// normalized, but writers need these paths for maximum interoperability
+    /// with importers that incorrectly treat well-known names as case-sensitive.
+    var streamPaths: [String] {
+        originalStreamPaths.values.sorted()
     }
 
     func containsStream(
@@ -733,7 +753,9 @@ nonisolated final class OLECompoundFile:
         visited: inout Set<Int>,
         depth: Int,
         output:
-            inout [String: DirectoryEntry]
+            inout [String: DirectoryEntry],
+        originalPaths:
+            inout [String: String]
     ) throws {
         if rawIndex == noStream {
             return
@@ -764,7 +786,8 @@ nonisolated final class OLECompoundFile:
             entries: entries,
             visited: &visited,
             depth: depth + 1,
-            output: &output
+            output: &output,
+            originalPaths: &originalPaths
         )
 
         let path = parentPath.isEmpty
@@ -777,6 +800,7 @@ nonisolated final class OLECompoundFile:
                     .invalidFile
             }
             output[key] = entry
+            originalPaths[key] = path
         } else {
             try walkDirectoryTree(
                 entry.child,
@@ -784,7 +808,8 @@ nonisolated final class OLECompoundFile:
                 entries: entries,
                 visited: &visited,
                 depth: depth + 1,
-                output: &output
+                output: &output,
+                originalPaths: &originalPaths
             )
         }
 
@@ -794,7 +819,8 @@ nonisolated final class OLECompoundFile:
             entries: entries,
             visited: &visited,
             depth: depth + 1,
-            output: &output
+            output: &output,
+            originalPaths: &originalPaths
         )
     }
 

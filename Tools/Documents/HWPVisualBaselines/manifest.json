@@ -1,0 +1,189 @@
+{
+  "version": 1,
+  "reviewedAt": "2026-09-08",
+  "captureResult": "/tmp/rivopad-polish-r3.xcresult",
+  "deviceId": "00008132-001A61443421801C",
+  "device": "iPad Pro 11-inch (M4)",
+  "osVersion": "26.5.2",
+  "osBuild": "23F84",
+  "scale": 2,
+  "limits": {
+    "channelDelta": 18,
+    "pageChangedFraction": 0.02,
+    "tileChangedFraction": 0.12,
+    "tileSize": 64
+  },
+  "purpose": "Protect reviewed app rendering against subsequent unintended changes; these images are not exact official PDF matches.",
+  "sourceDocuments": [
+    {
+      "id": "FP01_kcg_workshop",
+      "hwpSHA256": "21cd106d4953a437f2bc4f32ff0250e3364a01dff84653f7f0c0ac1f9c622762",
+      "pdfSHA256": "95d99f30cb15c99ff021191491ba402f36eb44fde497e1336eae3c292ec8df51"
+    },
+    {
+      "id": "FP02_mpva_recruitment",
+      "hwpSHA256": "9fb00cca761f25fb0e2c3b3230a1fa1f3bb038e4c517d6ea06f6d0a016cd7ed5",
+      "pdfSHA256": "58c3a80b07e884bb9c77115a7c636d27513982ad77a4fbd6a9b6dfe9d024aec3"
+    },
+    {
+      "id": "FP03_museum_recruitment",
+      "hwpSHA256": "499515b2598028a7155e877f0aeb0aca1843199ed287d919b7e25b55408d11b4",
+      "pdfSHA256": "c5853a8e652a1183bc02479c2d376a60142774435c22dfcf332047806870d3a5"
+    }
+  ],
+  "pages": [
+    {
+      "id": "FP01_kcg_workshop-page-001",
+      "file": "FP01_kcg_workshop-page-001.png",
+      "sha256": "1b3c63c24b9e8e8f15d4423ab0f6af3e7aa5a722b96a90aa3281829225e21172",
+      "size": [
+        1191,
+        1684
+      ]
+    },
+    {
+      "id": "FP01_kcg_workshop-page-002",
+      "file": "FP01_kcg_workshop-page-002.png",
+      "sha256": "08868e0ac99fe40687b2096f3b60d40f0103416393f71be610ba29f50bad67a3",
+      "size": [
+        1191,
+        1684
+      ]
+    },
+    {
+      "id": "FP01_kcg_workshop-page-003",
+      "file": "FP01_kcg_workshop-page-003.png",
+      "sha256": "edbd5ad6a2036b34626e3d164c418699d6a22844607acb70f87897c95ee39f97",
+      "size": [
+        1191,
+        1684
+      ]
+    },
+    {
+      "id": "FP01_kcg_workshop-page-004",
+      "file": "FP01_kcg_workshop-page-004.png",
+      "sha256": "9fadf413682187cc8aa4494c14864595cec9ea045c35e3c6bca70fcc9d73f22d",
+      "size": [
+        1191,
+        1684
+      ]
+    },
+    {
+      "id": "FP01_kcg_workshop-page-005",
+      "file": "FP01_kcg_workshop-page-005.png",
+      "sha256": "804c8c2a4d0cb8a6ebad9dc878cbb93bc8dc2a969f9dbe7e8a3dd04d7d06fa8c",
+      "size": [
+        1191,
+        1684
+      ]
+    },
+    {
+      "id": "FP01_kcg_workshop-page-009",
+      "file": "FP01_kcg_workshop-page-009.png",
+      "sha256": "459bdd0a127847648fbddebc9e4f77d8a7b8aa97641080249c93ace9db9be695",
+      "size": [
+        1191,
+        1684
+      ]
+    },
+    {
+      "id": "FP01_kcg_workshop-page-010",
+      "file": "FP01_kcg_workshop-page-010.png",
+      "sha256": "488ebecb262f2b1418dcb49eb7365c85915bb36b7ac098db7d91fb2a0a04abfc",
+      "size": [
+        1191,
+        1684
+      ]
+    },
+    {
+      "id": "FP01_kcg_workshop-page-012",
+      "file": "FP01_kcg_workshop-page-012.png",
+      "sha256": "239cf88dbb720ed71a4b800c371970ec3f0f2a0d69e67f152f07cbe6af99932c",
+      "size": [
+        1191,
+        1684
+      ]
+    },
+    {
+      "id": "FP01_kcg_workshop-page-013",
+      "file": "FP01_kcg_workshop-page-013.png",
+      "sha256": "8eabe8ae200e9bf6d9dbce5fb274ae1097e7a0e15ef7581f9e6030e74c1ba3f6",
+      "size": [
+        1191,
+        1684
+      ]
+    },
+    {
+      "id": "FP01_kcg_workshop-page-014",
+      "file": "FP01_kcg_workshop-page-014.png",
+      "sha256": "df4ee1e2b85fd1c09a8ecc2a8eb389a30654d7a911f3e2bf3fb575813e9eb4e8",
+      "size": [
+        1191,
+        1684
+      ]
+    },
+    {
+      "id": "FP01_kcg_workshop-page-020",
+      "file": "FP01_kcg_workshop-page-020.png",
+      "sha256": "b22a714b7db85a7b1e81f0805d3c5a58659b131f0a355d02166e044be433c034",
+      "size": [
+        1191,
+        1684
+      ]
+    },
+    {
+      "id": "FP01_kcg_workshop-page-026",
+      "file": "FP01_kcg_workshop-page-026.png",
+      "sha256": "2f8936ad04adc7c5f43ed45c10787055fafea62c6506e26da2941a5c30785b1b",
+      "size": [
+        1191,
+        1684
+      ]
+    },
+    {
+      "id": "FP02_mpva_recruitment-page-001",
+      "file": "FP02_mpva_recruitment-page-001.png",
+      "sha256": "b67c7e778fcef42226b7356cf2cdd0b9a603b095bde836a9286e167b915e70b1",
+      "size": [
+        1191,
+        1684
+      ]
+    },
+    {
+      "id": "FP02_mpva_recruitment-page-006",
+      "file": "FP02_mpva_recruitment-page-006.png",
+      "sha256": "d21e3995f0ef1322b68fda672dfa62ce206cd5e1cc5747c18e467e5cbdebb6bf",
+      "size": [
+        1191,
+        1684
+      ]
+    },
+    {
+      "id": "FP02_mpva_recruitment-page-015",
+      "file": "FP02_mpva_recruitment-page-015.png",
+      "sha256": "0080a7d8ced708e8e86fd9147121b1b381e0983c8e3cc7533c35fbf5fbb2db09",
+      "size": [
+        1191,
+        1684
+      ]
+    },
+    {
+      "id": "FP03_museum_recruitment-page-001",
+      "file": "FP03_museum_recruitment-page-001.png",
+      "sha256": "c4b452f049eee287fadfd83f77f91154daf0c85b23457e8347c428e890c8ac73",
+      "size": [
+        1191,
+        1684
+      ]
+    },
+    {
+      "id": "FP03_museum_recruitment-page-002",
+      "file": "FP03_museum_recruitment-page-002.png",
+      "sha256": "26e901a7377b2f85ebc04069dc43a68bca942a7b13e4e268c149c252a0019029",
+      "size": [
+        1191,
+        1684
+      ]
+    }
+  ]
+}

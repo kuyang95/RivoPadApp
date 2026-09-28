@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "description": "Second independent set of official HWP/PDF pairs used for full-page HWP renderer validation.",
+  "documents": [
+    {
+      "id": "FP06_gumc_recruitment",
+      "title": "광주도시관리공사 2026년 제2차 직원채용 공고",
+      "sourcePage": "https://www.gumc.or.kr/news/recruit_view?board_id=b0408&idx=13360&p=1&sf=subject",
+      "hwpURL": "https://www.gumc.or.kr/board/download/b0408/13360/1",
+      "pdfURL": "https://www.gumc.or.kr/board/download/b0408/13360/2",
+      "hwpSHA256": "e6b0dfb751f5b467073d5c7b643bdb5a236d45490bc7b601341f76ea19e0c43e",
+      "pdfSHA256": "3df7d57e61fa3430a22400f33198e754d9a76bcdf78e5e9f1c20fcc21116144f",
+      "expectedPages": 13
+    },
+    {
+      "id": "FP07_gwe_exam",
+      "title": "강원특별자치도교육청 2025년도 제2회 검정고시 시행계획 공고",
+      "sourcePage": "https://gwcce.gwe.go.kr/boardCnts/view.do?boardID=2712&boardSeq=7679811&lev=0&m=040101&page=1&s=gwcce",
+      "hwpURL": "https://gwcce.gwe.go.kr/boardCnts/fileDown.do?m=040101&s=gwcce&fileSeq=cdc47d5e098abfe4be0923cf886eb258",
+      "pdfURL": "https://gwcce.gwe.go.kr/boardCnts/fileDown.do?m=040101&s=gwcce&fileSeq=af161f6f2de4aefd6da6ef36065aab8e",
+      "hwpSHA256": "5a4ef97b8492df88abb45f06b441ec9845b4b732e1b7610271c80f0e86639274",
+      "pdfSHA256": "a4fd2532200a6552fa100defd35c50ac286fbd0416fda17c4d59f543cf81a9e2",
+      "expectedPages": 27
+    },
+    {
+      "id": "FP08_gogung_recruitment",
+      "title": "국립고궁박물관 2026년 제6차 공무직 근로자 채용 공고",
+      "sourcePage": "https://www.gogung.go.kr/gogung/bbs/BMSR00022/view.do?boardId=6971&gubunCd=B22_003&menuNo=800090&pageIndex=1&searchCondition=&searchKeyword=",
+      "hwpURL": "https://www.gogung.go.kr/gogung/cmmn/file/fileDown.do?atchFileId=773b57a9e1fe44a6ad0631e5f2c1ab39&fileSn=1",
+      "pdfURL": "https://www.gogung.go.kr/gogung/cmmn/file/fileDown.do?atchFileId=773b57a9e1fe44a6ad0631e5f2c1ab39&fileSn=3",
+      "hwpSHA256": "5666b778173c165a7c7328112ca7e9c24649b30b3029f02ff8da6c3d199dc270",
+      "pdfSHA256": "02a327a6a96a74d128a4dd8f9541f7202813beedda3c0ff37a796ffad8bfbf5e",
+      "expectedPages": 19
+    },
+    {
+      "id": "FP09_museum_research",
+      "title": "국립중앙박물관 2026년 연구직 공무원 경력경쟁채용 공고",
+      "sourcePage": "https://vcm.museum.go.kr/MUSEUM/contents/M0701030000.do?arcId=23669&catCustomType=post&catId=54&cp=7&schM=view&sv=",
+      "hwpURL": "https://vcm.museum.go.kr/afile/fileDownloadById/260529381434qdqa?siteCode=MUSEUM",
+      "pdfURL": "https://vcm.museum.go.kr/afile/fileDownloadById/260529381660rxf1?siteCode=MUSEUM",
+      "hwpSHA256": "c67a7beb206a7e6b5e543614bcc5f63ab83b9b520e04aa215d8801b96f6da9dc",
+      "pdfSHA256": "96420b03dc2dab6a047b5d8dc4a37a5a73b649b8f0b6088f5335571cfb594f25",
+      "expectedPages": 35
+    },
+    {
+      "id": "FP10_mois_disaster_research",
+      "title": "행정안전부 국립재난안전연구원 연구직 공무원 채용 공고",
+      "sourcePage": "https://www.mois.go.kr/frt/bbs/type013/commonSelectBoardArticle.do?bbsId=BBSMSTR_000000000006&nttId=125163",
+      "hwpURL": "https://www.mois.go.kr/cmm/fms/FileDown.do?atchFileId=FILE_00144232Wc6qLqE&fileSn=1",
+      "pdfURL": "https://www.mois.go.kr/cmm/fms/FileDown.do?atchFileId=FILE_00144232Wc6qLqE&fileSn=0",
+      "hwpSHA256": "f38063341a255fdd4b004e9a9e39df4d45f5c19146d5e16dcc8ba17968079b13",
+      "pdfSHA256": "5bf89100978f5ac1076b8fcafeb002084fb8d1485984f712ecfa10b47702270b",
+      "expectedPages": 35
+    }
+  ]
+}

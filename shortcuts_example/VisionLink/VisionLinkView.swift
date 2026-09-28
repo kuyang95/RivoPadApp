@@ -16,32 +16,71 @@ struct VisionLinkView: View {
         false
     @State private var receivedTextOpenError:
         String?
+    @State private var isSettingsPresented = false
 
     var body: some View {
-        List {
-            statusSection
+        ZStack {
+            VisionCraftUI.background
+                .ignoresSafeArea()
 
-            if manager.remoteVideoTrack != nil,
+            if let track = manager.remoteVideoTrack,
                manager.isCameraShareActive {
-                videoSection
+                VisionLinkVideoView(track: track) {
+                    manager.markFirstVideoFrameRendered()
+                }
+                .ignoresSafeArea()
+                .background(Color.black)
+            } else if isConnected {
+                connectedStage
+            } else {
+                connectionStage
             }
 
-            if let pairingCode = manager.pairingCode {
-                pairingSection(code: pairingCode)
-            }
+            VStack {
+                HStack {
+                    if isConnected {
+                        connectionChip
+                    }
+                    Spacer()
+                    Button {
+                        isSettingsPresented = true
+                    } label: {
+                        Image(systemName: "gearshape.fill")
+                            .font(.title3)
+                            .foregroundStyle(
+                                VisionCraftUI.primaryText
+                            )
+                            .frame(width: 48, height: 48)
+                            .background(
+                                VisionCraftUI.surface
+                                    .opacity(0.86),
+                                in: Circle()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        "VisionLink 설정"
+                    )
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
 
-            dataTransferSection
-            controlsSection
-            diagnosticsSection
-            currentScopeSection
+                Spacer()
+                transferOverlay
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 28)
+            }
         }
-        .listStyle(.insetGrouped)
-        .visionCraftListScreen()
-        .navigationTitle("VisionLink")
+        .visionCraftNavigationScreen()
+        .navigationTitle("스마트폰과 연동")
+        .navigationBarTitleDisplayMode(.inline)
         .task {
             manager.activate()
         }
         .quickLookPreview($previewURL)
+        .sheet(isPresented: $isSettingsPresented) {
+            visionLinkSettings
+        }
         .confirmationDialog(
             "저장된 VisionLink 연결을 해제할까요?",
             isPresented:
@@ -82,6 +121,380 @@ struct VisionLinkView: View {
                 )
             )
         }
+    }
+
+    @ViewBuilder
+    private var connectionStage: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                Circle()
+                    .fill(
+                        VisionCraftUI.primary
+                            .opacity(0.14)
+                    )
+                    .frame(width: 88, height: 88)
+                Circle()
+                    .fill(
+                        VisionCraftUI.primary
+                            .opacity(0.24)
+                    )
+                    .frame(width: 64, height: 64)
+                Image(systemName: "link")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(
+                        VisionCraftUI.primary
+                    )
+            }
+
+            Text(connectionTitle)
+                .font(.system(size: 26, weight: .bold))
+                .foregroundStyle(
+                    VisionCraftUI.primaryText
+                )
+                .multilineTextAlignment(.center)
+                .padding(.top, 18)
+
+            Text(connectionMessage)
+                .font(.system(size: 16))
+                .foregroundStyle(
+                    VisionCraftUI.secondaryText
+                )
+                .multilineTextAlignment(.center)
+                .padding(.top, 6)
+
+            if let code = manager.pairingCode {
+                VStack(spacing: 2) {
+                    Text(code)
+                        .font(
+                            .system(
+                                size: 30,
+                                weight: .bold,
+                                design: .monospaced
+                            )
+                        )
+                        .tracking(4)
+                        .foregroundStyle(
+                            VisionCraftUI.primaryText
+                        )
+                    if let seconds =
+                            manager.remainingSeconds {
+                        Text("만료까지 \(seconds)초")
+                            .font(.system(size: 14))
+                            .foregroundStyle(
+                                VisionCraftUI.warning
+                            )
+                    }
+                }
+                .frame(minWidth: 260)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(
+                    VisionCraftUI.surface,
+                    in: RoundedRectangle(
+                        cornerRadius: 16,
+                        style: .continuous
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 16,
+                        style: .continuous
+                    )
+                    .stroke(
+                        VisionCraftUI.outline,
+                        lineWidth: 1
+                    )
+                }
+                .padding(.top, 16)
+            }
+
+            if shouldShowNewCodeButton {
+                Button("새 코드 생성") {
+                    manager.createNewCode()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .padding(.top, 16)
+            }
+        }
+        .frame(maxWidth: 520)
+        .padding(.horizontal, 48)
+    }
+
+    private var connectedStage: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                VisionCraftUI.primary,
+                                VisionCraftUI.success,
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: 148, height: 2)
+
+                HStack {
+                    connectedNode(
+                        "iphone",
+                        color:
+                            VisionCraftUI.primary
+                    )
+                    Spacer()
+                    connectedNode(
+                        "ipad",
+                        color:
+                            VisionCraftUI.success
+                    )
+                }
+                .frame(width: 220)
+            }
+            .frame(width: 240, height: 96)
+
+            Text("연결됨")
+                .font(.system(size: 26, weight: .bold))
+                .foregroundStyle(
+                    VisionCraftUI.primaryText
+                )
+                .padding(.top, 10)
+            Text("VisionLink 에서 작업을 시작하세요.")
+                .font(.system(size: 16))
+                .foregroundStyle(
+                    VisionCraftUI.secondaryText
+                )
+                .padding(.top, 6)
+            Text(
+                "카메라 화면공유 · 파일보내기 · 비전크래프트 기능"
+            )
+            .font(.system(size: 14))
+            .foregroundStyle(VisionCraftUI.primary)
+            .multilineTextAlignment(.center)
+            .padding(.top, 12)
+
+            if let file = manager.lastReceivedFile {
+                Button {
+                    previewURL = file.url
+                } label: {
+                    Label(
+                        file.fileName,
+                        systemImage: "chevron.right"
+                    )
+                    .lineLimit(1)
+                    .frame(minHeight: 48)
+                }
+                .buttonStyle(.bordered)
+                .padding(.top, 18)
+            }
+        }
+        .frame(maxWidth: 520)
+        .padding(.horizontal, 48)
+    }
+
+    private func connectedNode(
+        _ image: String,
+        color: Color
+    ) -> some View {
+        Image(systemName: image)
+            .font(.system(size: 25, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 58, height: 58)
+            .background(color, in: Circle())
+    }
+
+    private var connectionChip: some View {
+        HStack(spacing: 9) {
+            Circle()
+                .fill(VisionCraftUI.success)
+                .frame(width: 10, height: 10)
+            Text(connectionActivityTitle)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(
+                    VisionCraftUI.primaryText
+                )
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 44)
+        .background(
+            VisionCraftUI.surface.opacity(0.88),
+            in: Capsule()
+        )
+    }
+
+    @ViewBuilder
+    private var transferOverlay: some View {
+        if let progress = manager.incomingTransfer {
+            VStack(alignment: .leading, spacing: 10) {
+                Label(
+                    "파일 받는 중",
+                    systemImage:
+                        "arrow.down.doc.fill"
+                )
+                .font(.headline)
+                Text(progress.fileName)
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        VisionCraftUI.secondaryText
+                    )
+                    .lineLimit(1)
+                ProgressView(
+                    value:
+                        progress.fractionCompleted
+                )
+            }
+            .visionLinkTransferCard()
+        } else if let text =
+                    manager.receivedClipboardText {
+            Button {
+                openReceivedText(text)
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "doc.text.fill")
+                        .font(.title2)
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text("텍스트를 받았습니다")
+                            .font(.headline)
+                        Text(text)
+                            .font(.subheadline)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                }
+                .foregroundStyle(
+                    VisionCraftUI.primaryText
+                )
+                .visionLinkTransferCard()
+            }
+            .buttonStyle(.plain)
+        } else if let message =
+                    manager.dataTransferMessage {
+            Label(
+                message,
+                systemImage:
+                    "exclamationmark.triangle.fill"
+            )
+            .foregroundStyle(.red)
+            .visionLinkTransferCard()
+        }
+    }
+
+    private var visionLinkSettings: some View {
+        NavigationStack {
+            List {
+                if manager.hasStoredPair {
+                    Button(
+                        "기기 등록 해제",
+                        systemImage: "link.badge.minus",
+                        role: .destructive
+                    ) {
+                        isSettingsPresented = false
+                        isUnregisterConfirmationPresented =
+                            true
+                    }
+                    .frame(minHeight: 64)
+                }
+
+                controlsSection
+            }
+            .visionCraftListScreen()
+            .navigationTitle("VisionLink 설정")
+            .toolbar {
+                ToolbarItem(
+                    placement: .confirmationAction
+                ) {
+                    Button("완료") {
+                        isSettingsPresented = false
+                    }
+                }
+            }
+        }
+    }
+
+    private var isConnected: Bool {
+        switch manager.state {
+        case .mediaConnected,
+             .mediaIdle,
+             .videoReceiving:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private var shouldShowNewCodeButton: Bool {
+        switch manager.state {
+        case .codeExpired, .failed, .disconnected:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private var connectionTitle: String {
+        switch manager.state {
+        case .waitingForCompanion:
+            return AppLocalization.string(
+                "VisionLink 연결 대기 중"
+            )
+        case .codeExpired:
+            return AppLocalization.string(
+                "연결 코드가 만료되었습니다"
+            )
+        case .disconnected, .failed:
+            return AppLocalization.string(
+                "연결이 끊겼습니다"
+            )
+        default:
+            return AppLocalization.string(
+                "연결 준비 중"
+            )
+        }
+    }
+
+    private var connectionMessage: String {
+        switch manager.state {
+        case .waitingForCompanion:
+            return AppLocalization.string(
+                "휴대폰의 VisionLink에서 아래 연결 코드를 입력해주세요."
+            )
+        case .codeExpired:
+            return AppLocalization.string(
+                "새 연결 코드를 만들어 다시 연결할 수 있습니다."
+            )
+        case .disconnected, .failed:
+            return AppLocalization.string(
+                "VisionLink의 연결 상태를 확인해주세요."
+            )
+        default:
+            return AppLocalization.string(
+                "VisionLink와 안전하게 연결하고 있습니다."
+            )
+        }
+    }
+
+    private var connectionActivityTitle: String {
+        if manager.isCameraShareActive {
+            return AppLocalization.string(
+                "카메라 화면 공유 중"
+            )
+        }
+        if manager.connectedActivity?.isWorking
+            == true {
+            return manager.connectedActivity?.title
+                ?? AppLocalization.string(
+                    "연결됨 · 전송 대기 중"
+                )
+        }
+        return AppLocalization.string(
+            "연결됨 · 전송 대기 중"
+        )
     }
 
     @ViewBuilder
@@ -679,5 +1092,38 @@ struct VisionLinkView: View {
         case .inactive, .disconnected:
             return .secondary
         }
+    }
+}
+
+private extension View {
+    func visionLinkTransferCard() -> some View {
+        self
+            .padding(18)
+            .frame(
+                maxWidth: 560,
+                alignment: .leading
+            )
+            .background(
+                VisionCraftUI.surface.opacity(0.94),
+                in: RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+                .stroke(
+                    VisionCraftUI.outline,
+                    lineWidth: 1
+                )
+            }
+            .shadow(
+                color: .black.opacity(0.2),
+                radius: 10,
+                y: 4
+            )
     }
 }

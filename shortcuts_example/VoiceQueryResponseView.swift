@@ -386,24 +386,10 @@ struct VoiceQueryResponseView: View {
         let service = LLMService.shared
 
         do {
-            try await service.activateModel(.qwen3_8b_4bit)
+            try await service.activateModel(.preferredTextModel)
 
         } catch {
             print("LLM 오류:", error)
-        }
-    }
-    
-    private func runVLM(_ image: UIImage) async {
-
-        let service = LLMService.shared
-
-        guard CIImage(image: image) != nil else { return }
-
-        do {
-            try await service.activateModel(.qwen3_vl_8b_4bit)
-
-        } catch {
-            print("VLM 오류:", error)
         }
     }
     
@@ -431,73 +417,13 @@ struct VoiceQueryResponseView: View {
 
         pendingImage = image
         pendingDocument = nil
-        let service = LLMService.shared
-         
-        messages.append(
-            Message(
-                text:
-                    AppLocalization.string(
-                        "모델 로딩중"
-                    ),
-                image: nil,
-                isMe: false
-            )
-        )
+
+        // 이미지 질문은 Gemini 가 처리해서 내려받거나 올려 둘 모델이 없다.
+        // 음성 인식만 끝나면 바로 질문을 보낼 수 있다.
+        modelReady = true
 
         Task {
-
-            soundEffectManager.play(.recording)
-
-            async let sttTask = startSTT()
-
-            async let modelTask: Void = {
-                try await service.activateModel(.qwen3_vl_8b_4bit)
-            }()
-
-            do {
-
-                try await modelTask
-
-                await MainActor.run {
-
-                    modelReady = true
-
-                    messages.append(
-                        Message(
-                            text:
-                                AppLocalization.string(
-                                    "모델 준비됨"
-                                ),
-                            image: nil,
-                            isMe: false
-                        )
-                    )
-
-                    Task {
-                        await processPendingQueryIfNeeded()
-                    }
-                }
-
-            } catch {
-
-                print("VLM 오류:", error)
-                await MainActor.run {
-                    messages.append(
-                        Message(
-                            text:
-                                AppLocalization.format(
-                                    "모델 로드 실패: %@",
-                                    error
-                                        .localizedDescription
-                                ),
-                            image: nil,
-                            isMe: false
-                        )
-                    )
-                }
-            }
-
-            await sttTask
+            await startSTT()
         }
     }
     
@@ -521,13 +447,10 @@ struct VoiceQueryResponseView: View {
         )
 
         Task {
-
-            soundEffectManager.play(.recording)
-
             async let sttTask = startSTT()
 
             async let modelTask: Void = {
-                try await service.activateModel(.qwen3_8b_4bit)
+                try await service.activateModel(.preferredTextModel)
             }()
 
             do {
@@ -579,7 +502,9 @@ struct VoiceQueryResponseView: View {
 
         do {
 
-            let stream = try await stt.startRecording()
+            let stream = try await stt.startRecording(
+                startEffect: .recording
+            )
 
             for await text in stream {
 
@@ -638,10 +563,8 @@ struct VoiceQueryResponseView: View {
 
             do {
                 let stream =
-                    try await service
-                    .streamVision(
-                        conversationID:
-                            conversationID,
+                    try await
+                    GeminiVisionService.stream(
                         system:
                             systemPromptVLM,
                         prompt: question,

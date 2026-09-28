@@ -1,0 +1,168 @@
+{
+  "sources": {
+    "labor": {
+      "title": "근로관계법령집",
+      "text_file": "labor_standards_act.txt",
+      "source_url": "https://law.go.kr/lbook/lbFileDownload.do?flExt=pdf&lbookConflSeq=102409&lbookSeq=96116"
+    },
+    "older_stats": {
+      "title": "2025 고령자 통계",
+      "text_file": "older_persons_statistics_2025.txt",
+      "source_url": "https://kostat.go.kr/boardDownload.es?bid=10820&list_no=438832&seq=1"
+    },
+    "economy": {
+      "title": "경제전망보고서(2026년 2월)",
+      "text_file": "economic_outlook_2026_02.txt",
+      "source_url": "https://www.bok.or.kr/fileSrc/portal/abee0d98aefe40b8abadc5744ec5d613/1/8e9cda349b1049f8be89054aa1d21d18.pdf"
+    }
+  },
+  "questions": [
+    {
+      "id": "L01",
+      "source": "labor",
+      "question": "직원을 해고하려면 며칠 전에 알려야 하나?",
+      "intent": "retrieve",
+      "difficulty": "동의어와 활용형",
+      "evidence_patterns": [
+        "제26조\\(해고의 예고\\).*적\\s*어도 30일 전에 예고"
+      ]
+    },
+    {
+      "id": "L02",
+      "source": "labor",
+      "question": "상시 근로자가 4명인 사업장에도 근로기준법이 전부 적용돼?",
+      "intent": "retrieve",
+      "difficulty": "두 문단을 함께 읽어야 함",
+      "evidence_patterns": [
+        "제11조\\(적용 범위\\).*상시 5명 이상의 근로자",
+        "상시 4명 이하의 근로자.*일부 규정을 적용"
+      ]
+    },
+    {
+      "id": "L03",
+      "source": "labor",
+      "question": "퇴사한 직원 월급을 늦게 주면 이자가 몇 퍼센트야?",
+      "intent": "retrieve",
+      "difficulty": "법률 본문과 시행령에 답이 분리됨",
+      "evidence_patterns": [
+        "제17조\\(미지급 임금에 대한 지연이자의 이율\\).*연 100분의 20"
+      ]
+    },
+    {
+      "id": "L04",
+      "source": "labor",
+      "question": "사장이 직원을 때리면 어떤 처벌을 받아?",
+      "intent": "retrieve",
+      "difficulty": "일상어를 법률용어로 바꾸고 멀리 떨어진 벌칙을 찾아야 함",
+      "evidence_patterns": [
+        "제107조\\(벌칙\\).*제8조.*5년 이하의 징역.*5천만원 이하의 벌금"
+      ]
+    },
+    {
+      "id": "L05",
+      "source": "labor",
+      "question": "1년 동안 거의 빠짐없이 일한 사람에게 휴가가 며칠 생겨?",
+      "intent": "retrieve",
+      "difficulty": "구어체 조건을 법 조항과 연결",
+      "evidence_patterns": [
+        "제60조\\(연차 유급휴가\\).*1년간 80퍼센트 이상 출근.*15일의 유급휴가"
+      ]
+    },
+    {
+      "id": "S01",
+      "source": "older_stats",
+      "question": "2025년 65세 이상 인구는 전체의 몇 퍼센트야?",
+      "intent": "retrieve",
+      "difficulty": "명시적 연도와 지표",
+      "evidence_patterns": [
+        "2025년 65세 이상 고령인구.*전체 인구의 20\\.3%"
+      ]
+    },
+    {
+      "id": "S02",
+      "source": "older_stats",
+      "question": "2025년 여성과 남성의 고령인구 비중 차이는?",
+      "intent": "retrieve",
+      "difficulty": "복수 값 비교",
+      "evidence_patterns": [
+        "여자.*22\\.6%.*남자.*18\\.0%.*4\\.6%p"
+      ]
+    },
+    {
+      "id": "S03",
+      "source": "older_stats",
+      "question": "노인 중 온라인에 접속하는 사람 비율은?",
+      "intent": "retrieve",
+      "difficulty": "노인·온라인이라는 동의어",
+      "evidence_patterns": [
+        "65세 이상 고령자의 76\\.9%가 인터넷을 이용"
+      ]
+    },
+    {
+      "id": "S04",
+      "source": "older_stats",
+      "question": "2024년 고령자의 인스턴트 메신저 이용률은?",
+      "intent": "retrieve",
+      "difficulty": "명시적 고유 지표",
+      "evidence_patterns": [
+        "2024년 고령자의 인터넷 이용률은 76\\.9%, 인스턴트 메신저 이용률은 92\\.6%"
+      ]
+    },
+    {
+      "id": "S05",
+      "source": "older_stats",
+      "question": "고령자 비율은 얼마야?",
+      "intent": "clarify",
+      "difficulty": "대상·연도·지표가 모두 모호함",
+      "evidence_patterns": []
+    },
+    {
+      "id": "E01",
+      "source": "economy",
+      "question": "한국은행이 전망한 2026년 GDP 성장률은?",
+      "intent": "retrieve",
+      "difficulty": "명시적 연도와 지표",
+      "evidence_patterns": [
+        "우리 경제.*2\\.0% 성장할 전망"
+      ]
+    },
+    {
+      "id": "E02",
+      "source": "economy",
+      "question": "2026년 경상수지 흑자 전망 규모는?",
+      "intent": "retrieve",
+      "difficulty": "연도 표기가 올해로 치환됨",
+      "evidence_patterns": [
+        "올해 경상수지 흑자규모.*1,700억달러"
+      ]
+    },
+    {
+      "id": "E03",
+      "source": "economy",
+      "question": "올해 수출이 좋아지는 가장 큰 이유는?",
+      "intent": "retrieve",
+      "difficulty": "포괄적 질문과 인과관계",
+      "evidence_patterns": [
+        "금년중 재화수출.*반도체 경기 개선세 확대.*AI 관련 반도체 수요.*범용 메모리까지 확산"
+      ]
+    },
+    {
+      "id": "E04",
+      "source": "economy",
+      "question": "반도체 수출이 비관 시나리오대로 둔화되면 내년 성장률은 기본 전망보다 얼마나 낮아져?",
+      "intent": "retrieve",
+      "difficulty": "시나리오 안의 특정 연도·값",
+      "evidence_patterns": [
+        "국내 성장률은 기본전망 대비 올해 -0\\.2%p, 내년 -0\\.3%p 하락"
+      ]
+    },
+    {
+      "id": "E05",
+      "source": "economy",
+      "question": "2026년 2.0% 전망치는 무엇을 뜻해?",
+      "intent": "clarify",
+      "difficulty": "같은 숫자가 성장률과 물가 문맥에 반복됨",
+      "evidence_patterns": []
+    }
+  ]
+}

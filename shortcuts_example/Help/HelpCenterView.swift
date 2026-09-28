@@ -110,7 +110,7 @@ struct HelpCenterView: View {
                         "square.and.arrow.down"
                 )
                 Label(
-                    "선택적 웹 검색을 켠 경우에만 질문을 Firebase AI Logic을 통해 Gemini와 Google Search로 보냅니다. 일반 AI 기능은 이 iPad에서 처리합니다.",
+                    "웹 검색을 선택하면 질문을 Gemini와 Google Search로 보냅니다. 이미지 분석은 사진을 Gemini로 보내 처리합니다. OCR 오타 자동 교정을 켜면 문서 이미지와 OCR 원문도 Gemini로 보냅니다. AI 대화와 문서 질문 답변은 이 iPad에서 처리합니다.",
                     systemImage:
                         "globe.badge.chevron.backward"
                 )
@@ -145,6 +145,9 @@ struct HelpCenterView: View {
                     "빌드",
                     value: appBuild
                 )
+                NavigationLink("내장 글꼴 및 라이선스") {
+                    BundledFontLicensesView()
+                }
             }
         }
         .listStyle(.insetGrouped)
@@ -206,6 +209,125 @@ struct HelpCenterView: View {
             forInfoDictionaryKey:
                 "CFBundleVersion"
         ) as? String ?? "1"
+    }
+}
+
+private struct BundledFontLicensesView: View {
+    private struct LicenseDocument: Identifiable {
+        let id: String
+        let title: String
+        let resource: String
+    }
+
+    private let licenses = [
+        LicenseDocument(
+            id: "legacy-serif",
+            title: "바탕 · 궁서",
+            resource: "OFL-Batang-Gungsuh"
+        ),
+        LicenseDocument(
+            id: "legacy-sans",
+            title: "굴림 · 돋움",
+            resource: "OFL-Gulim-Dotum"
+        ),
+        LicenseDocument(
+            id: "pretendard",
+            title: "Pretendard",
+            resource: "OFL-Pretendard"
+        ),
+        LicenseDocument(
+            id: "suit",
+            title: "SUIT",
+            resource: "OFL-SUIT"
+        ),
+        LicenseDocument(
+            id: "naver",
+            title: "나눔스퀘어 네오 · 마루 부리",
+            resource: "OFL-Naver-Nanum-Maru"
+        ),
+        LicenseDocument(
+            id: "sunbatang",
+            title: "순바탕",
+            resource: "LICENSE-SunBatang"
+        ),
+    ]
+
+    var body: some View {
+        List {
+            Section("HWP 호환 글꼴") {
+                Text("Pretendard · SUIT · 나눔스퀘어 네오 · 마루 부리 · 순바탕")
+                    .textSelection(.enabled)
+                Text(
+                    "원본 글꼴이 설치되어 있으면 원본을 우선하며, 없을 때만 문서 성격에 맞는 내장 글꼴로 대체합니다."
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+
+            Section("라이선스 전문") {
+                ForEach(licenses) { license in
+                    NavigationLink(license.title) {
+                        BundledLicenseTextView(
+                            title: license.title,
+                            resource: license.resource
+                        )
+                    }
+                }
+            }
+
+            Section("공식 배포처") {
+                Link(
+                    "Pretendard",
+                    destination: URL(
+                        string: "https://github.com/orioncactus/pretendard"
+                    )!
+                )
+                Link(
+                    "SUIT",
+                    destination: URL(string: "https://sun.fo/suit/")!
+                )
+                Link(
+                    "네이버 글꼴 모음",
+                    destination: URL(string: "https://hangeul.naver.com/font")!
+                )
+                Link(
+                    "순바탕",
+                    destination: URL(string: "https://baro.kpipa.or.kr/font/")!
+                )
+            }
+        }
+        .visionCraftListScreen()
+        .navigationTitle("내장 글꼴")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct BundledLicenseTextView: View {
+    let title: String
+    let resource: String
+
+    private var text: String {
+        guard let url = Bundle.main.url(
+            forResource: resource,
+            withExtension: "txt"
+        ),
+        let value = try? String(contentsOf: url, encoding: .utf8) else {
+            return "라이선스 문서를 불러올 수 없습니다."
+        }
+        return value
+    }
+
+    var body: some View {
+        ScrollView {
+            Text(text)
+                .font(.system(.footnote, design: .monospaced))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+        }
+        .visionCraftNavigationScreen()
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "description": "Official HWP/PDF pairs used for full-page HWP renderer validation.",
+  "documents": [
+    {
+      "id": "FP01_kcg_workshop",
+      "title": "해양경찰청 일반직공무원 경력경쟁채용시험 3차 공고",
+      "sourcePage": "https://www.kcg.go.kr/mcmkcg/na/ntt/selectNttInfo.do?mi=5244&nttSn=69551",
+      "hwpURL": "https://www.kcg.go.kr/common/nttFileDownload.do?fileKey=0b8e9de13427c830b174a4fc137034b1",
+      "pdfURL": "https://www.kcg.go.kr/common/nttFileDownload.do?fileKey=c1417ec7167db7cee8c800cd091b8cd9",
+      "hwpSHA256": "21cd106d4953a437f2bc4f32ff0250e3364a01dff84653f7f0c0ac1f9c622762",
+      "pdfSHA256": "95d99f30cb15c99ff021191491ba402f36eb44fde497e1336eae3c292ec8df51",
+      "expectedPages": 28
+    },
+    {
+      "id": "FP02_mpva_recruitment",
+      "title": "국가보훈부 등록서류 접수·관리 공무직근로자 모집 공고",
+      "sourcePage": "https://www.mpva.go.kr/icnc/selectBbsNttView.do?bbsNo=360&integrDeptCode=&key=710&nttNo=272122&pageIndex=7&searchCnd=all&searchCtgry=&searchKrwd=",
+      "hwpURL": "https://www.mpva.go.kr/icnc/downloadBbsFile.do?atchmnflNo=167315",
+      "pdfURL": "https://www.mpva.go.kr/icnc/downloadBbsFile.do?atchmnflNo=167316",
+      "hwpSHA256": "9fb00cca761f25fb0e2c3b3230a1fa1f3bb038e4c517d6ea06f6d0a016cd7ed5",
+      "pdfSHA256": "58c3a80b07e884bb9c77115a7c636d27513982ad77a4fbd6a9b6dfe9d024aec3",
+      "expectedPages": 25
+    },
+    {
+      "id": "FP03_museum_recruitment",
+      "title": "국립중앙박물관 공무원(일반임기제) 채용 공고",
+      "sourcePage": "https://www.museum.go.kr/MUSEUM/contents/M0701020000.do?anId=2977457&schM=view",
+      "hwpURL": "https://www.museum.go.kr/afile/fileDownloadById/25071514217VMI4p?siteCode=MUSEUM",
+      "pdfURL": "https://www.museum.go.kr/afile/fileDownloadById/25071514237vR5Nd?siteCode=MUSEUM",
+      "hwpSHA256": "499515b2598028a7155e877f0aeb0aca1843199ed287d919b7e25b55408d11b4",
+      "pdfSHA256": "c5853a8e652a1183bc02479c2d376a60142774435c22dfcf332047806870d3a5",
+      "expectedPages": 23
+    },
+    {
+      "id": "FP04_kbiz_notice",
+      "title": "소기업·소상공인 TV홈쇼핑 입점 지원사업 신청 안내",
+      "sourcePage": "https://www.kbiz.or.kr/ko/cscm/event2/view.do?mnSeq=1741&seq=8202",
+      "hwpURL": "https://www.kbiz.or.kr/download.do?fleDwnDs=eventFile&orgalFle=5456ed9988ec87bced959120ec9e85eca09020eca780ec9b9020ec8ba0ecb2adec9588eb82b420eab3b5eab3a0ebacb85f32303236eb85842031ecb0a82e687770&saveFle=177701633342691981.hwp&seq=12104",
+      "pdfURL": "https://www.kbiz.or.kr/download.do?fleDwnDs=eventFile&orgalFle=5456ed9988ec87bced959120ec9e85eca09020eca780ec9b9020ec8ba0ecb2adec9588eb82b420eab3b5eab3a0ebacb85f32303236eb85842031ecb0a82e706466&saveFle=177701634023654984.pdf&seq=12105",
+      "hwpSHA256": "ed88e1dd0fc04664098bd7fcacf86e685ecccf0072d56c068560ed29d158d1a4",
+      "pdfSHA256": "7750699f92cabc98fba38671b9febbf6ca88cda815337608f86e734f4ed11d6d",
+      "expectedPages": 2
+    },
+    {
+      "id": "FP05_kbiz_application",
+      "title": "TV홈쇼핑 입점 희망 신청서",
+      "sourcePage": "https://www.kbiz.or.kr/ko/cscm/event2/view.do?mnSeq=1741&seq=8202",
+      "hwpURL": "https://www.kbiz.or.kr/download.do?fleDwnDs=eventFile&orgalFle=28ec849cec8b9d3129205456ed9988ec87bced959120eca09020ed9daceba79d20ec8ba0ecb2adec849c20ec9691ec8b9d5f32303236eb85842031ecb0a82e687770&saveFle=177701661365041544.hwp&seq=12106",
+      "pdfURL": "https://www.kbiz.or.kr/download.do?fleDwnDs=eventFile&orgalFle=28ec849cec8b9d3129205456ed9988ec87bced959120eca09020ed9daceba79d20ec8ba0ecb2adec849c20ec9691ec8b9d5f32303236eb85842031ecb0a82e706466&saveFle=177701662019602139.pdf&seq=12107",
+      "hwpSHA256": "e47b7517cd9a87e4162d0eb2f4009d42e5deb8c43f15777d3750d365b337ffb8",
+      "pdfSHA256": "57df8bb74d56561ccd7c7240a6583f0e20d75ff8b89949ae5e05efb6248ca439",
+      "expectedPages": 3
+    }
+  ]
+}

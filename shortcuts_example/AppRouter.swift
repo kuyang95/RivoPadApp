@@ -13,9 +13,15 @@ final class AppRouter: ObservableObject {
     @Published var route: AppRoute?
     @Published private(set) var fileImportRequestID:
         UInt64 = 0
+    @Published private(set) var textSourceRequestID:
+        UInt64 = 0
 
     func requestFileImport() {
         fileImportRequestID &+= 1
+    }
+
+    func requestTextSource() {
+        textSourceRequestID &+= 1
     }
 }
 
@@ -67,10 +73,18 @@ enum AppRoute: Hashable {
     case sharedInbox
     case documentLibrary
     case localDocument(fileURL: URL)
+    case originalDocument(documentID: UUID)
     case localTextDocument(
         title: String,
         text: String
     )
+    case imageTextDocument(image: UIImage)
+    case textEditorDocument(fileURL: URL)
+    case textEditorText(
+        title: String,
+        text: String
+    )
+    case textEditorImage(image: UIImage)
     case documentQuestion(document: String, question: String)
     case readerLibrary
     case epubReader(fileURL: URL)

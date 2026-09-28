@@ -47,6 +47,12 @@ Android `TextEditorViewerScreen`과 iPad의 `LocalDocumentView`를 대조해,
 
 ## 실기기 일괄 확인
 
+엑셀 전용 편집 화면은 [엑셀 일괄 검증 목록](EXCEL_VALIDATION_BACKLOG.md)에
+항목을 모은다. 2026-09-15 사용자 요청에 따라 구현을 먼저 진행하고,
+해당 화면의 실사용 검증은 나중에 일괄 수행한다.
+셀 병합·해제 구현은 [별도 기록](EXCEL_CELL_MERGING_20260915.md)에 정리했다.
+시트 추가·이름 변경·복제·삭제·순서 변경도 [구현 기록](EXCEL_SHEET_MANAGEMENT_20260915.md)에 정리했다.
+
 - [ ] 11인치 M4 iPad의 세로·가로·Split View에서 1~10단계 글자 크기와
       줄 간격이 잘리지 않고 탐색 막대와 질문 입력창이 겹치지 않는다.
 - [ ] 16개 색상 조합이 본문·줄 구분선·VoiceOver 포커스에서 충분한 대비를

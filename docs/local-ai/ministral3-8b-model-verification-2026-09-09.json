@@ -1,0 +1,28 @@
+{
+  "repo": "mlx-community/Ministral-3-8B-Instruct-2512-4bit",
+  "revision": "182f003f01daa75f9de0f2c4d379722fd0bc1c61",
+  "verifiedFiles": 13,
+  "bytes": 5630654690,
+  "allHashesMatch": true,
+  "localAdaptations": [
+    {
+      "path": "model.safetensors.index.json",
+      "reason": "Published index references three nonexistent shards. Rebuilt from the two verified safetensors headers. Weight bytes are unchanged.",
+      "originalGitBlobSHA1": "74e4b50cb153a75aea5d9b3dc4a3388a9ffdabaa",
+      "repairedGitBlobSHA1": "2e65df99f87fc619b2a290f5cf60b9b6ea48827e",
+      "actualTensors": 1017,
+      "removedStaleKeysCount": 694,
+      "removedStaleKeysExamples": [
+        "language_model.model.layers.0.mlp.down_proj.activation_scale",
+        "language_model.model.layers.0.mlp.down_proj.weight_scale_inv",
+        "language_model.model.layers.0.mlp.gate_proj.activation_scale"
+      ],
+      "addedActualKeysCount": 704,
+      "addedActualKeysExamples": [
+        "language_model.lm_head.biases",
+        "language_model.lm_head.scales",
+        "language_model.model.embed_tokens.biases"
+      ]
+    }
+  ]
+}

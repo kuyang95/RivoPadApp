@@ -266,6 +266,139 @@ private struct VisionCraftListScreenModifier: ViewModifier {
     }
 }
 
+private struct VisionCraftRouteBackButtonModifier:
+    ViewModifier {
+    @Environment(\.dismiss) private var dismiss
+    @State private var childHandlesBackNavigation = false
+    @State private var childIsCameraScreen = false
+
+    func body(content: Content) -> some View {
+        content
+            .navigationBarBackButtonHidden(true)
+            .toolbar {
+                if #available(iOS 26.0, *) {
+                    ToolbarItem(placement: .topBarLeading) {
+                        if !childHandlesBackNavigation {
+                            VisionCraftBackButton(
+                                style: backButtonStyle
+                            ) {
+                                dismiss()
+                            }
+                        }
+                    }
+                    .sharedBackgroundVisibility(.hidden)
+                } else {
+                    ToolbarItem(placement: .topBarLeading) {
+                        if !childHandlesBackNavigation {
+                            VisionCraftBackButton(
+                                style: backButtonStyle
+                            ) {
+                                dismiss()
+                            }
+                        }
+                    }
+                }
+            }
+            .onPreferenceChange(
+                VisionCraftHandlesBackNavigationPreferenceKey.self
+            ) { handlesBackNavigation in
+                childHandlesBackNavigation = handlesBackNavigation
+            }
+            .onPreferenceChange(
+                VisionCraftCameraScreenPreferenceKey.self
+            ) { isCameraScreen in
+                childIsCameraScreen = isCameraScreen
+            }
+            .toolbarBackground(
+                VisionCraftUI.background,
+                for: .navigationBar
+            )
+            .toolbarBackground(
+                childIsCameraScreen ? .hidden : .visible,
+                for: .navigationBar
+            )
+            .toolbarColorScheme(
+                childIsCameraScreen ? .dark : nil,
+                for: .navigationBar
+            )
+    }
+
+    private var backButtonStyle: VisionCraftBackButton.Style {
+        childIsCameraScreen ? .overlay : .standard
+    }
+}
+
+private struct VisionCraftHandlesBackNavigationPreferenceKey:
+    PreferenceKey {
+    static var defaultValue = false
+
+    static func reduce(
+        value: inout Bool,
+        nextValue: () -> Bool
+    ) {
+        value = value || nextValue()
+    }
+}
+
+/// 카메라 화면(문서 스캔, 돋보기, 실시간 읽기, 이미지 설명)이 설정한다.
+/// 라우트 툴바 배경을 투명하게 만들고 뒤로가기 버튼을 카메라 위에 띄운다.
+private struct VisionCraftCameraScreenPreferenceKey:
+    PreferenceKey {
+    static var defaultValue = false
+
+    static func reduce(
+        value: inout Bool,
+        nextValue: () -> Bool
+    ) {
+        value = value || nextValue()
+    }
+}
+
+struct VisionCraftBackButton: View {
+    enum Style {
+        /// 밝은 화면 배경 위. Primary 색 chevron.
+        case standard
+        /// 카메라 프리뷰 위. 흰색 chevron + 그림자, 배경 없음.
+        case overlay
+    }
+
+    var style: Style = .standard
+    let action: () -> Void
+
+    init(
+        style: Style = .standard,
+        action: @escaping () -> Void
+    ) {
+        self.style = style
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "chevron.left.circle")
+            .font(.system(size: 30, weight: .regular))
+            .foregroundStyle(
+                style == .overlay
+                    ? Color.white
+                    : VisionCraftUI.primary
+            )
+            .shadow(
+                color: .black.opacity(
+                    style == .overlay ? 0.55 : 0
+                ),
+                radius: 4,
+                y: 1
+            )
+            .frame(width: 44, height: 44)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            AppLocalization.string("뒤로가기")
+        )
+    }
+}
+
 private struct VisionCraftSurfaceCardModifier: ViewModifier {
     let cornerRadius: CGFloat
     let outlineOpacity: Double
@@ -318,6 +451,26 @@ extension View {
 
     func visionCraftListScreen() -> some View {
         modifier(VisionCraftListScreenModifier())
+    }
+
+    func visionCraftRouteBackButton() -> some View {
+        modifier(VisionCraftRouteBackButtonModifier())
+    }
+
+    func visionCraftHandlesBackNavigation() -> some View {
+        preference(
+            key: VisionCraftHandlesBackNavigationPreferenceKey.self,
+            value: true
+        )
+    }
+
+    /// 카메라 프리뷰가 화면 전체를 채우는 라우트에 적용한다.
+    /// 라우트 툴바 배경이 사라지고 뒤로가기 버튼만 카메라 위에 남는다.
+    func visionCraftCameraScreen() -> some View {
+        preference(
+            key: VisionCraftCameraScreenPreferenceKey.self,
+            value: true
+        )
     }
 
     func visionCraftSurfaceCard(

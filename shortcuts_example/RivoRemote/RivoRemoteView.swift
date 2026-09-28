@@ -12,14 +12,11 @@ struct RivoRemoteView: View {
                 discoveredDevicesSection
             }
 
-            connectionDiagnosticsSection
             controlsSection
-            eventSection
-            limitationsSection
         }
         .listStyle(.insetGrouped)
         .visionCraftListScreen()
-        .navigationTitle("Rivo 리모컨")
+        .navigationTitle("리모컨 연결")
         .task {
             manager.activateAndScan()
         }
@@ -154,7 +151,10 @@ struct RivoRemoteView: View {
 
     private var discoveredDevicesSection: some View {
         Section("발견한 리모컨") {
-            ForEach(manager.discoveredDevices) { device in
+            ForEach(
+                manager.strongestDiscoveredDevice.map { [$0] }
+                    ?? []
+            ) { device in
                 Button {
                     manager.connect(to: device)
                 } label: {
@@ -203,87 +203,6 @@ struct RivoRemoteView: View {
                 )
                 .accessibilityHint("이 리모컨에 연결합니다.")
             }
-        }
-    }
-
-    @ViewBuilder
-    private var connectionDiagnosticsSection:
-        some View
-    {
-        Section {
-            if manager.connectionDiagnostics.isEmpty {
-                Text(
-                    "검색하거나 연결하면 단계별 기록이 여기에 표시됩니다."
-                )
-                .foregroundStyle(.secondary)
-            } else {
-                ForEach(
-                    manager.connectionDiagnostics.prefix(12)
-                ) { diagnostic in
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(
-                            systemName: diagnosticIcon(
-                                for: diagnostic.level
-                            )
-                        )
-                        .foregroundStyle(
-                            diagnosticColor(
-                                for: diagnostic.level
-                            )
-                        )
-                        .frame(width: 22)
-
-                        VStack(
-                            alignment: .leading,
-                            spacing: 4
-                        ) {
-                            HStack {
-                                Text(diagnostic.stage.title)
-                                    .font(.headline)
-                                Text(diagnostic.level.title)
-                                    .font(.caption.bold())
-                                    .foregroundStyle(
-                                        diagnosticColor(
-                                            for:
-                                                diagnostic.level
-                                        )
-                                    )
-                                Spacer()
-                                Text(
-                                    diagnostic.recordedAt,
-                                    style: .time
-                                )
-                                .font(
-                                    .caption
-                                        .monospacedDigit()
-                                )
-                                .foregroundStyle(.secondary)
-                            }
-                            Text(diagnostic.message)
-                                .font(.subheadline)
-                        }
-                    }
-                    .accessibilityElement(
-                        children: .combine
-                    )
-                }
-            }
-        } header: {
-            HStack {
-                Text("연결 진단")
-                Spacer()
-                if !manager.connectionDiagnostics.isEmpty {
-                    Button("지우기") {
-                        manager
-                            .clearConnectionDiagnostics()
-                    }
-                    .textCase(nil)
-                }
-            }
-        } footer: {
-            Text(
-                "최근 80개 기록은 앱을 다시 열어도 이 iPad에 남습니다."
-            )
         }
     }
 
@@ -364,77 +283,6 @@ struct RivoRemoteView: View {
         }
     }
 
-    @ViewBuilder
-    private var eventSection: some View {
-        Section {
-            if manager.recentEvents.isEmpty {
-                ContentUnavailableView(
-                    "아직 버튼 입력이 없습니다",
-                    systemImage: "button.programmable",
-                    description: Text(
-                        AppLocalization.string(
-                            "연결 후 Rivo 버튼을 누르면 해석 결과와 원본 패킷이 표시됩니다."
-                        )
-                    )
-                )
-            } else {
-                ForEach(manager.recentEvents.prefix(12)) {
-                    event in
-                    VStack(alignment: .leading, spacing: 5) {
-                        HStack {
-                            Text(event.input.summary)
-                                .font(.headline)
-                            Spacer()
-                            Text(
-                                event.receivedAt,
-                                style: .time
-                            )
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                        }
-                        Text(event.packetHex)
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-                    .accessibilityElement(children: .combine)
-                }
-            }
-        } header: {
-            HStack {
-                Text("버튼 진단")
-                Spacer()
-                if !manager.recentEvents.isEmpty
-                    || manager.invalidPacketCount > 0 {
-                    Button("지우기") {
-                        manager.clearEventHistory()
-                    }
-                    .textCase(nil)
-                }
-            }
-        } footer: {
-            if manager.invalidPacketCount > 0 {
-                Text(
-                    AppLocalization.format(
-                        "해석하지 못한 패킷 %lld개",
-                        manager.invalidPacketCount
-                    )
-                )
-            }
-        }
-    }
-
-    private var limitationsSection: some View {
-        Section("iPad 동작 범위") {
-            Text(
-                AppLocalization.string(
-                    "이 단계에서는 VisionCraft가 열려 있을 때 Rivo 버튼으로 앱 내부 기능을 조작합니다. 다른 앱의 터치·홈·VoiceOver를 제어하지는 않습니다."
-                )
-            )
-            .foregroundStyle(.secondary)
-        }
-    }
-
     private func signalValue(for rssi: Int) -> Double {
         min(
             max(
@@ -443,35 +291,5 @@ struct RivoRemoteView: View {
             ),
             1
         )
-    }
-
-    private func diagnosticIcon(
-        for level: RivoConnectionDiagnosticLevel
-    ) -> String {
-        switch level {
-        case .info:
-            return "info.circle.fill"
-        case .success:
-            return "checkmark.circle.fill"
-        case .warning:
-            return "exclamationmark.triangle.fill"
-        case .failure:
-            return "xmark.octagon.fill"
-        }
-    }
-
-    private func diagnosticColor(
-        for level: RivoConnectionDiagnosticLevel
-    ) -> Color {
-        switch level {
-        case .info:
-            return .blue
-        case .success:
-            return .green
-        case .warning:
-            return .orange
-        case .failure:
-            return .red
-        }
     }
 }

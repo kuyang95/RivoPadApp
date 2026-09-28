@@ -1,0 +1,1444 @@
+{
+  "auditedAt": "2026-09-08",
+  "sourceRelativePath": "outputs/hwp_internet_retest_20260907/fixtures/05_한글활용디자인공모전_신청서.hwp",
+  "sha256": "4cfa973e1c2b266a9de868e86572b3a7f297cd60747c817a666a8816e005c03f",
+  "tableCount": 4,
+  "tableParagraphCount": 89,
+  "file": "05_한글활용디자인공모전_신청서.hwp",
+  "blankTableParagraphCount": 46,
+  "missingTextRecordCount": 41,
+  "blankParagraphs": [
+    {
+      "paragraph": 6,
+      "table": 1,
+      "row": 1,
+      "column": 2,
+      "textRecordCount": 1,
+      "rawHeaderCount": 2147483657,
+      "characterCount": 9,
+      "textUnits": [
+        11,
+        27680,
+        29794,
+        0,
+        0,
+        0,
+        0,
+        11,
+        13
+      ],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          67,
+          3,
+          18
+        ],
+        [
+          68,
+          3,
+          16
+        ],
+        [
+          69,
+          3,
+          36
+        ],
+        [
+          71,
+          3,
+          46
+        ],
+        [
+          77,
+          4,
+          24
+        ],
+        [
+          72,
+          4,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 7,
+      "table": 2,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          4,
+          24
+        ],
+        [
+          68,
+          5,
+          8
+        ],
+        [
+          69,
+          5,
+          36
+        ],
+        [
+          72,
+          4,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 9,
+      "table": 2,
+      "row": 1,
+      "column": 3,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          4,
+          24
+        ],
+        [
+          68,
+          5,
+          8
+        ],
+        [
+          69,
+          5,
+          36
+        ],
+        [
+          72,
+          4,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 12,
+      "table": 1,
+      "row": 2,
+      "column": 2,
+      "textRecordCount": 1,
+      "rawHeaderCount": 2147483657,
+      "characterCount": 9,
+      "textUnits": [
+        11,
+        27680,
+        29794,
+        0,
+        0,
+        0,
+        0,
+        11,
+        13
+      ],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          67,
+          3,
+          18
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ],
+        [
+          71,
+          3,
+          46
+        ],
+        [
+          77,
+          4,
+          24
+        ],
+        [
+          72,
+          4,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 13,
+      "table": 3,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          4,
+          24
+        ],
+        [
+          68,
+          5,
+          8
+        ],
+        [
+          69,
+          5,
+          36
+        ],
+        [
+          72,
+          4,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 15,
+      "table": 3,
+      "row": 1,
+      "column": 3,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          4,
+          24
+        ],
+        [
+          68,
+          5,
+          8
+        ],
+        [
+          69,
+          5,
+          36
+        ],
+        [
+          72,
+          4,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 18,
+      "table": 1,
+      "row": 3,
+      "column": 2,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ],
+        [
+          72,
+          2,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 20,
+      "table": 1,
+      "row": 4,
+      "column": 2,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ],
+        [
+          72,
+          2,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 22,
+      "table": 1,
+      "row": 4,
+      "column": 4,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ],
+        [
+          72,
+          2,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 24,
+      "table": 1,
+      "row": 5,
+      "column": 2,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ],
+        [
+          72,
+          2,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 26,
+      "table": 1,
+      "row": 6,
+      "column": 2,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ],
+        [
+          72,
+          2,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 28,
+      "table": 1,
+      "row": 7,
+      "column": 2,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ],
+        [
+          72,
+          2,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 30,
+      "table": 1,
+      "row": 7,
+      "column": 4,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ],
+        [
+          72,
+          2,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 32,
+      "table": 1,
+      "row": 8,
+      "column": 2,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ],
+        [
+          72,
+          2,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 34,
+      "table": 1,
+      "row": 9,
+      "column": 2,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ],
+        [
+          72,
+          2,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 36,
+      "table": 1,
+      "row": 10,
+      "column": 2,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ],
+        [
+          72,
+          2,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 38,
+      "table": 1,
+      "row": 10,
+      "column": 4,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ],
+        [
+          72,
+          2,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 40,
+      "table": 1,
+      "row": 11,
+      "column": 2,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ],
+        [
+          72,
+          2,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 42,
+      "table": 1,
+      "row": 12,
+      "column": 2,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ],
+        [
+          72,
+          2,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 44,
+      "table": 1,
+      "row": 13,
+      "column": 2,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ],
+        [
+          72,
+          2,
+          47
+        ]
+      ]
+    },
+    {
+      "paragraph": 46,
+      "table": 1,
+      "row": 14,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 47,
+      "table": 1,
+      "row": 14,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 49,
+      "table": 1,
+      "row": 14,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 50,
+      "table": 1,
+      "row": 14,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 52,
+      "table": 1,
+      "row": 14,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 2147483649,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 58,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 62,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 1,
+      "rawHeaderCount": 6,
+      "characterCount": 6,
+      "textUnits": [
+        32,
+        32,
+        32,
+        32,
+        32,
+        13
+      ],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          67,
+          3,
+          12
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 67,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 72,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 75,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 1,
+      "rawHeaderCount": 8,
+      "characterCount": 8,
+      "textUnits": [
+        32,
+        32,
+        32,
+        32,
+        32,
+        32,
+        32,
+        13
+      ],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          67,
+          3,
+          16
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 76,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 78,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 79,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 81,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 82,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 84,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 85,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 86,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 87,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 89,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 90,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 91,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 93,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 94,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 95,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 0,
+      "rawHeaderCount": 1,
+      "characterCount": 1,
+      "textUnits": [],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    },
+    {
+      "paragraph": 97,
+      "table": 4,
+      "row": 1,
+      "column": 1,
+      "textRecordCount": 1,
+      "rawHeaderCount": 2147483650,
+      "characterCount": 2,
+      "textUnits": [
+        32,
+        13
+      ],
+      "records": [
+        [
+          66,
+          2,
+          24
+        ],
+        [
+          67,
+          3,
+          4
+        ],
+        [
+          68,
+          3,
+          8
+        ],
+        [
+          69,
+          3,
+          36
+        ]
+      ]
+    }
+  ],
+  "interpretation": {
+    "missingTextRecordParagraphs": 41,
+    "whitespaceTextParagraphs": 3,
+    "nestedTableAnchorParagraphs": 2,
+    "note": "Counts describe paragraphs, not distinct fillable fields. Missing text records were corroborated against the original OLE section records. No write was attempted in this audit."
+  }
+}

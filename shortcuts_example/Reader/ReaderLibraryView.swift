@@ -21,7 +21,33 @@ struct ReaderLibraryView: View {
 
     var body: some View {
         List {
-            Section {
+            Section(
+                "EPUB 또는 DAISY ZIP 파일을 선택하세요"
+            ) {
+                if let lastBook {
+                    NavigationLink(
+                        value: AppRoute.epubReader(
+                            fileURL:
+                                lastBook.fileURL
+                        )
+                    ) {
+                        VStack(spacing: 3) {
+                            Text("계속 읽기")
+                                .font(.headline)
+                            Text(lastBook.title)
+                                .font(.caption)
+                                .lineLimit(1)
+                        }
+                        .frame(
+                            maxWidth: .infinity,
+                            minHeight: 52
+                        )
+                    }
+                    .buttonStyle(
+                        .borderedProminent
+                    )
+                }
+
                 Button {
                     isImporterPresented = true
                 } label: {
@@ -31,15 +57,16 @@ struct ReaderLibraryView: View {
                                 "책 확인하고 가져오는 중"
                             )
                         } else {
-                            Label(
-                                "EPUB·DAISY 파일 열기",
-                                systemImage: "plus.rectangle.on.folder"
-                            )
+                            Text("도서 파일 선택")
                         }
                     }
-                    .font(.title2.bold())
-                    .padding(.vertical, 12)
+                    .font(.headline)
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 52
+                    )
                 }
+                .buttonStyle(.borderedProminent)
                 .disabled(isImporting)
                 .accessibilityHint(
                     "Files에서 EPUB 또는 ZIP 형식의 DAISY 책을 가져옵니다."
@@ -113,7 +140,9 @@ struct ReaderLibraryView: View {
         }
         .listStyle(.insetGrouped)
         .visionCraftListScreen()
-        .navigationTitle("독서")
+        .navigationTitle(
+            "데이지/EPUB 플레이어"
+        )
         .fileImporter(
             isPresented: $isImporterPresented,
             allowedContentTypes:
@@ -262,6 +291,10 @@ struct ReaderLibraryView: View {
             .standardizedFileURL
             == book.fileURL
                 .standardizedFileURL
+    }
+
+    private var lastBook: EPUBLibraryBook? {
+        books.first(where: isLastBook)
     }
 
     private func importBook(

@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "visioncraft-excel-ai",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-14",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1
+  },
+  "vars": {
+    "FIREBASE_PROJECT_NUMBER": "35852736965",
+    "FIREBASE_APP_ID": "1:35852736965:ios:d3f956f5ef198e013753ac"
+  }
+}

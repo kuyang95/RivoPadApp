@@ -4,20 +4,16 @@ import UIKit
 struct AppSettingsView: View {
     @ObservedObject private var settings =
         AppSettingsStore.shared
-    @ObservedObject private var webSearch =
-        WebSearchConfigurationStore.shared
     @ObservedObject private var appFonts =
         AppFontCatalogStore.shared
+    @ObservedObject private var webSearch =
+        WebSearchConfigurationStore.shared
     @Environment(\.openURL)
     private var openURL
 
     @State private var documentAppearance =
         LocalDocumentAppearanceStore().load()
     @State private var showsResetConfirmation =
-        false
-    @State private var webSearchStatus: String?
-    @State private var webSearchError: String?
-    @State private var showsWebSearchConsent =
         false
     @State private var showsFontSelection =
         false
@@ -37,12 +33,12 @@ struct AppSettingsView: View {
         Form {
             feedbackSection
             sharingSection
+            webSearchSection
             scannerSection
             appearanceSection
             rivoQuickMenuSection
             documentSection
             readerSection
-            webSearchSection
             connectionSection
             supportSection
             systemSection
@@ -72,31 +68,6 @@ struct AppSettingsView: View {
         } message: {
             Text(
                 "대화·문서·책은 삭제하지 않고 보기와 음성 설정만 초기화합니다."
-            )
-        }
-        .confirmationDialog(
-            "온라인 웹 검색을 켤까요?",
-            isPresented:
-                $showsWebSearchConsent,
-            titleVisibility: .visible
-        ) {
-            Button(
-                "동의하고 켜기"
-            ) {
-                webSearch.setEnabled(true)
-                webSearchStatus =
-                    AppLocalization.string(
-                        "온라인 웹 검색을 켰습니다."
-                    )
-                webSearchError = nil
-            }
-            Button(
-                "취소",
-                role: .cancel
-            ) {}
-        } message: {
-            Text(
-                "웹 검색을 선택한 경우 질문이 Firebase AI Logic을 통해 Gemini와 Google Search로 전송됩니다. 일반 채팅과 문서 분석은 M4에서 계속 로컬로 처리합니다."
             )
         }
         .sheet(
@@ -140,6 +111,45 @@ struct AppSettingsView: View {
         }
     }
 
+    private var webSearchSection: some View {
+        Section {
+            Toggle(
+                "온라인 웹 검색",
+                isOn: Binding(
+                    get: { webSearch.isEnabled },
+                    set: { webSearch.setEnabled($0) }
+                )
+            )
+            .accessibilityHint(
+                "웹 검색 화면에서 질문을 Gemini와 Google Search로 보냅니다."
+            )
+
+            Toggle(
+                "AI 대화에서 자동으로 웹 검색",
+                isOn: Binding(
+                    get: {
+                        webSearch
+                            .isAutomaticChatSearchEnabled
+                    },
+                    set: {
+                        webSearch
+                            .setAutomaticChatSearchEnabled($0)
+                    }
+                )
+            )
+            .disabled(!webSearch.isEnabled)
+            .accessibilityHint(
+                "날씨·뉴스·환율처럼 최신 정보가 필요한 질문만 Gemini로 보내고 출처를 함께 보여줍니다."
+            )
+        } header: {
+            Text("웹 검색")
+        } footer: {
+            Text(
+                "자동 웹 검색을 켜면 날씨·뉴스·시세처럼 최신 정보가 있어야 답할 수 있는 질문만 Gemini와 Google Search로 전송하고, 나머지 대화와 첨부 문서는 그대로 이 iPad에서 처리합니다."
+            )
+        }
+    }
+
     private var feedbackSection: some View {
         Section {
             Toggle(
@@ -149,7 +159,7 @@ struct AppSettingsView: View {
                     .soundEffectsEnabled
             )
             .accessibilityHint(
-                "녹음 시작과 AI 처리 시작 효과음을 켜거나 끕니다."
+                "버튼 조작과 기능 실행 상태를 효과음으로 알려줍니다."
             )
 
             Toggle(
@@ -185,11 +195,24 @@ struct AppSettingsView: View {
                     )
                 )
             }
+
+            Picker(
+                "앱 언어",
+                selection:
+                    $settings.appLanguage
+            ) {
+                ForEach(
+                    AppLanguage.allCases
+                ) { language in
+                    Text(language.title)
+                        .tag(language)
+                }
+            }
         } header: {
-            Text("소리와 음성")
+            Text("음성 및 언어")
         } footer: {
             Text(
-                "독서 화면의 오디오·TTS 속도는 책별 독서 설정을 따릅니다."
+                "앱 언어는 VisionCraft 화면과 번역·검색 기본 언어에 즉시 적용됩니다. 독서 화면의 오디오·TTS 속도는 책별 독서 설정을 따릅니다."
             )
         }
     }
@@ -207,13 +230,13 @@ struct AppSettingsView: View {
             )
 
             Toggle(
-                "휘어진 페이지 자동 보정",
+                "휘어진 페이지 보정",
                 isOn:
                     $settings
                     .documentScanCurvedPageCorrectionEnabled
             )
             .accessibilityHint(
-                "UVDoc 로컬 모델로 책처럼 휘어진 페이지를 펴 줍니다. 꺼도 모서리와 원근 보정은 유지됩니다."
+                "UVDoc 로컬 모델로 책처럼 휘어진 페이지를 펴 줍니다. 평평한 문서의 과보정을 막기 위해 기본으로 꺼져 있으며, 꺼도 모서리와 원근 보정은 유지됩니다."
             )
 
             Toggle(
@@ -233,13 +256,13 @@ struct AppSettingsView: View {
                     .ocrAutoCorrectionEnabled
             )
             .accessibilityHint(
-                "정적인 사진과 스캔 문서의 Vision OCR 결과를 이미지와 대조해 M4 로컬 AI로 교정합니다."
+                "정적인 사진과 스캔 문서의 이미지와 Vision OCR 원문을 Gemini로 보내 오타를 교정합니다."
             )
         } header: {
             Text("문서 스캐너")
         } footer: {
             Text(
-                "모서리 검출과 원근 보정은 항상 적용됩니다. UVDoc과 OCR 교정은 이 iPad에서 로컬 모델을 실행하므로 처음에는 준비 시간이 필요하며, 실패하면 각각 원근 보정 결과와 Vision OCR 원문을 유지합니다."
+                "모서리 검출과 원근 보정은 항상 적용됩니다. UVDoc은 이 iPad에서 처리하고, OCR 오타 교정은 Gemini를 사용하므로 네트워크가 필요합니다. Gemini 연결이 늦거나 실패하면 Vision OCR 원문을 바로 유지합니다."
             )
         }
     }
@@ -451,108 +474,10 @@ struct AppSettingsView: View {
         }
     }
 
-    private var webSearchSection:
-        some View
-    {
-        Section {
-            LabeledContent(
-                "공급자",
-                value:
-                    "Gemini + Google Search"
-            )
-
-            LabeledContent(
-                "Firebase 연결",
-                value:
-                    AppLocalization.string(
-                        webSearch
-                            .isFirebaseConfigured
-                            ? "구성됨"
-                            : "설정 필요"
-                    )
-            )
-
-            Toggle(
-                "온라인 웹 검색 사용",
-                isOn:
-                    Binding(
-                        get: {
-                            webSearch
-                                .isEnabled
-                        },
-                        set: {
-                            requested in
-                            if !requested {
-                                webSearch
-                                    .setEnabled(
-                                        false
-                                    )
-                                webSearchStatus =
-                                    AppLocalization.string(
-                                        "온라인 웹 검색을 껐습니다."
-                                    )
-                            } else if webSearch
-                                .isFirebaseConfigured {
-                                showsWebSearchConsent =
-                                    true
-                            } else {
-                                webSearchError =
-                                    AppLocalization.string(
-                                        "VisionCraft의 Firebase 연결 설정이 필요합니다."
-                                    )
-                            }
-                        }
-                    )
-            )
-
-            if let webSearchStatus {
-                Text(webSearchStatus)
-                    .font(.footnote)
-                    .foregroundStyle(.green)
-            }
-            if let webSearchError {
-                Text(webSearchError)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-                    .accessibilityLabel(
-                        "오류: \(webSearchError)"
-                    )
-            }
-
-            Link(
-                "Firebase AI Logic 안내",
-                destination: URL(
-                    string:
-                        "https://firebase.google.com/docs/ai-logic"
-                )!
-            )
-            Link(
-                "개인정보 안내",
-                destination: URL(
-                    string:
-                        "https://policies.google.com/privacy"
-                )!
-            )
-            Link(
-                "이용약관",
-                destination: URL(
-                    string:
-                        "https://ai.google.dev/gemini-api/terms"
-                )!
-            )
-        } header: {
-            Text("선택적 웹 검색")
-        } footer: {
-            Text(
-                "사용자 API 키는 필요하지 않습니다. 웹 검색 질문과 Gemini 답변은 Google 서비스를 거치며, VisionCraft 대화 기록에는 저장하지 않습니다. 일반 AI 기능은 M4 로컬 모델을 계속 사용합니다."
-            )
-        }
-    }
-
     private var connectionSection: some View {
         Section("연결") {
             NavigationLink(
-                "Rivo 리모컨",
+                "리모컨",
                 value: AppRoute.rivoRemote
             )
             NavigationLink(
@@ -573,28 +498,16 @@ struct AppSettingsView: View {
 
     private var systemSection: some View {
         Section {
-            Picker(
-                "앱 언어",
-                selection:
-                    $settings.appLanguage
-            ) {
-                ForEach(
-                    AppLanguage.allCases
-                ) { language in
-                    Text(language.title)
-                        .tag(language)
-                }
-            }
-
+            #if DEBUG
             NavigationLink {
-                LocalDiagnosticsView()
+                HWPReferenceComparisonView()
             } label: {
                 Label(
-                    "진단 및 개인정보",
-                    systemImage:
-                        "stethoscope"
+                    "HWP 비교 테스트",
+                    systemImage: "rectangle.split.2x1"
                 )
             }
+            #endif
 
             Button(
                 "VisionCraft 권한 설정 열기",
@@ -614,7 +527,7 @@ struct AppSettingsView: View {
             Text("iPadOS")
         } footer: {
             Text(
-                "앱 언어는 VisionCraft 화면과 번역·검색 기본 언어에 즉시 적용됩니다. 시스템 권한 문구는 iPadOS의 앱 언어 설정을 따릅니다. 일반 iPad 앱은 시스템 전체 밝기·화면 필터·VoiceOver·다른 앱의 터치를 직접 바꿀 수 없습니다."
+                "시스템 권한 문구는 iPadOS의 앱 언어 설정을 따릅니다. 일반 iPad 앱은 시스템 전체 밝기·화면 필터·VoiceOver·다른 앱의 터치를 직접 바꿀 수 없습니다."
             )
         }
     }
@@ -645,7 +558,7 @@ struct AppSettingsView: View {
 
 }
 
-private struct AppFontSelectionView:
+struct AppFontSelectionView:
     View
 {
     @ObservedObject var catalog:

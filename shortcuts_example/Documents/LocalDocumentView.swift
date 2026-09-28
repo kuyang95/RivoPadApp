@@ -104,7 +104,7 @@ final class LocalDocumentViewModel: ObservableObject {
                     userInfo: [
                         NSLocalizedDescriptionKey:
                             AppLocalization.string(
-                                "PDF, TXT, XLSX, XLS, HWP와 HWPX 문서만 지원합니다."
+                                "PDF, TXT, Word, XLSX, XLS, HWP와 HWPX 문서만 지원합니다."
                             )
                     ]
                 )
@@ -189,13 +189,11 @@ final class LocalDocumentViewModel: ObservableObject {
     }
 
     private func recognizeText(from image: UIImage) async throws -> String {
-        try await withCheckedThrowingContinuation { continuation in
-            DocumentTextExtractor().extractPlainText(
-                from: image
-            ) { result in
-                continuation.resume(with: result)
-            }
-        }
+        let text = try await OCRService.shared
+            .recognize(from: image)
+        return text == "(텍스트 없음)"
+            ? ""
+            : text
     }
 
     private func recognizeAndCorrectText(
@@ -219,13 +217,138 @@ final class LocalDocumentViewModel: ObservableObject {
                     pageCount
                 )
         }
-        return await LocalOCRCorrectionService
+        return await GeminiOCRCorrectionService
             .shared
             .correct(
                 image: image,
                 originalText: original,
                 isEnabled: isEnabled
             )
+    }
+}
+
+struct ImageTextDocumentView: View {
+    let image: UIImage
+
+    @State private var recognizedText: String?
+    @State private var status =
+        AppLocalization.string(
+            "이미지에서 텍스트를 읽는 중…"
+        )
+    @State private var errorDescription: String?
+    @State private var isLoading = false
+    @State private var didStart = false
+
+    var body: some View {
+        Group {
+            if let recognizedText {
+                LocalDocumentView(
+                    title: AppLocalization.string(
+                        "이미지 텍스트"
+                    ),
+                    text: recognizedText
+                )
+            } else if let errorDescription {
+                ContentUnavailableView {
+                    Label(
+                        AppLocalization.string(
+                            "이미지에서 텍스트를 찾지 못했습니다."
+                        ),
+                        systemImage: "text.magnifyingglass"
+                    )
+                } description: {
+                    Text(errorDescription)
+                } actions: {
+                    Button("다시 시도") {
+                        Task {
+                            await recognizeText()
+                        }
+                    }
+                }
+            } else {
+                ProgressView(status)
+            }
+        }
+        .navigationTitle(
+            AppLocalization.string(
+                "이미지 텍스트"
+            )
+        )
+        .navigationBarTitleDisplayMode(.inline)
+        .visionCraftNavigationScreen()
+        .task {
+            guard !didStart else {
+                return
+            }
+            didStart = true
+            await recognizeText()
+        }
+    }
+
+    @MainActor
+    private func recognizeText() async {
+        guard !isLoading else {
+            return
+        }
+        isLoading = true
+        errorDescription = nil
+        status = AppLocalization.string(
+            "이미지에서 텍스트를 읽는 중…"
+        )
+
+        do {
+            let original = try await OCRService.shared
+                .recognize(from: image)
+            let trimmedOriginal = original
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+            guard !trimmedOriginal.isEmpty,
+                  original != "(텍스트 없음)" else {
+                throw ImageTextImportError.noText
+            }
+
+            let correctionEnabled =
+                AppSettingsStore.shared
+                .ocrAutoCorrectionEnabled
+            if correctionEnabled {
+                status = AppLocalization.string(
+                    "오타 교정 중"
+                )
+            }
+            let corrected = await
+                GeminiOCRCorrectionService.shared
+                .correct(
+                    image: image,
+                    originalText: original,
+                    isEnabled: correctionEnabled
+                )
+            guard !corrected.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ).isEmpty else {
+                throw ImageTextImportError.noText
+            }
+            recognizedText = corrected
+            UIAccessibility.post(
+                notification: .screenChanged,
+                argument: AppLocalization.string(
+                    "이미지 텍스트"
+                )
+            )
+        } catch {
+            errorDescription = error.localizedDescription
+        }
+        isLoading = false
+    }
+}
+
+private enum ImageTextImportError: LocalizedError {
+    case noText
+
+    var errorDescription: String? {
+        AppLocalization.string(
+            "이미지에서 텍스트를 찾지 못했습니다."
+        )
     }
 }
 

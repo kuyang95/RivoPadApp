@@ -53,7 +53,7 @@ nonisolated enum AuthorizedDocumentLibraryError:
             )
         case .unsupportedDocument:
             return AppLocalization.string(
-                "PDF, TXT, XLSX, XLS, HWP와 HWPX 문서만 검색할 수 있습니다."
+                "PDF, TXT, Word, XLSX, XLS, HWP와 HWPX 문서만 검색할 수 있습니다."
             )
         case .resultLimitExceeded(
             let maximum
@@ -75,6 +75,9 @@ nonisolated enum AuthorizedDocumentSearch {
             "xls",
             "hwp",
             "hwpx",
+            "doc",
+            "docx",
+            "docs",
         ]
     static let maximumResults = 5_000
     static let maximumDepth = 64
@@ -457,6 +460,53 @@ actor AuthorizedDocumentLibrary {
     func importDocument(
         relativePath: String
     ) async throws -> URL {
+        let folderURL = try resolveFolder()
+        let didAccess =
+            folderURL
+            .startAccessingSecurityScopedResource()
+        defer {
+            if didAccess {
+                folderURL
+                    .stopAccessingSecurityScopedResource()
+            }
+        }
+        let documentURL = try validatedDocumentURL(
+            relativePath: relativePath,
+            folderURL: folderURL
+        )
+        return try await
+            LocalDocumentImportService.shared
+            .importDocument(
+                from: documentURL
+            )
+    }
+
+    func registerOriginalDocument(
+        relativePath: String
+    ) async throws -> RecentOriginalDocument {
+        let folderURL = try resolveFolder()
+        let didAccess =
+            folderURL
+            .startAccessingSecurityScopedResource()
+        defer {
+            if didAccess {
+                folderURL
+                    .stopAccessingSecurityScopedResource()
+            }
+        }
+        let documentURL = try validatedDocumentURL(
+            relativePath: relativePath,
+            folderURL: folderURL
+        )
+        return try await
+            RecentOriginalDocumentStore.shared
+            .register(fileURL: documentURL)
+    }
+
+    private func validatedDocumentURL(
+        relativePath: String,
+        folderURL: URL
+    ) throws -> URL {
         guard !relativePath.isEmpty,
               !relativePath.hasPrefix("/"),
               !relativePath
@@ -478,16 +528,6 @@ actor AuthorizedDocumentLibrary {
                 .unsupportedDocument
         }
 
-        let folderURL = try resolveFolder()
-        let didAccess =
-            folderURL
-            .startAccessingSecurityScopedResource()
-        defer {
-            if didAccess {
-                folderURL
-                    .stopAccessingSecurityScopedResource()
-            }
-        }
         let itemURL = folderURL
             .appendingPathComponent(
                 relativePath,
@@ -523,11 +563,7 @@ actor AuthorizedDocumentLibrary {
             throw AuthorizedDocumentLibraryError
                 .invalidItem
         }
-        return try await
-            LocalDocumentImportService.shared
-            .importDocument(
-                from: canonicalItem
-            )
+        return canonicalItem
     }
 
     func forgetFolder() {

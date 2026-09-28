@@ -1,6 +1,27 @@
-import CoreImage
+import FirebaseAILogic
 import Foundation
 import UIKit
+
+nonisolated enum OCRCorrectionResultStatus: Equatable {
+    case notRequested
+    case corrected
+    case unchanged
+    case unavailable
+    case quotaExceeded
+    case failed
+    case cancelled
+}
+
+nonisolated struct OCRCorrectionResult: Equatable {
+    let text: String
+    let status: OCRCorrectionResultStatus
+}
+
+nonisolated private enum OCRCorrectionRequestError:
+    Error
+{
+    case timedOut
+}
 
 nonisolated enum OCRCorrectionPolicy {
     static let maximumInputCharacters = 16_000
@@ -155,17 +176,38 @@ nonisolated enum OCRCorrectionPolicy {
 }
 
 @MainActor
-final class LocalOCRCorrectionService {
-    static let shared =
-        LocalOCRCorrectionService()
+final class GeminiOCRCorrectionService {
+    typealias Generator =
+        @MainActor @Sendable (
+            Data,
+            String
+        ) async throws -> String?
 
-    private let llmService: LLMService
+    static let shared =
+        GeminiOCRCorrectionService()
+
+    private let isFirebaseConfigured:
+        @MainActor @Sendable () -> Bool
+    private let generator: Generator
+    private let requestTimeout: Duration
 
     init(
-        llmService: LLMService? = nil
+        isFirebaseConfigured:
+            @escaping @MainActor @Sendable () -> Bool = {
+                FirebaseRuntime.isConfigured
+            },
+        requestTimeout: Duration = .seconds(20),
+        generator: Generator? = nil
     ) {
-        self.llmService =
-            llmService ?? .shared
+        self.isFirebaseConfigured =
+            isFirebaseConfigured
+        self.requestTimeout = requestTimeout
+        self.generator = generator ?? {
+            try await Self.generate(
+                imageData: $0,
+                prompt: $1
+            )
+        }
     }
 
     func correct(
@@ -173,81 +215,234 @@ final class LocalOCRCorrectionService {
         originalText: String,
         isEnabled: Bool
     ) async -> String {
-        guard isEnabled,
-              !llmService.isGenerating,
-              !llmService.isLoading,
+        await correctResult(
+            image: image,
+            originalText: originalText,
+            isEnabled: isEnabled
+        ).text
+    }
+
+    func correctResult(
+        image: UIImage,
+        originalText: String,
+        isEnabled: Bool
+    ) async -> OCRCorrectionResult {
+        guard isEnabled else {
+            return OCRCorrectionResult(
+                text: originalText,
+                status: .notRequested
+            )
+        }
+        guard !Task.isCancelled else {
+            return OCRCorrectionResult(
+                text: originalText,
+                status: .cancelled
+            )
+        }
+        guard isFirebaseConfigured() else {
+            return OCRCorrectionResult(
+                text: originalText,
+                status: .unavailable
+            )
+        }
+        guard
               let prompt =
                 OCRCorrectionPolicy.prompt(
                     originalText:
                         originalText
                 ),
-              let ciImage = CIImage(
-                  image: image
-              )
+              let imageData =
+                Self.encodedImageData(image)
         else {
-            return originalText
+            return OCRCorrectionResult(
+                text: originalText,
+                status: .unchanged
+            )
         }
 
-        let conversationID =
-            LLMConversationID()
         do {
-            let stream = try await
-                llmService.streamVision(
-                    conversationID:
-                        conversationID,
-                    system:
-                        OCRCorrectionPolicy
-                        .systemPrompt,
-                    prompt: prompt,
-                    images: [ciImage]
+            let candidate = try await
+                generateWithTimeout(
+                    imageData: imageData,
+                    prompt: prompt
                 )
-            var thinkFilter =
-                StreamingThinkFilter()
-            var candidate = ""
-            let outputLimit = max(
-                Int(
-                    Double(
-                        originalText.count
-                    ) * 1.5
-                ) + 64,
-                256
-            )
-
-            for try await chunk in stream {
-                try Task.checkCancellation()
-                candidate +=
-                    thinkFilter.consume(
-                        chunk
-                    )
-                guard candidate.count
-                        <= outputLimit else {
-                    await llmService
-                        .resetConversation(
-                            conversationID
-                        )
-                    return originalText
-                }
-            }
-            candidate += thinkFilter.finish()
-            await llmService
-                .resetConversation(
-                    conversationID
-                )
-            return OCRCorrectionPolicy
+            let corrected = OCRCorrectionPolicy
                 .acceptedText(
                     originalText:
                         originalText,
                     candidate: candidate
                 )
-        } catch {
-            await llmService
-                .resetConversation(
-                    conversationID
-                )
-            RVLogger.d(
-                "OCR 로컬 교정 fallback: \(error.localizedDescription)"
+            return OCRCorrectionResult(
+                text: corrected,
+                status:
+                    corrected == originalText
+                    ? .unchanged
+                    : .corrected
             )
-            return originalText
+        } catch is CancellationError {
+            return OCRCorrectionResult(
+                text: originalText,
+                status: .cancelled
+            )
+        } catch is CloudAITokenBudgetError {
+            return OCRCorrectionResult(
+                text: originalText,
+                status: .quotaExceeded
+            )
+        } catch {
+            RVLogger.d(
+                "OCR Gemini 교정 fallback: \(error.localizedDescription)"
+            )
+            return OCRCorrectionResult(
+                text: originalText,
+                status: .failed
+            )
         }
+    }
+
+    private func generateWithTimeout(
+        imageData: Data,
+        prompt: String
+    ) async throws -> String? {
+        let generator = generator
+        let requestTimeout = requestTimeout
+        return try await withThrowingTaskGroup(
+            of: String?.self
+        ) { group in
+            group.addTask {
+                try await generator(
+                    imageData,
+                    prompt
+                )
+            }
+            group.addTask {
+                try await Task.sleep(
+                    for: requestTimeout
+                )
+                throw OCRCorrectionRequestError
+                    .timedOut
+            }
+            defer {
+                group.cancelAll()
+            }
+            guard let result = try await
+                    group.next() else {
+                return nil
+            }
+            return result
+        }
+    }
+
+    private static func generate(
+        imageData: Data,
+        prompt: String
+    ) async throws -> String? {
+        let model = FirebaseAI
+            .firebaseAI(
+                backend: .googleAI()
+            )
+            .generativeModel(
+                modelName:
+                    "gemini-2.5-flash-lite",
+                generationConfig:
+                    GenerationConfig(
+                        temperature: 0.1,
+                        maxOutputTokens: 16_384
+                    ),
+                systemInstruction:
+                    ModelContent(
+                        role: "system",
+                        parts:
+                            OCRCorrectionPolicy
+                            .systemPrompt
+                    )
+            )
+        let imagePart = InlineDataPart(
+            data: imageData,
+            mimeType: "image/jpeg"
+        )
+        let inputTokens = try await model
+            .countTokens(
+                imagePart,
+                prompt
+            )
+            .totalTokens
+        let reservation = try await
+            CloudAITokenBudgetStore.shared
+            .reserve(
+                inputTokens: inputTokens,
+                maximumOutputTokens: 16_384
+            )
+        do {
+            let response = try await model
+                .generateContent(
+                    imagePart,
+                    prompt
+                )
+            await CloudAITokenBudgetStore
+                .shared
+                .commit(
+                    reservation,
+                    actualTokens:
+                        response
+                        .usageMetadata?
+                        .totalTokenCount
+                )
+            return response.text
+        } catch {
+            await CloudAITokenBudgetStore
+                .shared
+                .cancel(reservation)
+            throw error
+        }
+    }
+
+    private static func encodedImageData(
+        _ image: UIImage
+    ) -> Data? {
+        guard image.size.width > 0,
+              image.size.height > 0 else {
+            return nil
+        }
+        let maximumDimension: CGFloat = 2_048
+        let longestDimension = max(
+            image.size.width,
+            image.size.height
+        )
+        let scale = min(
+            1,
+            maximumDimension / longestDimension
+        )
+        let targetSize = CGSize(
+            width: max(
+                1,
+                (image.size.width * scale)
+                    .rounded()
+            ),
+            height: max(
+                1,
+                (image.size.height * scale)
+                    .rounded()
+            )
+        )
+        let format =
+            UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderedImage =
+            UIGraphicsImageRenderer(
+                size: targetSize,
+                format: format
+            )
+            .image { _ in
+                image.draw(
+                    in: CGRect(
+                        origin: .zero,
+                        size: targetSize
+                    )
+                )
+            }
+        return renderedImage.jpegData(
+            compressionQuality: 0.82
+        )
     }
 }

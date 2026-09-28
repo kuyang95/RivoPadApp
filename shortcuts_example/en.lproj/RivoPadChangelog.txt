@@ -66,8 +66,10 @@
 @text Added local extraction of Excel 97–2003 OLE/BIFF8 XLS and compressed HWP 5.x, with encryption, corruption, decompression-bomb defense, and original-file preservation.
 @text Added local extraction of XLSX, Excel 97–2003 XLS, and HWP 5.x as attachment context in VisionLink remote AI chat.
 @text Added remembered user-authorized Files folders for searching PDF, TXT, XLSX, XLS, and HWP and opening structured documents in the general document viewer.
-@text Added M4 Qwen3-VL OCR typo correction that compares a still image with Vision OCR, plus a setting and safeguards against changed numbers, URLs, line breaks, and excessive length changes.
+@text Added Gemini OCR typo correction that compares a still image with Vision OCR, plus a setting and safeguards against changed numbers, URLs, line breaks, and excessive length changes.
 @text Added separate local settings for document auto-capture and UVDoc curved-page correction while preserving manual capture and perspective-correction fallback.
+@text Added an App Documents Folder list to Documents so documents placed in the Files app's My iPad > VisionCraft folder can be opened without the file browser.
+@text HWPX original preview tables now fit the page width without horizontal scrolling, using smaller cell text so the whole table stays visible.
 
 @version 0.9
 @date July 29, 2026

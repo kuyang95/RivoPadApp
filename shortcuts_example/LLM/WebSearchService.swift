@@ -56,6 +56,7 @@ nonisolated enum WebSearchError:
     case emptyQuery
     case queryTooLong
     case invalidResponse
+    case dailyQuotaExceeded
     case rateLimited
     case noResults
     case requestFailed
@@ -82,6 +83,13 @@ nonisolated enum WebSearchError:
             return AppLocalization.string(
                 "검색 서버의 응답을 확인할 수 없습니다."
             )
+        case .dailyQuotaExceeded:
+            return CloudAITokenBudgetError
+                .dailyLimitExceeded(
+                    remainingTokens: 0,
+                    requiredTokens: 1
+                )
+                .errorDescription
         case .rateLimited:
             return AppLocalization.string(
                 "웹 검색 요청 한도를 초과했습니다. 잠시 후 다시 시도해 주세요."
@@ -197,6 +205,9 @@ final class GeminiGoogleSearchService:
             throw CancellationError()
         } catch let error as WebSearchError {
             throw error
+        } catch is CloudAITokenBudgetError {
+            throw WebSearchError
+                .dailyQuotaExceeded
         } catch {
             let description = error
                 .localizedDescription
@@ -274,10 +285,35 @@ final class GeminiGoogleSearchService:
                             systemInstruction
                     )
             )
-        let response = try await model
-            .generateContent(
-                searchPrompt(query)
+        let prompt = searchPrompt(query)
+        let inputTokens = try await model
+            .countTokens(prompt)
+            .totalTokens
+        let reservation = try await
+            CloudAITokenBudgetStore.shared
+            .reserve(
+                inputTokens: inputTokens,
+                maximumOutputTokens: 512
             )
+        let response: GenerateContentResponse
+        do {
+            response = try await model
+                .generateContent(prompt)
+            await CloudAITokenBudgetStore
+                .shared
+                .commit(
+                    reservation,
+                    actualTokens:
+                        response
+                        .usageMetadata?
+                        .totalTokenCount
+                )
+        } catch {
+            await CloudAITokenBudgetStore
+                .shared
+                .cancel(reservation)
+            throw error
+        }
         guard let answer = response.text?
                 .trimmingCharacters(
                     in:

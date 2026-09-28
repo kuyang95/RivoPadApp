@@ -5,6 +5,29 @@ import XCTest
 @testable import shortcuts_example
 
 final class LocalDocumentImportTests: XCTestCase {
+    func testDocumentLibraryFilePolicyNeverAllowsBookFormats() {
+        XCTAssertFalse(
+            DocumentLibraryFilePolicy
+                .allows(pathExtension: "epub")
+        )
+        XCTAssertFalse(
+            DocumentLibraryFilePolicy
+                .allows(pathExtension: "EPUB")
+        )
+        XCTAssertFalse(
+            DocumentLibraryFilePolicy
+                .allows(pathExtension: "zip")
+        )
+        XCTAssertTrue(
+            DocumentLibraryFilePolicy
+                .allows(pathExtension: "xls")
+        )
+        XCTAssertTrue(
+            DocumentLibraryFilePolicy
+                .allows(pathExtension: "xlsx")
+        )
+    }
+
     @MainActor
     func testInMemoryClipboardDocumentLoadsExactText()
         async
@@ -56,6 +79,58 @@ final class LocalDocumentImportTests: XCTestCase {
         )
     }
 
+    func testTextEditorLayoutMatchesAndroidScalePolicy() {
+        XCTAssertEqual(
+            TextEditorLayoutPolicy.fontSize(
+                level: 1,
+                availableWidth: 700
+            ),
+            58,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            TextEditorLayoutPolicy.fontSize(
+                level: 5,
+                availableWidth: 600
+            ),
+            100,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            TextEditorLayoutPolicy.fontSize(
+                level: 10,
+                availableWidth: 600
+            ),
+            600,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            TextEditorLayoutPolicy.lineSpacing(
+                level: 5,
+                fontSize: 100
+            ),
+            28,
+            accuracy: 0.001
+        )
+    }
+
+    func testTextEditorSingleLineChunksKeepLongDocumentVisible() {
+        let source = String(repeating: "가나다라마바사", count: 100)
+            + "\r\n다음 줄\n마지막 줄"
+        let chunks = TextEditorLayoutPolicy.singleLineChunks(
+            source,
+            maximumCharacterCount: 64
+        )
+
+        XCTAssertGreaterThan(chunks.count, 1)
+        XCTAssertTrue(chunks.allSatisfy { $0.count <= 64 })
+        XCTAssertEqual(
+            chunks.joined(),
+            String(repeating: "가나다라마바사", count: 100)
+                + "   다음 줄   마지막 줄"
+        )
+    }
+
     func testImportCopiesFileIntoSandbox() async throws {
         let fixtureDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent(
@@ -91,6 +166,54 @@ final class LocalDocumentImportTests: XCTestCase {
         XCTAssertNotEqual(importedURL, sourceURL)
         XCTAssertEqual(importedURL.lastPathComponent, "sample.txt")
         XCTAssertEqual(try Data(contentsOf: importedURL), expected)
+    }
+
+    @MainActor
+    func testFileOpeningRoutesTextDocumentThroughSandboxCopy()
+        async throws
+    {
+        let fixtureDirectory = FileManager.default
+            .temporaryDirectory
+            .appendingPathComponent(
+                "RivoFileOpeningTests-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        try FileManager.default.createDirectory(
+            at: fixtureDirectory,
+            withIntermediateDirectories: true
+        )
+        defer {
+            try? FileManager.default.removeItem(
+                at: fixtureDirectory
+            )
+        }
+
+        let sourceURL = fixtureDirectory
+            .appendingPathComponent("recent-item.txt")
+        let expected = Data("최근 항목 문서".utf8)
+        try expected.write(to: sourceURL)
+
+        let route = try await LocalFileOpening.route(
+            for: sourceURL
+        )
+        guard case .localDocument(let importedURL) = route
+        else {
+            return XCTFail(
+                "텍스트 문서는 로컬 문서 화면으로 열려야 합니다."
+            )
+        }
+
+        defer {
+            try? FileManager.default.removeItem(
+                at: importedURL
+                    .deletingLastPathComponent()
+            )
+        }
+        XCTAssertNotEqual(importedURL, sourceURL)
+        XCTAssertEqual(
+            try Data(contentsOf: importedURL),
+            expected
+        )
     }
 
     func testImportRejectsFileOverConfiguredLimit() async throws {
@@ -521,5 +644,71 @@ private final class
         let current = completion
         completion = nil
         current?()
+    }
+}
+
+final class DocumentLibraryAppFolderTests: XCTestCase {
+    @MainActor
+    func testAppFolderScanListsSupportedDocumentsAndSkipsHiddenFolders()
+        async throws
+    {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "DocumentLibraryAppFolderTests-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let nested = root.appendingPathComponent("여행", isDirectory: true)
+        let hidden = root.appendingPathComponent(".HWPValidation", isDirectory: true)
+        try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: hidden, withIntermediateDirectories: true)
+        try Data("xlsx".utf8).write(to: root.appendingPathComponent("원소.xlsx"))
+        try Data("hwpx".utf8).write(to: nested.appendingPathComponent("제주.hwpx"))
+        try Data("png".utf8).write(to: root.appendingPathComponent("사진.png"))
+        try Data("hwp".utf8).write(to: hidden.appendingPathComponent("V01.hwp"))
+
+        let viewModel = DocumentLibraryViewModel(
+            recentStore: RecentOriginalDocumentStore(
+                defaults: UserDefaults(suiteName: "DocumentLibraryAppFolderTests")!,
+                storageKey: "test.\(UUID().uuidString)"
+            ),
+            appFolderURL: root
+        )
+        await viewModel.refreshAppFolderDocuments()
+
+        let names = Set(viewModel.appFolderDocuments.map(\.name))
+        XCTAssertEqual(names, ["원소.xlsx", "제주.hwpx"])
+        XCTAssertFalse(viewModel.isAppFolderTruncated)
+
+        let nestedItem = try XCTUnwrap(
+            viewModel.appFolderDocuments.first { $0.name == "제주.hwpx" }
+        )
+        XCTAssertEqual(nestedItem.relativePath, "여행/제주.hwpx")
+        XCTAssertEqual(
+            viewModel.appFolderDocumentURL(for: nestedItem)?.standardizedFileURL,
+            nested.appendingPathComponent("제주.hwpx").standardizedFileURL
+        )
+    }
+
+    @MainActor
+    func testAppFolderScanIsSkippedWithoutFolder() async {
+        let viewModel = DocumentLibraryViewModel(
+            recentStore: RecentOriginalDocumentStore(
+                defaults: UserDefaults(suiteName: "DocumentLibraryAppFolderTests")!,
+                storageKey: "test.\(UUID().uuidString)"
+            ),
+            appFolderURL: nil
+        )
+        await viewModel.refreshAppFolderDocuments()
+        XCTAssertTrue(viewModel.appFolderDocuments.isEmpty)
+        XCTAssertNil(viewModel.appFolderDocumentURL(for: AuthorizedDocumentItem(
+            name: "a.xlsx", relativePath: "a.xlsx", pathExtension: "xlsx",
+            fileSize: nil, modificationDate: nil
+        )))
     }
 }

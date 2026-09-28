@@ -22,11 +22,11 @@ nonisolated enum AppSpeechRate:
         switch self {
         case .slow:
             return AppLocalization.string(
-                "느리게"
+                "천천히"
             )
         case .normal:
             return AppLocalization.string(
-                "보통"
+                "자연스럽게"
             )
         case .fast:
             return AppLocalization.string(
@@ -34,7 +34,7 @@ nonisolated enum AppSpeechRate:
             )
         case .veryFast:
             return AppLocalization.string(
-                "매우 빠르게"
+                "아주 빠르게"
             )
         }
     }
@@ -260,6 +260,8 @@ final class AppSettingsStore:
             "settings.scanAutomaticCapture.v1"
         static let scanCurvedPageCorrection =
             "settings.scanCurvedPageCorrection.v1"
+        static let scanCurvedPageCorrectionDefaultOffMigration =
+            "settings.scanCurvedPageCorrection.defaultOff.v1"
         static let ocrAutoCorrection =
             "settings.ocrAutoCorrection.v1"
         static let appLanguage =
@@ -280,6 +282,9 @@ final class AppSettingsStore:
                 soundEffectsEnabled,
                 forKey: Key.soundEffects
             )
+            if !soundEffectsEnabled {
+                SoundEffectManager.shared.stopAll()
+            }
         }
     }
 
@@ -411,6 +416,34 @@ final class AppSettingsStore:
     init(
         defaults: UserDefaults = .standard
     ) {
+        let curvedPageCorrectionEnabled: Bool
+        if defaults.bool(
+            forKey:
+                Key.scanCurvedPageCorrectionDefaultOffMigration
+        ) {
+            curvedPageCorrectionEnabled =
+                Self.bool(
+                    forKey:
+                        Key.scanCurvedPageCorrection,
+                    defaults: defaults,
+                    fallback: false
+                )
+        } else {
+            // VisionCraft Android keeps UVDoc disabled by default because the
+            // model can bend already-flat pages. Migrate the former iOS
+            // default-on value once; a later explicit user toggle persists.
+            curvedPageCorrectionEnabled = false
+            defaults.set(
+                false,
+                forKey:
+                    Key.scanCurvedPageCorrection
+            )
+            defaults.set(
+                true,
+                forKey:
+                    Key.scanCurvedPageCorrectionDefaultOffMigration
+            )
+        }
         self.defaults = defaults
         soundEffectsEnabled =
             Self.bool(
@@ -424,12 +457,14 @@ final class AppSettingsStore:
                 defaults: defaults,
                 fallback: true
             )
-        speechRate = defaults
-            .string(
-                forKey: Key.speechRate
-            )
-            .flatMap(AppSpeechRate.init)
-            ?? .normal
+        if let storedSpeechRate = defaults
+            .string(forKey: Key.speechRate) {
+            speechRate =
+                AppSpeechRate(rawValue: storedSpeechRate)
+                ?? .normal
+        } else {
+            speechRate = .fast
+        }
         documentScanColorEnhancementEnabled =
             Self.bool(
                 forKey:
@@ -445,12 +480,7 @@ final class AppSettingsStore:
                 fallback: true
             )
         documentScanCurvedPageCorrectionEnabled =
-            Self.bool(
-                forKey:
-                    Key.scanCurvedPageCorrection,
-                defaults: defaults,
-                fallback: true
-            )
+            curvedPageCorrectionEnabled
         ocrAutoCorrectionEnabled =
             Self.bool(
                 forKey:
@@ -508,13 +538,13 @@ final class AppSettingsStore:
     func resetToDefaults() {
         soundEffectsEnabled = true
         voiceFeedbackEnabled = true
-        speechRate = .normal
+        speechRate = .fast
         documentScanColorEnhancementEnabled =
             true
         documentScanAutomaticCaptureEnabled =
             true
         documentScanCurvedPageCorrectionEnabled =
-            true
+            false
         ocrAutoCorrectionEnabled = true
         appLanguage = .system
         sharedTextEntryMode = .voice

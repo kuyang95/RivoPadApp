@@ -7,6 +7,14 @@ protocol WebSearchConfigurationProviding:
     AnyObject
 {
     var isEnabled: Bool { get }
+
+    /// Whether AI chat may answer a question that needs live information
+    /// with a grounded web search instead of the local model.
+    var isAutomaticChatSearchEnabled: Bool { get }
+}
+
+extension WebSearchConfigurationProviding {
+    var isAutomaticChatSearchEnabled: Bool { false }
 }
 
 @MainActor
@@ -17,6 +25,8 @@ final class WebSearchConfigurationStore:
     private enum Key {
         static let isEnabled =
             "webSearch.enabled.v1"
+        static let automaticChatSearch =
+            "webSearch.automaticChat.v1"
         static let removedLegacyCredential =
             "webSearch.removedBraveCredential.v1"
     }
@@ -26,6 +36,9 @@ final class WebSearchConfigurationStore:
 
     @Published private(set)
     var isEnabled: Bool
+
+    @Published private(set)
+    var isAutomaticChatSearchEnabled: Bool
 
     private let defaults: UserDefaults
 
@@ -40,6 +53,10 @@ final class WebSearchConfigurationStore:
         isEnabled = defaults.bool(
             forKey: Key.isEnabled
         )
+        isAutomaticChatSearchEnabled =
+            defaults.bool(
+                forKey: Key.automaticChatSearch
+            )
         removeLegacyBraveCredentialIfNeeded()
     }
 
@@ -50,6 +67,19 @@ final class WebSearchConfigurationStore:
         defaults.set(
             enabled,
             forKey: Key.isEnabled
+        )
+        if !enabled {
+            setAutomaticChatSearchEnabled(false)
+        }
+    }
+
+    func setAutomaticChatSearchEnabled(
+        _ enabled: Bool
+    ) {
+        isAutomaticChatSearchEnabled = enabled
+        defaults.set(
+            enabled,
+            forKey: Key.automaticChatSearch
         )
     }
 

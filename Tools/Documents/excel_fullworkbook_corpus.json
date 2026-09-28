@@ -1,0 +1,50 @@
+{
+  "source": {
+    "name": "LibreOffice Calc XLSX regression corpus",
+    "repository": "https://github.com/LibreOffice/core",
+    "revision": "2003620e384e606168f24c3fd4b650fefb00a802",
+    "license": "MPL-2.0"
+  },
+  "documents": [
+    {
+      "id": "XL06_sparklines",
+      "filename": "Sparklines.xlsx",
+      "feature": "sparklines and extension-list preservation",
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2003620e384e606168f24c3fd4b650fefb00a802/sc/qa/unit/data/xlsx/Sparklines.xlsx",
+      "source_url": "https://github.com/LibreOffice/core/blob/2003620e384e606168f24c3fd4b650fefb00a802/sc/qa/unit/data/xlsx/Sparklines.xlsx",
+      "sha256": "9847a0015185459e126b3f60d09d4dbd4492d9a39644971118c67e38666d5b16"
+    },
+    {
+      "id": "XL07_pivot_cache",
+      "filename": "PivotTable_CachedDefinitionAndDataInSync.xlsx",
+      "feature": "pivot table, cache definition, and cache records",
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2003620e384e606168f24c3fd4b650fefb00a802/sc/qa/unit/data/xlsx/PivotTable_CachedDefinitionAndDataInSync.xlsx",
+      "source_url": "https://github.com/LibreOffice/core/blob/2003620e384e606168f24c3fd4b650fefb00a802/sc/qa/unit/data/xlsx/PivotTable_CachedDefinitionAndDataInSync.xlsx",
+      "sha256": "b549617019d5d67ad50c25181c0a11c3a179f437e9b75a4756e10ffe86772a7a"
+    },
+    {
+      "id": "XL08_image_hyperlink",
+      "filename": "image_hyperlink.xlsx",
+      "feature": "worksheet image with hyperlink relationship",
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2003620e384e606168f24c3fd4b650fefb00a802/sc/qa/unit/data/xlsx/image_hyperlink.xlsx",
+      "source_url": "https://github.com/LibreOffice/core/blob/2003620e384e606168f24c3fd4b650fefb00a802/sc/qa/unit/data/xlsx/image_hyperlink.xlsx",
+      "sha256": "ab0171ccc9b2b07d8a348cac527d49e26cd82c8e0aad002ab9cc877986466f67"
+    },
+    {
+      "id": "XL09_data_validation",
+      "filename": "data_validation_test.xlsx",
+      "feature": "multiple data-validation rule types",
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2003620e384e606168f24c3fd4b650fefb00a802/sc/qa/unit/data/xlsx/data_validation_test.xlsx",
+      "source_url": "https://github.com/LibreOffice/core/blob/2003620e384e606168f24c3fd4b650fefb00a802/sc/qa/unit/data/xlsx/data_validation_test.xlsx",
+      "sha256": "a9537c68719201cc64b35a6185bb5cbb602ce9d9e8d9d38a629846a67ac42488"
+    },
+    {
+      "id": "XL10_sheet_protection",
+      "filename": "ProtecteSheet1234Pass.xlsx",
+      "feature": "password-hash worksheet protection",
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2003620e384e606168f24c3fd4b650fefb00a802/sc/qa/unit/data/xlsx/ProtecteSheet1234Pass.xlsx",
+      "source_url": "https://github.com/LibreOffice/core/blob/2003620e384e606168f24c3fd4b650fefb00a802/sc/qa/unit/data/xlsx/ProtecteSheet1234Pass.xlsx",
+      "sha256": "fbad9061c6d2dd234ba99932004b60110775f8bd6dfc14349f015c6acde29ae3"
+    }
+  ]
+}

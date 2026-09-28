@@ -1,5 +1,51 @@
 import Foundation
 
+nonisolated enum LegacyXLSCellValue:
+    Equatable,
+    Sendable
+{
+    case text(String)
+    case number(Double)
+    case boolean(Bool)
+
+    var displayText: String {
+        switch self {
+        case .text(let value):
+            return value
+        case .number(let value):
+            return String(value)
+        case .boolean(let value):
+            return value ? "true" : "false"
+        }
+    }
+}
+
+nonisolated struct LegacyXLSCellSnapshot:
+    Equatable,
+    Sendable
+{
+    /// One-based row index used by XLSX cell references.
+    let row: Int
+    /// One-based column index used by XLSX cell references.
+    let column: Int
+    let value: LegacyXLSCellValue
+}
+
+nonisolated struct LegacyXLSSheetSnapshot:
+    Equatable,
+    Sendable
+{
+    let name: String
+    let cells: [LegacyXLSCellSnapshot]
+}
+
+nonisolated struct LegacyXLSWorkbookSnapshot:
+    Equatable,
+    Sendable
+{
+    let sheets: [LegacyXLSSheetSnapshot]
+}
+
 /// Local, read-only extraction for the BIFF8 workbook stream used by Excel
 /// 97–2003 `.xls` files. Formatting, formulas, macros, and embedded objects are
 /// never evaluated; only stored cell values are returned.
@@ -19,107 +65,12 @@ nonisolated enum LegacyXLSExtractor {
     static func extract(
         from data: Data
     ) throws -> String {
-        guard data.count
-                <= maximumWorkbookBytes else {
-            throw ChatAttachmentError
-                .fileTooLarge(
-                    maximumMegabytes:
-                        maximumWorkbookBytes
-                        / 1_024
-                        / 1_024
-                )
-        }
-
-        let container: OLECompoundFile
-        do {
-            container =
-                try OLECompoundFile(
-                    data: data,
-                    limits: .init(
-                        maximumFileBytes:
-                            maximumWorkbookBytes,
-                        maximumDirectoryEntries:
-                            4_096,
-                        maximumStreamBytes:
-                            maximumWorkbookBytes,
-                        maximumChainSectors:
-                            65_536
-                    )
-                )
-        } catch
-            OLECompoundFileError
-                .limitExceeded {
-            throw ChatAttachmentError
-                .spreadsheetLimitExceeded
-        } catch {
-            throw ChatAttachmentError
-                .invalidSpreadsheet
-        }
-
-        let workbookData: Data
-        do {
-            if container.containsStream(
-                named: "Workbook"
-            ) {
-                workbookData =
-                    try container.stream(
-                        named: "Workbook"
-                    )
-            } else {
-                workbookData =
-                    try container.stream(
-                        named: "Book"
-                    )
-            }
-        } catch {
-            throw ChatAttachmentError
-                .invalidSpreadsheet
-        }
-
-        let records = try parseRecords(
-            workbookData
+        let parsed = try parsedWorkbook(
+            from: data
         )
-        guard let firstBOF = records.first(
-            where: {
-                $0.id == 0x0809
-            }
-        ),
-        firstBOF.payload.count >= 4
-        else {
-            throw ChatAttachmentError
-                .invalidSpreadsheet
-        }
-        guard try firstBOF.payload
-                .xlsUInt16(at: 0)
-                == 0x0600 else {
-            throw ChatAttachmentError
-                .unsupportedLegacySpreadsheet
-        }
-        if records.contains(
-            where: {
-                $0.id == 0x002F
-            }
-        ) {
-            throw ChatAttachmentError
-                .encryptedSpreadsheet
-        }
-
-        let sheets = try parseSheets(
-            records
-        )
-        guard !sheets.isEmpty else {
-            throw ChatAttachmentError
-                .invalidSpreadsheet
-        }
-        guard sheets.count
-                <= maximumSheets else {
-            throw ChatAttachmentError
-                .spreadsheetLimitExceeded
-        }
-        let sharedStrings =
-            try parseSharedStrings(
-                records
-            )
+        let records = parsed.records
+        let sheets = parsed.sheets
+        let sharedStrings = parsed.sharedStrings
 
         var extracted:
             [LegacyXLSExtractedSheet] = []
@@ -180,6 +131,143 @@ nonisolated enum LegacyXLSExtractor {
             )
         }
         return result
+    }
+
+    /// Returns structured, typed cell values for loss-aware XLSX conversion.
+    /// BIFF formula tokens are intentionally not evaluated or copied. A formula
+    /// cell contributes only the cached result stored in the source workbook.
+    static func workbook(
+        from data: Data
+    ) throws -> LegacyXLSWorkbookSnapshot {
+        let parsed = try parsedWorkbook(
+            from: data
+        )
+        var convertedSheets:
+            [LegacyXLSSheetSnapshot] = []
+        convertedSheets.reserveCapacity(
+            parsed.sheets.count
+        )
+
+        for sheet in parsed.sheets
+        where sheet.isWorksheet {
+            let parsedCells = try parseCells(
+                parsed.records,
+                sheet: sheet,
+                sharedStrings:
+                    parsed.sharedStrings,
+                maximumOutputBytes: nil
+            )
+            convertedSheets.append(
+                LegacyXLSSheetSnapshot(
+                    name: sheet.name,
+                    cells: parsedCells.cells
+                )
+            )
+        }
+        guard !convertedSheets.isEmpty else {
+            throw ChatAttachmentError
+                .invalidSpreadsheet
+        }
+        return LegacyXLSWorkbookSnapshot(
+            sheets: convertedSheets
+        )
+    }
+
+    private static func parsedWorkbook(
+        from data: Data
+    ) throws -> LegacyXLSParsedWorkbook {
+        guard data.count
+                <= maximumWorkbookBytes else {
+            throw ChatAttachmentError
+                .fileTooLarge(
+                    maximumMegabytes:
+                        maximumWorkbookBytes
+                        / 1_024
+                        / 1_024
+                )
+        }
+
+        let container: OLECompoundFile
+        do {
+            container = try OLECompoundFile(
+                data: data,
+                limits: .init(
+                    maximumFileBytes:
+                        maximumWorkbookBytes,
+                    maximumDirectoryEntries:
+                        4_096,
+                    maximumStreamBytes:
+                        maximumWorkbookBytes,
+                    maximumChainSectors:
+                        65_536
+                )
+            )
+        } catch OLECompoundFileError
+            .limitExceeded {
+            throw ChatAttachmentError
+                .spreadsheetLimitExceeded
+        } catch {
+            throw ChatAttachmentError
+                .invalidSpreadsheet
+        }
+
+        let workbookData: Data
+        do {
+            if container.containsStream(
+                named: "Workbook"
+            ) {
+                workbookData = try container
+                    .stream(named: "Workbook")
+            } else {
+                workbookData = try container
+                    .stream(named: "Book")
+            }
+        } catch {
+            throw ChatAttachmentError
+                .invalidSpreadsheet
+        }
+
+        let records = try parseRecords(
+            workbookData
+        )
+        guard let firstBOF = records.first(
+            where: { $0.id == 0x0809 }
+        ),
+        firstBOF.payload.count >= 4 else {
+            throw ChatAttachmentError
+                .invalidSpreadsheet
+        }
+        guard try firstBOF.payload
+                .xlsUInt16(at: 0)
+                == 0x0600 else {
+            throw ChatAttachmentError
+                .unsupportedLegacySpreadsheet
+        }
+        if records.contains(
+            where: { $0.id == 0x002F }
+        ) {
+            throw ChatAttachmentError
+                .encryptedSpreadsheet
+        }
+
+        let sheets = try parseSheets(records)
+        guard !sheets.isEmpty else {
+            throw ChatAttachmentError
+                .invalidSpreadsheet
+        }
+        guard sheets.count <= maximumSheets
+        else {
+            throw ChatAttachmentError
+                .spreadsheetLimitExceeded
+        }
+        return LegacyXLSParsedWorkbook(
+            records: records,
+            sheets: sheets,
+            sharedStrings:
+                try parseSharedStrings(
+                    records
+                )
+        )
     }
 
     private static func parseRecords(
@@ -348,13 +436,14 @@ nonisolated enum LegacyXLSExtractor {
         _ records: [LegacyXLSRecord],
         sheet: LegacyXLSSheet,
         sharedStrings: [String],
-        maximumOutputBytes: Int
+        maximumOutputBytes: Int?
     ) throws -> (
         text: String,
-        didTruncate: Bool
+        didTruncate: Bool,
+        cells: [LegacyXLSCellSnapshot]
     ) {
         guard sheet.isWorksheet else {
-            return ("", false)
+            return ("", false, [])
         }
         guard let start = records.firstIndex(
             where: {
@@ -374,7 +463,7 @@ nonisolated enum LegacyXLSExtractor {
         }
 
         var rows:
-            [Int: [Int: String]] = [:]
+            [Int: [Int: LegacyXLSCellValue]] = [:]
         var cellCount = 0
         var pendingFormula:
             (row: Int, column: Int)?
@@ -382,7 +471,7 @@ nonisolated enum LegacyXLSExtractor {
         func add(
             row: Int,
             column: Int,
-            value rawValue: String
+            value rawValue: LegacyXLSCellValue
         ) throws {
             guard row >= 0,
                   row <= 65_535,
@@ -391,12 +480,20 @@ nonisolated enum LegacyXLSExtractor {
                 throw ChatAttachmentError
                     .invalidSpreadsheet
             }
-            let value =
-                normalizedCellText(
-                    rawValue
-                )
-            guard !value.isEmpty else {
-                return
+            let value: LegacyXLSCellValue
+            switch rawValue {
+            case .text(let rawText):
+                guard !rawText.isEmpty else {
+                    return
+                }
+                value = .text(rawText)
+            case .number(let number):
+                guard number.isFinite else {
+                    return
+                }
+                value = .number(number)
+            case .boolean:
+                value = rawValue
             }
             if rows[row]?[column] == nil {
                 cellCount += 1
@@ -454,10 +551,11 @@ nonisolated enum LegacyXLSExtractor {
                         try record.payload
                             .xlsUInt16(at: 2)
                     ),
-                    value:
+                    value: .text(
                         sharedStrings[
                             stringIndex
                         ]
+                    )
                 )
             case 0x0203: // Number
                 guard record.payload.count
@@ -474,7 +572,7 @@ nonisolated enum LegacyXLSExtractor {
                         try record.payload
                             .xlsUInt16(at: 2)
                     ),
-                    value: String(
+                    value: .number(
                         try record.payload
                             .xlsDouble(at: 6)
                     )
@@ -494,7 +592,7 @@ nonisolated enum LegacyXLSExtractor {
                         try record.payload
                             .xlsUInt16(at: 2)
                     ),
-                    value: String(
+                    value: .number(
                         decodeRK(
                             try record.payload
                                 .xlsUInt32(
@@ -542,7 +640,7 @@ nonisolated enum LegacyXLSExtractor {
                         column:
                             firstColumn
                             + cellIndex,
-                        value: String(
+                        value: .number(
                             decodeRK(
                                 try record
                                     .payload
@@ -576,11 +674,10 @@ nonisolated enum LegacyXLSExtractor {
                                     at: 2
                                 )
                         ),
-                        value:
+                        value: .boolean(
                             record.payload[6]
-                                == 0
-                            ? "false"
-                            : "true"
+                                != 0
+                        )
                     )
                 }
             case 0x0006: // Formula
@@ -610,11 +707,10 @@ nonisolated enum LegacyXLSExtractor {
                         try add(
                             row: row,
                             column: column,
-                            value:
+                            value: .boolean(
                                 record.payload[8]
-                                    == 0
-                                ? "false"
-                                : "true"
+                                    != 0
+                            )
                         )
                     default:
                         break
@@ -623,7 +719,7 @@ nonisolated enum LegacyXLSExtractor {
                     try add(
                         row: row,
                         column: column,
-                        value: String(
+                        value: .number(
                             try record.payload
                                 .xlsDouble(
                                     at: 6
@@ -657,9 +753,10 @@ nonisolated enum LegacyXLSExtractor {
                         column:
                             formula
                                 .column,
-                        value:
+                        value: .text(
                             try reader
                                 .readRichString()
+                        )
                     )
                     pendingFormula = nil
                 }
@@ -678,7 +775,7 @@ nonisolated enum LegacyXLSExtractor {
                         try record.payload
                             .xlsUInt16(at: 2)
                     ),
-                    value:
+                    value: .text(
                         try parseUnicodeString(
                             record.payload
                                 .subdata(
@@ -688,6 +785,7 @@ nonisolated enum LegacyXLSExtractor {
                                             .count
                                 )
                         )
+                    )
                 )
             default:
                 break
@@ -695,15 +793,38 @@ nonisolated enum LegacyXLSExtractor {
             index += 1
         }
 
+        let sortedRows = rows.keys.sorted()
+        let cells = sortedRows.flatMap {
+            row in
+            rows[row]!
+                .sorted { $0.key < $1.key }
+                .map {
+                    column,
+                    value in
+                    LegacyXLSCellSnapshot(
+                        row: row + 1,
+                        column: column + 1,
+                        value: value
+                    )
+                }
+        }
+        guard let maximumOutputBytes else {
+            return ("", false, cells)
+        }
+
         var output = ""
         var outputBytes = 0
         var didTruncate = false
-        for row in rows.keys.sorted() {
+        for row in sortedRows {
             let line = rows[row]!
                 .sorted {
                     $0.key < $1.key
                 }
-                .map(\.value)
+                .map {
+                    normalizedCellText(
+                        $0.value.displayText
+                    )
+                }
                 .joined(separator: "\t")
                 + "\n"
             let lineBytes = line.utf8.count
@@ -720,7 +841,8 @@ nonisolated enum LegacyXLSExtractor {
             output.trimmingCharacters(
                 in: .newlines
             ),
-            didTruncate
+            didTruncate,
+            cells
         )
     }
 
@@ -860,6 +982,14 @@ private nonisolated struct LegacyXLSSheet {
     let name: String
     let streamOffset: Int
     let isWorksheet: Bool
+}
+
+private nonisolated struct
+    LegacyXLSParsedWorkbook
+{
+    let records: [LegacyXLSRecord]
+    let sheets: [LegacyXLSSheet]
+    let sharedStrings: [String]
 }
 
 private nonisolated struct

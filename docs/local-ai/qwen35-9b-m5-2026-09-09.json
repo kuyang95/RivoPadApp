@@ -1,0 +1,64 @@
+{
+  "completed" : true,
+  "date" : "2026-09-09T01:06:14Z",
+  "memoryTier" : "balanced",
+  "mlxMemoryLimitBytes" : 7516192768,
+  "model" : "Qwen3.5-9B-4bit",
+  "modelLoadSeconds" : 3.885825991630554,
+  "offlineModelLoading" : true,
+  "physicalMemoryBytes" : 12082675712,
+  "samples" : [
+    {
+      "availableAppMemoryBytes" : 7510813896,
+      "firstResponseSeconds" : 2.4296369552612305,
+      "mlxActiveBytes" : 5098338736,
+      "mlxPeakBytes" : 5370124298,
+      "name" : "korean_reading",
+      "passed" : true,
+      "promptCharacters" : 93,
+      "response" : "별빛 도서관 특별 강연은 10 월 17 일 오후 2 시이며 참가비는 무료입니다.",
+      "responseCharacters" : 44,
+      "responseCharactersPerSecond" : 12.689407564590196,
+      "totalSeconds" : 3.467458963394165
+    },
+    {
+      "availableAppMemoryBytes" : 7509585096,
+      "firstResponseSeconds" : 0.17204797267913818,
+      "mlxActiveBytes" : 5098338736,
+      "mlxPeakBytes" : 5370124298,
+      "name" : "conversation_followup",
+      "passed" : true,
+      "promptCharacters" : 29,
+      "response" : "10 월 10 일",
+      "responseCharacters" : 9,
+      "responseCharactersPerSecond" : 19.982063710774955,
+      "totalSeconds" : 0.45040392875671387
+    },
+    {
+      "availableAppMemoryBytes" : 7508585672,
+      "firstResponseSeconds" : 0.2618659734725952,
+      "mlxActiveBytes" : 5098338736,
+      "mlxPeakBytes" : 5370124298,
+      "name" : "korean_reasoning",
+      "passed" : true,
+      "promptCharacters" : 74,
+      "response" : "3 권의 총 가격은 2500 원에 3 을 곱한 7500 원입니다. 따라서 지불한 10000 원에서 7500 원을 뺀 거스름돈은 2500 원입니다.",
+      "responseCharacters" : 81,
+      "responseCharactersPerSecond" : 31.73320906762328,
+      "totalSeconds" : 2.5525310039520264
+    },
+    {
+      "availableAppMemoryBytes" : 7261809864,
+      "firstResponseSeconds" : 9.877752900123596,
+      "mlxActiveBytes" : 5308053936,
+      "mlxPeakBytes" : 6081660354,
+      "name" : "long_document",
+      "passed" : true,
+      "promptCharacters" : 13244,
+      "response" : "문서 90의 달빛 과학관에서 11 월 23 일 오후 3 시에 열리는 특별 강연은 참가비 7000 원이며 11 월 18 일까지 신청 마감됩니다.",
+      "responseCharacters" : 79,
+      "responseCharactersPerSecond" : 6.564342749448529,
+      "totalSeconds" : 12.0347158908844
+    }
+  ]
+}

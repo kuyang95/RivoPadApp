@@ -169,6 +169,25 @@ nonisolated struct DocumentCaptureGateEvaluator {
 /// Laplacian variance used by VisionCraft Android, including the same 96×64
 /// bilinear downsample, integer RGB luminance, and four-neighbour kernel.
 nonisolated enum AndroidScannerFrameQuality {
+    /// Mean luminance (0–255) of the downsampled analysis frame, used to
+    /// decide whether the scene is too dark to focus and sharpen.
+    static func meanLuminance(of image: ScannerRGBAImage) -> Double {
+        let pixelCount = image.width * image.height
+        guard pixelCount > 0 else {
+            return 255
+        }
+        var sum = 0
+        for pixelIndex in 0 ..< pixelCount {
+            let offset = pixelIndex * 4
+            sum += (
+                Int(image.bytes[offset]) * 299
+                + Int(image.bytes[offset + 1]) * 587
+                + Int(image.bytes[offset + 2]) * 114
+            ) / 1_000
+        }
+        return Double(sum) / Double(pixelCount)
+    }
+
     static func laplacianVariance(
         of image: ScannerRGBAImage,
         sampleWidth: Int = 96,

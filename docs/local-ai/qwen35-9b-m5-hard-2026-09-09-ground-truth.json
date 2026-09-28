@@ -1,0 +1,55 @@
+{
+  "constraint_order": {
+    "answer": "라,나,바,가,마,다",
+    "verification": "6!개 순열을 전수 검사했을 때 유일한 해"
+  },
+  "constrained_optimization": {
+    "answer": [
+      "C",
+      "E",
+      "F"
+    ],
+    "score": 37,
+    "cost": 12,
+    "time": 8,
+    "runnerUp": {
+      "answer": [
+        "C",
+        "D",
+        "E"
+      ],
+      "score": 36
+    },
+    "verification": "2^6개 부분집합의 예산·시간·추가 조건을 전수 검사"
+  },
+  "conditional_refund": {
+    "initial": 110400,
+    "remainingTotal": 84600,
+    "refund": 25800,
+    "verification": "144000×0.85−12000=110400, 96000×0.85+3000=84600"
+  },
+  "conditional_probability": {
+    "boxB": "2/5",
+    "thirdRed": "7/20",
+    "observationProbability": "5/9",
+    "posterior": [
+      "3/20",
+      "2/5",
+      "9/20"
+    ],
+    "verification": "정확한 유리수 연산으로 베이즈 공식과 전확률을 계산"
+  },
+  "inclusion_exclusion": {
+    "answer": 8003,
+    "expression": "6633 + 4100 - 1365 - 945 - 525 + 105",
+    "verification": "1..200의 조건에 맞는 정수를 직접 순회한 합과 포함·배제식을 대조"
+  },
+  "document_revision_and_unknown": {
+    "fee": 39000,
+    "feeSource": "D68",
+    "deadline": "10월 10일",
+    "deadlineSource": "D37",
+    "parkingFee": "문서에 없음",
+    "verification": "D68은 북부센터 참가비만 변경하며 마감은 D37 유지, D94는 남부센터, 주차요금은 모든 문서에서 미제공"
+  }
+}

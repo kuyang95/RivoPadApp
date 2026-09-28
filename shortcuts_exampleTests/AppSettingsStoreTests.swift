@@ -44,7 +44,7 @@ final class AppSettingsStoreTests:
         )
         XCTAssertEqual(
             store.speechRate,
-            .normal
+            .fast
         )
         XCTAssertTrue(
             store
@@ -54,7 +54,7 @@ final class AppSettingsStoreTests:
             store
                 .documentScanAutomaticCaptureEnabled
         )
-        XCTAssertTrue(
+        XCTAssertFalse(
             store
                 .documentScanCurvedPageCorrectionEnabled
         )
@@ -96,7 +96,7 @@ final class AppSettingsStoreTests:
             false
         store
             .documentScanCurvedPageCorrectionEnabled =
-            false
+            true
         store.ocrAutoCorrectionEnabled =
             false
         store.appLanguage = .japanese
@@ -125,7 +125,7 @@ final class AppSettingsStoreTests:
             restored
                 .documentScanAutomaticCaptureEnabled
         )
-        XCTAssertFalse(
+        XCTAssertTrue(
             restored
                 .documentScanCurvedPageCorrectionEnabled
         )
@@ -218,7 +218,7 @@ final class AppSettingsStoreTests:
         )
         XCTAssertEqual(
             store.speechRate,
-            .normal
+            .fast
         )
         XCTAssertTrue(
             store
@@ -228,7 +228,7 @@ final class AppSettingsStoreTests:
             store
                 .documentScanAutomaticCaptureEnabled
         )
-        XCTAssertTrue(
+        XCTAssertFalse(
             store
                 .documentScanCurvedPageCorrectionEnabled
         )
@@ -277,6 +277,34 @@ final class AppSettingsStoreTests:
             SharedTextEntryMode
                 .chat
                 .automaticallyStartsVoiceInput
+        )
+    }
+
+    func testCurvedPageCorrectionMigratesFormerDefaultOnToOffOnce()
+    {
+        defaults.set(
+            true,
+            forKey:
+                "settings.scanCurvedPageCorrection.v1"
+        )
+
+        let migrated = AppSettingsStore(
+            defaults: defaults
+        )
+        XCTAssertFalse(
+            migrated
+                .documentScanCurvedPageCorrectionEnabled
+        )
+
+        migrated
+            .documentScanCurvedPageCorrectionEnabled =
+            true
+        let restored = AppSettingsStore(
+            defaults: defaults
+        )
+        XCTAssertTrue(
+            restored
+                .documentScanCurvedPageCorrectionEnabled
         )
     }
 
