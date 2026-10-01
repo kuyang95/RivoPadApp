@@ -473,7 +473,7 @@ final class AppLocalizationTests:
         XCTAssertEqual(
             EPUBReadAloudNavigationUnit
                 .line.displayName,
-            "Line"
+            "Sentence"
         )
         XCTAssertEqual(
             EPUBReadAloudPlaybackMode
@@ -497,12 +497,12 @@ final class AppLocalizationTests:
         XCTAssertEqual(
             EPUBReadAloudNavigationUnit
                 .chapter.displayName,
-            "章"
+            "目次"
         )
         XCTAssertEqual(
             EPUBReadAloudNavigationUnit
                 .line.displayName,
-            "行"
+            "文"
         )
         XCTAssertEqual(
             AccessiblePublicationParserError
@@ -771,7 +771,7 @@ final class AppLocalizationTests:
         XCTAssertEqual(
             LocalDocumentColorTheme
                 .all[0].displayName,
-            "White on Black"
+            "White text on black background"
         )
         XCTAssertEqual(
             LocalDocumentImportError
@@ -813,7 +813,7 @@ final class AppLocalizationTests:
         XCTAssertEqual(
             LocalDocumentColorTheme
                 .all[1].displayName,
-            "白地に黒"
+            "白背景に黒文字"
         )
         XCTAssertEqual(
             LocalDocumentImportError
@@ -1009,7 +1009,7 @@ final class AppLocalizationTests:
             )
         XCTAssertEqual(
             englishReaderControl
-                .items[7].title,
+                .items.first(where: { $0.id == "reader.search" })?.title,
             "Search Text"
         )
 
@@ -1046,7 +1046,7 @@ final class AppLocalizationTests:
             .publicationReader
         )
         XCTAssertEqual(
-            controlCenter.items[8].title,
+            controlCenter.items.first(where: { $0.id == "reader.settings" })?.title,
             "設定"
         )
         controlCenter.dismissCommandMode()
@@ -1109,7 +1109,7 @@ final class AppLocalizationTests:
             STTManager.STTError
                 .permissionDenied
                 .localizedDescription,
-            "Microphone and speech recognition permissions are required."
+            "Please check microphone permission."
         )
 
         defaults.set(
@@ -1138,7 +1138,7 @@ final class AppLocalizationTests:
             STTManager.STTError
                 .onDeviceRecognitionUnavailable
                 .localizedDescription,
-            "このデバイスでは韓国語のオンデバイス音声認識を利用できません。"
+            "このデバイスではオンデバイス音声認識を使用できません。"
         )
     }
 

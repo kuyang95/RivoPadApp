@@ -27,8 +27,13 @@ final class AppRouter: ObservableObject {
 
 enum AppRoute: Hashable {
     case settings
+    /// 홈 제목 줄의 설정 아이콘 → 전체 설정 화면(Android `AllSettingsScreen`).
+    case allSettings
+    /// 홈 업데이트 기록 카드의 "이전 업데이트 기록보기"(Android `FullChangeLogsScreen`).
+    case releaseNotes
     case help
     case chatHistory
+    case aiDocument
     case localChat(conversationID: UUID?)
     case translation(
         initialText: String?,
@@ -90,12 +95,13 @@ enum AppRoute: Hashable {
     case epubReader(fileURL: URL)
     case rivoRemote
     case visionLink
-    case cameraTools
     case magnifier
     case liveTextReader
     case imageDescriptionCamera
     case cameraAskAI
     case photoReview
+    /// 홈 "이미지 분석 > 사진에서": 사진을 고르면 바로 설명한다(Android `ImageAnalysisActivity`).
+    case imageAnalysisPhoto
     case capturedImageAnalysis(
         image: UIImage,
         question: String

@@ -33,13 +33,14 @@ struct HWPReferenceComparisonView: View {
                 Text("HWP/HWPX와 같은 이름의 PDF를 함께 선택하면 자동으로 연결됩니다. 이름이 다른 PDF도 문서 안에서 연결할 수 있습니다.")
             }
             if let loadError {
-                Section { Text(loadError).foregroundStyle(.red) }
+                Section { Text(loadError).foregroundStyle(VisionCraftUI.error) }
             }
             if !results.isEmpty {
                 Section {
                     ForEach(results, id: \.self) { url in
                         NavigationLink {
                             HWPComparisonPDFView(fileURL: url)
+                                .visionCraftRouteBackButton()
                         } label: {
                             Label(url.deletingPathExtension().lastPathComponent, systemImage: "doc.richtext")
                         }
@@ -83,6 +84,7 @@ struct HWPReferenceComparisonView: View {
                 ForEach(items, id: \.self) { url in
                     NavigationLink {
                         HWPReferenceComparisonPageView(hwpURL: url, library: library)
+                            .visionCraftRouteBackButton()
                     } label: {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(url.deletingPathExtension().lastPathComponent)

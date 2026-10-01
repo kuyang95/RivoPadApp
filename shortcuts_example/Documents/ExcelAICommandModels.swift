@@ -476,7 +476,7 @@ nonisolated struct ExcelAICommandPlan: Decodable, Sendable {
     let referencedCells: [String]
     let referencedGroupIDs: [String]
     let countGroupID: String?
-    let query: ExcelAIReadQuery?
+    var query: ExcelAIReadQuery?
     let workbookOperations: [ExcelAIWorkbookOperation]
 
     init(

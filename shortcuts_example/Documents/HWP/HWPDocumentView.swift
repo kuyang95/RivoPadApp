@@ -918,15 +918,7 @@ final class HWPDocumentViewModel: ObservableObject {
             blocks: wordBlocks,
             userRequest: userRequest
         )
-        let context = formFields.context(for: userRequest, selectedBlockID: selectedBlockID)
-        guard context.resolution != .unmatched else { return catalog }
-        // The form index has already searched the whole document. Avoid an
-        // outline router dropping an empty value beside a matched label.
-        return WordAIRetrievalCatalog(documentName: catalog.documentName,
-            documentBlockCount: catalog.documentBlockCount,
-            documentCharacterCount: catalog.documentCharacterCount,
-            queryTerms: catalog.queryTerms, sections: catalog.sections, candidates: catalog.candidates,
-            catalogWasTruncated: catalog.catalogWasTruncated, requiresRouting: false, revision: catalog.revision)
+        return catalog
     }
 
     func makeAISnapshot(
@@ -940,7 +932,7 @@ final class HWPDocumentViewModel: ObservableObject {
         guard catalog.queryTerms == WordAIQueryTokenizer.terms(in: userRequest),
               catalog.revision == WordAISnapshotBuilder.revision(blocks: wordBlocks)
         else { return nil }
-        let snapshot: WordAIDocumentSnapshot
+        var snapshot: WordAIDocumentSnapshot
         if !catalog.requiresRouting {
             snapshot = WordAISnapshotBuilder.make(
                 documentName: documentName,
@@ -955,8 +947,8 @@ final class HWPDocumentViewModel: ObservableObject {
             else { return nil }
             snapshot = retrieved
         }
-        return HWPFormAISnapshot.addingFormContext(to: snapshot, allBlocks: wordBlocks,
-            context: formFields.context(for: userRequest, selectedBlockID: selectedBlockID))
+        snapshot.supportedOperations = ["replaceText"]
+        return snapshot
     }
 
     @discardableResult
@@ -1018,28 +1010,7 @@ final class HWPDocumentViewModel: ObservableObject {
     }
 
     private var wordBlocks: [WordDocumentBlock] {
-        let document = HWPAccessibleDocument.make(blocks: accessibleBlocks)
-        let tableNumbers = Dictionary(document.tables.enumerated().flatMap { index, table in
-            table.rows.flatMap(\.blocks).map { ($0.id, index) }
-        }, uniquingKeysWith: { first, _ in first })
-        return accessibleBlocks.map { block in
-            WordDocumentBlock(
-                id: block.id,
-                paragraphIndex: block.paragraphIndex,
-                text: block.text,
-                styleID: nil,
-                isNumbered: false,
-                tableLocation: block.tableLocation.map {
-                    WordDocumentTableLocation(
-                        table: tableNumbers[block.id] ?? $0.table,
-                        row: $0.row,
-                        column: $0.column,
-                        paragraph: $0.paragraph
-                    )
-                },
-                isEditable: block.isEditable
-            )
-        }
+        HWPAISource.blocks(blocks)
     }
 
     private func apply(
@@ -1677,24 +1648,24 @@ struct HWPDocumentView: View {
             Button("그림 크기·배치", systemImage: "slider.horizontal.3") {
                 editingImage = refreshedImageTarget(image)
             }
-            .frame(minHeight: 44)
+            .frame(minHeight: 48)
             .accessibilityIdentifier("hwp-ribbon-image-properties")
             Button("삭제", systemImage: "trash", role: .destructive) { editImage(.delete, target: image) }
-                .frame(minHeight: 44)
+                .frame(minHeight: 48)
         }
         if let shape = selectedShape {
             Button("위치·크기·스타일", systemImage: "slider.horizontal.3") {
                 editingShape = refreshedShapeTarget(shape)
             }
-            .frame(minHeight: 44)
+            .frame(minHeight: 48)
             .accessibilityIdentifier("hwp-ribbon-shape-properties")
             if shape.isGroup {
                 Button("그룹 해제", systemImage: "square.3.layers.3d") { editShape(.ungroup, target: shape) }
-                    .frame(minHeight: 44)
+                    .frame(minHeight: 48)
             }
             Button("삭제", systemImage: "trash", role: .destructive) { editShape(.delete, target: shape) }
                 .disabled(shape.isGroupChild && !shape.canDeleteGroupChild)
-                .frame(minHeight: 44)
+                .frame(minHeight: 48)
         }
         if selectedImage == nil { shapeGroupingTools }
     }
@@ -1755,7 +1726,7 @@ struct HWPDocumentView: View {
                     "원래 문단 영역보다 긴 입력이 있습니다. 편집 중 문단 안에서 스크롤하여 확인하세요.",
                     systemImage: "exclamationmark.triangle"
                 )
-                .font(.caption2)
+                .font(.caption)
                 .foregroundStyle(VisionCraftUI.secondaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -1825,7 +1796,7 @@ struct HWPDocumentView: View {
         .pickerStyle(.segmented)
         .labelsHidden()
         .frame(width: pickerWidth)
-        .frame(minHeight: 44)
+        .frame(minHeight: 48)
     }
 
     @ViewBuilder
@@ -2572,7 +2543,7 @@ struct HWPDocumentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .overlay(alignment: .topTrailing) {
                 Text(label)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.gray)
                     .accessibilityHidden(true)
             }
@@ -2601,7 +2572,7 @@ struct HWPDocumentView: View {
                     .padding(.top, style?.separatorMarginTopPoints ?? 8)
                     .padding(.bottom, style?.separatorMarginBottomPoints ?? 5)
                 Text(label)
-                    .font(.caption2.weight(.semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.gray)
                 ForEach(elements) { element in
                     originalPreviewView(element, contentWidth: contentWidth)
@@ -2642,7 +2613,7 @@ struct HWPDocumentView: View {
         )
         return VStack(alignment: .leading, spacing: 6) {
             Text(AppLocalization.format("표 %lld", index + 1))
-                .font(.caption2.weight(.semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(VisionCraftUI.secondaryText)
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(rows) { row in
@@ -2984,11 +2955,11 @@ struct HWPDocumentView: View {
             if block.region.kind == .footnote || block.region.kind == .endnote,
                let region = block.region.accessibilityDescription {
                 Text(region)
-                    .font(.caption2.weight(.semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.gray)
             } else if let table = block.tableLocation {
                 Text(table.accessibilityDescription)
-                    .font(.caption2.weight(.semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(VisionCraftUI.secondaryText)
             }
             styledText(for: block)
@@ -3175,7 +3146,7 @@ struct HWPDocumentView: View {
                 originalEditor.finish()
                 viewModel.undo()
             }
-            .frame(width: 44, height: 44)
+            .frame(width: 48, height: 48)
             .contentShape(Rectangle())
             .disabled(viewModel.isSaving || (!viewModel.canUndo && !viewModel.hasPendingEditorChange
                 && !originalEditor.hasChanges && !originalEditor.canUndo))
@@ -3185,7 +3156,7 @@ struct HWPDocumentView: View {
                 originalEditor.finish()
                 viewModel.redo()
             }
-            .frame(width: 44, height: 44)
+            .frame(width: 48, height: 48)
             .contentShape(Rectangle())
             .disabled(viewModel.isSaving || (!originalEditor.canRedo && (!viewModel.canRedo
                 || viewModel.hasPendingEditorChange || originalEditor.hasChanges)))
@@ -3196,7 +3167,7 @@ struct HWPDocumentView: View {
                 setMoreActionsPresented(true)
             }
             .labelStyle(.iconOnly)
-            .frame(width: 44, height: 44)
+            .frame(width: 48, height: 48)
             .contentShape(Rectangle())
             .disabled(viewModel.isSaving || viewModel.isLoading || viewModel.blocks.isEmpty)
         }

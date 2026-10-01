@@ -15,7 +15,7 @@ struct HWPDocumentNavigationControls: View {
 
             Button("이전 쪽", systemImage: "chevron.left") { goToPage(navigation.currentPageIndex - 1) }
                 .labelStyle(.iconOnly)
-                .frame(minWidth: 44, minHeight: 44)
+                .frame(minWidth: 48, minHeight: 48)
                 .disabled(navigation.currentPageIndex == 0)
             Button {
                 finishEditing()
@@ -25,7 +25,7 @@ struct HWPDocumentNavigationControls: View {
                 Text("\(navigation.currentPageIndex + 1) / \(max(1, navigation.pages.count))")
                     .monospacedDigit()
                     .lineLimit(1)
-                    .frame(minHeight: 44)
+                    .frame(minHeight: 48)
             }
             .accessibilityLabel("쪽 이동")
             .accessibilityValue(AppLocalization.format("%lld / %lld쪽",
@@ -33,7 +33,7 @@ struct HWPDocumentNavigationControls: View {
             .accessibilityIdentifier("hwp-page-jump")
             Button("다음 쪽", systemImage: "chevron.right") { goToPage(navigation.currentPageIndex + 1) }
                 .labelStyle(.iconOnly)
-                .frame(minWidth: 44, minHeight: 44)
+                .frame(minWidth: 48, minHeight: 48)
                 .disabled(navigation.currentPageIndex >= navigation.pages.count - 1)
 
             Menu {
@@ -45,7 +45,7 @@ struct HWPDocumentNavigationControls: View {
                 Text("\(Int((navigation.zoomScale * 100).rounded()))%")
                     .monospacedDigit()
                     .lineLimit(1)
-                    .frame(minWidth: 52, minHeight: 44)
+                    .frame(minWidth: 52, minHeight: 48)
             }
             .accessibilityLabel("확대·축소")
             .accessibilityValue("\(Int((navigation.zoomScale * 100).rounded()))%")
@@ -106,7 +106,7 @@ struct HWPDocumentFindButton: View {
         .labelStyle(.iconOnly)
         .buttonStyle(.plain)
         .accessibilityIdentifier("hwp-search-toggle")
-        .frame(width: 44, height: 44)
+        .frame(width: 48, height: 48)
         .background(navigation.showsSearch ? Color.accentColor.opacity(0.12) : .clear,
             in: RoundedRectangle(cornerRadius: 10))
     }
@@ -229,7 +229,7 @@ struct HWPDocumentSearchBar: View {
 
 private struct HWPSearchButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label.frame(minWidth: 44, minHeight: 44)
+        configuration.label.frame(minWidth: 48, minHeight: 48)
             .opacity(configuration.isPressed ? 0.5 : 1)
     }
 }

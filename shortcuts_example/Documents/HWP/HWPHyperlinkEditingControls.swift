@@ -14,7 +14,7 @@ struct HWPHyperlinkButton: View {
         } label: {
             Label("링크", systemImage: "link")
                 .font(.subheadline.weight(.semibold))
-                .frame(minWidth: 44, minHeight: 44)
+                .frame(minWidth: 48, minHeight: 48)
         }
         .buttonStyle(.plain)
         .disabled(!enabled)

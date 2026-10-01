@@ -50,13 +50,15 @@ final class WebSearchConfigurationStore:
         defaults: UserDefaults = .standard
     ) {
         self.defaults = defaults
-        isEnabled = defaults.bool(
+        // Android runs the web-search check on every free-chat message, so
+        // both switches default to on; a stored `false` still wins.
+        isEnabled = defaults.object(
             forKey: Key.isEnabled
-        )
+        ) as? Bool ?? true
         isAutomaticChatSearchEnabled =
-            defaults.bool(
+            defaults.object(
                 forKey: Key.automaticChatSearch
-            )
+            ) as? Bool ?? true
         removeLegacyBraveCredentialIfNeeded()
     }
 

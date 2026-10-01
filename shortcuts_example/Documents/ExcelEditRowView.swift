@@ -77,7 +77,7 @@ struct ExcelEditRowView: View {
             Button("닫기", action: requestClose)
                 .font(.body.weight(.semibold))
                 .padding(.horizontal, 16)
-                .frame(minHeight: 44)
+                .frame(minHeight: 48)
                 .background(VisionCraftUI.surfaceVariant, in: Capsule())
                 .disabled(isClosing)
         }

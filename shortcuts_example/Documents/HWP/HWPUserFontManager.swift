@@ -338,7 +338,7 @@ struct HWPFontManagerView: View {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(font.displayName)
                             Text(font.postScriptNames.joined(separator: ", "))
-                                .font(.caption2)
+                                .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                         .swipeActions {

@@ -45,6 +45,7 @@ nonisolated enum WordDocumentEditingError:
 }
 
 nonisolated struct WordDocumentTableLocation:
+    Encodable,
     Hashable,
     Sendable
 {
@@ -52,6 +53,16 @@ nonisolated struct WordDocumentTableLocation:
     let row: Int
     let column: Int
     let paragraph: Int
+    var rowSpan: Int = 1
+    var columnSpan: Int = 1
+    var sectionPath: String? = nil
+    var parent: Parent? = nil
+
+    struct Parent: Encodable, Hashable, Sendable {
+        let table: Int
+        let row: Int
+        let column: Int
+    }
 
     var accessibilityDescription: String {
         AppLocalization.format(

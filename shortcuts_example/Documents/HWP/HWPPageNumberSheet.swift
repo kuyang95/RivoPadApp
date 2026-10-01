@@ -65,7 +65,7 @@ struct HWPPageNumberSheet: View {
                                 TextField("1", text: $start).keyboardType(.numberPad).multilineTextAlignment(.trailing)
                                     .focused($editingStart).accessibilityIdentifier("hwp-number-start")
                                 Button { start = ""; editingStart = true } label: {
-                                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary).frame(width: 44, height: 44)
+                                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary).frame(width: 48, height: 48)
                                 }.buttonStyle(.borderless).accessibilityLabel("입력 지우기").accessibilityIdentifier("hwp-number-start-clear")
                             }
                         }

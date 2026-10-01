@@ -486,6 +486,21 @@ nonisolated enum HelpContentLibrary {
         )
     }
 
+    /// Android `assets/manual`(리보탭 매뉴얼). 한국어 원문만 있어 모든 언어에서 같은 파일을 쓴다.
+    static func remoteManual(
+        bundle: Bundle = .main,
+        language: AppLanguage =
+            .current()
+    ) throws -> HelpManualDocument {
+        try HelpDocumentParser.parseManual(
+            resourceText(
+                named: "RivoRemoteManual",
+                bundle: bundle,
+                language: language
+            )
+        )
+    }
+
     static func releaseNotes(
         bundle: Bundle = .main,
         language: AppLanguage =

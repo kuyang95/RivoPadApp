@@ -119,11 +119,10 @@ nonisolated struct DocumentCaptureGateEvaluator {
                 $0 + max($1.y - (1 - margin), 0)
             })
         ]
-        guard let strongest = overflow.max(by: { $0.1 < $1.1 }),
-              strongest.1 > 0 else {
-            return nil
+        guard let strongest = overflow.max(by: { $0.1 < $1.1 }) else {
+            return .fitDocument
         }
-        return strongest.0
+        return strongest.1 > 0 ? strongest.0 : nil
     }
 
     private mutating func updateCornerStability(

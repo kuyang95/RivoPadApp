@@ -195,6 +195,8 @@ struct LLMContentView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
+                titleRow(title: "AI 대화")
+
                 if let source = webSource {
                     webSourceBanner(source)
                 }
@@ -273,7 +275,7 @@ struct LLMContentView: View {
                     ?? vm.historyErrorDescription {
                     Text(error)
                         .font(.footnote)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(VisionCraftUI.error)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 12)
                         .accessibilityLabel(
@@ -285,21 +287,10 @@ struct LLMContentView: View {
                 } else if stt.isRecording {
                     Text("듣는 중… 마이크 버튼을 다시 누르면 종료됩니다.")
                         .font(.footnote)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(VisionCraftUI.secondaryText)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 12)
                         .accessibilityLabel("음성을 듣는 중입니다.")
-                } else if vm.isPreparingAttachment,
-                          let attachmentStatus =
-                            vm.attachmentStatusDescription {
-                    Text(attachmentStatus)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 12)
-                        .accessibilityLabel(
-                            attachmentStatus
-                        )
                 } else if let status = visibleStatusDescription {
                     Text(status)
                         .font(.footnote)
@@ -337,8 +328,16 @@ struct LLMContentView: View {
                         spacing: 12
                     ) {
                         TextField(
-                            "메시지를 입력하세요",
+                            "",
                             text: $vm.input,
+                            prompt: Text(
+                                AppLocalization.string(
+                                    "메시지를 입력하세요"
+                                )
+                            )
+                            .foregroundStyle(
+                                VisionCraftUI.inputPlaceholder
+                            ),
                             axis: .vertical
                         )
                             .textFieldStyle(.plain)
@@ -359,7 +358,21 @@ struct LLMContentView: View {
                             }
                             .accessibilityIdentifier("local-chat-input")
 
-                        Button {
+                        // Android `bg_mic_button`: always the accent
+                        // circle, only the glyph changes (mic ↔ stop).
+                        VisionCraftChatMicButton(
+                            systemImage:
+                                answerSpeech.isSpeaking
+                                || stt.isRecording
+                                ? "stop.fill"
+                                : "mic.fill",
+                            label:
+                                answerSpeech.isSpeaking
+                                ? "읽기 정지"
+                                : stt.isRecording
+                                ? "음성 입력 종료"
+                                : "마이크"
+                        ) {
                             if answerSpeech.isSpeaking {
                                 answerSpeech.stop()
                             } else if stt.isRecording {
@@ -367,26 +380,7 @@ struct LLMContentView: View {
                             } else {
                                 startVoiceInput()
                             }
-                        } label: {
-                            Image(
-                                systemName:
-                                    answerSpeech.isSpeaking
-                                    || stt.isRecording
-                                    ? "stop.fill"
-                                    : "mic.fill"
-                            )
-                            .font(.title3.weight(.bold))
-                            .foregroundStyle(VisionCraftUI.onAccent)
-                            .frame(width: 52, height: 52)
-                            .background {
-                                if answerSpeech.isSpeaking || stt.isRecording {
-                                    Circle().fill(Color.red)
-                                } else {
-                                    Circle().fill(VisionCraftChatUI.accent)
-                                }
-                            }
                         }
-                        .buttonStyle(.plain)
                         .disabled(
                             !answerSpeech.isSpeaking
                             && (
@@ -397,15 +391,6 @@ struct LLMContentView: View {
                                     speechTask != nil
                                     && !stt.isRecording
                                 )
-                            )
-                        )
-                        .accessibilityLabel(
-                            AppLocalization.string(
-                                answerSpeech.isSpeaking
-                                ? "읽기 정지"
-                                : stt.isRecording
-                                ? "음성 입력 종료"
-                                : "마이크"
                             )
                         )
 
@@ -422,7 +407,7 @@ struct LLMContentView: View {
                                     if canSendTypedMessage {
                                         Capsule().fill(VisionCraftChatUI.accent)
                                     } else {
-                                        Capsule().fill(Color.secondary)
+                                        Capsule().fill(VisionCraftUI.secondaryText)
                                     }
                                 }
                         }
@@ -437,22 +422,16 @@ struct LLMContentView: View {
                 }
             }
 
-            if vm.isInitialQueryRunning
-                || vm.isPreparingAttachment {
+            // Attachment progress is shown as chat bubbles (Android);
+            // only the first document/image analysis keeps the overlay.
+            if vm.isInitialQueryRunning {
                 Color.black.opacity(0.4).ignoresSafeArea()
                 VStack(spacing: 16) {
                     ProgressView().progressViewStyle(.circular)
                     Text(
-                        vm.isPreparingAttachment
-                            ? (
-                                vm.attachmentStatusDescription
-                                ?? AppLocalization.string(
-                                    "첨부 준비 중…"
-                                )
-                            )
-                            : AppLocalization.string(
-                                "분석 중…"
-                            )
+                        AppLocalization.string(
+                            "분석 중…"
+                        )
                     )
                         .font(.headline)
                 }
@@ -466,66 +445,41 @@ struct LLMContentView: View {
             if showsModelPreparationPage {
                 VisionCraftUI.background
                     .ignoresSafeArea()
-                LocalModelPreparationView(
-                    phase:
-                        localAI
-                        .modelPreparationPhase,
-                    model:
-                        localAI
-                        .modelBeingPrepared,
-                    failure:
-                        vm
-                        .modelPreparationFailure,
-                    onRetry: {
-                        Task {
-                            await vm
-                                .retryModelPreparation(
-                                    for: intent
-                                )
+                VStack(spacing: 0) {
+                    titleRow(title: "AI 모델 다운로드")
+                    LocalModelPreparationView(
+                        phase:
+                            localAI
+                            .modelPreparationPhase,
+                        model:
+                            localAI
+                            .modelBeingPrepared,
+                        failure:
+                            vm
+                            .modelPreparationFailure,
+                        onRetry: {
+                            Task {
+                                await vm
+                                    .retryModelPreparation(
+                                        for: intent
+                                    )
+                            }
+                        },
+                        onDefer: {
+                            dismiss()
                         }
-                    },
-                    onDefer: {
-                        dismiss()
-                    }
-                )
-            }
-        }
-        .visionCraftNavigationScreen()
-        .navigationTitle(
-            showsModelPreparationPage
-                ? AppLocalization.string(
-                    "AI 모델 다운로드"
-                )
-                : navigationTitle
-        )
-        .navigationBarTitleDisplayMode(.inline)
-        .confirmationDialog(
-            "대화에 첨부",
-            isPresented:
-                $isAttachmentMenuPresented,
-            titleVisibility: .visible
-        ) {
-            Button("문서") {
-                isDocumentImporterPresented =
-                    true
-            }
-            Button("클립보드") {
-                Task {
-                    await vm.attachClipboardText(
-                        UIPasteboard
-                            .general.string
                     )
                 }
             }
-            Button("사진") {
-                isPhotoPickerPresented = true
+
+            if isAttachmentMenuPresented {
+                attachmentDialog
+                    .zIndex(20)
             }
-            Button("취소", role: .cancel) {}
-        } message: {
-            Text(
-                "PDF·TXT·XLSX·XLS·HWP·HWPX 문서, 클립보드 텍스트 또는 사진을 현재 대화의 문맥으로 사용합니다."
-            )
         }
+        .visionCraftNavigationScreen()
+        .toolbar(.hidden, for: .navigationBar)
+        .visionCraftHandlesBackNavigation()
         .fileImporter(
             isPresented:
                 $isDocumentImporterPresented,
@@ -642,6 +596,57 @@ struct LLMContentView: View {
         }
     }
 
+    /// Android `chatHeader`: 48pt back + 24pt bold heading "AI 대화".
+    /// The intent-specific wording stays available to VoiceOver as a hint.
+    private func titleRow(title: String) -> some View {
+        VisionCraftScreenTitleRow(
+            title: title,
+            onBack: { dismiss() }
+        )
+        .padding(.leading, 12)
+        .padding(.trailing, 20)
+        .padding(.top, 8)
+        .accessibilityHint(navigationTitle)
+    }
+
+    /// Android `showAttachmentDialog`: card dialog "첨부" with 문서 as the
+    /// primary row, then 클립보드 and 사진. The pickers stay behind them.
+    private var attachmentDialog: some View {
+        VisionCraftDialogCard(
+            title: "첨부",
+            onDismiss: {
+                isAttachmentMenuPresented = false
+            }
+        ) {
+            VisionCraftDialogOptionRow(
+                title: "문서",
+                systemImage: "doc.text",
+                isPrimary: true
+            ) {
+                isAttachmentMenuPresented = false
+                isDocumentImporterPresented = true
+            }
+            VisionCraftDialogOptionRow(
+                title: "클립보드",
+                systemImage: "doc.on.clipboard"
+            ) {
+                isAttachmentMenuPresented = false
+                Task {
+                    await vm.attachClipboardText(
+                        UIPasteboard.general.string
+                    )
+                }
+            }
+            VisionCraftDialogOptionRow(
+                title: "사진",
+                systemImage: "photo"
+            ) {
+                isAttachmentMenuPresented = false
+                isPhotoPickerPresented = true
+            }
+        }
+    }
+
     private var showsModelPreparationPage: Bool {
         intent.requiresLocalModel
             && (
@@ -669,9 +674,6 @@ struct LLMContentView: View {
     }
 
     private var visibleStatusDescription: String? {
-        if let attachmentStatus = vm.attachmentStatusDescription {
-            return attachmentStatus
-        }
         let routineStatuses = ["준비됨", "완료", "답변 생성 중…"]
             .map { AppLocalization.string($0) }
         guard !vm.status.isEmpty, !routineStatuses.contains(vm.status) else {
@@ -680,6 +682,14 @@ struct LLMContentView: View {
         return vm.status
     }
 
+    private var quickPromptsDisabled: Bool {
+        !vm.isReadyForInput
+            || vm.isGenerating
+            || vm.isPreparingAttachment
+            || stt.isRecording
+    }
+
+    /// Android `quickPromptScroll`: 48pt chips; disabled chips fade to 45%.
     private var quickPromptBar:
         some View
     {
@@ -700,21 +710,17 @@ struct LLMContentView: View {
                 ) {
                     vm.sendQuickPrompt(
                         AppLocalization.string(
-                            "대화와 첨부 내용을 요약해 주세요."
+                            "요약해주세요."
                         )
                     )
                 }
             }
+            .opacity(quickPromptsDisabled ? 0.45 : 1)
             .padding(.horizontal, 20)
             .padding(.top, 4)
             .padding(.bottom, 10)
         }
-        .disabled(
-            !vm.isReadyForInput
-                || vm.isGenerating
-                || vm.isPreparingAttachment
-                || stt.isRecording
-        )
+        .disabled(quickPromptsDisabled)
         .accessibilityElement(
             children: .contain
         )
@@ -727,7 +733,7 @@ struct LLMContentView: View {
     ) -> some View {
         Button(action: action) {
             Text(AppLocalization.string(title))
-                .font(.subheadline.bold())
+                .visionCraftAndroidText(15, weight: .bold, relativeTo: .subheadline)
                 .foregroundStyle(VisionCraftUI.primaryText)
                 .padding(.horizontal, 18)
                 .frame(minWidth: minimumWidth, minHeight: 48)
@@ -1025,7 +1031,7 @@ struct LLMContentView: View {
             Image(systemName: systemImage)
                 .frame(
                     maxWidth: .infinity,
-                    minHeight: 30
+                    minHeight: VisionCraftUI.minTouchTarget
                 )
         }
         .buttonStyle(.bordered)
@@ -1193,26 +1199,32 @@ struct LLMContentView: View {
                 let stream = try await stt.startRecording(
                     requiresOnDeviceRecognition: true
                 )
+                var heardQuestion = false
                 for await recognizedText in stream {
                     try Task.checkCancellation()
                     let question = recognizedText.trimmingCharacters(
                         in: .whitespacesAndNewlines
                     )
                     guard !question.isEmpty else {
-                        voiceErrorDescription =
-                            AppLocalization.string(
-                                "음성을 인식하지 못했습니다. 다시 시도해 주세요."
-                            )
                         continue
                     }
 
+                    heardQuestion = true
                     vm.input = question
                     shouldSpeakNextResponse = true
                     vm.sendUserMessage()
                 }
+                // Android `showSpeechRecognitionErrorToast`: the failure
+                // sound already played; show the matching text.
+                if !heardQuestion {
+                    voiceErrorDescription =
+                        (stt.consumeLastFailure() ?? .noSpeech)
+                        .message
+                }
             } catch is CancellationError {
                 return
             } catch {
+                _ = stt.consumeLastFailure()
                 voiceErrorDescription = error.localizedDescription
             }
         }
@@ -1394,7 +1406,8 @@ private struct MessageRow: View {
     }
 
     private var isTyping: Bool {
-        isGenerating && m.role != "user" && m.text.isEmpty && m.image == nil
+        m.isTypingIndicator
+            || (isGenerating && m.role != "user" && m.text.isEmpty && m.image == nil)
     }
 
     @ViewBuilder
@@ -1402,7 +1415,17 @@ private struct MessageRow: View {
         if isTyping {
             VisionCraftChatTypingIndicator()
         } else {
-            bubble
+            VStack(
+                alignment: m.role == "user" ? .trailing : .leading,
+                spacing: m.role == "user" ? 6 : 8
+            ) {
+                // Android item_*_message.xml `textViewSender`.
+                VisionCraftChatSenderLabel(
+                    name: m.role == "user" ? "나" : "비크"
+                )
+                .padding(.trailing, m.role == "user" ? 4 : 0)
+                bubble
+            }
         }
     }
 
@@ -1441,11 +1464,9 @@ private struct MessageRow: View {
         .accessibilityLabel(
             AppLocalization.format(
                 "%@: %@",
-                m.role == "user"
-                    ? AppLocalization.string(
-                        "사용자"
-                    )
-                    : "AI",
+                AppLocalization.string(
+                    m.role == "user" ? "나" : "비크"
+                ),
                 m.text
             )
         )

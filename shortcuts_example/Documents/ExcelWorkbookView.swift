@@ -6180,7 +6180,7 @@ struct ExcelWorkbookView: View {
                 viewModel.undo()
             } label: {
                 Image(systemName: "arrow.uturn.backward")
-                    .frame(width: 44, height: 44)
+                    .frame(width: 48, height: 48)
                     .contentShape(Rectangle())
             }
             .disabled(viewModel.isSaving || !viewModel.canUndo)
@@ -6190,7 +6190,7 @@ struct ExcelWorkbookView: View {
                 viewModel.redo()
             } label: {
                 Image(systemName: "arrow.uturn.forward")
-                    .frame(width: 44, height: 44)
+                    .frame(width: 48, height: 48)
                     .contentShape(Rectangle())
             }
             .disabled(viewModel.isSaving || !viewModel.canRedo)
@@ -6206,7 +6206,7 @@ struct ExcelWorkbookView: View {
             setMoreActionsPresented(true)
         } label: {
             Image(systemName: "ellipsis")
-                .frame(width: 44, height: 44)
+                .frame(width: 48, height: 48)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.borderless)
@@ -6221,7 +6221,7 @@ struct ExcelWorkbookView: View {
             Task { await beginExport() }
         } label: {
             Image(systemName: "square.and.arrow.up")
-                .frame(width: 44, height: 44)
+                .frame(width: 48, height: 48)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.borderless)
@@ -6243,7 +6243,7 @@ struct ExcelWorkbookView: View {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .strokeBorder(VisionCraftUI.primary.opacity(0.5), lineWidth: 1)
                 }
-                .frame(minHeight: 44)
+                .frame(minHeight: 48)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -6267,7 +6267,7 @@ struct ExcelWorkbookView: View {
                     .buttonStyle(.plain)
                     .font(.body.monospaced().weight(.semibold))
                     .foregroundStyle(VisionCraftUI.primary)
-                    .frame(width: headerWidth < 640 ? 44 : 62)
+                    .frame(width: headerWidth < 640 ? 48 : 62, height: 48)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                     .accessibilityLabel(
@@ -6311,7 +6311,7 @@ struct ExcelWorkbookView: View {
                 } label: {
                     Image(systemName: "delete.left")
                         .font(.system(size: 20, weight: .semibold))
-                        .frame(width: 44, height: 44)
+                        .frame(width: 48, height: 48)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
@@ -7064,7 +7064,7 @@ struct ExcelGridView: View {
         }
         .overlay(alignment: .bottomTrailing) {
             if selectedDrawing == nil, !drawingItems.isEmpty {
-                drawingPicker.padding(.horizontal, 12).frame(minHeight: 44)
+                drawingPicker.padding(.horizontal, 12).frame(minHeight: 48)
                     .background(.regularMaterial, in: Capsule()).padding(8)
             }
         }
@@ -7143,17 +7143,17 @@ struct ExcelGridView: View {
                     drawingPreview = nil
                 }
             }
-        } label: { Text("개체 선택").font(.subheadline.weight(.semibold)).frame(minHeight: 44) }
+        } label: { Text("개체 선택").font(.subheadline.weight(.semibold)).frame(minHeight: 48) }
     }
     private func drawingToolbar(_ item: ExcelDrawingCanvasItem) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 16) {
                 drawingPicker
                 Text(item.name).font(.subheadline).lineLimit(1).frame(maxWidth: 180)
-                Button("설정") { onEditDrawing?(.init(id: item.id, sheetPath: sheet.partPath)) }.frame(minHeight: 44)
+                Button("설정") { onEditDrawing?(.init(id: item.id, sheetPath: sheet.partPath)) }.frame(minHeight: 48)
                 Button("삭제", role: .destructive) { onDeleteDrawing?(.init(id: item.id, sheetPath: sheet.partPath)); selectedDrawingID = nil }
-                    .disabled(!canEditDrawings).frame(minHeight: 44)
-                Button("선택 해제") { selectedDrawingID = nil; drawingPreview = nil }.frame(minHeight: 44)
+                    .disabled(!canEditDrawings).frame(minHeight: 48)
+                Button("선택 해제") { selectedDrawingID = nil; drawingPreview = nil }.frame(minHeight: 48)
                 if canEditDrawings, !drawingGrid.canManipulate(item.anchor) {
                     Text("화면 구간을 벗어난 개체는 설정에서 위치를 바꿀 수 있습니다.").font(.caption).foregroundStyle(.secondary)
                 }
@@ -8982,7 +8982,8 @@ extension ExcelWorkbookViewModel {
             if !plan.edits.isEmpty || !plan.appendedRows.isEmpty || !plan.createdTables.isEmpty || !plan.actions.isEmpty {
                 var legacy = plan
                 legacy.workbookOperations = []
-                messages.append(try draft.applyAIPlan(legacy))
+                try draft.applyAIPlan(legacy)
+                messages.append(AppLocalization.format("%lld개 항목을 바꿨습니다.", legacy.changeCount))
                 references = ExcelAIReferences.resolve(command: .init(intent: .edit, assistantMessage: "", edits: [], appendedRows: []), snapshot: snapshot, appliedPlan: legacy)
             }
             for operation in plan.workbookOperations {

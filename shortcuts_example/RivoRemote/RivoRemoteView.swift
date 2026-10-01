@@ -33,8 +33,8 @@ struct RivoRemoteView: View {
                 .font(.system(size: 36, weight: .semibold))
                 .foregroundStyle(
                     manager.state.isReady
-                        ? Color.green
-                        : Color.orange
+                        ? VisionCraftUI.success
+                        : VisionCraftUI.warning
                 )
                 .frame(width: 54)
 

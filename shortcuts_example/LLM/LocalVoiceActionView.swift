@@ -43,8 +43,8 @@ struct LocalVoiceActionView: View {
                 .font(.system(size: 104))
                 .foregroundStyle(
                     stt.isRecording
-                        ? Color.red
-                        : Color.indigo
+                        ? VisionCraftUI.fixedColor(0xFFA05C)
+                        : VisionCraftUI.fixedColor(0xC9D5E7)
                 )
                 .accessibilityHidden(true)
 
@@ -57,7 +57,7 @@ struct LocalVoiceActionView: View {
                     .foregroundStyle(
                         errorDescription == nil
                             ? Color.white
-                            : Color.red
+                            : VisionCraftUI.error
                     )
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 620)
@@ -65,15 +65,21 @@ struct LocalVoiceActionView: View {
                 HStack(spacing: 20) {
                     if !stt.isRecording,
                        listeningTask == nil {
-                        Button("다시 듣기") {
+                        Button {
                             retryListening()
+                        } label: {
+                            Text("다시 듣기")
+                                .frame(minHeight: VisionCraftUI.minTouchTarget)
                         }
                         .buttonStyle(.borderedProminent)
                         .font(.title3.bold())
                     }
 
-                    Button("취소", role: .cancel) {
+                    Button(role: .cancel) {
                         cancelAndClose()
+                    } label: {
+                        Text("취소")
+                            .frame(minHeight: VisionCraftUI.minTouchTarget)
                     }
                     .buttonStyle(.bordered)
                     .font(.title3.bold())
@@ -201,12 +207,12 @@ struct LocalVoiceActionView: View {
                     )
             )
         case .openAIDocument:
-            announce(
-                AppLocalization.string(
-                    "질문할 PDF 또는 텍스트 문서를 선택해 주세요."
+            route(
+                .aiDocument,
+                announcement: AppLocalization.string(
+                    "AI 문서 질의를 엽니다."
                 )
             )
-            onFileImport()
         case .openReader:
             route(
                 .readerLibrary,

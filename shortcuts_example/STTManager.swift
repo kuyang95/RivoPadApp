@@ -4,6 +4,38 @@ import AVFoundation
 import Accelerate
 import Combine
 
+/// Android `STTHelper.showSpeechRecognitionErrorToast`: one distinct message
+/// per failure kind. Callers show `message` on screen; the failure sound is
+/// played here, once, when the failure is decided.
+nonisolated enum STTFailure: Equatable, Sendable {
+    case microphoneUnavailable
+    case network
+    case permissionDenied
+    case notRecognized
+    case noSpeech
+    case recognizerUnavailable
+    case unknown
+
+    var message: String {
+        switch self {
+        case .microphoneUnavailable:
+            return AppLocalization.string("마이크를 사용할 수 없습니다.")
+        case .network:
+            return AppLocalization.string("인터넷 연결을 확인해주세요.")
+        case .permissionDenied:
+            return AppLocalization.string("마이크 권한을 확인해주세요.")
+        case .notRecognized:
+            return AppLocalization.string("음성을 인식하지 못했습니다.")
+        case .noSpeech:
+            return AppLocalization.string("음성이 들리지 않았습니다.")
+        case .recognizerUnavailable:
+            return AppLocalization.string("음성 인식을 사용할 수 없습니다.")
+        case .unknown:
+            return AppLocalization.string("음성 인식에 실패했습니다.")
+        }
+    }
+}
+
 @MainActor
 final class STTManager: ObservableObject {
 
@@ -17,18 +49,35 @@ final class STTManager: ObservableObject {
     private var recognitionTask: SFSpeechRecognitionTask?
     private var requestFinishHandler: (() -> Void)?
 
-    private let locale = Locale(identifier: "ko-KR")
+    /// Android `STTHelper` uses the device language; here the app language
+    /// setting wins so the recognizer follows the UI the user reads.
+    private var locale: Locale {
+        Locale(
+            identifier:
+                AppSettingsStore.shared
+                .appLanguage
+                .speechLanguageCode
+        )
+    }
 
     // MARK: - Recording State
     @Published private(set) var isRecording: Bool = false
     @Published private(set) var amplitude: Float = 0
 
+    /// Why the last listening session ended without text. Cleared when a new
+    /// session starts; callers read it after the stream ends empty.
+    @Published private(set) var lastFailure: STTFailure?
+
     // MARK: - Auto Stop Tuning
+    /// End after 3.5 s of acoustic silence or 2.5 s without a transcript
+    /// update once speech has been recognized.
     private let silenceDurationRMS: TimeInterval = 3.5
     private let rmsThreshold: Float = 0.005
+    private let noTextUpdateDuration: TimeInterval = 2.5
 
-    // “텍스트가 더 이상 업데이트 안 됨” 기준 (말 끝 감지에 매우 강력)
-    private let noTextUpdateDuration: TimeInterval = 1.2
+    /// Safety net: a session never runs longer than this even when the room
+    /// is noisy enough to keep the RMS above the threshold.
+    private let maximumListeningDuration: TimeInterval = 90
 
     // endAudio 후 final이 안 오면 강제 종료 (안전장치)
     private let finalTimeoutAfterEndAudio: TimeInterval = 2.0
@@ -39,26 +88,67 @@ final class STTManager: ObservableObject {
         case alreadyRecording
         case onDeviceRecognitionUnavailable
 
-        var errorDescription: String? {
+        var failure: STTFailure {
             switch self {
             case .permissionDenied:
-                return AppLocalization.string(
-                    "마이크와 음성 인식 권한이 필요합니다."
-                )
-            case .recognizerUnavailable:
-                return AppLocalization.string(
-                    "한국어 음성 인식을 사용할 수 없습니다."
-                )
+                return .permissionDenied
+            case .recognizerUnavailable,
+                 .onDeviceRecognitionUnavailable:
+                return .recognizerUnavailable
+            case .alreadyRecording:
+                return .unknown
+            }
+        }
+
+        var errorDescription: String? {
+            switch self {
+            case .permissionDenied,
+                 .recognizerUnavailable:
+                return failure.message
             case .alreadyRecording:
                 return AppLocalization.string(
                     "이미 음성을 듣고 있습니다."
                 )
             case .onDeviceRecognitionUnavailable:
                 return AppLocalization.string(
-                    "이 기기에서 한국어 온디바이스 음성 인식을 사용할 수 없습니다."
+                    "이 기기에서 온디바이스 음성 인식을 사용할 수 없습니다."
                 )
             }
         }
+    }
+
+    /// Android `showSpeechRecognitionErrorToast` for a thrown start error.
+    nonisolated static func failure(for error: Error) -> STTFailure {
+        if let sttError = error as? STTError {
+            return sttError.failure
+        }
+        return Self.classify(error as NSError, heardText: false)
+    }
+
+    /// Maps a Speech framework error to the Android failure kinds.
+    nonisolated private static func classify(
+        _ error: NSError,
+        heardText: Bool
+    ) -> STTFailure {
+        if error.domain == NSURLErrorDomain {
+            return .network
+        }
+        if error.domain == "kAFAssistantErrorDomain" {
+            switch error.code {
+            case 1110:
+                return .noSpeech
+            case 203:
+                return .notRecognized
+            case 1101, 1107:
+                return .recognizerUnavailable
+            default:
+                break
+            }
+        }
+        if error.domain == NSOSStatusErrorDomain {
+            return .microphoneUnavailable
+        }
+        return heardText ? .notRecognized : .unknown
     }
 
     // MARK: - Logging
@@ -75,14 +165,14 @@ final class STTManager: ObservableObject {
         log("▶️ startRecording() called. isRecording=\(isRecording) audioEngine.isRunning=\(audioEngine.isRunning)")
 
         guard !isRecording else { throw STTError.alreadyRecording }
+        lastFailure = nil
         SoundEffectManager.shared.play(startEffect)
 
         let permissionGranted = await requestPermission()
         try Task.checkCancellation()
         log("🔐 Permission result: \(permissionGranted)")
         guard permissionGranted else {
-            SoundEffectManager.shared.play(.fail)
-            throw STTError.permissionDenied
+            throw fail(.permissionDenied, error: .permissionDenied)
         }
         guard !isRecording else {
             SoundEffectManager.shared.play(.fail)
@@ -93,13 +183,14 @@ final class STTManager: ObservableObject {
 
         guard let recognizer = SFSpeechRecognizer(locale: locale),
               recognizer.isAvailable else {
-            SoundEffectManager.shared.play(.fail)
-            throw STTError.recognizerUnavailable
+            throw fail(.recognizerUnavailable, error: .recognizerUnavailable)
         }
         guard !requiresOnDeviceRecognition
                 || recognizer.supportsOnDeviceRecognition else {
-            SoundEffectManager.shared.play(.fail)
-            throw STTError.onDeviceRecognitionUnavailable
+            throw fail(
+                .recognizerUnavailable,
+                error: .onDeviceRecognitionUnavailable
+            )
         }
         self.speechRecognizer = recognizer
 
@@ -114,6 +205,7 @@ final class STTManager: ObservableObject {
         return AsyncStream { continuation in
             self.log("🧵 AsyncStream started (continuation created)")
 
+            let sessionStart = Date()
             var lastVoiceTime = Date()
             var lastTextUpdateTime = Date()
             var lastPartialText: String = ""
@@ -123,24 +215,23 @@ final class STTManager: ObservableObject {
 
             func finishOnce(
                 _ text: String?,
-                failed: Bool = false
+                failure: STTFailure? = nil
             ) {
                 guard !didFinishStream else { return }
                 didFinishStream = true
                 Task { @MainActor in
                     self.requestFinishHandler = nil
-                    SoundEffectManager.shared.play(
-                        failed
-                            ? .fail
-                            : .recordComplete
-                    )
+                    if let failure {
+                        self.lastFailure = failure
+                        SoundEffectManager.shared.play(.fail)
+                    } else {
+                        SoundEffectManager.shared.play(.recordComplete)
+                    }
                     if let text {
                         continuation.yield(text)
                     }
                     self.stopInternalCancel()
                     continuation.finish()
-
-            
                 }
             }
 
@@ -171,7 +262,7 @@ final class STTManager: ObservableObject {
                                 )
                             finishOnce(
                                 fallback.isEmpty ? nil : fallback,
-                                failed: fallback.isEmpty
+                                failure: fallback.isEmpty ? .noSpeech : nil
                             )
                         }
                     }
@@ -191,16 +282,16 @@ final class STTManager: ObservableObject {
                 if didEndAudio { return } // endAudio 이후엔 append 금지
 
                 request.append(buffer)
-                
+
                 // 🔹 음성 amplitude 계산
-                  let rms = Self.rmsValue(buffer: buffer)
+                let rms = Self.rmsValue(buffer: buffer)
 
-                  Task { @MainActor in
-                      // smoothing (UI가 덜 튐)
-                      self.amplitude = self.amplitude * 0.7 + rms * 0.3
-                  }
+                Task { @MainActor in
+                    // smoothing (UI가 덜 튐)
+                    self.amplitude = self.amplitude * 0.7 + rms * 0.3
+                }
 
-                // RMS 기반 무음 감지
+                // RMS 기반 무음 감지 — Android 와 같은 3.5초 창
                 if rms >= self.rmsThreshold {
                     lastVoiceTime = Date()
                 } else {
@@ -211,10 +302,17 @@ final class STTManager: ObservableObject {
                     }
                 }
 
-                // 텍스트 업데이트 정지 기반 종료 (말 끝났는데 노이즈로 RMS가 계속 튀는 상황을 잡아줌)
                 let noUpdate = Date().timeIntervalSince(lastTextUpdateTime)
-                if noUpdate >= self.noTextUpdateDuration, !lastPartialText.isEmpty {
+                if noUpdate >= self.noTextUpdateDuration,
+                   !lastPartialText.isEmpty {
                     endAudioAndStopEngineOnce(reason: "no text update \(noUpdate)s >= \(self.noTextUpdateDuration)s")
+                    return
+                }
+
+                // 안전장치: 소음으로 RMS 가 계속 튀어도 세션이 무한히 이어지지 않는다
+                let elapsed = Date().timeIntervalSince(sessionStart)
+                if elapsed >= self.maximumListeningDuration {
+                    endAudioAndStopEngineOnce(reason: "maximum duration \(elapsed)s")
                     return
                 }
             }
@@ -226,7 +324,7 @@ final class STTManager: ObservableObject {
                 self.log("✅ audioEngine.start() success. isRecording=true")
             } catch {
                 self.log("⛔️ audioEngine.start() failed: \(error.localizedDescription)")
-                finishOnce(nil, failed: true)
+                finishOnce(nil, failure: .microphoneUnavailable)
                 return
             }
 
@@ -236,7 +334,6 @@ final class STTManager: ObservableObject {
                     let text = result.bestTranscription.formattedString
                     self.log("📝 result isFinal=\(result.isFinal) text=\(text)")
 
-                    // partial 텍스트가 실제로 바뀌는 순간만 “업데이트 시각” 갱신
                     if !text.isEmpty && text != lastPartialText {
                         lastPartialText = text
                         lastTextUpdateTime = Date()
@@ -244,7 +341,10 @@ final class STTManager: ObservableObject {
 
                     if result.isFinal {
                         let finalText = text.isEmpty ? lastPartialText : text
-                        finishOnce(finalText.isEmpty ? nil : finalText)
+                        finishOnce(
+                            finalText.isEmpty ? nil : finalText,
+                            failure: finalText.isEmpty ? .noSpeech : nil
+                        )
                         return
                     }
                 }
@@ -252,13 +352,22 @@ final class STTManager: ObservableObject {
                 if let error {
                     // endAudio 이후에 나오는 취소/기타 에러는 상황에 따라 final이 늦게 올 수도 있으니,
                     // 여기선 즉시 cancel하기보단 마무리로 종료
-                    self.log("❌ recognition error: \((error as NSError).domain) \((error as NSError).code) \(error.localizedDescription)")
-                    finishOnce(
-                        lastPartialText.isEmpty
-                            ? nil
-                            : lastPartialText,
-                        failed: true
-                    )
+                    let nsError = error as NSError
+                    self.log("❌ recognition error: \(nsError.domain) \(nsError.code) \(error.localizedDescription)")
+                    let heard = lastPartialText
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !heard.isEmpty {
+                        // 말은 들었으니 실패가 아니라 그 문장으로 끝낸다.
+                        finishOnce(heard)
+                    } else {
+                        finishOnce(
+                            nil,
+                            failure: Self.classify(
+                                nsError,
+                                heardText: false
+                            )
+                        )
+                    }
                     return
                 }
             }
@@ -267,7 +376,6 @@ final class STTManager: ObservableObject {
                 Task { @MainActor in
                     self.log("🧵 AsyncStream onTermination reason=\(reason)")
                     self.stopInternalCancel()
-                    
                 }
             }
         }
@@ -280,6 +388,22 @@ final class STTManager: ObservableObject {
     func cancelRecording() {
         requestFinishHandler = nil
         stopInternalCancel()
+    }
+
+    /// Returns the reason the last session ended empty, then clears it so a
+    /// later session cannot show a stale message.
+    func consumeLastFailure() -> STTFailure? {
+        defer { lastFailure = nil }
+        return lastFailure
+    }
+
+    private func fail(
+        _ failure: STTFailure,
+        error: STTError
+    ) -> STTError {
+        lastFailure = failure
+        SoundEffectManager.shared.play(.fail)
+        return error
     }
 
     // MARK: - Stop
@@ -304,7 +428,6 @@ final class STTManager: ObservableObject {
         requestFinishHandler = nil
         self.amplitude = 0
 
-//        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         log("🛑 STT fully stopped")
     }
 
@@ -336,7 +459,7 @@ final class STTManager: ObservableObject {
     }
 
     // MARK: - RMS
-    private static func rmsValue(buffer: AVAudioPCMBuffer) -> Float {
+    nonisolated private static func rmsValue(buffer: AVAudioPCMBuffer) -> Float {
         guard let channel = buffer.floatChannelData?[0] else { return 0 }
         var rms: Float = 0
         vDSP_rmsqv(channel, 1, &rms, vDSP_Length(buffer.frameLength))

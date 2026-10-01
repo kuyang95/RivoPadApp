@@ -19,6 +19,7 @@ nonisolated enum AppDeepLinkDestination:
     case voiceAction = "voice-action"
     case scanner
     case files
+    case textViewer = "text-viewer"
     case rivo
     case visionLink = "vision-link"
 
@@ -42,6 +43,7 @@ nonisolated enum AppDeepLinkDestination:
             .voiceAction: "음성 명령",
             .scanner: "문서 스캔",
             .files: "파일 열기",
+            .textViewer: "텍스트뷰어",
             .rivo: "Rivo 리모컨",
             .visionLink: "VisionLink"
         ]

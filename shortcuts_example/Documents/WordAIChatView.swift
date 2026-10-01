@@ -128,11 +128,12 @@ final class WordAIChatViewModel: ObservableObject {
         )
         if let validated, let apply {
             do {
-                let result = try apply(validated)
+                // The status bar carries the generic "applied N" result; the
+                // chat keeps only the AI's description of what it did.
+                _ = try apply(validated)
                 messages.append(
                     Message(role: .assistant, text: command.assistantMessage)
                 )
-                appendNotice(result)
             } catch {
                 appendNotice(error.localizedDescription)
             }
@@ -186,6 +187,17 @@ final class WordAIChatViewModel: ObservableObject {
         )
     }
 
+    /// The reply to read aloud for the latest request: the AI's own work
+    /// description, not the generic "applied N changes" notice.
+    var spokenResponse: Message? {
+        guard let last = messages.last, last.role != .user else { return nil }
+        if last.role == .notice, messages.count > 1,
+           messages[messages.count - 2].role == .assistant {
+            return messages[messages.count - 2]
+        }
+        return last
+    }
+
     private func appendNotice(_ text: String) {
         messages.append(Message(role: .notice, text: text))
     }
@@ -211,6 +223,8 @@ struct WordAIChatPanel: View {
     @State private var isExpanded = true
     @State private var speechTask: Task<Void, Never>?
     @State private var ownsVoiceRecording = false
+    @StateObject private var answerSpeech = ChatAnswerSpeechController()
+    @State private var responsePlaybackTask: Task<Void, Never>?
     @FocusState private var isInputFocused: Bool
 
     var body: some View {
@@ -232,7 +246,7 @@ struct WordAIChatPanel: View {
                         ? "AI 명령 처리 시 현재 \(documentDisplayName) 문서의 일부 문단과 입력 내용이 Gemini로 전송됩니다. 수정안은 앱의 검증을 거쳐 바로 문서에 반영됩니다."
                         : "AI 명령 처리 시 현재 \(documentDisplayName) 문서의 일부 문단과 입력 내용이 Gemini로 전송됩니다. 수정안은 앱의 검증과 미리보기를 거쳐 사용자가 적용할 때만 문서에 반영됩니다."
                 )
-                .font(.caption2)
+                .font(.caption)
                 .foregroundStyle(VisionCraftUI.secondaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
@@ -242,14 +256,14 @@ struct WordAIChatPanel: View {
         .background(VisionCraftUI.surface)
         .onDisappear {
             speechTask?.cancel()
+            stopResponsePlayback()
             if ownsVoiceRecording {
                 stt.cancelRecording()
                 ownsVoiceRecording = false
             }
         }
         .onChange(of: chat.messages.count) { _, _ in
-            guard let latest = chat.messages.last,
-                  latest.role != .user,
+            guard let latest = chat.spokenResponse,
                   UIAccessibility.isVoiceOverRunning else { return }
             UIAccessibility.post(
                 notification: .announcement,
@@ -395,7 +409,7 @@ struct WordAIChatPanel: View {
                 } label: {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.up")
                         .foregroundStyle(VisionCraftUI.secondaryText)
-                        .frame(width: 44, height: 46)
+                        .frame(width: 48, height: 48)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -510,6 +524,7 @@ struct WordAIChatPanel: View {
               chat.pendingPlan == nil, speechTask == nil,
               !stt.isRecording else { return }
         isInputFocused = false
+        stopResponsePlayback()
         speechTask = Task {
             defer {
                 speechTask = nil
@@ -528,12 +543,19 @@ struct WordAIChatPanel: View {
                     guard !request.isEmpty else { continue }
                     chat.input = request
                     isExpanded = true
+                    let previousMessageCount = chat.messages.count
                     await chat.send(
                         catalogProvider: catalogProvider,
                         snapshotProvider: snapshotProvider,
                         documentDisplayName: documentDisplayName,
                         applying: appliesEditsAutomatically ? onApply : nil
                     )
+                    guard !Task.isCancelled,
+                          chat.messages.count > previousMessageCount,
+                          let response = chat.spokenResponse else {
+                        continue
+                    }
+                    playVoiceResponse(response)
                 }
             } catch is CancellationError {
                 return
@@ -542,6 +564,32 @@ struct WordAIChatPanel: View {
                 isExpanded = true
                 chat.appendVoiceError(error)
             }
+        }
+    }
+
+    private func playVoiceResponse(_ response: WordAIChatViewModel.Message) {
+        stopResponsePlayback()
+        responsePlaybackTask = Task {
+            // A brief cue marks the result before the spoken chat message.
+            SoundEffectManager.shared.play(.popUp2, volume: 0.35)
+            try? await Task.sleep(nanoseconds: 550_000_000)
+            guard !Task.isCancelled,
+                  !UIAccessibility.isVoiceOverRunning,
+                  AppSettingsStore.shared.voiceFeedbackEnabled else {
+                return
+            }
+            _ = answerSpeech.play(
+                messageID: response.id,
+                text: response.text
+            )
+        }
+    }
+
+    private func stopResponsePlayback() {
+        responsePlaybackTask?.cancel()
+        responsePlaybackTask = nil
+        if answerSpeech.isSpeaking {
+            answerSpeech.stop()
         }
     }
 }

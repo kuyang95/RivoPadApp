@@ -167,7 +167,9 @@ final class ExcelAIChatViewModel: ObservableObject {
         }
 
         do {
-            let result = try apply(validated)
+            // The status bar carries the generic "applied N" result; the
+            // chat keeps only the AI's description of what it did.
+            _ = try apply(validated)
             let references = ExcelAIReferences.resolve(
                 command: command, snapshot: snapshot, appliedPlan: validated
             )
@@ -178,7 +180,6 @@ final class ExcelAIChatViewModel: ObservableObject {
                     references: references
                 )
             )
-            appendNotice(result)
             activeReferences = references
         } catch {
             appendNotice(error.localizedDescription)
@@ -192,6 +193,17 @@ final class ExcelAIChatViewModel: ObservableObject {
                 error.localizedDescription
             )
         )
+    }
+
+    /// The reply to read aloud for the latest request: the AI's own work
+    /// description, not the generic "applied N changes" notice.
+    var spokenResponse: Message? {
+        guard let last = messages.last, last.role != .user else { return nil }
+        if last.role == .notice, messages.count > 1,
+           messages[messages.count - 2].role == .assistant {
+            return messages[messages.count - 2]
+        }
+        return last
     }
 
     private func appendNotice(_ text: String) {
@@ -239,8 +251,7 @@ struct ExcelAIChatPanel: View {
             stt.cancelRecording()
         }
         .onChange(of: chat.messages.count) { _, _ in
-            guard let latest = chat.messages.last,
-                  latest.role != .user,
+            guard let latest = chat.spokenResponse,
                   UIAccessibility.isVoiceOverRunning else {
                 return
             }
@@ -483,9 +494,8 @@ struct ExcelAIChatPanel: View {
                         applyingOperations: onApplyOperations
                     )
                     guard !Task.isCancelled,
-                          let response = chat.messages
-                            .dropFirst(previousMessageCount)
-                            .last(where: { $0.role != .user }) else {
+                          chat.messages.count > previousMessageCount,
+                          let response = chat.spokenResponse else {
                         continue
                     }
                     playVoiceResponse(response)

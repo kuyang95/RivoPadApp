@@ -779,8 +779,9 @@ final class AppFontCatalogStore:
 {
     nonisolated static let preferenceKey =
         "settings.fontChoice.v1"
+    /// Android와 같이 기본값은 시스템 글꼴. 사용자가 설정에서 바꾼다.
     nonisolated static let defaultKey =
-        AppFontOption.bundledNanumKey
+        AppFontOption.systemKey
     nonisolated static let bundledFontName =
         "NanumSquareRoundOTFEB"
     nonisolated static let manifestURL = URL(
@@ -882,6 +883,31 @@ final class AppFontCatalogStore:
             languageCode:
                 languageCode
         )
+    }
+
+    /// 공용 글자 스타일(`visionCraftAndroidText`)이 크기·굵기를 정해 쓸 글꼴 이름.
+    /// 시스템 글꼴이면 nil.
+    func fontName(
+        languageCode: String
+    ) -> String? {
+        let option =
+            effectiveOption(
+                languageCode:
+                    languageCode
+            )
+        if option.isSystem {
+            return nil
+        }
+        if option.isBundled {
+            return Self.bundledFontName
+        }
+        guard activeRemoteKey
+                == option.key,
+              let activeRemoteFontName
+        else {
+            return nil
+        }
+        return activeRemoteFontName
     }
 
     func font(

@@ -78,3 +78,40 @@ struct VisionCraftChatTypingIndicator: View {
             .accessibilityLabel(AppLocalization.string("답변 생성 중…"))
     }
 }
+
+/// Android `item_sent_message.xml` / `item_received_message.xml`
+/// `textViewSender`: 13sp bold, secondary text, letter spacing 0.03.
+struct VisionCraftChatSenderLabel: View {
+    let name: String
+
+    var body: some View {
+        Text(AppLocalization.string(name))
+            .visionCraftAndroidText(13, weight: .bold, relativeTo: .footnote)
+            .tracking(0.4)
+            .foregroundStyle(VisionCraftUI.secondaryText)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Android `buttonMic` (`bg_mic_button`): 52pt accent circle that never
+/// changes colour; only the glyph switches between mic and stop.
+struct VisionCraftChatMicButton: View {
+    let systemImage: String
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(VisionCraftUI.onAccent)
+                .frame(width: 52, height: 52)
+                .background {
+                    Circle().fill(VisionCraftChatUI.accent)
+                }
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(AppLocalization.string(label))
+    }
+}

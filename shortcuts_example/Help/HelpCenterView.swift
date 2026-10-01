@@ -47,6 +47,7 @@ struct HelpCenterView: View {
                         HelpManualView(
                             document: manual
                         )
+                        .visionCraftRouteBackButton()
                     } label: {
                         helpRow(
                             title: "iPad 사용 설명서",
@@ -63,6 +64,7 @@ struct HelpCenterView: View {
                         HelpReleaseNotesView(
                             notes: releaseNotes
                         )
+                        .visionCraftRouteBackButton()
                     } label: {
                         helpRow(
                             title: "변경 내역",
@@ -147,10 +149,12 @@ struct HelpCenterView: View {
                 )
                 NavigationLink("내장 글꼴 및 라이선스") {
                     BundledFontLicensesView()
+                        .visionCraftRouteBackButton()
                 }
             }
         }
         .listStyle(.insetGrouped)
+        .environment(\.defaultMinListRowHeight, VisionCraftUI.minTouchTarget)
         .visionCraftListScreen()
         .navigationTitle("도움말")
         .navigationBarTitleDisplayMode(.large)
@@ -271,6 +275,7 @@ private struct BundledFontLicensesView: View {
                             title: license.title,
                             resource: license.resource
                         )
+                        .visionCraftRouteBackButton()
                     }
                 }
             }
@@ -296,6 +301,7 @@ private struct BundledFontLicensesView: View {
                 )
             }
         }
+        .environment(\.defaultMinListRowHeight, VisionCraftUI.minTouchTarget)
         .visionCraftListScreen()
         .navigationTitle("내장 글꼴")
         .navigationBarTitleDisplayMode(.inline)
@@ -381,6 +387,7 @@ private struct HelpManualView: View {
                 )
             }
         }
+        .environment(\.defaultMinListRowHeight, VisionCraftUI.minTouchTarget)
         .visionCraftListScreen()
         .navigationTitle("사용 설명서")
         .navigationBarTitleDisplayMode(.inline)
@@ -537,47 +544,54 @@ private struct HelpManualView: View {
     }
 }
 
-private struct HelpReleaseNotesView:
-    View
-{
+/// Android `FullChangeLogsScreen` + `ChangeLogInfoUI`: 버전마다 카드(버전 24 Bold + "(날짜)" 한 줄,
+/// 구분선, 항목마다 "- " 16). 내용은 iPad 자체 릴리스 노트(`RivoPadChangelog.txt`)를 그대로 쓴다.
+struct HelpReleaseNotesView: View {
     let notes: [HelpReleaseNote]
 
     var body: some View {
-        List(notes) { note in
-            Section {
-                ForEach(
-                    Array(
-                        note.texts.enumerated()
-                    ),
-                    id: \.offset
-                ) { _, text in
-                    HStack(
-                        alignment:
-                            .firstTextBaseline
-                    ) {
-                        Text("•")
-                            .accessibilityHidden(
-                                true
-                            )
-                        Text(text)
-                            .textSelection(
-                                .enabled
-                            )
-                    }
-                    .accessibilityElement(
-                        children: .combine
-                    )
-                }
-            } header: {
-                VStack(alignment: .leading) {
-                    Text("버전 \(note.version)")
-                    Text(note.date)
-                        .font(.caption)
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 16) {
+                ForEach(notes) { note in
+                    releaseNoteCard(note)
                 }
             }
+            .padding(16)
+            .frame(maxWidth: .infinity)
         }
-        .visionCraftListScreen()
-        .navigationTitle("변경 내역")
+        .background(VisionCraftUI.background.ignoresSafeArea())
+        .visionCraftNavigationScreen()
+        .navigationTitle(AppLocalization.string("전체 업데이트 기록"))
         .navigationBarTitleDisplayMode(.inline)
+        .accessibilityIdentifier("help.release-notes")
+    }
+
+    private func releaseNoteCard(_ note: HelpReleaseNote) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(note.version)
+                    .visionCraftAndroidText(24, weight: .bold, relativeTo: .title2)
+                    .foregroundStyle(VisionCraftUI.primaryText)
+                Text("(\(note.date))")
+                    .visionCraftAndroidText(14)
+                    .foregroundStyle(VisionCraftUI.secondaryText)
+            }
+            .accessibilityElement(children: .combine)
+            Divider()
+                .overlay(VisionCraftUI.outline.opacity(0.4))
+                .padding(.vertical, 8)
+            ForEach(Array(note.texts.enumerated()), id: \.offset) { _, text in
+                Text("- \(text)")
+                    .visionCraftAndroidText(16)
+                    .foregroundStyle(VisionCraftUI.primaryText)
+                    .textSelection(.enabled)
+                    .padding(.leading, 16)
+                    .padding(.bottom, 4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .visionCraftSurfaceCard(cornerRadius: 16)
     }
 }

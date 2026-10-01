@@ -89,7 +89,7 @@ struct HWPTableSizingSheet: View {
                     text.wrappedValue = ""; focusedDimension = id
                 } label: {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-                        .frame(width: 44, height: 44)
+                        .frame(width: 48, height: 48)
                 }.buttonStyle(.borderless).accessibilityLabel("입력 지우기")
                     .accessibilityIdentifier("hwp-table-size-\(id)-clear")
                 Text("mm").foregroundStyle(.secondary)

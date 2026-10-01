@@ -105,7 +105,7 @@ struct HWPCellFormattingSheet: View {
                     RoundedRectangle(cornerRadius: 8).fill(color(rgb))
                         .overlay { RoundedRectangle(cornerRadius: 8).stroke(Color.secondary.opacity(0.3)) }
                         .overlay { if selected == rgb { Image(systemName: "checkmark").foregroundStyle(rgb == 0 || rgb == 0xCC0000 || rgb == 0x0066CC ? .white : .black) } }
-                        .frame(height: 44)
+                        .frame(height: 48)
                 }.buttonStyle(.borderless)
                     .accessibilityLabel(AppLocalization.string(name))
                     .accessibilityIdentifier("hwp-cell-\(id)-\(rgb)")

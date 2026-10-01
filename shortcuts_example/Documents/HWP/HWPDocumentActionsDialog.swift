@@ -39,7 +39,7 @@ struct HWPDocumentActionsDialog: View {
     }
 
     private var actions: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: VisionCraftUI.actionRowSpacing) {
             if showsEditingAction {
                 VisionCraftDialogOptionRow(
                     title: isEditing ? "읽기 보기" : "편집",

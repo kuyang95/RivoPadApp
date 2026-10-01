@@ -55,7 +55,8 @@ final class AppDeepLinkRouterTests: XCTestCase {
             [String: AppDeepLinkDestination] = [
                 "ai-new": .aiNew,
                 "ai-history": .aiHistory,
-                "voice-action": .voiceAction
+                "voice-action": .voiceAction,
+                "text-viewer": .textViewer
             ]
 
         for (path, destination) in expected {

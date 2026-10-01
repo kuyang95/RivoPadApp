@@ -288,7 +288,7 @@ final class HWPFormFieldTests: XCTestCase {
 
     #if canImport(UIKit)
     @MainActor
-    func testHWPViewModelUsesFieldSnapshotAndSameUndoSavePipeline() async throws {
+    func testHWPViewModelUsesOriginalBlocksAndSameUndoSavePipeline() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".hwp")
         defer { try? FileManager.default.removeItem(at: url) }
         try fixture().write(to: url)
@@ -298,9 +298,11 @@ final class HWPFormFieldTests: XCTestCase {
         let catalog = try XCTUnwrap(model.makeAIRetrievalCatalog(for: request))
         XCTAssertFalse(catalog.requiresRouting)
         let snapshot = try XCTUnwrap(model.makeAISnapshot(for: request, catalog: catalog, retrievalPlan: nil))
-        let field = try XCTUnwrap(snapshot.formContext?.targetFields.first)
-        XCTAssertEqual(field.displayName, "출품자 2 · 연락처")
-        let target = try XCTUnwrap(field.valueBlockIDs.first)
+        XCTAssertNil(snapshot.formContext)
+        XCTAssertEqual(snapshot.blocks.map(\.text), model.blocks.map(\.text))
+        XCTAssertEqual(snapshot.supportedOperations, ["replaceText"])
+        let target = model.blocks[32].id
+        XCTAssertNotNil(snapshot.block(id: target)?.tableGeometry)
         let validated = try XCTUnwrap(WordAICommandValidator.validate(plan(target: target, text: "010-1234-5678"),
             snapshot: snapshot, userRequest: request))
         try model.applyAIPlan(validated)

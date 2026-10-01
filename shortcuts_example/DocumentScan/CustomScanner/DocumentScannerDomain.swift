@@ -47,6 +47,8 @@ nonisolated struct DocumentDetection: Equatable, Sendable {
 }
 
 nonisolated enum DocumentFramingGuidance: String, Equatable, Sendable {
+    /// Android `FIT_DOCUMENT`: 네 모서리를 잡았지만 화면에 다 들어오지 않아 방향을 정할 수 없을 때.
+    case fitDocument
     case moveLeft
     case moveRight
     case moveUp

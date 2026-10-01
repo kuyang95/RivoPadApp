@@ -236,12 +236,12 @@ final class WordDocumentEditingTests: XCTestCase {
     }
 
     func testLargeWordCatalogFindsCandidateNearDocumentEnd() throws {
-        var blocks = (0..<180).map {
+        var blocks = (0..<680).map {
             makeWordBlock(index: $0, text: "일반 본문 \($0)")
         }
-        blocks[160].text = "문서 관리 정보"
-        blocks[160].styleID = "Heading1"
-        blocks[174].text = "작성일: 2026-08-25"
+        blocks[660].text = "문서 관리 정보"
+        blocks[660].styleID = "Heading1"
+        blocks[674].text = "작성일: 2026-08-25"
 
         let catalog = WordAIRetrievalCatalogBuilder.make(
             documentName: "large.docx",
@@ -250,9 +250,9 @@ final class WordDocumentEditingTests: XCTestCase {
         )
 
         XCTAssertTrue(catalog.requiresRouting)
-        XCTAssertEqual(catalog.documentBlockCount, 180)
+        XCTAssertEqual(catalog.documentBlockCount, 680)
         XCTAssertTrue(catalog.queryTerms.contains("작성일"))
-        XCTAssertEqual(catalog.candidates.first?.blockID, "word-paragraph-174")
+        XCTAssertEqual(catalog.candidates.first?.blockID, "word-paragraph-674")
         XCTAssertTrue(
             catalog.sections.contains {
                 $0.id == catalog.candidates.first?.sectionID
@@ -277,12 +277,12 @@ final class WordDocumentEditingTests: XCTestCase {
     }
 
     func testRetrievedSnapshotContainsTargetAndNeighborsNotDocumentPrefix() throws {
-        var blocks = (0..<180).map {
+        var blocks = (0..<680).map {
             makeWordBlock(index: $0, text: "일반 본문 \($0)")
         }
-        blocks[160].text = "문서 관리 정보"
-        blocks[160].styleID = "Heading1"
-        blocks[174].text = "작성일: 2026-08-25"
+        blocks[660].text = "문서 관리 정보"
+        blocks[660].styleID = "Heading1"
+        blocks[674].text = "작성일: 2026-08-25"
         let catalog = WordAIRetrievalCatalogBuilder.make(
             documentName: "large.docx",
             blocks: blocks,
@@ -307,10 +307,10 @@ final class WordDocumentEditingTests: XCTestCase {
         )
         let includedIDs = Set(snapshot.blocks.map(\.id))
 
-        XCTAssertTrue(includedIDs.contains("word-paragraph-174"))
-        XCTAssertTrue(includedIDs.contains("word-paragraph-172"))
-        XCTAssertTrue(includedIDs.contains("word-paragraph-176"))
-        XCTAssertTrue(includedIDs.contains("word-paragraph-160"))
+        XCTAssertTrue(includedIDs.contains("word-paragraph-674"))
+        XCTAssertTrue(includedIDs.contains("word-paragraph-672"))
+        XCTAssertTrue(includedIDs.contains("word-paragraph-676"))
+        XCTAssertTrue(includedIDs.contains("word-paragraph-660"))
         XCTAssertFalse(includedIDs.contains("word-paragraph-0"))
         XCTAssertTrue(snapshot.contextWasTruncated)
         XCTAssertEqual(
@@ -321,10 +321,10 @@ final class WordDocumentEditingTests: XCTestCase {
     }
 
     func testRetrievalResponseDecodesAndRejectsUnknownIDs() throws {
-        let blocks = (0..<180).map {
+        let blocks = (0..<680).map {
             makeWordBlock(
                 index: $0,
-                text: $0 == 170 ? "작성일: 2026-08-25" : "본문 \($0)"
+                text: $0 == 670 ? "작성일: 2026-08-25" : "본문 \($0)"
             )
         }
         let catalog = WordAIRetrievalCatalogBuilder.make(
@@ -364,10 +364,10 @@ final class WordDocumentEditingTests: XCTestCase {
     }
 
     func testRetrievalClarifyCannotCarryTargets() throws {
-        let blocks = (0..<180).map {
+        let blocks = (0..<680).map {
             makeWordBlock(
                 index: $0,
-                text: $0 == 170 ? "작성일: 2026-08-25" : "본문 \($0)"
+                text: $0 == 670 ? "작성일: 2026-08-25" : "본문 \($0)"
             )
         }
         let catalog = WordAIRetrievalCatalogBuilder.make(

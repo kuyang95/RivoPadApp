@@ -44,6 +44,7 @@ struct AppSettingsView: View {
             systemSection
             resetSection
         }
+        .environment(\.defaultMinListRowHeight, VisionCraftUI.minTouchTarget)
         .visionCraftListScreen()
         .navigationTitle("설정")
         .navigationBarTitleDisplayMode(.large)
@@ -87,26 +88,28 @@ struct AppSettingsView: View {
     private var sharingSection:
         some View
     {
+        // Android `a_app_settings.xml` share_ui_mode: 켜면 음성 질의, 끄면 채팅 화면.
         Section {
-            Picker(
-                "공유 항목 열기",
-                selection:
-                    $settings
-                    .sharedTextEntryMode
-            ) {
-                ForEach(
-                    SharedTextEntryMode
-                        .allCases
-                ) { mode in
-                    Text(mode.title)
-                        .tag(mode)
-                }
-            }
+            Toggle(
+                "음성 질의 모드 사용 (끄면 채팅 화면)",
+                isOn: Binding(
+                    get: {
+                        settings.sharedTextEntryMode == .voice
+                    },
+                    set: { usesVoice in
+                        settings.sharedTextEntryMode =
+                            usesVoice ? .voice : .chat
+                    }
+                )
+            )
+            .accessibilityHint(
+                "음성 질문은 공유한 텍스트, 웹페이지, 사진과 지원 문서를 준비한 뒤 바로 듣기를 시작합니다. AI 채팅은 같은 자료를 첨부한 새 대화에서 질문을 기다립니다."
+            )
         } header: {
-            Text("다른 앱에서 공유")
+            Text("공유 받았을 때 화면")
         } footer: {
             Text(
-                "음성 질문은 공유한 텍스트, 웹페이지, 사진과 지원 문서를 준비한 뒤 바로 듣기를 시작합니다. AI 채팅은 같은 자료를 첨부한 새 대화에서 질문을 기다립니다."
+                "외부 앱에서 공유받았을 때 어떤 화면으로 열지 선택합니다."
             )
         }
     }
@@ -163,7 +166,7 @@ struct AppSettingsView: View {
             )
 
             Toggle(
-                "자동 음성 안내",
+                "음성 피드백",
                 isOn:
                     $settings
                     .voiceFeedbackEnabled
@@ -173,7 +176,7 @@ struct AppSettingsView: View {
             )
 
             Picker(
-                "기본 말하기 속도",
+                "음성 속도",
                 selection:
                     $settings.speechRate
             ) {
@@ -197,7 +200,7 @@ struct AppSettingsView: View {
             }
 
             Picker(
-                "앱 언어",
+                "언어",
                 selection:
                     $settings.appLanguage
             ) {
@@ -240,13 +243,13 @@ struct AppSettingsView: View {
             )
 
             Toggle(
-                "문서 색상 자동 보정",
+                "문서 스캔 색상 자동 보정",
                 isOn:
                     $settings
                     .documentScanColorEnhancementEnabled
             )
             .accessibilityHint(
-                "촬영한 문서의 배경과 글자 대비를 Android VisionCraft 방식으로 강화합니다."
+                "촬영한 문서의 배경을 밝게 하고 글자 대비를 높입니다."
             )
 
             Toggle(
@@ -501,6 +504,7 @@ struct AppSettingsView: View {
             #if DEBUG
             NavigationLink {
                 HWPReferenceComparisonView()
+                    .visionCraftRouteBackButton()
             } label: {
                 Label(
                     "HWP 비교 테스트",
@@ -510,7 +514,7 @@ struct AppSettingsView: View {
             #endif
 
             Button(
-                "VisionCraft 권한 설정 열기",
+                "앱 권한 설정 열기",
                 systemImage: "gear"
             ) {
                 guard let url = URL(
@@ -576,7 +580,7 @@ struct AppFontSelectionView:
                     Section {
                         Text(errorMessage)
                             .foregroundStyle(
-                                .red
+                                VisionCraftUI.error
                             )
                             .accessibilityLabel(
                                 "오류: \(errorMessage)"
@@ -599,6 +603,7 @@ struct AppFontSelectionView:
                     )
                 }
             }
+            .environment(\.defaultMinListRowHeight, VisionCraftUI.minTouchTarget)
             .visionCraftListScreen()
             .navigationTitle(
                 "앱 글꼴 선택"

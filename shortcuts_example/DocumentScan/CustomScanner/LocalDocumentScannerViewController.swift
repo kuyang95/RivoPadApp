@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import CoreImage
 import CoreMedia
+import SwiftUI
 import UIKit
 
 nonisolated enum ScannerInterfaceOrientationRotation {
@@ -219,8 +220,8 @@ final class LocalDocumentScannerViewController: UIViewController {
 
     private let overlayLayer: CAShapeLayer = {
         let layer = CAShapeLayer()
-        layer.fillColor = UIColor.systemBlue.withAlphaComponent(0.12).cgColor
-        layer.strokeColor = UIColor.systemBlue.cgColor
+        layer.fillColor = UIColor(VisionCraftUI.linkBlue).withAlphaComponent(0.12).cgColor
+        layer.strokeColor = UIColor(VisionCraftUI.linkBlue).cgColor
         layer.lineWidth = 4
         layer.lineJoin = .round
         layer.lineCap = .round
@@ -241,21 +242,13 @@ final class LocalDocumentScannerViewController: UIViewController {
         label.numberOfLines = 1
         label.adjustsFontSizeToFitWidth = true
         label.minimumScaleFactor = 0.8
-        label.backgroundColor = UIColor(
-            red: 37 / 255,
-            green: 37 / 255,
-            blue: 37 / 255,
-            alpha: 0.15
-        )
+        label.backgroundColor = UIColor(VisionCraftCameraUI.surface)
+            .withAlphaComponent(0.15)
         label.layer.cornerRadius = 22
         label.layer.masksToBounds = true
         label.layer.borderWidth = 1
-        label.layer.borderColor = UIColor(
-            red: 124 / 255,
-            green: 158 / 255,
-            blue: 1,
-            alpha: 0.2
-        ).cgColor
+        label.layer.borderColor = UIColor(VisionCraftUI.linkBlue)
+            .withAlphaComponent(0.2).cgColor
         label.translatesAutoresizingMaskIntoConstraints = false
         label.isAccessibilityElement = true
         label.accessibilityTraits = .updatesFrequently
@@ -344,9 +337,9 @@ final class LocalDocumentScannerViewController: UIViewController {
                 "다음 페이지 준비"
             )
         configuration.baseBackgroundColor =
-            .systemBlue
+            UIColor(VisionCraftCameraUI.mode)
         configuration.baseForegroundColor =
-            .white
+            UIColor(VisionCraftCameraUI.text)
         configuration.cornerStyle = .capsule
         let button = UIButton(
             configuration: configuration
@@ -388,6 +381,8 @@ final class LocalDocumentScannerViewController: UIViewController {
         return view
     }()
 
+    private var statusAboveControlsConstraint: NSLayoutConstraint?
+    private var statusAtBottomConstraint: NSLayoutConstraint?
     private var lastAnnouncedText: String?
     private var lastAnnouncementTime: TimeInterval = 0
     private var isViewActive = false
@@ -509,11 +504,16 @@ final class LocalDocumentScannerViewController: UIViewController {
         view.addSubview(processingOverlay)
         processingOverlay.addSubview(activityIndicator)
 
+        statusAboveControlsConstraint = statusLabel.bottomAnchor.constraint(
+            equalTo: controls.topAnchor,
+            constant: -16
+        )
+        statusAtBottomConstraint = statusLabel.bottomAnchor.constraint(
+            equalTo: view.safeAreaLayoutGuide.bottomAnchor,
+            constant: -24
+        )
+        statusAtBottomConstraint?.isActive = true
         NSLayoutConstraint.activate([
-            statusLabel.topAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.topAnchor,
-                constant: 92
-            ),
             statusLabel.leadingAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.leadingAnchor,
                 constant: 24
@@ -791,6 +791,10 @@ final class LocalDocumentScannerViewController: UIViewController {
             isAwaitingPageRemoval || !needsManualShutter
         shutterButton.isEnabled =
             canCapture && isViewActive && !sessionInterrupted
+        // 상태 알약은 아래쪽에 두되, 촬영·닫기 줄이 보이면 그 위로 올린다(Android scanBottomPanel).
+        let controlsVisible = !shutterButton.isHidden || !cancelButton.isHidden
+        statusAtBottomConstraint?.isActive = !controlsVisible
+        statusAboveControlsConstraint?.isActive = controlsVisible
         nextPageButton.isHidden =
             !isAwaitingPageRemoval
         nextPageButton.isEnabled =
@@ -1579,7 +1583,7 @@ final class LocalDocumentScannerViewController: UIViewController {
         }
         path.close()
 
-        let color = stable ? UIColor.systemGreen : UIColor.systemBlue
+        let color = stable ? UIColor(VisionCraftUI.success) : UIColor(VisionCraftUI.linkBlue)
         overlayLayer.strokeColor = color.cgColor
         overlayLayer.fillColor = color.withAlphaComponent(0.12).cgColor
         overlayLayer.path = path.cgPath
@@ -2183,13 +2187,15 @@ final class LocalDocumentScannerViewController: UIViewController {
         }
     }
 
+    /// Android `speakFramingGuidanceText` 처럼 안내(강제 촬영·손전등·다음 장)는 음성 피드백 설정을 따라 늘 TTS 로 읽는다.
+    /// 음성 피드백이 꺼져 있고 VoiceOver 가 켜져 있으면 VoiceOver 안내로 대신한다(두 번 읽지 않도록).
     private func setStatus(
         _ text: String,
         announce: Bool = false
     ) {
         let changed = statusLabel.text != text
         statusLabel.text = text
-        guard announce, changed, UIAccessibility.isVoiceOverRunning else {
+        guard announce, changed else {
             return
         }
 
@@ -2200,7 +2206,11 @@ final class LocalDocumentScannerViewController: UIViewController {
         }
         lastAnnouncedText = text
         lastAnnouncementTime = now
-        UIAccessibility.post(notification: .announcement, argument: text)
+        if AppSettingsStore.shared.voiceFeedbackEnabled {
+            TTSManager.shared.speakFeedback(text)
+        } else if UIAccessibility.isVoiceOverRunning {
+            UIAccessibility.post(notification: .announcement, argument: text)
+        }
     }
 
     private func updateFramingGuidance(_ guidance: DocumentFramingGuidance) {
@@ -2281,21 +2291,25 @@ final class LocalDocumentScannerViewController: UIViewController {
         for guidance: DocumentFramingGuidance
     ) -> String {
         switch guidance {
+        case .fitDocument:
+            return AppLocalization.string(
+                "문서 전체가 보이게 비춰주세요"
+            )
         case .moveLeft:
             return AppLocalization.string(
-                "기기를 왼쪽으로 이동해 주세요."
+                "왼쪽이 안보입니다. 조금 왼쪽을 비춰주세요"
             )
         case .moveRight:
             return AppLocalization.string(
-                "기기를 오른쪽으로 이동해 주세요."
+                "오른쪽이 안보입니다. 조금 오른쪽을 비춰주세요"
             )
         case .moveUp:
             return AppLocalization.string(
-                "기기를 위로 이동해 주세요."
+                "위쪽이 안보입니다. 조금 위쪽을 비춰주세요"
             )
         case .moveDown:
             return AppLocalization.string(
-                "기기를 아래로 이동해 주세요."
+                "아래쪽이 안보입니다. 조금 아래쪽을 비춰주세요"
             )
         case .moveCloser:
             return AppLocalization.string(

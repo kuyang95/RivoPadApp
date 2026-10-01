@@ -1,6 +1,43 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// Android `PublicationSummaryCard`에 보이는 값: 형식·제목·읽기 순서·목차·페이지·아카이브 파일 수.
+nonisolated struct ReaderBookSummary:
+    Equatable,
+    Sendable
+{
+    let fileName: String
+    let formatName: String
+    let title: String
+    let readingOrderCount: Int
+    let tocCount: Int
+    let pageCount: Int
+    let assetCount: Int
+
+    static func load(
+        from fileURL: URL
+    ) throws -> ReaderBookSummary {
+        let data = try Data(
+            contentsOf: fileURL,
+            options: .mappedIfSafe
+        )
+        let book = try AccessiblePublicationParser
+            .parse(data: data)
+        let archive = try EPUBArchive(data: data)
+        return ReaderBookSummary(
+            fileName: fileURL.lastPathComponent,
+            formatName: book.format.displayName,
+            title: book.title,
+            readingOrderCount: book.chapters.count,
+            tocCount: book.navigationItems.count,
+            pageCount: book.pageListItems.count,
+            assetCount: archive.paths.count
+        )
+    }
+}
+
+/// Android `DaisyFileOpenScreen`: 안내 문장 → VcActionRow(계속 읽기 / 도서 파일 선택) → 로딩·오류·요약 패널.
+/// iOS 고유의 "내 서재" 목록은 그 아래에 유지한다.
 struct ReaderLibraryView: View {
     @EnvironmentObject private var appRouter: AppRouter
     @State private var isImporterPresented = false
@@ -11,134 +48,56 @@ struct ReaderLibraryView: View {
         EPUBLibraryBook?
     @State private var errorDescription: String?
     @State private var statusDescription: String?
+    @State private var summary: ReaderBookSummary?
 
+    /// Android `bookMimeTypes`: epub+zip, zip, x-zip-compressed, octet-stream(=public.data).
     private var supportedBookTypes: [UTType] {
         let epub =
             UTType(filenameExtension: "epub")
             ?? .data
-        return [epub, .zip]
+        return [epub, .zip, .data]
     }
 
     var body: some View {
-        List {
-            Section(
-                "EPUB 또는 DAISY ZIP 파일을 선택하세요"
+        ScrollView {
+            VStack(
+                alignment: .leading,
+                spacing: 16
             ) {
-                if let lastBook {
-                    NavigationLink(
-                        value: AppRoute.epubReader(
-                            fileURL:
-                                lastBook.fileURL
-                        )
-                    ) {
-                        VStack(spacing: 3) {
-                            Text("계속 읽기")
-                                .font(.headline)
-                            Text(lastBook.title)
-                                .font(.caption)
-                                .lineLimit(1)
-                        }
-                        .frame(
-                            maxWidth: .infinity,
-                            minHeight: 52
-                        )
-                    }
-                    .buttonStyle(
-                        .borderedProminent
+                Text("EPUB 또는 DAISY ZIP 파일을 선택하세요")
+                    .visionCraftAndroidText(16)
+                    .foregroundStyle(
+                        VisionCraftUI.secondaryText
                     )
-                }
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
 
-                Button {
-                    isImporterPresented = true
-                } label: {
-                    Group {
-                        if isImporting {
-                            ProgressView(
-                                "책 확인하고 가져오는 중"
-                            )
-                        } else {
-                            Text("도서 파일 선택")
-                        }
-                    }
-                    .font(.headline)
-                    .frame(
-                        maxWidth: .infinity,
-                        minHeight: 52
-                    )
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(isImporting)
-                .accessibilityHint(
-                    "Files에서 EPUB 또는 ZIP 형식의 DAISY 책을 가져옵니다."
+                VisionCraftHomeActionList(
+                    items: actionItems
                 )
-            }
 
-            if let statusDescription {
-                Section {
-                    HStack(
-                        alignment: .firstTextBaseline,
-                        spacing: 12
-                    ) {
-                        Label(
-                            statusDescription,
-                            systemImage:
-                                "checkmark.circle.fill"
-                        )
-                        .foregroundStyle(.secondary)
-                        Spacer()
-                        Button {
-                            self.statusDescription =
-                                nil
-                        } label: {
-                            Image(
-                                systemName: "xmark.circle"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("알림 닫기")
-                    }
+                if isImporting {
+                    loadingPanel
                 }
-            }
 
-            if isLoading {
-                Section {
-                    HStack {
-                        Spacer()
-                        ProgressView("서재 불러오는 중")
-                        Spacer()
-                    }
+                if let errorDescription {
+                    errorPanel(errorDescription)
                 }
-            } else if books.isEmpty {
-                Section("내 서재") {
-                    ContentUnavailableView(
-                        "가져온 책이 없습니다",
-                        systemImage: "books.vertical",
-                        description: Text(
-                            "EPUB·DAISY 파일을 가져오면 이 iPad에 보관됩니다."
-                        )
-                    )
+
+                if let summary {
+                    summaryPanel(summary)
                 }
-            } else {
-                Section {
-                    ForEach(books) { book in
-                        bookLink(book)
-                    }
-                } header: {
-                    HStack {
-                        Text("내 서재")
-                        Spacer()
-                        Text(
-                            AppLocalization.format(
-                                "책 %lld권",
-                                books.count
-                            )
-                        )
-                        .textCase(nil)
-                    }
+
+                if let statusDescription {
+                    statusPanel(statusDescription)
                 }
+
+                librarySection
             }
+            .visionCraftScreenPadding()
         }
-        .listStyle(.insetGrouped)
         .visionCraftListScreen()
         .navigationTitle(
             "데이지/EPUB 플레이어"
@@ -150,23 +109,6 @@ struct ReaderLibraryView: View {
             allowsMultipleSelection: false
         ) { result in
             importBook(result)
-        }
-        .alert(
-            "책을 열 수 없습니다",
-            isPresented: Binding(
-                get: { errorDescription != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        errorDescription = nil
-                    }
-                }
-            )
-        ) {
-            Button("확인", role: .cancel) {
-                errorDescription = nil
-            }
-        } message: {
-            Text(errorDescription ?? "")
         }
         .confirmationDialog(
             "책 삭제",
@@ -206,71 +148,437 @@ struct ReaderLibraryView: View {
         .onAppear {
             reloadBooks()
         }
+        .task(id: lastBook?.id) {
+            await loadSummary()
+        }
     }
 
-    private func bookLink(
-        _ book: EPUBLibraryBook
-    ) -> some View {
-        NavigationLink(
-            value: AppRoute.epubReader(
-                fileURL: book.fileURL
-            )
-        ) {
-            HStack(spacing: 14) {
-                Image(
-                    systemName:
-                        book.fileURL.pathExtension
-                            .lowercased() == "epub"
-                        ? "book.closed.fill"
-                        : "waveform.badge.plus"
-                )
-                .font(.title2)
-                .frame(width: 32)
-                .foregroundStyle(
-                    Color.accentColor
-                )
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 5
-                ) {
-                    Text(book.title)
-                        .font(.headline)
-                        .lineLimit(2)
-                    HStack(spacing: 8) {
-                        Text(book.formatDescription)
-                        if isLastBook(book) {
-                            Label(
-                                "최근 읽음",
-                                systemImage: "clock.fill"
-                            )
+    private var actionItems: [VisionCraftActionItem] {
+        var items: [VisionCraftActionItem] = []
+        if let lastBook {
+            items.append(
+                VisionCraftActionItem(
+                    id: "reader.continue",
+                    icon: "clock",
+                    title: "계속 읽기",
+                    description: lastBook.title,
+                    action: {
+                        guard !isImporting else {
+                            return
                         }
+                        appRouter.route = .epubReader(
+                            fileURL: lastBook.fileURL
+                        )
                     }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    Text(book.activityDate, style: .date)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.vertical, 7)
+                )
+            )
         }
-        .accessibilityHint(
-            AppLocalization.string(
-                isLastBook(book)
-                    ? "마지막으로 읽던 위치부터 계속합니다."
-                    : "저장된 읽기 위치부터 책을 엽니다."
+        items.append(
+            VisionCraftActionItem(
+                id: "reader.pick",
+                icon: "folder",
+                title: "도서 파일 선택",
+                description:
+                    "EPUB 또는 DAISY ZIP 파일을 선택하세요",
+                action: {
+                    guard !isImporting else {
+                        return
+                    }
+                    isImporterPresented = true
+                }
             )
         )
-        .swipeActions(edge: .trailing) {
-            Button(role: .destructive) {
-                bookToDelete = book
+        return items
+    }
+
+    private var loadingPanel: some View {
+        HStack(spacing: 14) {
+            ProgressView()
+                .tint(VisionCraftUI.accent)
+            Text("도서 불러오는 중")
+                .visionCraftAndroidText(16)
+                .foregroundStyle(
+                    VisionCraftUI.primaryText
+                )
+        }
+        .padding(20)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .visionCraftSurfaceCard()
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Android `VcPanel(error = true)`: "도서 파일을 해석하지 못했습니다." + 원인.
+    private func errorPanel(
+        _ message: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 12) {
+                Text("도서 파일을 해석하지 못했습니다.")
+                    .visionCraftAndroidText(
+                        16,
+                        weight: .semibold
+                    )
+                    .foregroundStyle(
+                        VisionCraftUI.accent
+                    )
+                Spacer(minLength: 0)
+                Button {
+                    errorDescription = nil
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(
+                            .system(
+                                size: 18,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            VisionCraftUI.icon
+                        )
+                        .frame(width: 48, height: 48)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("알림 닫기")
+            }
+            Text(message)
+                .visionCraftAndroidText(
+                    14,
+                    relativeTo: .footnote
+                )
+                .foregroundStyle(
+                    VisionCraftUI.primaryText
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+        }
+        .padding(16)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .visionCraftErrorPanel()
+    }
+
+    private func statusPanel(
+        _ message: String
+    ) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 22))
+                .foregroundStyle(VisionCraftUI.success)
+                .accessibilityHidden(true)
+            Text(message)
+                .visionCraftAndroidText(16)
+                .foregroundStyle(
+                    VisionCraftUI.primaryText
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+            Spacer(minLength: 0)
+            Button {
+                statusDescription = nil
             } label: {
-                Label(
-                    "삭제",
-                    systemImage: "trash"
+                Image(systemName: "xmark")
+                    .font(
+                        .system(
+                            size: 18,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(VisionCraftUI.icon)
+                    .frame(width: 48, height: 48)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("알림 닫기")
+        }
+        .padding(.leading, 16)
+        .padding(.trailing, 8)
+        .padding(.vertical, 8)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .visionCraftSurfaceCard()
+    }
+
+    /// Android `PublicationSummaryCard`: 파싱 결과 패널.
+    private func summaryPanel(
+        _ summary: ReaderBookSummary
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("파싱 결과")
+                .visionCraftAndroidText(
+                    18,
+                    weight: .semibold,
+                    relativeTo: .headline
+                )
+                .foregroundStyle(
+                    VisionCraftUI.primaryText
+                )
+            Text(summary.fileName)
+                .visionCraftAndroidText(16)
+                .foregroundStyle(
+                    VisionCraftUI.secondaryText
+                )
+                .lineLimit(1)
+            summaryRow(
+                "형식",
+                value: summary.formatName
+            )
+            summaryRow(
+                "제목",
+                value: summary.title.isEmpty
+                    ? AppLocalization.string("제목 없음")
+                    : summary.title
+            )
+            summaryRow(
+                "읽기 순서",
+                value: "\(summary.readingOrderCount)"
+            )
+            summaryRow(
+                "목차 항목",
+                value: "\(summary.tocCount)"
+            )
+            summaryRow(
+                "페이지 항목",
+                value: "\(summary.pageCount)"
+            )
+            summaryRow(
+                "아카이브 파일",
+                value: "\(summary.assetCount)"
+            )
+        }
+        .padding(16)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .visionCraftSurfaceCard()
+    }
+
+    private func summaryRow(
+        _ label: String,
+        value: String
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(AppLocalization.string(label))
+                .visionCraftAndroidText(16)
+                .foregroundStyle(
+                    VisionCraftUI.secondaryText
+                )
+            Spacer(minLength: 8)
+            Text(value)
+                .visionCraftAndroidText(
+                    16,
+                    weight: .medium
+                )
+                .foregroundStyle(
+                    VisionCraftUI.primaryText
+                )
+                .multilineTextAlignment(.trailing)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private var librarySection: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text("내 서재")
+                .visionCraftAndroidText(
+                    18,
+                    weight: .semibold,
+                    relativeTo: .headline
+                )
+                .foregroundStyle(
+                    VisionCraftUI.primaryText
+                )
+                .accessibilityAddTraits(.isHeader)
+            Spacer()
+            if !isLoading, !books.isEmpty {
+                Text(
+                    AppLocalization.format(
+                        "책 %lld권",
+                        books.count
+                    )
+                )
+                .visionCraftAndroidText(
+                    14,
+                    relativeTo: .footnote
+                )
+                .foregroundStyle(
+                    VisionCraftUI.secondaryText
                 )
             }
+        }
+        .padding(.top, 12)
+
+        if isLoading {
+            HStack(spacing: 14) {
+                ProgressView()
+                    .tint(VisionCraftUI.accent)
+                Text("서재 불러오는 중")
+                    .visionCraftAndroidText(16)
+                    .foregroundStyle(
+                        VisionCraftUI.primaryText
+                    )
+            }
+            .padding(20)
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+            .visionCraftSurfaceCard()
+            .accessibilityElement(children: .combine)
+        } else if books.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("가져온 책이 없습니다")
+                    .visionCraftAndroidText(
+                        16,
+                        weight: .semibold
+                    )
+                    .foregroundStyle(
+                        VisionCraftUI.primaryText
+                    )
+                Text(
+                    "EPUB·DAISY 파일을 가져오면 이 iPad에 보관됩니다."
+                )
+                .visionCraftAndroidText(
+                    14,
+                    relativeTo: .footnote
+                )
+                .foregroundStyle(
+                    VisionCraftUI.secondaryText
+                )
+            }
+            .padding(16)
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+            .visionCraftSurfaceCard()
+            .accessibilityElement(children: .combine)
+        } else {
+            VStack(spacing: 0) {
+                ForEach(
+                    Array(books.enumerated()),
+                    id: \.element.id
+                ) { index, book in
+                    bookRow(book)
+                    if index < books.count - 1 {
+                        Divider()
+                            .overlay(
+                                VisionCraftUI.outline
+                                    .opacity(0.7)
+                            )
+                            .padding(.leading, 62)
+                    }
+                }
+            }
+            .visionCraftSurfaceCard()
+        }
+    }
+
+    private func bookRow(
+        _ book: EPUBLibraryBook
+    ) -> some View {
+        HStack(spacing: 0) {
+            Button {
+                appRouter.route = .epubReader(
+                    fileURL: book.fileURL
+                )
+            } label: {
+                HStack(spacing: 14) {
+                    Image(
+                        systemName:
+                            book.fileURL.pathExtension
+                                .lowercased() == "epub"
+                            ? "book.closed.fill"
+                            : "waveform.badge.plus"
+                    )
+                    .font(.system(size: 24))
+                    .frame(width: 32)
+                    .foregroundStyle(
+                        VisionCraftUI.icon
+                    )
+                    .accessibilityHidden(true)
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 4
+                    ) {
+                        Text(book.title)
+                            .visionCraftAndroidText(
+                                16,
+                                weight: .semibold
+                            )
+                            .foregroundStyle(
+                                VisionCraftUI.primaryText
+                            )
+                            .lineLimit(2)
+                        HStack(spacing: 8) {
+                            Text(book.formatDescription)
+                            if isLastBook(book) {
+                                Label(
+                                    "최근 읽음",
+                                    systemImage: "clock.fill"
+                                )
+                            }
+                            Text(
+                                book.activityDate,
+                                style: .date
+                            )
+                        }
+                        .visionCraftAndroidText(
+                            14,
+                            relativeTo: .footnote
+                        )
+                        .foregroundStyle(
+                            VisionCraftUI.secondaryText
+                        )
+                    }
+                    .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                }
+                .padding(.leading, 16)
+                .padding(.vertical, 12)
+                .frame(minHeight: 64)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(
+                AppLocalization.string(
+                    isLastBook(book)
+                        ? "마지막으로 읽던 위치부터 계속합니다."
+                        : "저장된 읽기 위치부터 책을 엽니다."
+                )
+            )
+
+            Button {
+                bookToDelete = book
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 20))
+                    .foregroundStyle(VisionCraftUI.icon)
+                    .frame(width: 48, height: 48)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 8)
+            .accessibilityLabel(
+                AppLocalization.format(
+                    "\"%@\" 서재에서 삭제",
+                    book.title
+                )
+            )
         }
         .contextMenu {
             Button(role: .destructive) {
@@ -297,11 +605,29 @@ struct ReaderLibraryView: View {
         books.first(where: isLastBook)
     }
 
+    private func loadSummary() async {
+        guard let lastBook else {
+            summary = nil
+            return
+        }
+        let fileURL = lastBook.fileURL
+        let loaded = try? await Task.detached(
+            priority: .utility
+        ) {
+            try ReaderBookSummary.load(from: fileURL)
+        }.value
+        guard !Task.isCancelled else {
+            return
+        }
+        summary = loaded
+    }
+
     private func importBook(
         _ result: Result<[URL], Error>
     ) {
         Task {
             isImporting = true
+            errorDescription = nil
             defer {
                 isImporting = false
             }

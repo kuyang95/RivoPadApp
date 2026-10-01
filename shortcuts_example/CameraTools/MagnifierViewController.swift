@@ -912,8 +912,7 @@ nonisolated struct MagnifierDisplayAdjustment:
 final class MagnifierViewController:
     UIViewController,
     AVCaptureVideoDataOutputSampleBufferDelegate,
-    MTKViewDelegate,
-    UIDocumentPickerDelegate
+    MTKViewDelegate
 {
     private struct LiveOCRFrameContext {
         let width: Int
@@ -926,16 +925,20 @@ final class MagnifierViewController:
     }
 
     var onClose: (() -> Void)?
-    var onCapture: ((UIImage) -> Void)?
+    /// 문서 스캔·실시간 문자 읽기: 자체 카메라 세션을 쓰므로 이 화면을 대신한다(Android `closeCameraActivity`).
     var onOpenDocumentScan: (() -> Void)?
     var onOpenLiveTextReader: (() -> Void)?
-    var onOpenImageAnalysisMode: (() -> Void)?
-    var onOpenBasicMode: (() -> Void)?
+    /// 사진 분석: 카메라 위에 얹어 연다. 기본 모드 촬영 결과도 `PhotoReviewHandoff` 로 넘겨 같은 화면을 연다.
     var onOpenPhotoReview: (() -> Void)?
-    var onOpenAskAIMode: (() -> Void)?
-    var onDescribeImage: ((UIImage) -> Void)?
+    /// AI 질문하기 촬영: 찍은 사진을 첨부해 음성 질문 화면으로 넘긴다.
+    var onAskAI: ((UIImage) -> Void)?
+    /// 기본·이미지 분석·AI 질문하기 사이를 제자리에서 바꿀 때 툴바의 모드 알약에 알린다.
+    var onModeChanged: ((MagnifierCameraMode) -> Void)?
+    /// 실시간 읽기는 촬영 컨트롤이 없으므로 촬영 모드는 별도 화면으로 연다.
+    var onOpenCaptureMode: ((MagnifierCameraMode) -> Void)?
+    var onCameraStateChanged: ((_ isTorchOn: Bool, _ isFrontCamera: Bool) -> Void)?
 
-    private let mode: MagnifierCameraMode
+    private(set) var mode: MagnifierCameraMode
     private let session = AVCaptureSession()
     private let videoOutput = AVCaptureVideoDataOutput()
     private let sessionQueue = DispatchQueue(
@@ -971,6 +974,7 @@ final class MagnifierViewController:
     )
 
     private var cameraInput: AVCaptureDeviceInput?
+    private var torchObservation: NSKeyValueObservation?
     private var rotationCoordinator:
         AVCaptureDevice.RotationCoordinator?
     private var latestPixelBuffer: CVPixelBuffer?
@@ -1030,29 +1034,41 @@ final class MagnifierViewController:
         return view
     }()
 
-    private let closeButton = UIButton(type: .system)
     private let zoomLabel = UILabel()
     private let zoomSlider = UISlider()
     private let filterControl = UISegmentedControl(
         items: MagnifierFilter.allCases.map(\.title)
     )
-    private let gridButton = UIButton(type: .system)
-    private let moreButton = UIButton(type: .system)
-    private let torchButton = UIButton(type: .system)
-    private let switchCameraButton = UIButton(type: .system)
-    private let photoSaveButton = UIButton(type: .system)
-    private let captureButton = UIButton(type: .system)
+    private let gridTile = VisionCraftCameraControlTile()
+    private let torchTile = VisionCraftCameraControlTile()
+    private let switchTile = VisionCraftCameraControlTile()
+    private let settingsTile = VisionCraftCameraControlTile()
+    private let captureButton = VisionCraftCameraShutterButton()
+    private let expandableStack = UIStackView()
+    private let controlsColumn = UIStackView()
+    private let cameraStatusBand = VisionCraftPaddedLabel()
     private let statusLabel = UILabel()
-    private let liveTextLabel = UILabel()
+    private let liveTextPanel = UIView()
+    private let liveTitleLabel = UILabel()
     private let gridOverlay = UIView()
     private let verticalGridLine = UIView()
     private let horizontalGridLine = UIView()
+    private var tileWidthConstraints: [NSLayoutConstraint] = []
+    private var tileHeightConstraints: [NSLayoutConstraint] = []
+    private var shutterSizeConstraints: [NSLayoutConstraint] = []
+    private var controlsColumnWidthConstraint: NSLayoutConstraint?
+    private var columnTrailingConstraint: NSLayoutConstraint?
+    private var controlMetrics: VisionCraftCameraControlMetrics?
+    private var isControlsExpanded = false
+    private var isAnalyzingImage = false
+    private var isSavingPhoto = false
+    private var didAnnounceEntryHint = false
     private var zoomOverlayHideWorkItem:
         DispatchWorkItem?
+    private var bandHideWorkItem: DispatchWorkItem?
     private let tts = TTSManager.shared
     private let photoSaveService =
         MagnifierPhotoSaveService()
-    private var pendingPhotoExportURL: URL?
 
     init(mode: MagnifierCameraMode = .magnifier) {
         self.mode = mode
@@ -1076,32 +1092,37 @@ final class MagnifierViewController:
         isCameraScreenVisible = true
         isOpeningCameraTool = false
         view.isUserInteractionEnabled = true
+        updateTorchUI()
         requestCameraAndStart()
+        announceEntryHintIfNeeded()
+    }
+
+    /// Android `onCreate` 끝: 이미지 분석·AI 질문 모드로 들어오면 700ms 뒤 촬영 버튼의 쓰임을 음성으로 알린다.
+    private func announceEntryHintIfNeeded() {
+        guard !didAnnounceEntryHint,
+              mode == .imageDescription || mode == .askAI else { return }
+        didAnnounceEntryHint = true
+        let hint = Self.modeHint(for: mode)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
+            guard let self, self.isCameraScreenVisible else { return }
+            self.tts.speakFeedback(hint)
+        }
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         updateVideoRotation()
         updateLivePreviewSize()
-        if mode != .liveTextReader {
-            zoomLabel.font = .monospacedDigitSystemFont(
-                ofSize: min(
-                    view.bounds.width,
-                    view.bounds.height
-                ) * 0.4,
-                weight: .regular
-            )
-        }
+        applyControlMetrics()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         isCameraScreenVisible = false
         zoomOverlayHideWorkItem?.cancel()
+        bandHideWorkItem?.cancel()
         setTorch(false)
-        if mode == .liveTextReader {
-            tts.stop()
-        }
+        tts.stop()
         sessionQueue.async { [weak self] in
             self?.session.stopRunning()
         }
@@ -1156,169 +1177,105 @@ final class MagnifierViewController:
             : "카메라 준비 중"
         )
         statusLabel.numberOfLines = 2
-
-        closeButton.addTarget(
-            self,
-            action: #selector(closeTapped),
-            for: .touchUpInside
-        )
-        closeButton.accessibilityLabel =
-            AppLocalization.string("닫기")
     }
 
+    /// Android `a_live_text_reader.xml`: 아래 반투명 패널(#80000000)에 제목 "바로 읽기"(22 Bold 흰색)와 상태(16).
+    /// 닫기는 라우트의 뒤로가기 버튼이 담당한다. 모드 알약은 SwiftUI 툴바(왼쪽 위)에 있다.
     private func setupLiveTextReaderUI() {
-        // 문서 스캔과 같은 구성: 상단 상태 캡슐 + 하단 닫기 버튼.
-        // 라벨과 버튼을 감싸는 패널은 두지 않는다.
-        configureModeButton()
-        moreButton.accessibilityIdentifier = "camera.more"
-        moreButton.accessibilityHint = AppLocalization.string(
-            "문서 스캔, 실시간 문자 읽기, 이미지 분석, AI 질문하기, 사진 분석 모드를 엽니다."
-        )
-        view.addSubview(moreButton)
-        statusLabel.textColor = .white
-        statusLabel.font = .systemFont(
-            ofSize: 17,
-            weight: .bold
-        )
-        statusLabel.adjustsFontForContentSizeCategory = true
-        statusLabel.textAlignment = .center
-        statusLabel.numberOfLines = 2
-        statusLabel.lineBreakMode = .byTruncatingTail
-        statusLabel.backgroundColor = UIColor(
-            red: 37 / 255,
-            green: 37 / 255,
-            blue: 37 / 255,
-            alpha: 0.15
-        )
-        statusLabel.layer.cornerRadius = 22
-        statusLabel.layer.masksToBounds = true
-        statusLabel.layer.borderWidth = 1
-        statusLabel.layer.borderColor = UIColor(
-            red: 124 / 255,
-            green: 158 / 255,
-            blue: 1,
-            alpha: 0.2
-        ).cgColor
+        liveTextPanel.translatesAutoresizingMaskIntoConstraints = false
+        liveTextPanel.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        view.addSubview(liveTextPanel)
+
+        liveTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        liveTitleLabel.text = AppLocalization.string("바로 읽기")
+        liveTitleLabel.textColor = UIColor(VisionCraftCameraUI.text)
+        liveTitleLabel.font = UIFontMetrics(forTextStyle: .title2)
+            .scaledFont(for: .systemFont(ofSize: 22, weight: .bold))
+        liveTitleLabel.adjustsFontForContentSizeCategory = true
+        liveTitleLabel.numberOfLines = 1
+        liveTitleLabel.accessibilityTraits = .header
+        liveTextPanel.addSubview(liveTitleLabel)
+
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
+        statusLabel.textColor = UIColor(VisionCraftCameraUI.secondaryText)
+        statusLabel.font = UIFontMetrics(forTextStyle: .callout)
+            .scaledFont(for: .systemFont(ofSize: 16, weight: .regular))
+        statusLabel.adjustsFontForContentSizeCategory = true
+        statusLabel.textAlignment = .natural
+        statusLabel.numberOfLines = 3
+        statusLabel.lineBreakMode = .byTruncatingTail
         statusLabel.isAccessibilityElement = true
         statusLabel.accessibilityTraits = .updatesFrequently
-        view.addSubview(statusLabel)
-
-        // 문서 스캔의 촬영 버튼과 같은 크기·칠. 화면 가운데 정렬.
-        var configuration = UIButton.Configuration.filled()
-        configuration.title = AppLocalization.string("닫기")
-        configuration.baseBackgroundColor = UIColor(
-            white: 1,
-            alpha: 0.14
-        )
-        configuration.baseForegroundColor = .white
-        configuration.cornerStyle = .large
-        closeButton.configuration = configuration
-        closeButton.titleLabel?.font = .preferredFont(
-            forTextStyle: .headline
-        )
-        closeButton.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(closeButton)
+        liveTextPanel.addSubview(statusLabel)
 
         NSLayoutConstraint.activate([
-            moreButton.topAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.topAnchor,
-                constant: 12
-            ),
-            moreButton.trailingAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.trailingAnchor,
-                constant: -16
-            ),
-            moreButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 64),
-            statusLabel.topAnchor.constraint(
-                equalTo: moreButton.bottomAnchor,
-                constant: 12
-            ),
-            statusLabel.leadingAnchor.constraint(
+            liveTextPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            liveTextPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            liveTextPanel.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            liveTitleLabel.topAnchor.constraint(equalTo: liveTextPanel.topAnchor, constant: 16),
+            liveTitleLabel.leadingAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.leadingAnchor,
                 constant: 24
             ),
-            statusLabel.trailingAnchor.constraint(
+            liveTitleLabel.trailingAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.trailingAnchor,
                 constant: -24
             ),
-            statusLabel.heightAnchor.constraint(
-                greaterThanOrEqualToConstant: 48
-            ),
-
-            closeButton.centerXAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.centerXAnchor
-            ),
-            // 스캐너 버튼 폭: (safe area 폭 - 좌우 24*2 - 간격 12) / 2
-            closeButton.widthAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.widthAnchor,
-                multiplier: 0.5,
-                constant: -30
-            ),
-            closeButton.bottomAnchor.constraint(
+            statusLabel.topAnchor.constraint(equalTo: liveTitleLabel.bottomAnchor, constant: 6),
+            statusLabel.leadingAnchor.constraint(equalTo: liveTitleLabel.leadingAnchor),
+            statusLabel.trailingAnchor.constraint(equalTo: liveTitleLabel.trailingAnchor),
+            statusLabel.bottomAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.bottomAnchor,
-                constant: -34
-            ),
-            closeButton.heightAnchor.constraint(
-                equalToConstant: 52
+                constant: -16
             ),
         ])
+        view.accessibilityElements = [liveTitleLabel, statusLabel, cameraView]
     }
 
+    /// Android `CameraControls.kt`: 오른쪽 아래 세로 열에 [격자·라이트·전환(접힘)] → 설정 → 촬영.
+    /// 미리보기를 가리지 않도록 띠 배경은 두지 않는다. 읽기 순서는 모드 → 촬영 → 설정 → 전환 → 라이트 → 격자.
     private func setupAndroidCameraUI() {
         view.addSubview(gridOverlay)
         configureGridOverlay()
 
-        if mode != .liveTextReader {
-            configureModeButton()
-            moreButton.accessibilityIdentifier = "camera.more"
-            moreButton.accessibilityHint = AppLocalization.string(
-                "문서 스캔, 실시간 문자 읽기, 이미지 분석, AI 질문하기, 사진 분석 모드를 엽니다."
-            )
-            view.addSubview(moreButton)
-        }
-        configureCircularCameraButton(
-            gridButton,
-            systemImage: "grid",
-            accessibilityLabel: "격자 토글",
-            action: #selector(gridTapped),
-            size: 56
-        )
-        configureCircularCameraButton(
-            torchButton,
-            systemImage: "flashlight.off.fill",
-            accessibilityLabel: "플래시 토글",
-            action: #selector(torchTapped),
-            size: 56
-        )
-        configureCircularCameraButton(
-            switchCameraButton,
-            systemImage: "camera.rotate.fill",
-            accessibilityLabel: "카메라 전환",
-            action: #selector(switchCameraTapped),
-            size: 56
-        )
-        configureShutterButton()
+        gridTile.title = AppLocalization.string("격자")
+        gridTile.systemImage = "grid"
+        gridTile.isOn = false
+        gridTile.addTarget(self, action: #selector(gridTapped), for: .touchUpInside)
 
-        let actionStack = UIStackView(
-            arrangedSubviews: [
-                gridButton,
-                torchButton,
-                switchCameraButton,
-                captureButton,
-            ]
-        )
-        actionStack.translatesAutoresizingMaskIntoConstraints = false
-        actionStack.axis = .vertical
-        actionStack.alignment = .center
-        actionStack.spacing = 16
-        view.addSubview(actionStack)
+        torchTile.title = AppLocalization.string("라이트")
+        torchTile.systemImage = "flashlight.off.fill"
+        torchTile.isOn = false
+        torchTile.addTarget(self, action: #selector(torchTapped), for: .touchUpInside)
 
-        // 닫기는 라우트의 뒤로가기 버튼이 담당한다. 별도 X 버튼은 두지 않는다.
+        switchTile.title = AppLocalization.string("전환")
+        switchTile.systemImage = "camera.rotate"
+        switchTile.addTarget(self, action: #selector(switchCameraTapped), for: .touchUpInside)
+
+        settingsTile.title = AppLocalization.string("설정")
+        settingsTile.systemImage = "chevron.up"
+        settingsTile.addTarget(self, action: #selector(settingsTapped), for: .touchUpInside)
+
+        captureButton.addTarget(self, action: #selector(captureTapped), for: .touchUpInside)
+        applyModeToShutter()
+
+        expandableStack.axis = .vertical
+        expandableStack.alignment = .trailing
+        expandableStack.translatesAutoresizingMaskIntoConstraints = false
+        [gridTile, torchTile, switchTile].forEach(expandableStack.addArrangedSubview)
+
+        controlsColumn.axis = .vertical
+        controlsColumn.alignment = .trailing
+        controlsColumn.translatesAutoresizingMaskIntoConstraints = false
+        [settingsTile, captureButton].forEach(controlsColumn.addArrangedSubview)
+        view.addSubview(controlsColumn)
+
+        // 격자·라이트·전환 피드백과 배율을 보여 주는 화면 가운데 큰 글씨(Android overlayTextView).
         zoomLabel.translatesAutoresizingMaskIntoConstraints = false
         zoomLabel.text = "1.0"
         zoomLabel.textColor = .white
         zoomLabel.textAlignment = .center
+        zoomLabel.numberOfLines = 0
         zoomLabel.layer.shadowColor = UIColor.black.cgColor
         zoomLabel.layer.shadowOpacity = 0.7
         zoomLabel.layer.shadowRadius = 10
@@ -1326,92 +1283,109 @@ final class MagnifierViewController:
         zoomLabel.isAccessibilityElement = false
         view.addSubview(zoomLabel)
 
-        let shutterVerticalPosition = NSLayoutConstraint(
-            item: captureButton,
-            attribute: .centerY,
-            relatedBy: .equal,
-            toItem: view,
-            attribute: .bottom,
-            multiplier: 0.6,
-            constant: 0
+        // Android 토스트 자리: 이미지 분석 결과·저장 실패 안내 띠(VcCamStatusOverlay).
+        cameraStatusBand.translatesAutoresizingMaskIntoConstraints = false
+        cameraStatusBand.backgroundColor = UIColor(VisionCraftUI.overlay)
+        cameraStatusBand.textColor = UIColor(VisionCraftUI.background)
+        cameraStatusBand.font = UIFontMetrics(forTextStyle: .headline)
+            .scaledFont(for: .systemFont(ofSize: 17, weight: .bold))
+        cameraStatusBand.adjustsFontForContentSizeCategory = true
+        cameraStatusBand.textAlignment = .center
+        cameraStatusBand.numberOfLines = 0
+        cameraStatusBand.layer.cornerRadius = 14
+        cameraStatusBand.layer.cornerCurve = .continuous
+        cameraStatusBand.layer.masksToBounds = true
+        cameraStatusBand.isHidden = true
+        cameraStatusBand.accessibilityTraits = .updatesFrequently
+        view.addSubview(cameraStatusBand)
+
+        tileWidthConstraints = [gridTile, torchTile, switchTile, settingsTile].map {
+            $0.widthAnchor.constraint(equalToConstant: 76)
+        }
+        // Android heightIn(min=...)처럼 글자 크기에 따라 타일이 커져야 한다.
+        // 고정 높이는 아이콘·제목·상태의 합이 80pt를 넘을 때 글자를 자른다.
+        tileHeightConstraints = [gridTile, torchTile, switchTile, settingsTile].map {
+            $0.heightAnchor.constraint(greaterThanOrEqualToConstant: 68)
+        }
+        shutterSizeConstraints = [
+            captureButton.widthAnchor.constraint(equalToConstant: 100),
+            captureButton.heightAnchor.constraint(equalToConstant: 100),
+        ]
+        columnTrailingConstraint = controlsColumn.trailingAnchor.constraint(
+            equalTo: view.safeAreaLayoutGuide.trailingAnchor,
+            constant: -10
         )
-        // 모드 버튼은 뒤로가기와 겹치지 않도록 오른쪽 위에 따로 둔다.
-        shutterVerticalPosition.priority = .defaultHigh
-        NSLayoutConstraint.activate([
-            actionStack.topAnchor.constraint(
-                greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor,
-                constant: 12
-            ),
-            actionStack.bottomAnchor.constraint(
-                lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor,
-                constant: -12
-            ),
-            actionStack.trailingAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.trailingAnchor,
-                constant: -16
-            ),
-            shutterVerticalPosition,
-            zoomLabel.centerXAnchor.constraint(
-                equalTo: view.centerXAnchor
-            ),
-            zoomLabel.centerYAnchor.constraint(
-                equalTo: view.centerYAnchor
-            ),
-        ])
-        if mode != .liveTextReader {
-            NSLayoutConstraint.activate([
-                moreButton.topAnchor.constraint(
-                    equalTo: view.safeAreaLayoutGuide.topAnchor,
-                    constant: 12
-                ),
-                moreButton.trailingAnchor.constraint(
-                    equalTo: view.safeAreaLayoutGuide.trailingAnchor,
+        controlsColumnWidthConstraint = controlsColumn.widthAnchor.constraint(equalToConstant: 100)
+
+        NSLayoutConstraint.activate(
+            tileWidthConstraints + tileHeightConstraints + shutterSizeConstraints + [
+                columnTrailingConstraint!,
+                controlsColumnWidthConstraint!,
+                controlsColumn.bottomAnchor.constraint(
+                    equalTo: view.safeAreaLayoutGuide.bottomAnchor,
                     constant: -16
                 ),
-                moreButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 64),
-            ])
-        }
+                controlsColumn.topAnchor.constraint(
+                    greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor,
+                    constant: 16
+                ),
+                zoomLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                zoomLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+                zoomLabel.leadingAnchor.constraint(
+                    greaterThanOrEqualTo: view.leadingAnchor,
+                    constant: 8
+                ),
+                cameraStatusBand.leadingAnchor.constraint(
+                    equalTo: view.safeAreaLayoutGuide.leadingAnchor,
+                    constant: 16
+                ),
+                cameraStatusBand.trailingAnchor.constraint(
+                    equalTo: controlsColumn.leadingAnchor,
+                    constant: -12
+                ),
+                cameraStatusBand.bottomAnchor.constraint(
+                    equalTo: view.safeAreaLayoutGuide.bottomAnchor,
+                    constant: -24
+                ),
+                cameraStatusBand.heightAnchor.constraint(greaterThanOrEqualToConstant: 56),
+            ]
+        )
+        applyControlMetrics(force: true)
+        updateControlTiles()
+        updateGridColor()
+
+        // VoiceOver 읽기 순서(Android traversalIndex): 촬영 → 설정 → 전환 → 라이트 → 격자.
+        // 모드 알약은 툴바에 있어 그보다 먼저 읽힌다.
+        view.accessibilityElements = [
+            captureButton,
+            settingsTile,
+            switchTile,
+            torchTile,
+            gridTile,
+            cameraStatusBand,
+            cameraView,
+        ]
     }
 
-    private func configureModeButton() {
-        moreButton.translatesAutoresizingMaskIntoConstraints = false
-        var configuration = UIButton.Configuration.filled()
-        let modeName: String
-        switch mode {
-        case .magnifier: modeName = "기본"
-        case .imageDescription: modeName = "이미지 분석"
-        case .askAI: modeName = "AI 질문하기"
-        case .liveTextReader: modeName = "실시간 문자 읽기"
+    /// Android `BoxWithConstraints`: 폭 600 이상이면 iPad 치수, 높이 560 미만이면 낮은 타일·작은 촬영 버튼.
+    private func applyControlMetrics(force: Bool = false) {
+        guard mode != .liveTextReader else { return }
+        let metrics = VisionCraftCameraControlMetrics(bounds: view.bounds.size)
+        guard force || metrics != controlMetrics else { return }
+        controlMetrics = metrics
+        tileWidthConstraints.forEach { $0.constant = metrics.tileWidth }
+        tileHeightConstraints.forEach { $0.constant = metrics.tileMinHeight }
+        [gridTile, torchTile, switchTile, settingsTile].forEach {
+            $0.layoutWidth = metrics.tileWidth
+            $0.minimumHeight = metrics.tileMinHeight
         }
-        configuration.title = AppLocalization.format("모드: %@", AppLocalization.string(modeName))
-        configuration.image = UIImage(systemName: "slider.horizontal.3")
-        configuration.imagePadding = 10
-        configuration.baseBackgroundColor = UIColor(
-            red: 40 / 255,
-            green: 53 / 255,
-            blue: 70 / 255,
-            alpha: 1
-        )
-        configuration.baseForegroundColor = .white
-        configuration.contentInsets = NSDirectionalEdgeInsets(
-            top: 8,
-            leading: 16,
-            bottom: 8,
-            trailing: 12
-        )
-        moreButton.configuration = configuration
-        moreButton.titleLabel?.font = .systemFont(ofSize: 18, weight: .semibold)
-        moreButton.layer.cornerRadius = 20
-        moreButton.layer.borderWidth = 2.5
-        moreButton.layer.borderColor = UIColor(
-            red: 240 / 255,
-            green: 244 / 255,
-            blue: 250 / 255,
-            alpha: 1
-        ).cgColor
-        moreButton.clipsToBounds = true
-        moreButton.accessibilityLabel = AppLocalization.format("모드, %@", AppLocalization.string(modeName))
-        moreButton.addTarget(self, action: #selector(moreTapped), for: .touchUpInside)
+        shutterSizeConstraints.forEach { $0.constant = metrics.shutterSize }
+        controlsColumnWidthConstraint?.constant = metrics.shutterSize
+        columnTrailingConstraint?.constant = -metrics.horizontalInset
+        expandableStack.spacing = metrics.gap
+        controlsColumn.spacing = metrics.gap
+        [gridTile, torchTile, switchTile].forEach { $0.showsIcon = metrics.showsTileIcons }
+        settingsTile.showsIcon = true
     }
 
     private func configureGridOverlay() {
@@ -1463,111 +1437,6 @@ final class MagnifierViewController:
             ),
         ])
     }
-
-    private func configureCircularCameraButton(
-        _ button: UIButton,
-        systemImage: String,
-        accessibilityLabel: String,
-        action: Selector,
-        size: CGFloat
-    ) {
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.configuration = nil
-        button.setImage(
-            UIImage(
-                systemName: systemImage,
-                withConfiguration:
-                    UIImage.SymbolConfiguration(
-                        pointSize: 24,
-                        weight: .semibold
-                    )
-            ),
-            for: .normal
-        )
-        button.tintColor = .white
-        button.backgroundColor = UIColor(
-            red: 0.145,
-            green: 0.145,
-            blue: 0.145,
-            alpha: 1
-        )
-        button.layer.cornerRadius = size / 2
-        button.accessibilityLabel =
-            AppLocalization.string(accessibilityLabel)
-        button.addTarget(
-            self,
-            action: action,
-            for: .touchUpInside
-        )
-        NSLayoutConstraint.activate([
-            button.widthAnchor.constraint(
-                equalToConstant: size
-            ),
-            button.heightAnchor.constraint(
-                equalToConstant: size
-            ),
-        ])
-    }
-
-    private func configureShutterButton() {
-        captureButton.translatesAutoresizingMaskIntoConstraints = false
-        captureButton.configuration = nil
-        captureButton.backgroundColor = .white
-        captureButton.layer.cornerRadius = 35
-        captureButton.layer.shadowColor = UIColor.black.cgColor
-        captureButton.layer.shadowOpacity = 0.45
-        captureButton.layer.shadowRadius = 9
-        captureButton.layer.shadowOffset = CGSize(width: 0, height: 3)
-        if mode == .imageDescription || mode == .askAI {
-            captureButton.setImage(
-                UIImage(systemName: mode == .askAI ? "bubble.left.and.bubble.right" : "sparkles"),
-                for: .normal
-            )
-            captureButton.tintColor = .black
-            captureButton.accessibilityLabel =
-                AppLocalization.string(mode == .askAI ? "AI 질문하기" : "이미지 설명")
-        } else {
-            captureButton.setImage(nil, for: .normal)
-            captureButton.accessibilityLabel =
-                AppLocalization.string("촬영")
-        }
-        captureButton.addTarget(
-            self,
-            action: #selector(captureTapped),
-            for: .touchUpInside
-        )
-        NSLayoutConstraint.activate([
-            captureButton.widthAnchor.constraint(
-                equalToConstant: 70
-            ),
-            captureButton.heightAnchor.constraint(
-                equalToConstant: 70
-            ),
-        ])
-    }
-
-    private func configureActionButton(
-        _ button: UIButton,
-        title: String,
-        systemImage: String,
-        action: Selector
-    ) {
-        button.configuration = .filled()
-        button.configuration?.title = title
-        button.configuration?.image = UIImage(
-            systemName: systemImage
-        )
-        button.configuration?.imagePlacement = .top
-        button.configuration?.imagePadding = 6
-        button.configuration?.baseBackgroundColor =
-            UIColor.white.withAlphaComponent(0.18)
-        button.addTarget(
-            self,
-            action: action,
-            for: .touchUpInside
-        )
-    }
-
     private func setupGestures() {
         guard mode != .liveTextReader else {
             return
@@ -1638,16 +1507,23 @@ final class MagnifierViewController:
                 return
             }
             guard authorized else {
-                statusLabel.text =
-                    AppLocalization.string(
-                        mode == .liveTextReader
-                        ? "카메라 권한이 필요합니다."
-                        : "설정에서 카메라 권한을 허용해 주세요."
-                    )
+                if mode == .liveTextReader {
+                    // Android LiveTextReaderActivity: 안내 문구를 보인 뒤 화면을 닫는다.
+                    let message = AppLocalization.string("카메라 권한이 필요합니다.")
+                    statusLabel.text = message
+                    tts.speakFeedback(message)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        guard self.isCameraScreenVisible else { return }
+                        self.onClose?()
+                    }
+                } else {
+                    let message = AppLocalization.string("설정에서 카메라 권한을 허용해 주세요.")
+                    statusLabel.text = message
+                    showCameraBand(message, duration: 6)
+                }
                 return
             }
-            sessionQueue.async { [weak self] in
-                guard let self else { return }
+            sessionQueue.async {
                 if self.cameraInput == nil {
                     self.configureSession(position: .back)
                 }
@@ -1657,7 +1533,6 @@ final class MagnifierViewController:
             }
         }
     }
-
     private func configureSession(
         position: AVCaptureDevice.Position
     ) {
@@ -1679,7 +1554,9 @@ final class MagnifierViewController:
             session.commitConfiguration()
             publishStatus(
                 AppLocalization.string(
-                    "카메라를 사용할 수 없습니다."
+                    mode == .liveTextReader
+                    ? "카메라를 열 수 없습니다."
+                    : "카메라를 사용할 수 없습니다."
                 )
             )
             return
@@ -1727,6 +1604,12 @@ final class MagnifierViewController:
             }
             self.updateVideoRotation()
             self.updateZoomUI(for: device)
+            self.torchObservation = device.observe(\.isTorchActive, options: [.new]) { [weak self] device, _ in
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.cameraInput?.device === device else { return }
+                    self.updateTorchUI()
+                }
+            }
             self.updateTorchUI()
             self.statusLabel.text =
                 self.mode == .liveTextReader
@@ -1952,11 +1835,7 @@ final class MagnifierViewController:
         case .toggleTorch:
             torchTapped()
         case .capture:
-            if mode == .magnifier {
-                saveCurrentFrameToPhotos()
-            } else {
-                captureTapped()
-            }
+            captureTapped()
         case .focus:
             focusAtCenter()
         case .decreaseZoom:
@@ -2032,29 +1911,15 @@ final class MagnifierViewController:
     }
 
     private func updateTorchUI() {
+        isTorchEnabled = cameraInput?.device.isTorchActive == true
         let isAvailable = cameraInput?.device.hasTorch == true
             && currentPosition == .back
-        torchButton.isEnabled = isAvailable
-        torchButton.setImage(
-            UIImage(
-                systemName:
-                    isTorchEnabled
-                    ? "flashlight.on.fill"
-                    : "flashlight.off.fill",
-                withConfiguration:
-                    UIImage.SymbolConfiguration(
-                        pointSize: 24,
-                        weight: .semibold
-                    )
-            ),
-            for: .normal
-        )
-        torchButton.accessibilityValue =
-            isTorchEnabled
-            ? AppLocalization.string("켜짐")
-            : AppLocalization.string("꺼짐")
+        torchTile.isEnabled = isAvailable
+        updateControlTiles()
+        if isCameraScreenVisible {
+            onCameraStateChanged?(isTorchEnabled, currentPosition == .front)
+        }
     }
-
     @objc private func closeTapped() {
         onClose?()
     }
@@ -2076,6 +1941,7 @@ final class MagnifierViewController:
                 currentFilter.title
             )
         )
+        updateGridColor()
     }
 
     private func applyRemoteDisplayAction(
@@ -2138,6 +2004,7 @@ final class MagnifierViewController:
         default:
             return
         }
+        updateGridColor()
         announceRemoteStatus(message)
     }
 
@@ -2151,6 +2018,7 @@ final class MagnifierViewController:
             filterControl.selectedSegmentIndex =
                 UISegmentedControl.noSegment
         }
+        updateGridColor()
     }
 
     private func persistDisplayAdjustment(
@@ -2254,16 +2122,26 @@ final class MagnifierViewController:
 
     @objc private func torchTapped() {
         setTorch(!isTorchEnabled)
+        announceControlState(
+            label: AppLocalization.string("라이트"),
+            isOn: isTorchEnabled
+        )
     }
 
     @objc private func gridTapped() {
         gridOverlay.isHidden.toggle()
-        gridButton.accessibilityValue =
-            AppLocalization.string(
-                gridOverlay.isHidden
-                ? "꺼짐"
-                : "켜짐"
-            )
+        updateControlTiles()
+        announceControlState(
+            label: AppLocalization.string("격자"),
+            isOn: !gridOverlay.isHidden
+        )
+    }
+
+    /// Android `announceControlState`: 켜고 끈 결과를 화면 중앙 큰 글씨(700ms)와 음성으로 알린다.
+    private func announceControlState(label: String, isOn: Bool) {
+        let state = AppLocalization.string(isOn ? "켬" : "끔")
+        showOverlay("\(label)\n\(state)", duration: 0.7)
+        tts.speakFeedback("\(label) \(state)")
     }
 
     @objc private func switchCameraTapped() {
@@ -2273,6 +2151,73 @@ final class MagnifierViewController:
         sessionQueue.async { [weak self] in
             self?.configureSession(position: nextPosition)
         }
+        showOverlay(
+            AppLocalization.string(nextPosition == .back ? "후면" : "전면"),
+            duration: 0.5
+        )
+    }
+
+    @objc private func settingsTapped() {
+        isControlsExpanded.toggle()
+        updateControlTiles()
+        UIAccessibility.post(
+            notification: .layoutChanged,
+            argument: settingsTile
+        )
+    }
+
+    /// 격자·라이트·전환 타일과 접기 타일의 글자·상태·강조를 지금 상태로 맞춘다.
+    private func updateControlTiles() {
+        let onText = AppLocalization.string("켬")
+        let offText = AppLocalization.string("끔")
+        let isGridOn = !gridOverlay.isHidden
+        gridTile.isOn = isGridOn
+        gridTile.stateText = isGridOn ? onText : offText
+        torchTile.isOn = isTorchEnabled
+        torchTile.stateText = isTorchEnabled ? onText : offText
+        torchTile.systemImage = isTorchEnabled ? "flashlight.on.fill" : "flashlight.off.fill"
+        let facingText = AppLocalization.string(currentPosition == .front ? "전면" : "후면")
+        switchTile.stateText = facingText
+
+        if isControlsExpanded, expandableStack.superview == nil {
+            controlsColumn.insertArrangedSubview(expandableStack, at: 0)
+        } else if !isControlsExpanded, expandableStack.superview != nil {
+            controlsColumn.removeArrangedSubview(expandableStack)
+            expandableStack.removeFromSuperview()
+        }
+        settingsTile.systemImage = isControlsExpanded ? "chevron.down" : "chevron.up"
+        settingsTile.title = AppLocalization.string(isControlsExpanded ? "설정 접기" : "설정")
+        settingsTile.isOutlineHighlighted = !isControlsExpanded && (isGridOn || isTorchEnabled)
+        // "설정. 격자 끔, 라이트 끔, 전환 후면, 접힘"
+        var label = AppLocalization.string("설정") + ". "
+        label += AppLocalization.string("격자") + " " + (isGridOn ? onText : offText) + ", "
+        label += AppLocalization.string("라이트") + " " + (isTorchEnabled ? onText : offText) + ", "
+        label += AppLocalization.string("전환") + " " + facingText
+        settingsTile.accessibilityOverrideLabel = label
+        settingsTile.accessibilityStateText =
+            AppLocalization.string(isControlsExpanded ? "펼쳐짐" : "접힘")
+    }
+
+    /// 격자선은 선택한 색 조합의 전경색을 따른다(Android `changeGridColor`). 원래 색상이면 검정.
+    private func updateGridColor() {
+        let color: UIColor
+        if let index = displayAdjustment.colorIndex,
+           !LocalDocumentColorTheme.all.isEmpty {
+            let themes = LocalDocumentColorTheme.all
+            let theme = themes[min(max(index, 0), themes.count - 1)]
+            color = UIColor(hex: UInt32(theme.foregroundHex & 0xFFFFFF))
+        } else {
+            color = .black
+        }
+        verticalGridLine.backgroundColor = color
+        horizontalGridLine.backgroundColor = color
+    }
+
+    // MARK: - 모드: 기본 / 문서 스캔 / 실시간 문자 읽기 / 이미지 분석 / AI 질문하기 / 사진 분석
+
+    /// 왼쪽 위 모드 알약(SwiftUI 툴바)이 부른다.
+    func presentModeDialog() {
+        moreTapped()
     }
 
     @objc private func moreTapped() {
@@ -2283,8 +2228,7 @@ final class MagnifierViewController:
             currentMode: mode,
             onBasic: { [weak self] in
                 self?.dismissMoreOptions { [weak self] in
-                    guard let self else { return }
-                    self.openCameraTool(self.onOpenBasicMode)
+                    self?.switchMode(to: .magnifier)
                 }
             },
             onDocumentScan: { [weak self] in
@@ -2301,20 +2245,19 @@ final class MagnifierViewController:
             },
             onImageAnalysis: { [weak self] in
                 self?.dismissMoreOptions { [weak self] in
-                    guard let self else { return }
-                    self.openCameraTool(self.onOpenImageAnalysisMode)
+                    self?.switchMode(to: .imageDescription)
                 }
             },
             onAskAI: { [weak self] in
                 self?.dismissMoreOptions { [weak self] in
-                    guard let self else { return }
-                    self.openCameraTool(self.onOpenAskAIMode)
+                    self?.switchMode(to: .askAI)
                 }
             },
             onPhotoReview: { [weak self] in
                 self?.dismissMoreOptions { [weak self] in
-                    guard let self else { return }
-                    self.openCameraTool(self.onOpenPhotoReview)
+                    // 사진 분석은 카메라가 필요 없으니 이 화면 위에 연다. 뒤로 가면 카메라로 돌아온다.
+                    guard let self, self.isCameraScreenVisible else { return }
+                    self.onOpenPhotoReview?()
                 }
             },
             onDismiss: { [weak self] in
@@ -2339,6 +2282,7 @@ final class MagnifierViewController:
         }
     }
 
+    /// 문서 스캔·실시간 문자 읽기는 자체 카메라 세션을 쓰므로 이 세션을 내리고 화면을 바꾼다.
     private func openCameraTool(_ action: (() -> Void)?) {
         guard let action, isCameraScreenVisible,
               !isOpeningCameraTool else { return }
@@ -2355,32 +2299,65 @@ final class MagnifierViewController:
         }
     }
 
-    private func captureForImageDescription(
-        _ onImage: ((UIImage) -> Void)?
-    ) {
-        guard let onImage, !isOpeningCameraTool else { return }
-        guard let image = capturedImage(applyingDisplayAdjustments: false) else {
-            SoundEffectManager.shared.play(.fail)
-            let message = AppLocalization.string(
-                "카메라 프레임을 기다리는 중입니다."
-            )
-            announceRemoteStatus(message)
-            let alert = UIAlertController(
-                title: AppLocalization.string("이미지 설명"),
-                message: message,
-                preferredStyle: .alert
-            )
-            alert.addAction(UIAlertAction(
-                title: AppLocalization.string("확인"),
-                style: .default
-            ))
-            present(alert, animated: true)
+    /// Android `selectCameraMode`: 모드를 고르는 순간에는 촬영하지 않는다. 세션·줌·토치·격자·색상은 그대로 두고
+    /// 촬영 버튼의 동작만 바꾼 뒤, 바뀐 모드를 화면 중앙 큰 글씨와 음성으로 알린다. 이미 그 모드면 아무것도 하지 않는다.
+    private func switchMode(to newMode: MagnifierCameraMode) {
+        guard newMode != mode, newMode != .liveTextReader else { return }
+        if mode == .liveTextReader {
+            guard let onOpenCaptureMode else { return }
+            openCameraTool { onOpenCaptureMode(newMode) }
             return
         }
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        SoundEffectManager.shared.play(.cameraShot2)
-        openCameraTool { onImage(image) }
+        mode = newMode
+        applyModeToShutter()
+        onModeChanged?(newMode)
+        showOverlay(
+            Self.modeName(for: newMode).replacingOccurrences(of: " ", with: "\n"),
+            duration: 0.9
+        )
+        tts.speakFeedback(Self.modeHint(for: newMode))
     }
+
+    static func modeName(for mode: MagnifierCameraMode) -> String {
+        switch mode {
+        case .magnifier: return AppLocalization.string("기본")
+        case .imageDescription: return AppLocalization.string("이미지 분석")
+        case .askAI: return AppLocalization.string("AI 질문하기")
+        case .liveTextReader: return AppLocalization.string("실시간 문자 읽기")
+        }
+    }
+
+    /// Android `camera_mode_basic_hint` / `image_analysis_camera_hint` / `camera_ask_ai_mode_hint`.
+    private static func modeHint(for mode: MagnifierCameraMode) -> String {
+        switch mode {
+        case .imageDescription:
+            return AppLocalization.string("촬영 버튼을 누르면 이미지를 설명합니다.")
+        case .askAI:
+            return AppLocalization.string("촬영 버튼을 누르면 찍은 사진으로 AI에게 질문합니다.")
+        case .magnifier, .liveTextReader:
+            return AppLocalization.string("기본 모드입니다. 촬영 버튼을 누르면 사진을 저장합니다.")
+        }
+    }
+
+    /// 촬영 버튼의 글자·색·접근성 이름을 지금 모드에 맞춘다(Android `VcCamShutter`).
+    private func applyModeToShutter() {
+        switch mode {
+        case .imageDescription:
+            captureButton.title = AppLocalization.string("분석\n촬영")
+            captureButton.isSpecial = true
+            captureButton.accessibilityLabel = AppLocalization.string("이미지 분석 촬영")
+        case .askAI:
+            captureButton.title = AppLocalization.string("질문\n촬영")
+            captureButton.isSpecial = true
+            captureButton.accessibilityLabel = AppLocalization.string("AI 질문 촬영")
+        case .magnifier, .liveTextReader:
+            captureButton.title = AppLocalization.string("촬영")
+            captureButton.isSpecial = false
+            captureButton.accessibilityLabel = AppLocalization.string("촬영")
+        }
+    }
+
+    // MARK: - 촬영
 
     @objc private func captureTapped() {
         switch mode {
@@ -2389,233 +2366,117 @@ final class MagnifierViewController:
         case .magnifier:
             saveCurrentFrameToPhotos()
         case .imageDescription:
-            captureForImageDescription(onCapture)
+            captureAndAnalyzeImage()
         case .askAI:
-            captureForImageDescription(onCapture)
+            captureForAskAI()
         }
     }
 
-    private var captureButtonTitle: String {
-        switch mode {
-        case .magnifier:
-            return AppLocalization.string(
-                "텍스트 읽기"
-            )
-        case .liveTextReader:
-            return AppLocalization.string(
-                "읽기 일시정지"
-            )
-        case .imageDescription:
-            return AppLocalization.string(
-                "이미지 설명"
-            )
-        case .askAI:
-            return AppLocalization.string("AI 질문하기")
+    private func frameForAnalysis() -> UIImage? {
+        guard let image = capturedImage(applyingDisplayAdjustments: false) else {
+            SoundEffectManager.shared.play(.fail)
+            let message = AppLocalization.string("카메라 프레임을 기다리는 중입니다.")
+            announceRemoteStatus(message)
+            showCameraBand(message, duration: 3)
+            return nil
         }
+        return image
     }
 
-    private var captureButtonSystemImage: String {
-        switch mode {
-        case .magnifier:
-            return "text.viewfinder"
-        case .liveTextReader:
-            return "pause.fill"
-        case .imageDescription:
-            return "sparkles"
-        case .askAI:
-            return "bubble.left.and.bubble.right"
-        }
-    }
-
-    @objc private func photoSaveTapped() {
-        guard let image = capturedImage() else {
-            announceRemoteStatus(
-                AppLocalization.string(
-                    "카메라 프레임을 기다리는 중입니다."
-                )
-            )
+    /// Android `captureAndAnalyzeImage`: 카메라에 머문 채 한 장 찍어 이미지 설명을 받는다.
+    /// 결과는 클립보드에 복사하고, 음성으로 읽고, 화면 아래 띠로 보여준다. 사진은 저장하지 않는다.
+    private func captureAndAnalyzeImage() {
+        guard !isOpeningCameraTool else { return }
+        if isAnalyzingImage {
+            tts.speakFeedback(AppLocalization.string("이미 이미지를 분석하고 있습니다."))
             return
         }
-        presentPhotoSaveOptions(
-            for: image
-        )
+        guard let image = frameForAnalysis() else { return }
+        isAnalyzingImage = true
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        SoundEffectManager.shared.play(.cameraShot2)
+        SoundEffectManager.shared.play(.waiting)
+        let started = AppLocalization.string("촬영한 이미지를 분석하고 있습니다.")
+        tts.speakFeedback(started)
+        showCameraBand(started, duration: 60)
+
+        Task { [weak self] in
+            guard let self else { return }
+            defer { self.isAnalyzingImage = false }
+            do {
+                let caption = try await CameraImageDescriber.describe(image)
+                guard self.isCameraScreenVisible else { return }
+                guard !caption.isEmpty else {
+                    self.handleAnalysisError(AppLocalization.string("사진을 해석하지 못했어요."))
+                    return
+                }
+                UIPasteboard.general.string = caption
+                SoundEffectManager.shared.play(.complete)
+                self.tts.speakFeedback(caption)
+                self.showCameraBand(caption, duration: 12)
+            } catch {
+                guard self.isCameraScreenVisible else { return }
+                self.handleAnalysisError(CameraImageDescriber.userMessage(for: error))
+            }
+        }
     }
 
-    private func presentPhotoSaveOptions(
-        for image: UIImage
-    ) {
-        let alert = UIAlertController(
-            title: AppLocalization.string(
-                "사진 저장"
-            ),
-            message:
-                AppLocalization.string(
-                    "저장할 위치를 선택합니다. 사진 보관함은 추가 전용 권한만 사용합니다."
-                ),
-            preferredStyle: .actionSheet
-        )
-        alert.addAction(
-            UIAlertAction(
-                title: AppLocalization.string(
-                    "사진 보관함"
-                ),
-                style: .default
-            ) { [weak self] _ in
-                self?.saveImageToPhotos(image)
-            }
-        )
-        alert.addAction(
-            UIAlertAction(
-                title: "Files",
-                style: .default
-            ) { [weak self] _ in
-                self?.exportImageToFiles(image)
-            }
-        )
-        alert.addAction(
-            UIAlertAction(
-                title: AppLocalization.string(
-                    "취소"
-                ),
-                style: .cancel
-            )
-        )
-        if let popover =
-                alert.popoverPresentationController {
-            popover.sourceView = photoSaveButton
-            popover.sourceRect =
-                photoSaveButton.bounds
+    private func handleAnalysisError(_ message: String) {
+        SoundEffectManager.shared.play(.fail)
+        tts.speakFeedback(message)
+        showCameraBand(message, duration: 4)
+    }
+
+    /// Android `captureAndAskAi`: 한 장 찍어 음성 질문 화면으로 넘긴다. 사진은 갤러리에 저장하지 않는다.
+    private func captureForAskAI() {
+        guard !isOpeningCameraTool, let onAskAI else { return }
+        if isAnalyzingImage {
+            tts.speakFeedback(AppLocalization.string("이미 이미지를 분석하고 있습니다."))
+            return
         }
-        present(alert, animated: true)
+        guard let image = frameForAnalysis() else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        SoundEffectManager.shared.play(.cameraShot2)
+        openCameraTool { onAskAI(image) }
     }
 
     private func saveCurrentFrameToPhotos() {
         guard let image = capturedImage() else {
-            announceRemoteStatus(
-                AppLocalization.string(
-                    "카메라 프레임을 기다리는 중입니다."
-                )
-            )
+            let message = AppLocalization.string("카메라 프레임을 기다리는 중입니다.")
+            announceRemoteStatus(message)
+            showCameraBand(message, duration: 3)
             return
         }
         saveImageToPhotos(image)
     }
 
-    private func saveImageToPhotos(
-        _ image: UIImage
-    ) {
-        SoundEffectManager.shared.play(
-            .cameraShot2
-        )
-        photoSaveButton.isEnabled = false
-        statusLabel.text =
-            AppLocalization.string(
-                "사진 보관함에 저장하는 중"
-            )
+    /// Android `capturePhoto` → `saveCapturedPhoto`: 저장한 뒤 "촬영한 사진" 검토 화면을 위에 연다.
+    /// 뒤로 가면 카메라로 돌아온다. 실패하면 토스트("사진 저장 실패: %@")만 띄운다.
+    private func saveImageToPhotos(_ image: UIImage) {
+        guard !isSavingPhoto else { return }
+        isSavingPhoto = true
+        SoundEffectManager.shared.play(.cameraShot2)
         Task { [weak self] in
-            guard let self else {
-                return
-            }
-            defer {
-                self.photoSaveButton
-                    .isEnabled = true
-            }
+            guard let self else { return }
+            defer { self.isSavingPhoto = false }
             do {
-                let capture =
-                    try MagnifierPhotoCapture(
-                        image: image
-                    )
-                try await self
-                    .photoSaveService
-                    .saveToPhotoLibrary(
-                        capture
-                    )
-                UIImpactFeedbackGenerator(
-                    style: .medium
-                ).impactOccurred()
-                self.announceRemoteStatus(
-                    AppLocalization.string(
-                        "사진 보관함에 저장했습니다."
-                    )
-                )
+                let capture = try MagnifierPhotoCapture(image: image)
+                try await self.photoSaveService.saveToPhotoLibrary(capture)
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                guard self.isCameraScreenVisible, !self.isOpeningCameraTool else { return }
+                PhotoReviewHandoff.pendingCapturedImage = image
+                self.onOpenPhotoReview?()
             } catch {
-                self.announceRemoteStatus(
-                    AppLocalization.format(
-                        "사진을 저장하지 못했습니다: %@",
-                        error.localizedDescription
-                    )
-                )
-            }
-        }
-    }
-
-    private func exportImageToFiles(
-        _ image: UIImage
-    ) {
-        SoundEffectManager.shared.play(
-            .cameraShot2
-        )
-        do {
-            photoSaveService
-                .removeTemporaryExport(
-                    at:
-                        pendingPhotoExportURL
-                )
-            let capture =
-                try MagnifierPhotoCapture(
-                    image: image
-                )
-            let url =
-                try photoSaveService
-                    .makeTemporaryExportURL(
-                        for: capture
-                    )
-            pendingPhotoExportURL = url
-            let picker =
-                UIDocumentPickerViewController(
-                    forExporting: [url],
-                    asCopy: true
-                )
-            picker.delegate = self
-            present(picker, animated: true)
-        } catch {
-            announceRemoteStatus(
-                AppLocalization.format(
-                    "Files로 내보내지 못했습니다: %@",
+                SoundEffectManager.shared.play(.fail)
+                let message = AppLocalization.format(
+                    "사진 저장 실패: %@",
                     error.localizedDescription
                 )
-            )
+                self.tts.speakFeedback(message)
+                self.showCameraBand(message, duration: 4)
+            }
         }
     }
-
-    func documentPicker(
-        _ controller: UIDocumentPickerViewController,
-        didPickDocumentsAt urls: [URL]
-    ) {
-        photoSaveService.removeTemporaryExport(
-            at: pendingPhotoExportURL
-        )
-        pendingPhotoExportURL = nil
-        announceRemoteStatus(
-            AppLocalization.string(
-                "Files에 사진을 저장했습니다."
-            )
-        )
-    }
-
-    func documentPickerWasCancelled(
-        _ controller: UIDocumentPickerViewController
-    ) {
-        photoSaveService.removeTemporaryExport(
-            at: pendingPhotoExportURL
-        )
-        pendingPhotoExportURL = nil
-        statusLabel.text =
-            AppLocalization.string(
-                "Files 저장을 취소했습니다."
-            )
-    }
-
     @objc private func handlePinch(
         _ gesture: UIPinchGestureRecognizer
     ) {
@@ -2637,6 +2498,7 @@ final class MagnifierViewController:
             MagnifierFilter.normal.rawValue
         displayAdjustment.colorIndex = nil
         displayAdjustment.isInverted = false
+        updateGridColor()
     }
 
     @objc private func handleHorizontalSwipe(
@@ -2654,12 +2516,29 @@ final class MagnifierViewController:
     }
 
     private func showZoomOverlay() {
-        zoomOverlayHideWorkItem?.cancel()
-        zoomLabel.text = String(
-            format: "%.1f",
-            cameraInput?.device.videoZoomFactor
-                ?? CGFloat(zoomSlider.value)
+        showOverlay(
+            String(
+                format: "%.1f",
+                cameraInput?.device.videoZoomFactor
+                    ?? CGFloat(zoomSlider.value)
+            ),
+            duration: 0.6
         )
+    }
+
+    /// Android `showOverlay`: 화면 가운데 큰 글씨. 기본 크기는 "후면"·"2.0" 같은 두세 글자 기준이고,
+    /// 더 긴 줄은 화면 폭의 90%에 들어가게만 줄인다.
+    private func showOverlay(_ text: String, duration: TimeInterval) {
+        zoomOverlayHideWorkItem?.cancel()
+        let baseSize = overlayBaseFontSize
+        let baseFont = UIFont.monospacedDigitSystemFont(ofSize: baseSize, weight: .regular)
+        let widest = text.split(separator: "\n").map {
+            (String($0) as NSString).size(withAttributes: [.font: baseFont]).width
+        }.max() ?? 0
+        let available = view.bounds.width * 0.9
+        let scale = (widest > 0 && available > 0) ? min(1, available / widest) : 1
+        zoomLabel.font = .monospacedDigitSystemFont(ofSize: baseSize * scale, weight: .regular)
+        zoomLabel.text = text
         zoomLabel.isHidden = false
 
         let workItem = DispatchWorkItem { [weak self] in
@@ -2667,11 +2546,30 @@ final class MagnifierViewController:
         }
         zoomOverlayHideWorkItem = workItem
         DispatchQueue.main.asyncAfter(
-            deadline: .now() + 0.6,
+            deadline: .now() + duration,
             execute: workItem
         )
     }
 
+    private var overlayBaseFontSize: CGFloat {
+        min(view.bounds.width, view.bounds.height) * 0.4
+    }
+
+    /// Android 카메라 화면의 토스트 자리: VcCamStatusOverlay 띠를 아래쪽에 띄운다.
+    private func showCameraBand(_ text: String, duration: TimeInterval) {
+        bandHideWorkItem?.cancel()
+        cameraStatusBand.text = text
+        cameraStatusBand.isHidden = false
+        UIAccessibility.post(notification: .announcement, argument: text)
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.cameraStatusBand.isHidden = true
+        }
+        bandHideWorkItem = workItem
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + duration,
+            execute: workItem
+        )
+    }
     func captureOutput(
         _ output: AVCaptureOutput,
         didOutput sampleBuffer: CMSampleBuffer,
@@ -3133,10 +3031,7 @@ final class MagnifierViewController:
                 AppLocalization.string(
                     "읽는 중입니다."
                 )
-            tts.speak(
-                decision.text,
-                language: "ko-KR"
-            )
+            tts.speak(decision.text)
         case .noText:
             return
         }

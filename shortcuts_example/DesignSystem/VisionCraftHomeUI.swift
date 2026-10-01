@@ -1,7 +1,8 @@
 import SwiftUI
 import UIKit
 
-/// Shared soft UI palette from Android VisionCraft.
+/// Android VisionCraft soft UI 팔레트(`VcSoftHome.kt` `softHomeColors()`).
+/// 앱 전체가 이 한 벌을 쓴다. 색·모양·면을 새로 정하지 말고 여기 토큰을 쓴다.
 enum VisionCraftHomeUI {
     static let background = VisionCraftUI.background
     static let surface = VisionCraftUI.surface
@@ -19,11 +20,17 @@ enum VisionCraftHomeUI {
     static let guideAccent = color(0x885024, 0xF3C9A4)
     static let guideSecondaryText = color(0x6F604F, 0xD4C4AF)
     static let guideArrow = color(0xFFE1C9, 0x483326)
-    // Android VcHomeTileArt: neutral tint blended with the home surface.
+    /// Android `VcHomeTileArt`: 회색(Neutral)을 면에 14% 섞은 값, 다크는 회색 다크색을 흰색 쪽으로 50%.
     static let tileArtBackground = color(0xE6E8EA, 0xDBE2EC)
-    static let onPrimary = color(0xFFFFFF, 0x171717)
+    /// 잉크 버튼 글자 = 배경색(라이트 흰색, 다크 검정). Android `VcHomeSoftButton(ink = true)`.
+    static let onPrimary = VisionCraftUI.background
     static let switchOn = color(0x34C759, 0x34C759)
     static let switchOff = color(0xB8BDC7, 0xB8BDC7)
+    /// Android `VCColors.Surface3Light` / `Surface3`: 색 견본 테두리.
+    static let swatchOutline = color(0xDADADA, 0x303030)
+    /// `raised` 면의 위·아래 색: 면을 밝은 면 쪽으로 70%, 그림자 쪽으로 28% 섞은 값.
+    static let raisedTop = color(0xFDFDFD, 0x252525)
+    static let raisedBottom = color(0xEDEFF1, 0x111111)
     static let logoAccents: [Color] = [
         color(0xB5403C, 0xF2A09B),
         color(0xB2611F, 0xEFB07F),
@@ -33,8 +40,13 @@ enum VisionCraftHomeUI {
         color(0x7655B4, 0xC6B1F5),
     ]
 
+    static func logoAccent(_ index: Int) -> Color {
+        logoAccents[((index % logoAccents.count) + logoAccents.count) % logoAccents.count]
+    }
+
+    /// 영역 구분 색(섹션 밑줄). Android `HomeSectionTone`.
     enum SectionTone {
-        case ai, camera, reading, link, settings, updates
+        case ai, camera, reading, link, settings, updates, neutral
 
         var color: Color {
             switch self {
@@ -43,7 +55,7 @@ enum VisionCraftHomeUI {
             case .reading: VisionCraftHomeUI.color(0x28765A, 0x99D8BA)
             case .link: VisionCraftHomeUI.color(0x2A7A86, 0x8FD6E0)
             case .settings: VisionCraftHomeUI.color(0x976026, 0xE7BE80)
-            case .updates: VisionCraftHomeUI.color(0x69778B, 0xB7C5D9)
+            case .updates, .neutral: VisionCraftHomeUI.color(0x69778B, 0xB7C5D9)
             }
         }
     }
@@ -69,7 +81,8 @@ struct VisionCraftHomeCategory: Identifiable {
     let items: [VisionCraftActionItem]
 }
 
-/// Android VcHomeCategoryGrid: two columns, 16pt gap, 4:5 tile ratio.
+/// Android `VcTile`(`VcHomeCategoryGrid`): 세로 2열, 가로 4열, 16pt 간격, 4:5 비율.
+/// 테두리 없이 큰 그림자와 위아래 밝기 기울기로 띄운다(`raised`).
 struct VisionCraftHomeCategoryGrid: View {
     let categories: [VisionCraftHomeCategory]
     let columns: Int
@@ -101,87 +114,126 @@ struct VisionCraftHomeCategoryGrid: View {
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                            Text(AppLocalization.string(category.title))
-                                .font(.system(size: min(geometry.size.width * 0.17, 94), weight: .bold))
-                                .minimumScaleFactor(0.65)
-                                .lineLimit(2)
-                                .multilineTextAlignment(.center)
-                                .foregroundStyle(VisionCraftHomeUI.text)
-                                .frame(maxWidth: .infinity)
-                                .padding(.horizontal, 18)
+                            VisionCraftHomeTileTitle(
+                                title: category.title,
+                                tileWidth: geometry.size.width
+                            )
                         }
                         .padding(.top, 18)
                         .padding(.bottom, 16)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     .aspectRatio(4.0 / 5.0, contentMode: .fit)
-                    .visionCraftHomeSurface(outlined: false)
+                    .visionCraftHomeSurface(outlined: false, raised: true)
                     .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 }
                 .buttonStyle(VisionCraftHomePressStyle())
-                .accessibilityLabel("\(AppLocalization.string(category.title)). \(category.items.map { AppLocalization.string($0.title) }.joined(separator: ", "))")
+                .accessibilityLabel(accessibilityLabel(for: category))
                 .accessibilityIdentifier("home.category.\(category.id)")
             }
         }
     }
+
+    /// 항목이 하나면 타일이 곧 그 기능이므로 기능 설명을, 여럿이면 안에 든 항목 이름을 읽어 준다.
+    private func accessibilityLabel(for category: VisionCraftHomeCategory) -> String {
+        let title = AppLocalization.string(category.title)
+        if category.items.count == 1, let only = category.items.first {
+            return "\(title). \(AppLocalization.string(only.description))"
+        }
+        let names = category.items
+            .map { AppLocalization.string($0.title) }
+            .joined(separator: ", ")
+        return "\(title). \(names)"
+    }
 }
 
+/// Android `VcHomeTileTitle`: 타일 안쪽 너비(타일 폭 − 36)의 17%를 글자 크기로 쓰고
+/// 사용자 글자 크기 설정을 따른다. 줄바꿈은 낱말 사이에서만 일어나야 하므로
+/// 가장 긴 낱말이 한 줄에 들어갈 때까지만 줄인다.
+struct VisionCraftHomeTileTitle: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    let title: String
+    let tileWidth: CGFloat
+    var widthFraction: CGFloat = 0.17
+
+    var body: some View {
+        let text = AppLocalization.string(title)
+        let available = max(1, tileWidth - 36)
+        let target = UIFontMetrics.default.scaledValue(for: available * widthFraction)
+        let size = fittedSize(text: text, target: target, available: available)
+        let _ = dynamicTypeSize
+        Text(text)
+            .font(.system(size: size, weight: .bold))
+            .lineSpacing(size * 0.18)
+            .multilineTextAlignment(.center)
+            .foregroundStyle(VisionCraftHomeUI.text)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 18)
+    }
+
+    private func fittedSize(text: String, target: CGFloat, available: CGFloat) -> CGFloat {
+        let words: [String] = text.components(separatedBy: " ")
+        let longestWord: String = words.max { $0.count < $1.count } ?? text
+        let font = UIFont.systemFont(ofSize: target, weight: .bold)
+        let wordWidth = (longestWord as NSString)
+            .size(withAttributes: [.font: font]).width
+        guard wordWidth > available, wordWidth > 0 else { return target }
+        return target * (available / wordWidth) * 0.97
+    }
+}
+
+/// Android `VcCardDialog`(`VcHomeCategoryDialog`): 카테고리 타일을 눌렀을 때 항목을 보여 주는 카드 다이얼로그.
 struct VisionCraftHomeCategoryDialog: View {
     let category: VisionCraftHomeCategory
     let onDismiss: () -> Void
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                VisionCraftDialogScrim(onTap: onDismiss)
-
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        VisionCraftHomeSectionHeader(title: category.title, tone: category.tone)
-                        VisionCraftHomeActionList(items: category.items.map { item in
-                            VisionCraftActionItem(
-                                id: item.id,
-                                icon: item.icon,
-                                title: item.title,
-                                description: item.description,
-                                accent: item.accent,
-                                action: {
-                                    onDismiss()
-                                    item.action()
-                                }
-                            )
-                        }, useLogoAccents: true)
-                        Button(AppLocalization.string("닫기"), action: onDismiss)
-                            .frame(maxWidth: .infinity)
-                            .buttonStyle(VisionCraftAndroidButtonStyle())
-                            .padding(.top, 24)
-                    }
-                    .padding(24)
+        VisionCraftDialogCard(
+            title: category.title,
+            cancelTitle: "닫기",
+            tone: category.tone,
+            onDismiss: onDismiss
+        ) {
+            ForEach(Array(category.items.enumerated()), id: \.element.id) { index, item in
+                VisionCraftDialogOptionRow(
+                    title: item.title,
+                    subtitle: item.description,
+                    systemImage: item.icon,
+                    badge: item.badge,
+                    accent: VisionCraftHomeUI.logoAccent(index)
+                ) {
+                    onDismiss()
+                    item.action()
                 }
-                .frame(maxWidth: 560, maxHeight: geometry.size.height - 48)
-                .background(VisionCraftHomeUI.background, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .strokeBorder(VisionCraftHomeUI.outline, lineWidth: 1.5)
-                }
-                .padding(.horizontal, 20)
+                .accessibilityIdentifier("home.action.\(item.id)")
             }
         }
-        .accessibilityAddTraits(.isModal)
-        .accessibilityAction(.escape, onDismiss)
-        .zIndex(100)
     }
 }
 
+/// Android `VcSectionHeader`: 22pt SemiBold + heading, 7pt 띄우고 3pt 밑줄.
+/// 밑줄 색은 영역 식별용이고 버튼 배경의 두 번째 강조색이 아니다.
 struct VisionCraftHomeSectionHeader: View {
     let title: String
     let tone: VisionCraftHomeUI.SectionTone
+    var bottomSpacing: CGFloat = VisionCraftUI.sectionHeaderBottomSpacing
+
+    init(
+        title: String,
+        tone: VisionCraftHomeUI.SectionTone,
+        bottomSpacing: CGFloat = VisionCraftUI.sectionHeaderBottomSpacing
+    ) {
+        self.title = title
+        self.tone = tone
+        self.bottomSpacing = bottomSpacing
+    }
 
     var body: some View {
         Text(AppLocalization.string(title))
             .visionCraftAndroidText(22, weight: .semibold, relativeTo: .title2)
             .foregroundStyle(VisionCraftHomeUI.text)
-            .padding(.bottom, 7)
+            // overlay는 높이를 차지하지 않으므로 공백 7 + 밑줄 3을 확보한다.
+            .padding(.bottom, 7 + 3)
             .overlay(alignment: .bottom) {
                 Capsule()
                     .fill(tone.color)
@@ -189,27 +241,27 @@ struct VisionCraftHomeSectionHeader: View {
                     .accessibilityHidden(true)
             }
             .accessibilityAddTraits(.isHeader)
-            .padding(.bottom, 14)
+            .padding(.bottom, bottomSpacing)
     }
 }
 
+/// Android `VcActionRow` 목록(`VcHomeActionList`): 모서리 22, 최소 88pt, 안쪽 20/18, 간격 16.
+/// 목록형 기본 아이콘은 회색 28pt, `useLogoAccents`면 로고 색 VcIconTile Large.
+/// `badge`가 있으면 테두리가 강조색이 되고 화살표 자리에 뱃지가 들어간다.
 struct VisionCraftHomeActionList: View {
     let items: [VisionCraftActionItem]
     var useLogoAccents = false
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: VisionCraftUI.actionRowSpacing) {
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                 Button(action: item.action) {
                     HStack(spacing: 16) {
                         if useLogoAccents {
-                            let accent = VisionCraftHomeUI.logoAccents[index % VisionCraftHomeUI.logoAccents.count]
                             VisionCraftIconTile(
                                 systemImage: item.icon,
-                                foreground: accent,
-                                background: accent.opacity(0.14),
-                                size: 52,
-                                iconSize: 28
+                                tint: VisionCraftHomeUI.logoAccent(index),
+                                tileSize: .large
                             )
                         } else {
                             Image(systemName: item.icon)
@@ -231,25 +283,70 @@ struct VisionCraftHomeActionList: View {
                         .fixedSize(horizontal: false, vertical: true)
 
                         Spacer(minLength: 0)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(VisionCraftHomeUI.icon)
-                            .accessibilityHidden(true)
+                        if let badge = item.badge {
+                            VisionCraftBadge(text: badge)
+                        } else {
+                            VisionCraftChevron()
+                        }
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 18)
                     .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
-                    .visionCraftHomeSurface()
-                    .contentShape(RoundedRectangle(cornerRadius: 22))
+                    .visionCraftHomeSurface(
+                        outlineColor: item.badge == nil ? nil : VisionCraftHomeUI.accent
+                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 }
                 .buttonStyle(VisionCraftHomePressStyle())
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(accessibilityLabel(for: item))
+                .accessibilityAddTraits(.isButton)
                 .accessibilityIdentifier("home.action.\(item.id)")
             }
         }
     }
+
+    /// Android: "제목. 설명"(뱃지가 있으면 "제목, 뱃지. 설명") 한 덩어리.
+    private func accessibilityLabel(for item: VisionCraftActionItem) -> String {
+        let title = AppLocalization.string(item.title)
+        let description = AppLocalization.string(item.description)
+        if let badge = item.badge {
+            return "\(title), \(AppLocalization.string(badge)). \(description)"
+        }
+        return "\(title). \(description)"
+    }
 }
 
+/// Android `VcBadge`: 강조색 채움, 모서리 10, 12/6 여백, 16pt Bold, 글자는 배경색.
+struct VisionCraftBadge: View {
+    let text: String
+
+    var body: some View {
+        Text(AppLocalization.string(text))
+            .visionCraftAndroidText(16, weight: .bold)
+            .foregroundStyle(VisionCraftUI.background)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                VisionCraftUI.accent,
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
+    }
+}
+
+/// Android `VcChevron`: 오른쪽 18pt / 아래 16pt, 아이콘색.
+struct VisionCraftChevron: View {
+    var down = false
+
+    var body: some View {
+        Image(systemName: down ? "chevron.down" : "chevron.right")
+            .font(.system(size: down ? 16 : 18, weight: .medium))
+            .foregroundStyle(VisionCraftHomeUI.icon)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Android `VcNoticeCard`(`VcHomeGuideEntry`): 크림색 안내 카드 + 40pt 원형 화살표 칩.
 struct VisionCraftHomeGuideEntry: View {
     let action: () -> Void
 
@@ -278,39 +375,53 @@ struct VisionCraftHomeGuideEntry: View {
             .padding(.vertical, 18)
             .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
             .visionCraftHomeSurface(fill: VisionCraftHomeUI.guideSurface)
-            .contentShape(RoundedRectangle(cornerRadius: 22))
+            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
         .buttonStyle(VisionCraftHomePressStyle())
         .accessibilityElement(children: .combine)
-        .accessibilityHint(AppLocalization.string("사용 설명서 열기"))
+        .accessibilityHint(AppLocalization.string("열기"))
         .accessibilityIdentifier("home.user-guide")
     }
 }
 
-/// Android VcSoftHome: opaque fill with upper-left light and lower-right shadow.
+/// Android `VcSoftSurface`(`softHomeSurface`): 면 + 1.5pt 테두리 + 양방향 그림자(흐림 5, 오프셋 2).
+/// 누르면 흐림 2·오프셋 0.75, 면을 그림자 쪽으로 14% 어둡게. 물결 효과는 쓰지 않는다.
+/// `raised`: 테두리 없음, 흐림 10·오프셋 5, 위→아래 밝기 기울기(2x2 타일 전용).
 private struct VisionCraftHomeSurfaceModifier: ViewModifier {
     @Environment(\.visionCraftHomePressed) private var pressed
     @Environment(\.colorSchemeContrast) private var contrast
     let cornerRadius: CGFloat
     let fill: Color?
     let outlined: Bool
+    let outlineColor: Color?
+    let raised: Bool
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         let surface = fill ?? VisionCraftHomeUI.surface
-        let blur: CGFloat = pressed ? 2 : 5
-        let offset: CGFloat = pressed ? 0.75 : 2
+        let blur: CGFloat = pressed ? 2 : (raised ? 10 : 5)
+        let offset: CGFloat = pressed ? 0.75 : (raised ? 5 : 2)
         content.background {
             ZStack {
                 shape.fill(surface)
                     .shadow(color: VisionCraftHomeUI.highlight, radius: blur, x: -offset, y: -offset)
                 shape.fill(surface)
                     .shadow(color: VisionCraftHomeUI.shadow, radius: blur, x: offset, y: offset)
-                shape.fill(surface)
+                if raised, fill == nil {
+                    shape.fill(
+                        LinearGradient(
+                            colors: [VisionCraftHomeUI.raisedTop, VisionCraftHomeUI.raisedBottom],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                } else {
+                    shape.fill(surface)
+                }
                 shape.fill(VisionCraftHomeUI.shadow.opacity(pressed ? 0.14 : 0))
                 if outlined {
                     shape.strokeBorder(
-                        VisionCraftHomeUI.outline,
+                        outlineColor ?? VisionCraftHomeUI.outline,
                         lineWidth: contrast == .increased ? 2 : 1.5
                     )
                 }
@@ -337,31 +448,61 @@ private extension EnvironmentValues {
     }
 }
 
-/// Basic outlined button; `filled` uses the ink action for navigation.
+/// Android `VcButton` / `VcButtonAccent` / `VcButtonInk`(`VcHomeSoftButton`).
+/// 기본: 면 + 1.5pt 테두리, 모서리 14, 최소 52pt, 양방향 그림자, 누르면 면이 14% 어두워진다.
+/// `emphasized`(주황): 면·테두리 강조색, 글자 배경색, 64pt — 뭔가를 실행하는 동작.
+/// `filled`(남색 잉크): 면·테두리 글자색, 글자 배경색, 64pt — 확인·이동. 한 화면에 하나만.
 struct VisionCraftAndroidButtonStyle: ButtonStyle {
     var filled = false
     var emphasized = false
 
     func makeBody(configuration: Configuration) -> some View {
         let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        let pressed = configuration.isPressed
+        let fill: Color = emphasized
+            ? VisionCraftHomeUI.accent
+            : (filled ? VisionCraftHomeUI.text : VisionCraftHomeUI.surface)
+        let outline: Color = emphasized
+            ? VisionCraftHomeUI.accent
+            : (filled ? VisionCraftHomeUI.text : VisionCraftHomeUI.outline)
+        let blur: CGFloat = pressed ? 2 : 5
+        let offset: CGFloat = pressed ? 0.75 : 2
         return configuration.label
             .visionCraftAndroidText(16, weight: .semibold)
-            .foregroundStyle(emphasized ? VisionCraftUI.onAccent : (filled ? VisionCraftHomeUI.onPrimary : VisionCraftHomeUI.text))
-            .padding(.horizontal, 16)
-            .frame(minHeight: emphasized ? 64 : 52)
+            .multilineTextAlignment(.center)
+            .foregroundStyle((emphasized || filled) ? VisionCraftHomeUI.onPrimary : VisionCraftHomeUI.text)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 14)
+            .frame(minHeight: (emphasized || filled) ? 64 : 52)
             .background {
-                shape.fill(emphasized ? VisionCraftHomeUI.accent : (filled ? VisionCraftHomeUI.text : VisionCraftHomeUI.surface))
-                    .shadow(color: VisionCraftHomeUI.shadow,
-                            radius: configuration.isPressed ? 2 : 5,
-                            x: configuration.isPressed ? 0.75 : 2,
-                            y: configuration.isPressed ? 0.75 : 2)
-                shape.strokeBorder(emphasized ? VisionCraftHomeUI.accent : VisionCraftHomeUI.outline, lineWidth: 1.5)
+                ZStack {
+                    shape.fill(fill)
+                        .shadow(color: VisionCraftHomeUI.highlight, radius: blur, x: -offset, y: -offset)
+                    shape.fill(fill)
+                        .shadow(color: VisionCraftHomeUI.shadow, radius: blur, x: offset, y: offset)
+                    shape.fill(fill)
+                    shape.fill(VisionCraftHomeUI.shadow.opacity(pressed ? 0.14 : 0))
+                    shape.strokeBorder(outline, lineWidth: 1.5)
+                }
             }
             .contentShape(shape)
     }
 }
 
+/// 앱 글꼴 설정(`AppFontCatalogStore.fontName`)을 공용 글자 스타일에 전달한다. nil = 시스템 글꼴.
+struct VisionCraftAppFontNameKey: EnvironmentKey {
+    static let defaultValue: String? = nil
+}
+
+extension EnvironmentValues {
+    var visionCraftAppFontName: String? {
+        get { self[VisionCraftAppFontNameKey.self] }
+        set { self[VisionCraftAppFontNameKey.self] = newValue }
+    }
+}
+
 private struct VisionCraftAndroidTextModifier: ViewModifier {
+    @Environment(\.visionCraftAppFontName) private var appFontName
     @ScaledMetric private var size: CGFloat
     let weight: Font.Weight
 
@@ -371,7 +512,17 @@ private struct VisionCraftAndroidTextModifier: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        content.font(.system(size: size, weight: weight))
+        content.font(VisionCraftHomeUI.font(size: size, weight: weight, appFontName: appFontName))
+    }
+}
+
+extension VisionCraftHomeUI {
+    /// 앱 글꼴 이름이 있으면 그 글꼴로, 없으면 시스템 글꼴로 크기·굵기를 맞춘 Font.
+    static func font(size: CGFloat, weight: Font.Weight, appFontName: String?) -> Font {
+        if let appFontName {
+            return Font.custom(appFontName, size: size).weight(weight)
+        }
+        return .system(size: size, weight: weight)
     }
 }
 
@@ -379,15 +530,20 @@ extension View {
     func visionCraftHomeSurface(
         cornerRadius: CGFloat = 22,
         fill: Color? = nil,
-        outlined: Bool = true
+        outlined: Bool = true,
+        outlineColor: Color? = nil,
+        raised: Bool = false
     ) -> some View {
         modifier(VisionCraftHomeSurfaceModifier(
             cornerRadius: cornerRadius,
             fill: fill,
-            outlined: outlined
+            outlined: outlined,
+            outlineColor: outlineColor,
+            raised: raised
         ))
     }
 
+    /// Android 글자 스타일. 크기는 sp처럼 사용자 글자 크기를 따르고, 글꼴은 앱 글꼴 설정을 따른다.
     func visionCraftAndroidText(
         _ size: CGFloat,
         weight: Font.Weight = .regular,
@@ -396,13 +552,14 @@ extension View {
         modifier(VisionCraftAndroidTextModifier(size: size, weight: weight, relativeTo: relativeTo))
     }
 
-    func visionCraftHomeDialogSurface() -> some View {
+    /// 다이얼로그 카드 면: 모서리 28(값 고르기는 24), 면 색, 1.5pt 테두리, 그림자.
+    func visionCraftHomeDialogSurface(cornerRadius: CGFloat = 28) -> some View {
         background {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(VisionCraftHomeUI.surface)
                 .shadow(color: .black.opacity(0.22), radius: 18, y: 8)
                 .overlay {
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .strokeBorder(VisionCraftHomeUI.outline, lineWidth: 1.5)
                 }
         }

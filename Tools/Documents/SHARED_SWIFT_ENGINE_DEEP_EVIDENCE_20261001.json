@@ -1,0 +1,573 @@
+{
+  "date": "2026-10-01",
+  "fonts": [
+    {
+      "file": "Batang-Regular.ttf",
+      "sha256": "0929031e799b2feadda22208c58f503515e6f8fa2eaba75acd2e6847d73fc54b",
+      "unitsPerEm": 1024,
+      "advanceEm": {
+        "가": 1.0,
+        "A": 0.736328,
+        "space": 0.333008,
+        "※": 1.0,
+        "○": 1.0,
+        "☞": 1.0
+      },
+      "bytes": 6829552
+    },
+    {
+      "file": "Dotum-Regular.ttf",
+      "sha256": "12f749ac462e547e3f4073227bb3b2b4c116062fc7546fbdadaa04e5e9f88b12",
+      "unitsPerEm": 1024,
+      "advanceEm": {
+        "가": 1.0,
+        "A": 0.666992,
+        "space": 0.333984,
+        "※": 1.0,
+        "○": 1.0,
+        "☞": 1.0
+      },
+      "bytes": 4575996
+    },
+    {
+      "file": "Gulim-Regular.ttf",
+      "sha256": "a435857b8ffe2102f8faa7cf098d0d48b1d01d951c1c8326770848203bb7b5c2",
+      "unitsPerEm": 1024,
+      "advanceEm": {
+        "가": 1.0,
+        "A": 0.645508,
+        "space": 0.333008,
+        "※": 1.0,
+        "○": 1.0,
+        "☞": 1.0
+      },
+      "bytes": 4719024
+    },
+    {
+      "file": "Gungsuh-Regular.ttf",
+      "sha256": "e0887c3b3a92f0ebc604cbd5e94ad6d0dad4ed3ffa624f6bae9a95f2d4d06735",
+      "unitsPerEm": 1024,
+      "advanceEm": {
+        "가": 1.0,
+        "A": 0.6875,
+        "space": 0.333008,
+        "※": 1.0,
+        "○": 1.0,
+        "☞": 1.0
+      },
+      "bytes": 6582836
+    },
+    {
+      "file": "MaruBuri-Bold.otf",
+      "sha256": "8226dcc1e975ba48d8b34cc97417e26712a5a5c3d25a8b18844d72c046d6f85b",
+      "unitsPerEm": 1000,
+      "advanceEm": {
+        "가": 0.97,
+        "A": 0.723,
+        "space": 0.28,
+        "※": 0.855,
+        "○": 0.97,
+        "☞": 0.97
+      },
+      "bytes": 688436
+    },
+    {
+      "file": "MaruBuri-Regular.otf",
+      "sha256": "79451e27328ba230b6b39ab41ac039390fce3de41be2a3f745d5eb8b24f35b90",
+      "unitsPerEm": 1000,
+      "advanceEm": {
+        "가": 0.97,
+        "A": 0.675,
+        "space": 0.28,
+        "※": 0.855,
+        "○": 0.97,
+        "☞": 0.97
+      },
+      "bytes": 642936
+    },
+    {
+      "file": "NanumSquareNeoOTF-Eb.otf",
+      "sha256": "e13237e91ad428f5347d6cc8880a7c4b961e31c26a7eae2bf3394b77a41577cb",
+      "unitsPerEm": 1000,
+      "advanceEm": {
+        "가": 0.948,
+        "A": 0.785,
+        "space": 0.248,
+        "※": 1.0,
+        "○": 1.0,
+        "☞": 1.0
+      },
+      "bytes": 1681436
+    },
+    {
+      "file": "NanumSquareNeoOTF-Rg.otf",
+      "sha256": "76e9f1d818b10994cf37c58c637692445a2414fe6c4a8c3ec4ec59aa3c1b9050",
+      "unitsPerEm": 1000,
+      "advanceEm": {
+        "가": 0.948,
+        "A": 0.758,
+        "space": 0.243,
+        "※": 1.0,
+        "○": 1.0,
+        "☞": 1.0
+      },
+      "bytes": 1669400
+    },
+    {
+      "file": "NanumSquareRoundOTFEB.otf",
+      "sha256": "c1e41280f9e586f2b2a1c934d2bcec730049ffd5d8d721a86a24456017fb0905",
+      "unitsPerEm": 1000,
+      "advanceEm": {
+        "가": 0.91,
+        "A": 0.69,
+        "space": 0.25,
+        "※": 0.91,
+        "○": 0.91,
+        "☞": 0.91
+      },
+      "bytes": 432680
+    },
+    {
+      "file": "Pretendard-Bold.otf",
+      "sha256": "2e91915fab54df71cc9598ebf608b2bdb54c6fe3c066ac61dff0bc44fca71cc7",
+      "unitsPerEm": 2048,
+      "advanceEm": {
+        "가": 0.864258,
+        "A": 0.717773,
+        "space": 0.230469,
+        "※": 0.786133,
+        "○": 0.894531,
+        "☞": null
+      },
+      "bytes": 1576660
+    },
+    {
+      "file": "Pretendard-Regular.otf",
+      "sha256": "3ffbacde6ab8411f1d2db54bb9b1f0b3ee2a738932033722cf0388c06aed1c93",
+      "unitsPerEm": 2048,
+      "advanceEm": {
+        "가": 0.864258,
+        "A": 0.645508,
+        "space": 0.250977,
+        "※": 0.602539,
+        "○": 0.871094,
+        "☞": null
+      },
+      "bytes": 1574352
+    },
+    {
+      "file": "PureBatang-Bold.otf",
+      "sha256": "c1323f5e5ce4e6c144515835beb6c634cc13f1cfe170823736b17bc2205e8ef7",
+      "unitsPerEm": 1000,
+      "advanceEm": {
+        "가": 1.0,
+        "A": 0.748,
+        "space": 0.3,
+        "※": 1.0,
+        "○": 1.0,
+        "☞": 1.0
+      },
+      "bytes": 8902704
+    },
+    {
+      "file": "PureBatang-Medium.otf",
+      "sha256": "12ba1d5b55965289e3feacca5363c24b8b9e7f3cdf5f2597ce17a24861364a49",
+      "unitsPerEm": 1000,
+      "advanceEm": {
+        "가": 1.0,
+        "A": 0.728,
+        "space": 0.3,
+        "※": 1.0,
+        "○": 1.0,
+        "☞": 1.0
+      },
+      "bytes": 8586964
+    },
+    {
+      "file": "SUIT-Bold.otf",
+      "sha256": "40178aa07b8ce5ef7bfe8381641272de8e6020095245995d95ed71c26f54f2a8",
+      "unitsPerEm": 1000,
+      "advanceEm": {
+        "가": 0.874,
+        "A": 0.806,
+        "space": 0.23,
+        "※": 0.911,
+        "○": 1.0,
+        "☞": 1.0
+      },
+      "bytes": 352192
+    },
+    {
+      "file": "SUIT-Regular.otf",
+      "sha256": "75559147fba6cf373d3a9b5e4a2ea3ba2f8dfb22e5debaabb90277365b8831ad",
+      "unitsPerEm": 1000,
+      "advanceEm": {
+        "가": 0.874,
+        "A": 0.78,
+        "space": 0.23,
+        "※": 0.911,
+        "○": 1.0,
+        "☞": 1.0
+      },
+      "bytes": 351524
+    }
+  ],
+  "corpus": {
+    "archives": 40,
+    "media_entries_including_duplicate_fixture_copies": {
+      "JPEG": 3,
+      "PNG": 16
+    },
+    "first_examples": {
+      "JPEG": {
+        "file": "shortcuts_exampleTests/HWPXViewerFixtures/mss_voucher.hwpx",
+        "entry": "BinData/image1.jpg"
+      },
+      "PNG": {
+        "file": "shortcuts_exampleTests/InternetWorkbookFixtures/03_ConditionalFormattingSamples.xlsx",
+        "entry": "xl/media/image16.png"
+      }
+    },
+    "hwpx_declared_fonts": {
+      "Apple SD Gothic Neo": 48,
+      "바탕": 175,
+      "Helvetica": 72,
+      "Hiragino Sans": 24,
+      "Apple Symbols": 24,
+      "굴림": 7,
+      "돋움": 7,
+      "돋움체": 7,
+      "맑은 고딕": 7,
+      "바탕체": 7,
+      "한컴바탕": 7,
+      "함초롬돋움": 7,
+      "함초롬바탕": 7,
+      "휴먼명조": 7,
+      "HY견고딕": 2,
+      "HY헤드라인M": 7,
+      "HCI Poppy": 7,
+      "한양신명조": 4,
+      "함초롬바탕 확장B": 3,
+      "명조": 1
+    },
+    "hwpx_lineseg_count": 493
+  },
+  "existing_saved_fixture_pair": {
+    "pair": [
+      "/Users/me/Develop/IOSProject/RivoPadApp/Tools/Documents/HWP_M5_UI_20260928/shape-inline-f10-before.hwpx",
+      "/Users/me/Develop/IOSProject/RivoPadApp/Tools/Documents/HWP_M5_UI_20260928/shape-inline-f10-saved.hwpx"
+    ],
+    "sha256": [
+      "1fd445ab6e10d53eb7980f3eaafe67d03b87868ec8b3c111e7d07254dc556b72",
+      "998b9956e80381b83ffdf96b51b90a63f2f7788193fbea82dc753330e07daec9"
+    ],
+    "same_payloads": [
+      "Contents/content.hpf",
+      "Contents/header.xml",
+      "META-INF/container.xml",
+      "META-INF/manifest.xml",
+      "Preview/PrvText.txt",
+      "mimetype",
+      "settings.xml",
+      "version.xml"
+    ],
+    "changed_payloads": [
+      "Contents/section0.xml"
+    ],
+    "line_cache_comparison": {
+      "counts": [
+        14,
+        14
+      ],
+      "all_attributes_equal": true
+    }
+  },
+  "zip_manifest_on_macos": {
+    "host": "macOS arm64",
+    "source": "ZIPFoundation tag 0.9.20",
+    "targets": [
+      {
+        "dependencies": [],
+        "exclude": [],
+        "name": "ZIPFoundation",
+        "packageAccess": false,
+        "resources": [],
+        "settings": [],
+        "type": "regular"
+      },
+      {
+        "dependencies": [
+          {
+            "byName": [
+              "ZIPFoundation",
+              null
+            ]
+          }
+        ],
+        "exclude": [],
+        "name": "ZIPFoundationTests",
+        "packageAccess": false,
+        "resources": [],
+        "settings": [],
+        "type": "test"
+      }
+    ]
+  },
+  "focused_source_import_groups": {
+    "CoreGraphics 기하": [
+      "shortcuts_example/Documents/ExcelFreezePanes.swift",
+      "shortcuts_example/Documents/ExcelCellMerging.swift",
+      "shortcuts_example/Documents/ExcelAIWorkbookOperations.swift",
+      "shortcuts_example/Documents/ExcelDrawingPlacement.swift",
+      "shortcuts_example/Documents/HWP/HWPImageEditingWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPXLayoutParser.swift",
+      "shortcuts_example/Documents/HWP/HWPShapeEditing.swift",
+      "shortcuts_example/Documents/HWP/HWPShapeEditingWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPDocumentSceneModels.swift",
+      "shortcuts_example/Documents/HWP/HWPDocumentEditing.swift"
+    ],
+    "Foundation 및 ZIP": [
+      "shortcuts_example/Documents/ExcelCellAnnotations.swift",
+      "shortcuts_example/Documents/LegacyXLSXConverter.swift",
+      "shortcuts_example/Documents/ExcelAICommandService.swift",
+      "shortcuts_example/Documents/ExcelAIWorkbookReadQuery.swift",
+      "shortcuts_example/Documents/ExcelPivotTables.swift",
+      "shortcuts_example/Documents/ExcelAILocalReadPlanner.swift",
+      "shortcuts_example/Documents/ExcelAIReadQuery.swift",
+      "shortcuts_example/Documents/ExcelWorkbookDocument.swift",
+      "shortcuts_example/Documents/ExcelAIReferences.swift",
+      "shortcuts_example/Documents/ExcelCellFormatting.swift",
+      "shortcuts_example/Documents/ExcelSheetManagement.swift",
+      "shortcuts_example/Documents/ExcelFormulaCalculation.swift",
+      "shortcuts_example/Documents/ExcelAISourceData.swift",
+      "shortcuts_example/Documents/ExcelAccessibilityModel.swift",
+      "shortcuts_example/Documents/ExcelAIAggregation.swift",
+      "shortcuts_example/Documents/ExcelDataValidation.swift",
+      "shortcuts_example/Documents/ExcelAdvancedWorkbookEditing.swift",
+      "shortcuts_example/Documents/ExcelWorksheetDrawings.swift",
+      "shortcuts_example/Documents/ExcelExtendedStyleReader.swift",
+      "shortcuts_example/Documents/ExcelDrawingChartData.swift",
+      "shortcuts_example/Documents/ExcelAICommandModels.swift",
+      "shortcuts_example/Documents/ExcelConditionalFormatting.swift",
+      "shortcuts_example/Documents/ExcelEditingXML.swift",
+      "shortcuts_example/Documents/ExcelRangeEditing.swift",
+      "shortcuts_example/Documents/ExcelAIDeterministicEditPlanner.swift",
+      "shortcuts_example/Documents/HWP/HWPHyperlinkEditing.swift",
+      "shortcuts_example/Documents/HWP/HWPFormFields.swift",
+      "shortcuts_example/Documents/HWP/HWPTableStructureWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPTablePageLayout.swift",
+      "shortcuts_example/Documents/HWP/HWPTableStructureEditing.swift",
+      "shortcuts_example/Documents/HWP/HWPTableStructureDocument.swift",
+      "shortcuts_example/Documents/HWP/HWPHeaderFooterWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPEquationEditingWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPTableCellEditing.swift",
+      "shortcuts_example/Documents/HWP/HWP5FormattingWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPTableDeletion.swift",
+      "shortcuts_example/Documents/HWP/HWP5LineLayoutWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPPageNumberWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPNoteEditing.swift",
+      "shortcuts_example/Documents/HWP/HWPNoteEditingWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPFindReplace.swift",
+      "shortcuts_example/Documents/HWP/HWPHeaderFooterEditing.swift",
+      "shortcuts_example/Documents/HWP/HWPTableInsertion.swift",
+      "shortcuts_example/Documents/HWP/HWPEquationEditing.swift",
+      "shortcuts_example/Documents/HWP/HWPCellFormatting.swift",
+      "shortcuts_example/Documents/HWP/HWP5ParagraphWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPColumnSetup.swift",
+      "shortcuts_example/Documents/HWP/HWPTableLayoutWriter.swift",
+      "shortcuts_example/Documents/HWP/HWP5DocumentRewriter.swift",
+      "shortcuts_example/Documents/HWP/HWPXFormattingWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPChartOOXMLParser.swift",
+      "shortcuts_example/Documents/HWP/HWPFormAISnapshot.swift",
+      "shortcuts_example/Documents/HWP/HWPTableSizing.swift",
+      "shortcuts_example/Documents/HWP/HWPXParagraphWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPAccessibleDocument.swift",
+      "shortcuts_example/Documents/HWP/HWPTableInsertionWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPAISource.swift",
+      "shortcuts_example/Documents/HWP/HanyangPUANormalizer.swift",
+      "shortcuts_example/Documents/HWP/HWPCellFormattingWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPPageNumberEditing.swift",
+      "shortcuts_example/Documents/HWP/HWPTableDeletionWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPXLineLayoutWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPHyperlinkEditingWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPTextBoxEditing.swift",
+      "shortcuts_example/Documents/HWP/HWPPageSetup.swift",
+      "shortcuts_example/Documents/HWP/HWPParagraphEditing.swift",
+      "shortcuts_example/Documents/HWP/HWPTableEditing.swift",
+      "shortcuts_example/Documents/HWP/HWPPageSetupWriter.swift",
+      "shortcuts_example/Documents/HWP/HWPTextBoxStructureWriter.swift"
+    ],
+    "UI를 import": [
+      "shortcuts_example/Documents/ExcelAIChatView.swift",
+      "shortcuts_example/Documents/ExcelZoomScrollView.swift",
+      "shortcuts_example/Documents/ExcelSheetManagerView.swift",
+      "shortcuts_example/Documents/ExcelWorkbookActionsDialog.swift",
+      "shortcuts_example/Documents/ExcelDrawingCanvas.swift",
+      "shortcuts_example/Documents/ExcelWorkbookView.swift",
+      "shortcuts_example/Documents/ExcelEditingToolsView.swift",
+      "shortcuts_example/Documents/LegacyXLSConversionView.swift",
+      "shortcuts_example/Documents/ExcelDrawingInspector.swift",
+      "shortcuts_example/Documents/ExcelEditRowView.swift",
+      "shortcuts_example/Documents/ExcelWorkbookBottomBar.swift",
+      "shortcuts_example/Documents/ExcelRowEditingSession.swift",
+      "shortcuts_example/Documents/ExcelDocumentLoadingView.swift",
+      "shortcuts_example/Documents/ExcelCellToolsDialog.swift",
+      "shortcuts_example/Documents/HWP/HWPShapeEditingControls.swift",
+      "shortcuts_example/Documents/HWP/HWPImageEditingControls.swift",
+      "shortcuts_example/Documents/HWP/HWPPDFRenderer.swift",
+      "shortcuts_example/Documents/HWP/HWPComparisonReview.swift",
+      "shortcuts_example/Documents/HWP/HWPOriginalDocumentCanvas.swift",
+      "shortcuts_example/Documents/HWP/HWPImageEditing.swift",
+      "shortcuts_example/Documents/HWP/HWPDocumentActionsDialog.swift",
+      "shortcuts_example/Documents/HWP/HWPFlowLayout.swift",
+      "shortcuts_example/Documents/HWP/HWPDocumentNavigationControls.swift",
+      "shortcuts_example/Documents/HWP/HWPDocumentZoomView.swift",
+      "shortcuts_example/Documents/HWP/HWPObjectContentEditingControls.swift",
+      "shortcuts_example/Documents/HWP/HWPAccessibleTableView.swift",
+      "shortcuts_example/Documents/HWP/HWPDocumentNavigation.swift",
+      "shortcuts_example/Documents/HWP/HWPPageSetupSheet.swift",
+      "shortcuts_example/Documents/HWP/HWPDocumentFormatting.swift",
+      "shortcuts_example/Documents/HWP/HWPUserFontManager.swift",
+      "shortcuts_example/Documents/HWP/HWPTableSizingSheet.swift",
+      "shortcuts_example/Documents/HWP/HWPComparisonLibrary.swift",
+      "shortcuts_example/Documents/HWP/HWPTableInsertionSheet.swift",
+      "shortcuts_example/Documents/HWP/HWPInlineEditingSession.swift",
+      "shortcuts_example/Documents/HWP/HWPNoteEditingControls.swift",
+      "shortcuts_example/Documents/HWP/HWPFormattingToolbar.swift",
+      "shortcuts_example/Documents/HWP/HWPHyperlinkEditingControls.swift",
+      "shortcuts_example/Documents/HWP/HWPDocumentFontResolver.swift",
+      "shortcuts_example/Documents/HWP/HWPPDFPreview.swift",
+      "shortcuts_example/Documents/HWP/HWPPageNumberSheet.swift",
+      "shortcuts_example/Documents/HWP/HWPDocumentView.swift",
+      "shortcuts_example/Documents/HWP/HWPMetricLineText.swift",
+      "shortcuts_example/Documents/HWP/HWPHeaderFooterSheet.swift",
+      "shortcuts_example/Documents/HWP/HWPCellFormattingSheet.swift",
+      "shortcuts_example/Documents/HWP/HWPColumnSetupSheet.swift",
+      "shortcuts_example/Documents/HWP/HWPComparisonPDFView.swift",
+      "shortcuts_example/Documents/HWP/HWPReferenceComparisonView.swift",
+      "shortcuts_example/Documents/HWP/HWPInlineTextEditor.swift",
+      "shortcuts_example/Documents/HWP/HWPEquationCanvasView.swift"
+    ],
+    "CoreText 또는 ImageIO": [
+      "shortcuts_example/Documents/HWP/HWP5StructuredDocumentParser.swift",
+      "shortcuts_example/Documents/HWP/HWPTextRunEditing.swift",
+      "shortcuts_example/Documents/HWP/HWPListFormatting.swift"
+    ]
+  },
+  "external_source_sha256": {
+    "android-linebreaker": "91c73f85c8b5405d11413c8262de9ff0a4af427f7fd91948f79e9c4b3a077f00",
+    "android-measuredtext": "f301cbcab0f27b8548401a07ce849ca81f594f19b329387ef73f62775e642e11",
+    "android-paint": "e748f2b3c0adafe7af32236e82c82b71cb211c058872b659159fc58f4f7cc3c7",
+    "examples-gradle_libs.versions.toml": "123013f2a359f889ec54aff09a11f2d6db04c012901fb26d1f4907783fd932d4",
+    "examples-hello-swift-java_hashing-app_build.gradle.kts": "6296cdb680a719000019eded9c1581318395f9d86bc4cba3f5ca6b8dc4b3c55e",
+    "examples-hello-swift-java_hashing-lib_Package.swift": "bd3e04af7630fe786a7fa716f5219ef04cbc21be4e3d627d9b65325561613add",
+    "examples-hello-swift-java_hashing-lib_build.gradle": "95e52cae3aea2e33a65da008f7b3d6a24bd0f5e3f16aee22cc543b2eab900ff8",
+    "examples-swift-android.gradle.kts": "87cf5c2706aaaf7150f611ae4aecb3b8b8acba3ae7e477be3e729506c0141fc0",
+    "examples-swift-java-weather-app_weather-lib_Package.swift": "e82587a14429ea3cd1743f3a221c9e24e2dfe74d8225282caf04d294f4e19a69",
+    "foundation-CMakeLists.txt": "8b68912a3d2fb3dcd777d289e1ac21026b18b7f2229930350a1c11f6a8844ef8",
+    "foundation-Package.swift": "90989d447fb1b1fbc0614677a6fc7f7ed54215062dc0f5ad5f3986432c584d9a",
+    "foundation-Sources_FoundationXML_CMakeLists.txt": "7d8ea5760b4ba5b9729aa4b181dc5b57fec6e5a052eecbff9996267782cc09be",
+    "foundation-Sources_FoundationXML_XMLParser.swift": "be4facb0be9b674bdbe8b585749b7d9011b7287af5046704698336f84572ad0e",
+    "foundation-Sources_Foundation_CMakeLists.txt": "002c87bc76a156835e3b0907575fb2e2ad87404922ee89fe359171f0e4d8607a",
+    "foundation-runtime": "88dd9ec1120003f6b7d9304b2926b4e8ee39c3e1a23d8e42d4e3b7e68cbce4d3",
+    "foundation-tree": "9d4d5065775390bbfea6e8a5ea5e2ac74d8167bd9824c04e7bd33ef0d2a9967b",
+    "java-Samples_SwiftJavaExtractJNISampleApp_Sources_MySwiftLibrary_Arrays.swift": "f604e55f544ef3e9eaaa68efc3664f82c023956c32244cb5aae6decb83dbc2c7",
+    "java-Samples_SwiftJavaExtractJNISampleApp_Sources_MySwiftLibrary_Async.swift": "6a3c148c72ab00b463aee28cacdbb5b4bef8014af8967019c0f0439b04c69203",
+    "java-Samples_SwiftJavaExtractJNISampleApp_Sources_MySwiftLibrary_Closures.swift": "1ba60c306a4cd358a19b0d32219c8aa3a334d187d512b01c2c4c91beda368239",
+    "java-Samples_SwiftJavaExtractJNISampleApp_Sources_MySwiftLibrary_Data.swift": "36370e75c2b866dbcd5da8aa710809dbb21e37539edd02810fb4e0bfac8d78dc",
+    "java-Samples_SwiftJavaExtractJNISampleApp_Sources_MySwiftLibrary_Dictionary.swift": "f4afd0a808740bc7b984814c77216736654f4b3adc8c45266c1e561a99b3b79a",
+    "java-Samples_SwiftJavaExtractJNISampleApp_Sources_MySwiftLibrary_Enums.swift": "320c67a5d9b53a987c867b6e99cfa81ccf1bae779af1c4cf11de8794447d1a72",
+    "java-Samples_SwiftJavaExtractJNISampleApp_Sources_MySwiftLibrary_EscapingClosures.swift": "9ca2a3dcdf8933713b5942d6641b0fb2f7aca45265a6ddaba96794c80332cf59",
+    "java-Samples_SwiftJavaExtractJNISampleApp_Sources_MySwiftLibrary_FoundationTypes.swift": "a5054d2ab6b759722dd81aaedcc4af001736a6acd19ef14efba98e4305a5e01d",
+    "java-Samples_SwiftJavaExtractJNISampleApp_Sources_MySwiftLibrary_Isolated.swift": "2fa97c7679d41cc8047c1e6ce37598c3d96a176797fc5338cfee69193935ff58",
+    "java-Samples_SwiftJavaExtractJNISampleApp_Sources_MySwiftLibrary_swift-java.config": "fa2826a216d7b5412cf91ca54c1fc0b696109ca63e36fcbc9b33cec37bcf912c",
+    "java-Sources_SwiftJavaDocumentation_Documentation.docc_FeaturesJextract.md": "b82472bd83765307a424613f76ccf8650d65f9aa29264fa390a79fbd62e148b4",
+    "java-Sources_SwiftJavaDocumentation_Documentation.docc_SwiftJavaJextract.md": "ea6261906d8130280c4100689984c57aff85415622f61f48547b8c3e124877c9",
+    "sdkexamples-tree": "3b7e85f6c391c58293b1392d9f79d47c2b04d724e904b9960697d393c3dc5e6f",
+    "swift-presets": "2508bc0d7a3feffedae6b6ea94927e7e1270e22faa4964b9cb120f54e8a51c3a",
+    "swiftfoundation-geometry": "d85078ac241bbfe5b46f5c6bb12b7605e0db5a4922ea51a963c399d59d6a3322",
+    "swiftjava-tree": "29de4c9d4e2b6bfa081ad964809e9cb8225e3d9d70b6661d51d4a2a1fe8badbb",
+    "zip-compression": "88c2b802cc903d48987cd3808cd9212226e889948c76f0790a01572bdaab1d2d",
+    "zip-czlib": "1d6577e0f4ac0ce32cd158f426e0a337a777e8e1722bd51330514b98877a200f",
+    "zip-dev-archive": "4a204d3453088a7e108ecf67f33c5d57fb7f852f097522a2fae2cd43cc23041c",
+    "zip-dev-manifest": "a4a866c879ef8d1efbbd994085a674930e699be52b18ad89ab217ddab19f9e55",
+    "zip-development": "55babc4ea1e0bd9200fa4b33c547f8ffb90d3c01e92f69163a2bc860cef426e0",
+    "zip-package": "2dd90c2f70b1f3d17a4d73bd32ac97e5fc002eecd5797586edaf170def789fff",
+    "zip-release-018": "dade95bb263a3dbdb4581bf06085ef5b0784d247d3de973def6f4e96598585b3",
+    "zip-release-019": "ac5be2c6346407f5a04a08d72390c6051e36f1b26db2e2bb7176919633c8b0d7",
+    "zip-release-020": "488c6c46ea56f47a97a3207e9bf8a647633b2bef516ff6dd024ba7e3956a8319",
+    "product-swiftfoundationtests.py": "38ed5e44bf140f33313803d0818822297b80290dfcdb616054995ab1445227ef",
+    "product-foundation.py": "6b0dadea1edc41ce6415dcdb1d1a9c304671658772f21a4935607be7590f4611",
+    "product-foundationtests.py": "503e73ef762af9f1a020e8564cf9174a3817f050db8c50314d5b066006230342",
+    "product-libxml2.py": "4f71bab69bf31d324e043d4520de4b4277b468a68edda1333405cc08967007fe"
+  },
+  "android_api_34": {
+    "jar": "/Users/me/Library/Android/sdk/platforms/android-34/android.jar",
+    "sha256": "6cea1df3efb77103ac3e2beb9bf4718964b0e0869ab16d39d29d5cbae1c147ad",
+    "javap_public_signatures": {
+      "android.graphics.Paint": [
+        "public void setTextScaleX(float);",
+        "public void setLetterSpacing(float);",
+        "public void setWordSpacing(float);",
+        "public float getFontMetrics(android.graphics.Paint$FontMetrics);",
+        "public android.graphics.Paint$FontMetrics getFontMetrics();",
+        "public void getFontMetricsInt(java.lang.CharSequence, int, int, int, int, boolean, android.graphics.Paint$FontMetricsInt);",
+        "public void getFontMetricsInt(char[], int, int, int, int, boolean, android.graphics.Paint$FontMetricsInt);",
+        "public int getFontMetricsInt(android.graphics.Paint$FontMetricsInt);",
+        "public android.graphics.Paint$FontMetricsInt getFontMetricsInt();",
+        "public float getTextRunAdvances(char[], int, int, int, int, boolean, float[], int);",
+        "public int getTextRunCursor(char[], int, int, boolean, int, int);",
+        "public int getTextRunCursor(java.lang.CharSequence, int, int, boolean, int, int);",
+        "public float getRunAdvance(char[], int, int, int, int, boolean, int);",
+        "public float getRunAdvance(java.lang.CharSequence, int, int, int, int, boolean, int);",
+        "public int getOffsetForAdvance(char[], int, int, int, int, boolean, float);",
+        "public int getOffsetForAdvance(java.lang.CharSequence, int, int, int, int, boolean, float);"
+      ],
+      "android.graphics.Typeface$Builder": [
+        "public android.graphics.Typeface$Builder setWeight(int);",
+        "public android.graphics.Typeface$Builder setItalic(boolean);",
+        "public android.graphics.Typeface$Builder setTtcIndex(int);"
+      ],
+      "android.graphics.text.MeasuredText$Builder": [
+        "public android.graphics.text.MeasuredText$Builder appendStyleRun(android.graphics.Paint, int, boolean);",
+        "public android.graphics.text.MeasuredText$Builder appendStyleRun(android.graphics.Paint, android.graphics.text.LineBreakConfig, int, boolean);",
+        "public android.graphics.text.MeasuredText$Builder appendReplacementRun(android.graphics.Paint, int, float);"
+      ],
+      "android.graphics.text.LineBreaker": [
+        "public android.graphics.text.LineBreaker$Result computeLineBreaks(android.graphics.text.MeasuredText, android.graphics.text.LineBreaker$ParagraphConstraints, int);"
+      ],
+      "android.graphics.text.LineBreaker$ParagraphConstraints": [
+        "public void setWidth(float);",
+        "public void setTabStops(float[], float);"
+      ],
+      "android.graphics.text.TextRunShaper": [
+        "public static android.graphics.text.PositionedGlyphs shapeTextRun(char[], int, int, int, int, float, float, boolean, android.graphics.Paint);",
+        "public static android.graphics.text.PositionedGlyphs shapeTextRun(java.lang.CharSequence, int, int, int, int, float, float, boolean, android.graphics.Paint);"
+      ],
+      "android.graphics.pdf.PdfDocument$PageInfo$Builder": [
+        "public android.graphics.pdf.PdfDocument$PageInfo$Builder(int, int, int);"
+      ],
+      "android.view.inputmethod.InputConnection": [
+        "public abstract boolean setComposingText(java.lang.CharSequence, int);",
+        "public default boolean setComposingText(java.lang.CharSequence, int, android.view.inputmethod.TextAttribute);",
+        "public abstract boolean setComposingRegion(int, int);",
+        "public default boolean setComposingRegion(int, int, android.view.inputmethod.TextAttribute);",
+        "public abstract boolean finishComposingText();",
+        "public abstract boolean commitText(java.lang.CharSequence, int);",
+        "public default boolean commitText(java.lang.CharSequence, int, android.view.inputmethod.TextAttribute);"
+      ],
+      "android.widget.TextView": [
+        "public void setTextScaleX(float);",
+        "public void setLetterSpacing(float);",
+        "public void setWidth(int);",
+        "public void clearComposingText();",
+        "public boolean onTextContextMenuItem(int);"
+      ],
+      "android.util.AtomicFile": [
+        "public java.io.FileOutputStream startWrite() throws java.io.IOException;",
+        "public void finishWrite(java.io.FileOutputStream);",
+        "public void failWrite(java.io.FileOutputStream);"
+      ]
+    }
+  }
+}

@@ -12,19 +12,34 @@ final class ChatViewModel: ObservableObject {
         var text: String
         var image: UIImage?
         let createdAt: Date
+        /// Android `addReceivedMessage`/`addPresetSendMessage` progress
+        /// bubbles ("첨부를 읽는 중입니다…", "준비되었습니다."). Shown in the
+        /// list but never stored or replayed to the model.
+        var isNotice: Bool
+        /// Android `showTypingIndicator`: a received-side row that only shows
+        /// the typing animation while an attachment is being read.
+        var isTypingIndicator: Bool
 
         init(
             id: UUID = UUID(),
             role: String,
             text: String = "",
             image: UIImage? = nil,
-            createdAt: Date = Date()
+            createdAt: Date = Date(),
+            isNotice: Bool = false,
+            isTypingIndicator: Bool = false
         ) {
             self.id = id
             self.role = role
             self.text = text
             self.image = image
             self.createdAt = createdAt
+            self.isNotice = isNotice
+            self.isTypingIndicator = isTypingIndicator
+        }
+
+        var isTranscript: Bool {
+            !isNotice && !isTypingIndicator
         }
     }
 
@@ -43,8 +58,6 @@ final class ChatViewModel: ObservableObject {
             ChatAttachmentSummary?
     @Published private(set) var
         isPreparingAttachment = false
-    @Published private(set) var
-        attachmentStatusDescription: String?
     @Published var attachmentErrorDescription:
         String?
 
@@ -255,11 +268,30 @@ final class ChatViewModel: ObservableObject {
             await restoreConversation()
         }
 
+        switch intent {
+        case .sharedAttachmentQuestion(
+            let attachment,
+            _
+        ):
+            beginSharedIntroduction(
+                name: attachment.name
+            )
+        case .sharedTextQuestion:
+            beginSharedIntroduction(
+                name: AppLocalization.string(
+                    "공유 텍스트"
+                )
+            )
+        default:
+            break
+        }
+
         if case .sharedAttachmentQuestion =
             intent {
             guard await
                     prepareInitialFileAttachment()
             else {
+                removeTypingIndicator()
                 return
             }
             // The share inbox removes its temporary copy after routing.
@@ -269,10 +301,75 @@ final class ChatViewModel: ObservableObject {
         }
 
         guard await loadModel(for: intent) else {
+            removeTypingIndicator()
             return
         }
 
         await finishPreparing(for: intent)
+    }
+
+    /// Android `processSharedIntent`/`processSelectedFileIntent` opening:
+    /// "무엇에 대해 이야기해볼까요?" → user "\"파일\" 에 대해 이야기하자." →
+    /// "읽어보겠습니다…" with the typing indicator until the file is ready.
+    private func beginSharedIntroduction(
+        name: String
+    ) {
+        appendNotice(
+            AppLocalization.string(
+                "무엇에 대해 이야기해볼까요?"
+            )
+        )
+        appendNotice(
+            AppLocalization.format(
+                "\"%@\" 에 대해 이야기하자.",
+                name
+            ),
+            fromUser: true
+        )
+        appendNotice(
+            AppLocalization.string(
+                "읽어보겠습니다. 잠시만 기다려주세요."
+            )
+        )
+        showTypingIndicator()
+    }
+
+    // MARK: - Notice bubbles (Android addReceivedMessage / typing indicator)
+
+    func appendNotice(
+        _ text: String,
+        fromUser: Bool = false
+    ) {
+        removeTypingIndicator()
+        messages.append(
+            .init(
+                role: fromUser ? "user" : "assistant",
+                text: text,
+                isNotice: true
+            )
+        )
+    }
+
+    private func showTypingIndicator() {
+        guard messages.last?.isTypingIndicator
+                != true else {
+            return
+        }
+        messages.append(
+            .init(
+                role: "assistant",
+                isNotice: true,
+                isTypingIndicator: true
+            )
+        )
+    }
+
+    private func removeTypingIndicator() {
+        guard messages.last?.isTypingIndicator
+                == true else {
+            return
+        }
+        messages.removeLast()
     }
 
     func retryModelPreparation(
@@ -284,6 +381,7 @@ final class ChatViewModel: ObservableObject {
         }
         modelPreparationFailure = nil
         guard await loadModel(for: intent) else {
+            removeTypingIndicator()
             return
         }
         await finishPreparing(for: intent)
@@ -314,10 +412,11 @@ final class ChatViewModel: ObservableObject {
         ):
             await attachSharedText(text)
         case .sharedAttachmentQuestion:
-            attachmentStatusDescription =
+            appendNotice(
                 AppLocalization.string(
-                    "공유 파일을 준비했습니다."
+                    "준비되었습니다."
                 )
+            )
             SoundEffectManager.shared.play(.complete)
         case .imageAnalysis,
              .capturedImageAnalysis,
@@ -648,11 +747,9 @@ final class ChatViewModel: ObservableObject {
     func attachClipboardText(
         _ rawText: String?
     ) async {
+        // Android attaches the clipboard without a reading bubble.
         guard beginPreparingAttachment(
-            status:
-                AppLocalization.string(
-                    "클립보드 문맥을 준비하는 중…"
-                )
+            status: nil
         ) else {
             return
         }
@@ -682,27 +779,27 @@ final class ChatViewModel: ObservableObject {
                         "클립보드"
                     )
             )
-            attachmentStatusDescription =
-                AppLocalization.string(
-                    "클립보드 문맥을 첨부했습니다."
+            appendNotice(
+                AppLocalization.format(
+                    "%@ 첨부 완료",
+                    AppLocalization.string(
+                        "클립보드"
+                    )
                 )
+            )
         } catch {
             textContexts = previousContexts
             refreshAttachmentSummary()
-            attachmentErrorDescription =
-                userMessage(for: error)
-            attachmentStatusDescription = nil
+            failAttachment(error)
         }
     }
 
     func attachSharedText(
         _ rawText: String
     ) async {
+        // The introduction already showed "읽어보겠습니다…" + typing.
         guard beginPreparingAttachment(
-            status:
-                AppLocalization.string(
-                    "공유 텍스트를 준비하는 중…"
-                )
+            status: nil
         ) else {
             return
         }
@@ -728,16 +825,16 @@ final class ChatViewModel: ObservableObject {
                         "공유 텍스트"
                     )
             )
-            attachmentStatusDescription =
+            appendNotice(
                 AppLocalization.string(
-                    "공유 텍스트 문맥을 준비했습니다."
+                    "준비되었습니다."
                 )
+            )
+            SoundEffectManager.shared.play(.complete)
         } catch {
             textContexts = previousContexts
             refreshAttachmentSummary()
-            attachmentErrorDescription =
-                userMessage(for: error)
-            attachmentStatusDescription = nil
+            failAttachment(error)
         }
     }
 
@@ -747,7 +844,7 @@ final class ChatViewModel: ObservableObject {
         guard beginPreparingAttachment(
             status:
                 AppLocalization.string(
-                    "문서 첨부를 읽는 중…"
+                    "첨부를 읽는 중입니다. 잠시만 기다려주세요."
                 )
         ) else {
             return
@@ -829,17 +926,16 @@ final class ChatViewModel: ObservableObject {
                 throw ChatAttachmentError
                     .unsupportedDocument
             }
-            attachmentStatusDescription =
+            appendNotice(
                 AppLocalization.format(
                     "%@ 첨부 완료",
                     url.lastPathComponent
                 )
+            )
         } catch {
             textContexts = previousContexts
             refreshAttachmentSummary()
-            attachmentErrorDescription =
-                userMessage(for: error)
-            attachmentStatusDescription = nil
+            failAttachment(error)
         }
     }
 
@@ -851,7 +947,7 @@ final class ChatViewModel: ObservableObject {
         guard beginPreparingAttachment(
             status:
                 AppLocalization.string(
-                    "사진 첨부를 읽는 중…"
+                    "사진을 읽는 중입니다. 잠시만 기다려주세요."
                 )
         ) else {
             return
@@ -872,15 +968,14 @@ final class ChatViewModel: ObservableObject {
             try await replaceFileAttachment(
                 attachment
             )
-            attachmentStatusDescription =
+            appendNotice(
                 AppLocalization.format(
                     "%@ 첨부 완료",
                     attachment.name
                 )
+            )
         } catch {
-            attachmentErrorDescription =
-                userMessage(for: error)
-            attachmentStatusDescription = nil
+            failAttachment(error)
         }
     }
 
@@ -896,8 +991,11 @@ final class ChatViewModel: ObservableObject {
         sendUserMessage()
     }
 
+    /// Android `processDocumentAttachment`: a received bubble with the
+    /// reading notice followed by the typing indicator. `nil` skips the
+    /// bubble (clipboard, shared text whose introduction already showed it).
     private func beginPreparingAttachment(
-        status: String
+        status: String?
     ) -> Bool {
         guard isReadyForInput,
               !isGenerating,
@@ -905,10 +1003,19 @@ final class ChatViewModel: ObservableObject {
             return false
         }
         attachmentErrorDescription = nil
-        attachmentStatusDescription =
-            status
+        if let status {
+            appendNotice(status)
+            showTypingIndicator()
+        }
         isPreparingAttachment = true
         return true
+    }
+
+    /// Errors keep the status line under the list; the typing row goes away.
+    private func failAttachment(_ error: Error) {
+        removeTypingIndicator()
+        attachmentErrorDescription =
+            userMessage(for: error)
     }
 
     private func replaceFileAttachment(
@@ -1038,7 +1145,6 @@ final class ChatViewModel: ObservableObject {
             return
         }
         input = ""
-        attachmentStatusDescription = nil
         attachmentErrorDescription = nil
 
         let attachmentBudget =
@@ -1249,6 +1355,9 @@ final class ChatViewModel: ObservableObject {
             .dropLast()
             .compactMap {
                 message -> GeminiVisionService.Turn? in
+                guard message.isTranscript else {
+                    return nil
+                }
                 let text = message.text
                     .trimmingCharacters(
                         in: .whitespacesAndNewlines
@@ -1376,19 +1485,33 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
-    private static func groundedAnswerText(
+    /// Android `appendSources`: "출처: 제목1, 제목2, 제목3" — distinct titles,
+    /// at most three, no URLs.
+    static func groundedAnswerText(
         _ response: WebSearchResponse
     ) -> String {
+        var names: [String] = []
+        for result in response.results {
+            let title = result.title
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !title.isEmpty,
+                  !names.contains(title) else {
+                continue
+            }
+            names.append(title)
+            if names.count == 3 {
+                break
+            }
+        }
+        guard !names.isEmpty else {
+            return response.answer
+        }
         var text = response.answer
-        guard !response.results.isEmpty else {
-            return text
-        }
         text += "\n\n"
-        text += AppLocalization.string("출처")
-        for (index, result) in response.results.enumerated() {
-            text += "\n\(index + 1). \(result.title) — "
-            text += result.url.absoluteString
-        }
+        text += AppLocalization.format(
+            "출처: %@",
+            names.joined(separator: ", ")
+        )
         return text
     }
 
@@ -1606,6 +1729,9 @@ final class ChatViewModel: ObservableObject {
 
     private func storedMessages() -> [StoredChatMessage] {
         messages.compactMap { message in
+            guard message.isTranscript else {
+                return nil
+            }
             let text = message.text.trimmingCharacters(
                 in: .whitespacesAndNewlines
             )

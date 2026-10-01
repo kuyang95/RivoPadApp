@@ -96,7 +96,7 @@ struct HWPComparisonReviewBar: View {
                     if !note.text.isEmpty { Text(note.text).font(.caption).lineLimit(2) }
                 }
             } else if let error {
-                Text(error).font(.caption).foregroundStyle(.red)
+                Text(error).font(.caption).foregroundStyle(VisionCraftUI.error)
             } else {
                 Text("다르게 보이는 부분을 이 쪽에 기록해 둘 수 있어요.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -134,7 +134,7 @@ struct HWPComparisonReviewBar: View {
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     if note != nil { Button("기록 지우기", role: .destructive) { save(nil) } }
-                    if let error { Text(error).foregroundStyle(.red) }
+                    if let error { Text(error).foregroundStyle(VisionCraftUI.error) }
                 }
                 .navigationTitle("비교 기록")
                 .toolbar {

@@ -44,3 +44,14 @@
 "VisionCraft 제어 센터" = "VisionCraft Control Center";
 "제어 센터와 잠금 화면에서 자주 쓰는 기능 하나를 바로 엽니다." = "Open one frequently used feature directly from Control Center or the Lock Screen.";
 "제어 센터나 잠금 화면에서 선택한 VisionCraft 기능을 엽니다." = "Open the selected VisionCraft feature from Control Center or the Lock Screen.";
+
+"새 대화" = "New Chat";
+"실시간 문자 읽기" = "Live Text Reader";
+"데이지 플레이어" = "DAISY Player";
+"텍스트뷰어" = "Text Viewer";
+"새 대화, 대화 기록, 문서 스캔, 실시간 문자 읽기, 돋보기, 음성 명령, 문서, 데이지 플레이어와 텍스트뷰어를 바로 엽니다." = "Quickly open a new chat, chat history, document scanner, live text reader, magnifier, voice command, documents, DAISY player, or text viewer.";
+"오늘 남은 비율" = "Remaining Today";
+"AI 토큰 잔량" = "AI Token Balance";
+"AI 토큰 잔량 %ld퍼센트, %@" = "AI token balance %ld percent, %@";
+"로컬 AI %ld회 완료" = "On-device AI %ld completed";
+"오늘 남은 클라우드 AI 토큰 비율과 로컬 AI 완료 횟수를 표시합니다." = "Shows today’s remaining cloud AI token percentage and on-device AI completions.";

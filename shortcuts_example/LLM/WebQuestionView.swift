@@ -47,7 +47,7 @@ struct WebQuestionView: View {
                         .errorDescription {
                     Text(error)
                         .font(.footnote)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(VisionCraftUI.error)
                         .accessibilityLabel(
                             "오류: \(error)"
                         )
@@ -215,7 +215,7 @@ struct WebQuestionView: View {
                     .buttonStyle(
                         .borderedProminent
                     )
-                    .tint(.red)
+                    .tint(VisionCraftUI.error)
 
                     ProgressView()
                         .accessibilityLabel(
@@ -266,7 +266,7 @@ struct WebQuestionView: View {
                         "checkmark.circle.fill"
                 )
                 .font(.headline)
-                .foregroundStyle(.green)
+                .foregroundStyle(VisionCraftUI.success)
 
                 Spacer()
 
@@ -310,7 +310,7 @@ struct WebQuestionView: View {
                         "exclamationmark.triangle"
                 )
                 .font(.footnote)
-                .foregroundStyle(.orange)
+                .foregroundStyle(VisionCraftUI.warning)
             }
 
             if content

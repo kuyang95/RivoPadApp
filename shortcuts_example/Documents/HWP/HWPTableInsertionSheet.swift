@@ -58,7 +58,7 @@ struct HWPTableInsertionSheet: View {
             TextField("1~20", text: value).keyboardType(.numberPad).multilineTextAlignment(.trailing)
                 .frame(maxWidth: 100).focused($focused, equals: id).accessibilityIdentifier("hwp-insert-table-\(id)")
             Button { value.wrappedValue = ""; focused = id } label: {
-                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary).frame(width: 44, height: 44)
+                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary).frame(width: 48, height: 48)
             }.buttonStyle(.borderless).accessibilityLabel("입력 지우기").accessibilityIdentifier("hwp-insert-table-\(id)-clear")
             Stepper(AppLocalization.string(title), value: Binding(get: { min(20, max(1, Int(value.wrappedValue) ?? 1)) }, set: { value.wrappedValue = String($0); focused = nil }), in: 1...20)
                 .labelsHidden().fixedSize().accessibilityIdentifier("hwp-insert-table-\(id)-stepper")
@@ -75,7 +75,7 @@ struct HWPTableInsertionButton: View {
     @State private var pending: HWPTableInsertion.Request?
     var body: some View {
         Button { presented = selection() } label: {
-            Label("표", systemImage: "tablecells").font(.subheadline).frame(minWidth: 60, minHeight: 44)
+            Label("표", systemImage: "tablecells").font(.subheadline).frame(minWidth: 60, minHeight: 48)
         }.disabled(!enabled).accessibilityLabel("표 삽입").accessibilityIdentifier("hwp-table-insert")
             .sheet(item: $presented, onDismiss: {
                 if let pending { self.pending = nil; onApply(pending) } else { restoreFocus() }

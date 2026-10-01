@@ -542,6 +542,7 @@ struct LocalDiagnosticsView: View {
             }
             exportSection
         }
+        .environment(\.defaultMinListRowHeight, VisionCraftUI.minTouchTarget)
         .visionCraftListScreen()
         .navigationTitle(
             "진단 및 개인정보"
@@ -724,7 +725,7 @@ struct LocalDiagnosticsView: View {
             }
             if let errorMessage {
                 Text(errorMessage)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(VisionCraftUI.error)
             }
         } footer: {
             Text(

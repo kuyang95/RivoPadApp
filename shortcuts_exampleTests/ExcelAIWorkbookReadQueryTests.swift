@@ -76,15 +76,17 @@ final class ExcelAIWorkbookReadQueryTests: XCTestCase {
         XCTAssertEqual(result.references?.totalAddressCount, 10)
     }
 
-    func testWorkbookContextIncludesBothSheetSchemas() throws {
+    func testWorkbookContextIncludesOriginalCellsFromBothSheets() throws {
         let book = workbook()
         let snapshot = try XCTUnwrap(ExcelAISnapshotBuilder.make(workbookName: "Months", workbook: book, selectedSheetIndex: 0, selectedAddress: nil))
         let context = ExcelAIReadQueryContext(request: "각 시트의 매출 합계", snapshot: snapshot, history: [])
         let json = String(data: try JSONEncoder().encode(context), encoding: .utf8)!
         XCTAssertTrue(json.contains(#""queryScope":"workbook""#), json)
-        XCTAssertTrue(json.contains(#""sheetName":"1월""#), json)
-        XCTAssertTrue(json.contains(#""sheetName":"2월""#), json)
-        XCTAssertTrue(json.contains(#""title":"Revenue""#), json)
+        XCTAssertTrue(json.contains(#""name":"1월""#), json)
+        XCTAssertTrue(json.contains(#""name":"2월""#), json)
+        XCTAssertTrue(json.contains(#""value":"Revenue""#), json)
+        XCTAssertFalse(json.contains(#""title":"Revenue""#), json)
+        XCTAssertEqual(context.source.cells.first { $0.sheetID == book.sheets[1].partPath && $0.address == "B1" }?.value, "Revenue")
     }
 
     func testUnsafeWorkbookPlansAreRejected() throws {

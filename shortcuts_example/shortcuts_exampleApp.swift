@@ -69,6 +69,14 @@ struct shortcuts_exampleApp: App {
                             switch event {
                         case .settings:
                             AppSettingsView()
+                        case .allSettings:
+                            HomeAllSettingsView()
+                        case .releaseNotes:
+                            HelpReleaseNotesView(
+                                notes: (try? HelpContentLibrary.releaseNotes(
+                                    language: appSettings.appLanguage
+                                )) ?? []
+                            )
                         case .help:
                             HelpGuideView(
                                 language:
@@ -78,6 +86,8 @@ struct shortcuts_exampleApp: App {
                             )
                         case .chatHistory:
                             ChatHistoryView()
+                        case .aiDocument:
+                            AIDocumentSelectionView()
                         case .localChat(let conversationID):
                             LLMContentView(
                                 intent: .textChat(
@@ -207,45 +217,57 @@ struct shortcuts_exampleApp: App {
                             let text,
                             let automaticallyStartsVoiceInput
                         ):
-                            LLMContentView(
-                                intent: .sharedTextQuestion(
-                                    text: text,
-                                    automaticallyStartsVoiceInput:
-                                        automaticallyStartsVoiceInput
+                            // 공유 → 음성 모드는 Android VoiceQueryActivity 와 같은
+                            // 전용 음성 질의 화면, 채팅 모드는 AI 대화 화면.
+                            if automaticallyStartsVoiceInput {
+                                VoiceQueryResponseView(
+                                    source: .text(text, kind: .text)
                                 )
-                            )
-                            .onAppear {
-                                rivoScreenRemoteControlCenter
-                                    .activate(.localAIChat)
-                            }
-                            .onDisappear {
-                                rivoScreenRemoteControlCenter
-                                    .deactivate(.localAIChat)
+                            } else {
+                                LLMContentView(
+                                    intent: .sharedTextQuestion(
+                                        text: text,
+                                        automaticallyStartsVoiceInput: false
+                                    )
+                                )
+                                .onAppear {
+                                    rivoScreenRemoteControlCenter
+                                        .activate(.localAIChat)
+                                }
+                                .onDisappear {
+                                    rivoScreenRemoteControlCenter
+                                        .deactivate(.localAIChat)
+                                }
                             }
                         case .sharedAttachmentQuestion(
                             let attachment,
                             let automaticallyStartsVoiceInput
                         ):
-                            LLMContentView(
-                                intent:
-                                    .sharedAttachmentQuestion(
-                                        attachment:
-                                            attachment,
-                                        automaticallyStartsVoiceInput:
-                                            automaticallyStartsVoiceInput
-                                    )
-                            )
-                            .onAppear {
-                                rivoScreenRemoteControlCenter
-                                    .activate(
-                                        .localAIChat
-                                    )
-                            }
-                            .onDisappear {
-                                rivoScreenRemoteControlCenter
-                                    .deactivate(
-                                        .localAIChat
-                                    )
+                            if automaticallyStartsVoiceInput {
+                                VoiceQueryResponseView(
+                                    source: .attachment(attachment)
+                                )
+                            } else {
+                                LLMContentView(
+                                    intent:
+                                        .sharedAttachmentQuestion(
+                                            attachment:
+                                                attachment,
+                                            automaticallyStartsVoiceInput: false
+                                        )
+                                )
+                                .onAppear {
+                                    rivoScreenRemoteControlCenter
+                                        .activate(
+                                            .localAIChat
+                                        )
+                                }
+                                .onDisappear {
+                                    rivoScreenRemoteControlCenter
+                                        .deactivate(
+                                            .localAIChat
+                                        )
+                                }
                             }
                         case .voiceAction:
                             LocalVoiceActionView(
@@ -465,8 +487,6 @@ struct shortcuts_exampleApp: App {
                             RivoRemoteView()
                         case .visionLink:
                             VisionLinkView()
-                        case .cameraTools:
-                            CameraToolsView()
                         case .magnifier:
                             MagnifierView(mode: .magnifier)
                                 .onAppear {
@@ -477,7 +497,6 @@ struct shortcuts_exampleApp: App {
                                     rivoScreenRemoteControlCenter
                                         .deactivate(.magnifier)
                                 }
-                                .ignoresSafeArea()
                                 .visionCraftCameraScreen()
                         case .liveTextReader:
                             MagnifierView(mode: .liveTextReader)
@@ -493,7 +512,6 @@ struct shortcuts_exampleApp: App {
                                             .liveTextReader
                                         )
                                 }
-                                .ignoresSafeArea()
                                 .visionCraftCameraScreen()
                         case .imageDescriptionCamera:
                             MagnifierView(
@@ -512,13 +530,19 @@ struct shortcuts_exampleApp: App {
                                         .magnifier
                                     )
                             }
-                            .ignoresSafeArea()
                             .visionCraftCameraScreen()
                         case .photoReview:
                             PhotoReviewView()
+                        case .imageAnalysisPhoto:
+                            PhotoReviewView(startsWithImageDescription: true)
                         case .cameraAskAI:
                             MagnifierView(mode: .askAI)
-                                .ignoresSafeArea()
+                                .onAppear {
+                                    rivoScreenRemoteControlCenter.activate(.magnifier)
+                                }
+                                .onDisappear {
+                                    rivoScreenRemoteControlCenter.deactivate(.magnifier)
+                                }
                                 .visionCraftCameraScreen()
                         case .capturedImageAnalysis(
                             let image,
@@ -640,6 +664,7 @@ struct shortcuts_exampleApp: App {
             .environmentObject(appSettings)
             .environmentObject(appRouter)
             .environmentObject(rivoRemoteManager)
+            .environmentObject(rivoRemoteControlCenter)
             .environmentObject(
                 rivoScreenRemoteControlCenter
             )
@@ -783,11 +808,21 @@ struct shortcuts_exampleApp: App {
                         )
                 )
             }
+            .overlay { VisionCraftSplashShine() }
             
         }
         .environment(
             \.font,
             appFonts.font(
+                languageCode:
+                    appSettings
+                    .appLanguage
+                    .effectiveLanguageCode
+            )
+        )
+        .environment(
+            \.visionCraftAppFontName,
+            appFonts.fontName(
                 languageCode:
                     appSettings
                     .appLanguage
@@ -861,7 +896,7 @@ struct shortcuts_exampleApp: App {
         case .reader:
             route = .readerLibrary
         case .camera:
-            route = .cameraTools
+            route = .magnifier
         case .magnifier:
             route = .magnifier
         case .liveText:
@@ -872,6 +907,14 @@ struct shortcuts_exampleApp: App {
             route = .documentScanning
         case .files:
             route = .documentLibrary
+        case .textViewer:
+            let text = HomeTextSourcePolicy.availableClipboardText(
+                UIPasteboard.general.string
+            )
+            route = .textEditorText(
+                title: AppLocalization.string(text == nil ? "텍스트" : "클립보드 텍스트"),
+                text: text ?? ""
+            )
         case .rivo:
             route = .rivoRemote
         case .visionLink:

@@ -220,8 +220,8 @@ nonisolated enum WordAIRetrievalSectionBuilder {
 }
 
 nonisolated enum WordAIRetrievalCatalogBuilder {
-    static let directBlockLimit = 160
-    static let directCharacterLimit = 24_000
+    static let directBlockLimit = WordAISnapshotBuilder.maximumContextBlocks
+    static let directCharacterLimit = WordAISnapshotBuilder.maximumContextCharacters
     static let maximumCatalogSections = 100
     static let maximumCandidates = 20
 
@@ -238,6 +238,12 @@ nonisolated enum WordAIRetrievalCatalogBuilder {
     ) -> WordAIRetrievalCatalog {
         let queryTerms = WordAIQueryTokenizer.terms(in: userRequest)
         let characterCount = blocks.reduce(0) { $0 + $1.text.count }
+        if blocks.count <= directBlockLimit, characterCount <= directCharacterLimit {
+            return WordAIRetrievalCatalog(documentName: documentName,
+                documentBlockCount: blocks.count, documentCharacterCount: characterCount,
+                queryTerms: queryTerms, sections: [], candidates: [], catalogWasTruncated: false,
+                requiresRouting: false, revision: WordAISnapshotBuilder.revision(blocks: blocks))
+        }
         let records = WordAIRetrievalSectionBuilder.make(
             blocks: blocks,
             queryTerms: queryTerms
@@ -454,7 +460,8 @@ nonisolated extension WordAISnapshotBuilder {
                 styleID: block.styleID ?? "Normal",
                 text: block.text,
                 tableLocation: block.tableLocation?.accessibilityDescription,
-                isEditable: block.isEditable
+                isEditable: block.isEditable,
+                tableGeometry: block.tableLocation
             )
         }
         return WordAIDocumentSnapshot(

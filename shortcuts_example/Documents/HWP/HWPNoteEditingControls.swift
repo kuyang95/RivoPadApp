@@ -12,7 +12,7 @@ struct HWPNoteButton: View {
         Button { pending = selection() } label: {
             Label("주석", systemImage: "text.badge.plus")
                 .font(.subheadline.weight(.semibold))
-                .frame(minWidth: 44, minHeight: 44)
+                .frame(minWidth: 48, minHeight: 48)
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
@@ -43,6 +43,7 @@ private struct HWPNoteManager: View {
                                 HWPNoteEditor(title: "\(kind.title) 삽입", initialText: "") { text in
                                     onApply(.insert(kind, text, insertion))
                                 }
+                                .visionCraftRouteBackButton()
                             } label: {
                                 Label("\(kind.title) 추가", systemImage: kind == .footNote
                                       ? "text.append" : "doc.append")
@@ -66,6 +67,7 @@ private struct HWPNoteManager: View {
                                           onDelete: { onApply(.delete(note)) }) { text in
                                 onApply(.update(note, text))
                             }
+                            .visionCraftRouteBackButton()
                         } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("\(note.kind.title) \(note.number)")

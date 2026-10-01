@@ -188,7 +188,7 @@ struct ExcelEditingToolsView: View {
     private var mergingTools: some View {
         Group {
             if let mergeError {
-                Section { Text(mergeError).foregroundStyle(.red) }
+                Section { Text(mergeError).foregroundStyle(VisionCraftUI.error) }
             }
             Section {
                 if let range, let sheet = viewModel.selectedSheet {

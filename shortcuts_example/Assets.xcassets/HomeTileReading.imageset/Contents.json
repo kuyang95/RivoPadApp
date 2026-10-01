@@ -1,1 +1,12 @@
-{"images":[{"filename":"HomeTileReading.png","idiom":"universal"},{"appearances":[{"appearance":"luminosity","value":"dark"}],"filename":"HomeTileReading-dark.png","idiom":"universal"}],"info":{"author":"xcode","version":1}}
+{
+  "images" : [
+    {
+      "filename" : "HomeTileReading.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

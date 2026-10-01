@@ -136,7 +136,7 @@ struct HWPPageSetupSheet: View {
                 .focused($focusedField, equals: field).submitLabel(.done).onSubmit { focusedField = nil }
                 .accessibilityIdentifier("hwp-page-\(field.rawValue)")
             Button { values[field] = ""; focusedField = field } label: {
-                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary).frame(width: 44, height: 44)
+                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary).frame(width: 48, height: 48)
             }.buttonStyle(.borderless).accessibilityLabel("입력 지우기").accessibilityIdentifier("hwp-page-\(field.rawValue)-clear")
             Text("mm").foregroundStyle(.secondary)
         }
@@ -170,11 +170,11 @@ struct HWPPageSetupButton: View {
                 HStack(spacing: 16) { actions }
                     .buttonStyle(HWPRibbonPageButtonStyle())
                     .font(.subheadline)
-                    .frame(minHeight: 44)
+                    .frame(minHeight: 48)
             } else {
                 Menu { actions } label: {
                     Label("쪽", systemImage: "doc.badge.gearshape").font(.subheadline)
-                        .frame(minWidth: 60, minHeight: 44)
+                        .frame(minWidth: 60, minHeight: 48)
                 }.accessibilityLabel("쪽").accessibilityIdentifier("hwp-page-menu")
             }
         }
@@ -230,7 +230,7 @@ struct HWPPageSetupButton: View {
 private struct HWPRibbonPageButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .frame(minHeight: 44)
+            .frame(minHeight: 48)
             .opacity(configuration.isPressed ? 0.6 : 1)
     }
 }

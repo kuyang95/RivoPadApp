@@ -95,7 +95,7 @@ struct HWPShapeGroupingControl: View {
                 Button(action: onApply) {
                     Label("그룹 \(selectionCount)", systemImage: "square.3.layers.3d")
                         .font(.subheadline.weight(.semibold))
-                        .frame(minHeight: 44)
+                        .frame(minHeight: 48)
                 }
                 .disabled(selectionCount < 2)
                 .accessibilityIdentifier("hwp-shape-group-apply")
@@ -134,7 +134,7 @@ struct HWPShapeGroupingControl: View {
                     }
                 } label: {
                     Label("맞춤", systemImage: "align.horizontal.left")
-                        .frame(minHeight: 44)
+                        .frame(minHeight: 48)
                 }
                 .disabled(selectionCount < 1)
                 .accessibilityIdentifier("hwp-shape-arrange")
@@ -146,7 +146,7 @@ struct HWPShapeGroupingControl: View {
                     }
                 } label: {
                     Label("크기", systemImage: "arrow.up.left.and.arrow.down.right")
-                        .frame(minHeight: 44)
+                        .frame(minHeight: 48)
                 }
                 .disabled(selectionCount < 2)
                 .accessibilityIdentifier("hwp-shape-size-match")
@@ -158,7 +158,7 @@ struct HWPShapeGroupingControl: View {
                     }
                 } label: {
                     Label("뒤집기", systemImage: "arrow.left.and.right")
-                        .frame(minHeight: 44)
+                        .frame(minHeight: 48)
                 }
                 .disabled(selectionCount < 1)
                 .accessibilityIdentifier("hwp-shape-flip")
@@ -171,13 +171,13 @@ struct HWPShapeGroupingControl: View {
                     }
                 } label: {
                     Label("작업", systemImage: "ellipsis.circle")
-                        .frame(minHeight: 44)
+                        .frame(minHeight: 48)
                 }
                 .disabled(selectionCount < 2)
                 .accessibilityIdentifier("hwp-shape-batch-actions")
                 Button(action: onCancel) {
                     Image(systemName: "xmark")
-                        .frame(minWidth: 34, minHeight: 44)
+                        .frame(minWidth: 34, minHeight: 48)
                 }
                 .accessibilityLabel("그룹 선택 취소")
             }
@@ -186,7 +186,7 @@ struct HWPShapeGroupingControl: View {
             Button(action: onStart) {
                 Label("선택", systemImage: "square.dashed")
                     .font(.subheadline.weight(.semibold))
-                    .frame(minWidth: 44, minHeight: 44)
+                    .frame(minWidth: 48, minHeight: 48)
             }
             .buttonStyle(.plain)
             .disabled(!enabled)
@@ -229,7 +229,7 @@ struct HWPShapeInsertionButton: View {
         } label: {
             Label("도형", systemImage: "square.on.circle")
                 .font(.subheadline.weight(.semibold))
-                .frame(minWidth: 44, minHeight: 44)
+                .frame(minWidth: 48, minHeight: 48)
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
@@ -685,7 +685,7 @@ private struct HWPShapePathPointEditor: View {
                 }
                 ForEach(points.indices, id: \.self) { index in
                     Circle()
-                        .fill(index == 0 ? Color.orange : Color.accentColor)
+                        .fill(index == 0 ? VisionCraftUI.accent : Color.accentColor)
                         .overlay(Circle().stroke(.white, lineWidth: 2))
                         .frame(width: 24, height: 24)
                         .position(position(for: points[index], in: proxy.size))

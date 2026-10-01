@@ -123,6 +123,22 @@ nonisolated struct RivoQuickMenuItem:
     var isSubmenu: Bool {
         destinationPage != nil
     }
+
+    /// Android `MenuAdjustment.isAdjustable`: 2/8(−/+)로 값을 조절하는 항목.
+    var isAdjustable: Bool {
+        increaseCommand != nil
+            || decreaseCommand != nil
+    }
+}
+
+/// Android `labelResForRibbonItem`: 토글 항목은 현재 상태에 따라 "수행될 동작"을 라벨로 보여준다.
+/// 카메라 화면이 알려 준 실제 상태(`noteMagnifierState`)를 사용한다.
+nonisolated struct RivoRemoteToggleStates:
+    Equatable,
+    Sendable
+{
+    var isTorchOn = false
+    var isFrontCamera = false
 }
 
 @MainActor
@@ -136,13 +152,37 @@ final class RivoRemoteControlCenter: ObservableObject {
         RivoRemoteScreen?
     @Published private(set) var currentPage:
         RivoQuickMenuPage = .home
+    @Published private(set) var toggleStates =
+        RivoRemoteToggleStates()
+    /// Android `RemoteModeOverlay.showKeyGuide`: 빠른 메뉴 안에서 현재 페이지 모드의 키 안내 키패드.
+    @Published private(set) var isKeyGuidePresented =
+        false
+    /// Android `RemoteModeOverlay.showModeName`: 모드가 바뀌면 1.15초 동안 모드 이름을 띄운다.
+    @Published private(set) var modeNameFlash:
+        RivoRemoteKeyMode?
 
     private struct PageState {
         let page: RivoQuickMenuPage
         let selectedIndex: Int
     }
 
+    /// Android `RibbonSessionState`: 닫힌 뒤 60초 안에 다시 열면 페이지·선택을 되살린다.
+    private struct MenuSession {
+        let page: RivoQuickMenuPage
+        let selectedIndex: Int
+        let pageStack: [PageState]
+        let screen: RivoRemoteScreen?
+        let closedAt: TimeInterval
+    }
+
+    /// Android `AUTO_CLOSE_DELAY_MS` / `SESSION_RESTORE_WINDOW_MS` = 60초.
+    static let autoCloseDelay: TimeInterval = 60
+    static let sessionRestoreWindow: TimeInterval = 60
+
     private var pageStack: [PageState] = []
+    private var savedSession: MenuSession?
+    private var autoCloseTask: Task<Void, Never>?
+    private var modeNameFlashTask: Task<Void, Never>?
 
     var items: [RivoQuickMenuItem] {
         switch currentPage {
@@ -188,6 +228,49 @@ final class RivoRemoteControlCenter: ObservableObject {
 
     var canGoBackInMenu: Bool {
         !pageStack.isEmpty
+    }
+
+    /// 현재 페이지가 대응하는 리모컨 모드. DAISY·텍스트 페이지는 그 모드의 키 안내를, 나머지는 메뉴 키 안내를 보여준다.
+    var keyGuideMode: RivoRemoteKeyMode {
+        switch currentPage {
+        case .publication:
+            return .daisy
+        case .text:
+            return .textView
+        default:
+            return .menu
+        }
+    }
+
+    /// 카메라 화면이 실제 라이트·전후면 상태를 알려줄 때 호출한다.
+    func noteMagnifierState(
+        isTorchOn: Bool,
+        isFrontCamera: Bool
+    ) {
+        let state = RivoRemoteToggleStates(
+            isTorchOn: isTorchOn,
+            isFrontCamera: isFrontCamera
+        )
+        if toggleStates != state {
+            toggleStates = state
+        }
+    }
+
+    func toggleKeyGuide() {
+        guard isMenuPresented else {
+            return
+        }
+        isKeyGuidePresented.toggle()
+        restartAutoCloseTimer()
+        if isKeyGuidePresented {
+            feedback = keyGuideMode.accessibilitySummary
+            announceFeedback()
+        }
+    }
+
+    func dismissKeyGuide() {
+        isKeyGuidePresented = false
+        restartAutoCloseTimer()
     }
 
     private var homeItems: [RivoQuickMenuItem] {
@@ -336,12 +419,7 @@ final class RivoRemoteControlCenter: ObservableObject {
 
     private var cameraItems: [RivoQuickMenuItem] {
         [
-            RivoQuickMenuItem(
-                id: "camera.back",
-                title: AppLocalization.string("뒤로"),
-                systemImage: "chevron.backward",
-                command: magnifierCommand(.close)
-            ),
+            // Android `HIDDEN_BACK_MENU_IDS`: "뒤로" 항목은 별표/상단 버튼이 대신하므로 숨긴다.
             RivoQuickMenuItem(
                 id: "camera.tools",
                 title: AppLocalization.string("도구"),
@@ -370,15 +448,21 @@ final class RivoRemoteControlCenter: ObservableObject {
             ),
             magnifierItem(
                 id: "camera.switch",
-                title: "전면/후면",
+                title: toggleStates.isFrontCamera
+                    ? "후면 카메라"
+                    : "전면 카메라",
                 systemImage:
                     "arrow.triangle.2.circlepath.camera",
                 action: .switchCamera
             ),
             magnifierItem(
                 id: "camera.torch",
-                title: "라이트",
-                systemImage: "flashlight.on.fill",
+                title: toggleStates.isTorchOn
+                    ? "라이트 끄기"
+                    : "라이트 켜기",
+                systemImage: toggleStates.isTorchOn
+                    ? "flashlight.off.fill"
+                    : "flashlight.on.fill",
                 action: .toggleTorch
             ),
         ]
@@ -414,12 +498,6 @@ final class RivoRemoteControlCenter: ObservableObject {
 
     private var textItems: [RivoQuickMenuItem] {
         [
-            RivoQuickMenuItem(
-                id: "document.back",
-                title: AppLocalization.string("뒤로"),
-                systemImage: "chevron.backward",
-                command: .back
-            ),
             localDocumentReaderItem(
                 id: "document.originalColor",
                 title: "원래 색상",
@@ -459,12 +537,6 @@ final class RivoRemoteControlCenter: ObservableObject {
 
     private var publicationReaderItems: [RivoQuickMenuItem] {
         [
-            RivoQuickMenuItem(
-                id: "reader.back",
-                title: AppLocalization.string("뒤로"),
-                systemImage: "chevron.backward",
-                command: .back
-            ),
             publicationReaderItem(
                 id: "reader.playPause",
                 title: "재생/일시정지",
@@ -688,7 +760,7 @@ final class RivoRemoteControlCenter: ObservableObject {
             feedback = AppLocalization.string(
                 "음성 명령 듣기"
             )
-            isMenuPresented = false
+            hideMenu()
             isCommandModeActive = false
             return RivoRemoteDecision(
                 command: .startVoiceAction,
@@ -702,12 +774,8 @@ final class RivoRemoteControlCenter: ObservableObject {
         ):
             if button == .l1,
                action == .doubleTapped {
-                isCommandModeActive = false
-                isMenuPresented = true
-                SoundEffectManager.shared.play(
-                    .toggleButtonPressed
-                )
-                feedback = selectedItemAnnouncement
+                // Android L1 두 번: 메뉴 + 키 안내 키패드.
+                presentMenu(showKeyGuide: true)
                 return RivoRemoteDecision(
                     command: nil,
                     consumed: true
@@ -770,18 +838,11 @@ final class RivoRemoteControlCenter: ObservableObject {
                 )
             }
             if button == .l1 {
-                isCommandModeActive = false
-                isMenuPresented.toggle()
                 if isMenuPresented {
-                    SoundEffectManager.shared.play(
-                        .toggleButtonPressed
-                    )
+                    dismissMenu()
+                } else {
+                    presentMenu(showKeyGuide: false)
                 }
-                feedback = isMenuPresented
-                    ? selectedItemAnnouncement
-                    : AppLocalization.string(
-                        "빠른 메뉴 닫힘"
-                    )
                 return RivoRemoteDecision(
                     command: nil,
                     consumed: true
@@ -797,6 +858,11 @@ final class RivoRemoteControlCenter: ObservableObject {
                     command: nil,
                     consumed: false
                 )
+            }
+            restartAutoCloseTimer()
+            if isKeyGuidePresented,
+               button != .star {
+                isKeyGuidePresented = false
             }
 
             let command: RivoRemoteCommand?
@@ -828,7 +894,7 @@ final class RivoRemoteControlCenter: ObservableObject {
             case .five:
                 command = activateSelection()
             case .zero:
-                isMenuPresented = false
+                hideMenu()
                 feedback = AppLocalization.string(
                     "홈으로 이동"
                 )
@@ -858,7 +924,22 @@ final class RivoRemoteControlCenter: ObservableObject {
             return nil
         }
         selectedIndex = index
+        restartAutoCloseTimer()
         return activateSelection()
+    }
+
+    /// 펼친 줄의 −/+ 버튼(Android 펼침 줄 48dp 조절 버튼).
+    func adjustItem(
+        at index: Int,
+        increase: Bool
+    ) -> RivoRemoteCommand? {
+        guard items.indices.contains(index) else {
+            SoundEffectManager.shared.play(.fail)
+            return nil
+        }
+        selectedIndex = index
+        restartAutoCloseTimer()
+        return activateAdjustment(increase: increase)
     }
 
     func focusItem(at index: Int) {
@@ -867,17 +948,25 @@ final class RivoRemoteControlCenter: ObservableObject {
             return
         }
         selectedIndex = index
+        restartAutoCloseTimer()
         announceSelection()
     }
 
     func dismissMenu() {
-        isMenuPresented = false
+        hideMenu()
         feedback = AppLocalization.string(
             "빠른 메뉴 닫힘"
         )
     }
 
     func goBackInMenu() {
+        restartAutoCloseTimer()
+        if isKeyGuidePresented {
+            isKeyGuidePresented = false
+            feedback = selectedItemAnnouncement
+            announceFeedback()
+            return
+        }
         guard let previous = pageStack.popLast()
         else {
             SoundEffectManager.shared.play(.popUp2)
@@ -909,6 +998,117 @@ final class RivoRemoteControlCenter: ObservableObject {
         feedback = AppLocalization.string(
             "명령 모드 닫힘"
         )
+    }
+
+    // MARK: - 메뉴 표시·자동 닫힘·세션 복원 (Android `RemoteRibbonOverlay.show/hide`)
+
+    private func presentMenu(showKeyGuide: Bool) {
+        isCommandModeActive = false
+        restoreSessionIfRecent()
+        isMenuPresented = true
+        isKeyGuidePresented = showKeyGuide
+        SoundEffectManager.shared.play(
+            .toggleButtonPressed
+        )
+        flashModeName(.menu)
+        restartAutoCloseTimer()
+        feedback = showKeyGuide
+            ? keyGuideMode.accessibilitySummary
+            : selectedItemAnnouncement
+        if showKeyGuide {
+            announceFeedback()
+        }
+    }
+
+    private func hideMenu() {
+        autoCloseTask?.cancel()
+        autoCloseTask = nil
+        if isMenuPresented {
+            savedSession = MenuSession(
+                page: currentPage,
+                selectedIndex: selectedIndex,
+                pageStack: pageStack,
+                screen: activeScreen,
+                closedAt: Self.uptime
+            )
+        }
+        isMenuPresented = false
+        isKeyGuidePresented = false
+    }
+
+    private func restoreSessionIfRecent() {
+        guard let session = savedSession else {
+            return
+        }
+        savedSession = nil
+        guard Self.uptime - session.closedAt
+                <= Self.sessionRestoreWindow,
+              session.screen == activeScreen else {
+            return
+        }
+        pageStack = session.pageStack
+        currentPage = session.page
+        selectedIndex = min(
+            max(session.selectedIndex, 0),
+            max(items.count - 1, 0)
+        )
+    }
+
+    private func restartAutoCloseTimer() {
+        autoCloseTask?.cancel()
+        guard isMenuPresented else {
+            return
+        }
+        autoCloseTask = Task { [weak self] in
+            try? await Task.sleep(
+                nanoseconds: UInt64(
+                    Self.autoCloseDelay * 1_000_000_000
+                )
+            )
+            guard !Task.isCancelled,
+                  let self,
+                  self.isMenuPresented else {
+                return
+            }
+            self.dismissMenu()
+        }
+    }
+
+    private func flashModeName(
+        _ mode: RivoRemoteKeyMode
+    ) {
+        modeNameFlashTask?.cancel()
+        modeNameFlash = mode
+        modeNameFlashTask = Task { [weak self] in
+            try? await Task.sleep(
+                nanoseconds:
+                    RivoRemoteKeyMode
+                    .modeNameVisibleNanoseconds
+            )
+            guard !Task.isCancelled else {
+                return
+            }
+            self?.modeNameFlash = nil
+        }
+    }
+
+    /// Android `shouldCloseRibbonAfterSelection`: 도구·위젯 페이지만 닫고, DAISY·카메라·텍스트 페이지는 열어 둔다.
+    /// 화면을 옮기는 명령(이동·음성 명령·홈·뒤로)은 어느 페이지에서든 닫는다.
+    private func shouldCloseMenuAfterSelection(
+        _ command: RivoRemoteCommand
+    ) -> Bool {
+        switch command {
+        case .navigate, .startVoiceAction, .home, .back:
+            return true
+        default:
+            break
+        }
+        return currentPage == .tools
+            || currentPage == .widgets
+    }
+
+    private static var uptime: TimeInterval {
+        ProcessInfo.processInfo.systemUptime
     }
 
     private var selectedItemAnnouncement: String {
@@ -1002,6 +1202,7 @@ final class RivoRemoteControlCenter: ObservableObject {
             selectedIndex = 0
             feedback = selectedItemAnnouncement
             announceFeedback()
+            restartAutoCloseTimer()
             return nil
         }
         guard let command = item.command else {
@@ -1009,12 +1210,17 @@ final class RivoRemoteControlCenter: ObservableObject {
             return nil
         }
         SoundEffectManager.shared.play(.bbob)
-        isMenuPresented = false
         isCommandModeActive = false
         feedback = AppLocalization.format(
             "%@ 실행",
             item.title
         )
+        if shouldCloseMenuAfterSelection(command) {
+            hideMenu()
+        } else {
+            announceFeedback()
+            restartAutoCloseTimer()
+        }
         return command
     }
 
@@ -1053,8 +1259,9 @@ final class RivoRemoteControlCenter: ObservableObject {
     private func enterCommandMode(
         showGuide: Bool
     ) {
-        isMenuPresented = false
+        hideMenu()
         isCommandModeActive = true
+        flashModeName(.command)
         feedback = showGuide
             ? AppLocalization.string(
                 "명령 모드. 2 클립보드 번역, 3 실시간 텍스트 읽기, 4 카메라 돋보기, 9 이미지 설명. 카메라를 연 뒤 5 전환, 6 토치, 7 촬영, 별표 0 샵 확대를 사용합니다."
@@ -1162,26 +1369,13 @@ struct RivoQuickMenuOverlay: View {
         color(hex: theme.foregroundHex)
     }
 
+    /// Android 리모컨 조작 메뉴 색 조합: 선택 강조는 글자색 면 + 바탕색 글자(반전)로, 고정 파랑을 쓰지 않는다.
     private var accentColor: Color {
-        color(
-            hex: backgroundIsLight
-                ? 0x0066CC
-                : 0x64D2FF
-        )
+        foregroundColor
     }
 
     private var accentForegroundColor: Color {
-        backgroundIsLight ? .white : .black
-    }
-
-    private var backgroundIsLight: Bool {
-        let hex = theme.backgroundHex
-        let red = Double((hex >> 16) & 0xFF) / 255
-        let green = Double((hex >> 8) & 0xFF) / 255
-        let blue = Double(hex & 0xFF) / 255
-        return (red * 0.2126)
-            + (green * 0.7152)
-            + (blue * 0.0722) > 0.6
+        backgroundColor
     }
 
     private var indexedItems: [
@@ -1241,16 +1435,9 @@ struct RivoQuickMenuOverlay: View {
                 VStack(alignment: .leading, spacing: 22) {
                 HStack(spacing: 14) {
                     if controlCenter.canGoBackInMenu {
-                        Button("뒤로", systemImage: "chevron.left") {
+                        VisionCraftBackButton(tint: foregroundColor) {
                             controlCenter.goBackInMenu()
                         }
-                        .labelStyle(.iconOnly)
-                        .font(.system(size: 26, weight: .bold))
-                        .frame(width: 58, height: 58)
-                        .background(
-                            foregroundColor.opacity(0.14)
-                        )
-                        .clipShape(Circle())
                     }
 
                     Text(controlCenter.pageTitle)
@@ -1259,6 +1446,30 @@ struct RivoQuickMenuOverlay: View {
                         .minimumScaleFactor(0.7)
 
                     Spacer()
+
+                    Button(
+                        "키 안내",
+                        systemImage: "questionmark.circle"
+                    ) {
+                        controlCenter.toggleKeyGuide()
+                    }
+                    .labelStyle(.iconOnly)
+                    .font(.system(size: 25, weight: .bold))
+                    .frame(width: 58, height: 58)
+                    .background(
+                        controlCenter.isKeyGuidePresented
+                            ? accentColor.opacity(0.28)
+                            : foregroundColor.opacity(0.14)
+                    )
+                    .clipShape(Circle())
+                    .accessibilityValue(
+                        Text(
+                            verbatim:
+                                controlCenter.isKeyGuidePresented
+                                ? AppLocalization.string("열림")
+                                : ""
+                        )
+                    )
 
                     Button(
                         "음성 읽기 정지",
@@ -1335,11 +1546,47 @@ struct RivoQuickMenuOverlay: View {
                     lineWidth: 2
                 )
             }
+            .overlay {
+                if controlCenter.isKeyGuidePresented {
+                    ZStack {
+                        Color.black.opacity(0.79)
+                        ScrollView {
+                            RivoRemoteKeyGuideView(
+                                mode: controlCenter.keyGuideMode,
+                                onDismiss: {
+                                    controlCenter.dismissKeyGuide()
+                                }
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 32,
+                            style: .continuous
+                        )
+                    )
+                    .transition(.opacity)
+                }
+            }
             .shadow(color: .black.opacity(0.34), radius: 30)
             .padding(.horizontal, 24)
             .padding(.bottom, 20)
+
+            if let mode = controlCenter.modeNameFlash {
+                RivoRemoteModeNameFlash(mode: mode)
+                    .transition(.opacity)
+            }
             }
         }
+        .animation(
+            .easeInOut(duration: 0.16),
+            value: controlCenter.isKeyGuidePresented
+        )
+        .animation(
+            .easeInOut(duration: 0.16),
+            value: controlCenter.modeNameFlash
+        )
         .transition(
             .move(edge: .bottom)
                 .combined(with: .opacity)
@@ -1461,9 +1708,32 @@ struct RivoQuickMenuOverlay: View {
                 Text(item.title)
                     .font(.system(size: 27, weight: .bold))
                 Spacer()
+                if item.isAdjustable {
+                    // Android 펼침 줄: 조절 항목은 −/+ 48dp 버튼.
+                    HStack(spacing: 8) {
+                        adjustButton(
+                            systemImage: "minus",
+                            label: AppLocalization.format(
+                                "%@ 감소",
+                                item.title
+                            ),
+                            index: index,
+                            increase: false
+                        )
+                        adjustButton(
+                            systemImage: "plus",
+                            label: AppLocalization.format(
+                                "%@ 증가",
+                                item.title
+                            ),
+                            index: index,
+                            increase: true
+                        )
+                    }
+                }
                 if item.isSubmenu {
-                    Image(systemName: "chevron.right")
-                        .font(.title2.bold())
+                    Text("›")
+                        .font(.system(size: 34, weight: .bold))
                         .accessibilityHidden(true)
                 }
                 if isSelected {
@@ -1523,6 +1793,41 @@ struct RivoQuickMenuOverlay: View {
                     : ""
             )
         )
+    }
+
+    private func adjustButton(
+        systemImage: String,
+        label: String,
+        index: Int,
+        increase: Bool
+    ) -> some View {
+        Button {
+            if let command =
+                controlCenter.adjustItem(
+                    at: index,
+                    increase: increase
+                ) {
+                onCommand(command)
+            }
+        } label: {
+            Image(systemName: systemImage)
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(foregroundColor)
+                .frame(width: 48, height: 48)
+                .background(
+                    foregroundColor.opacity(0.14),
+                    in: Circle()
+                )
+                .overlay {
+                    Circle().strokeBorder(
+                        foregroundColor.opacity(0.5),
+                        lineWidth: 1
+                    )
+                }
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 
     private func compactMenuItem(
@@ -1661,169 +1966,53 @@ struct RivoQuickMenuOverlay: View {
     }
 }
 
+/// Android `RemoteModeOverlay`(COMMAND): 모드 이름 1.15초 + COMMAND 키 안내 키패드(3×4 + R3).
 struct RivoCommandModeOverlay: View {
     @ObservedObject var controlCenter:
         RivoRemoteControlCenter
 
-    private var commands: [
-        (
-            key: String,
-            title: String
-        )
-    ] {
-        [
-            ("1", "—"),
-            (
-                "2",
-                AppLocalization.string("번역")
-            ),
-            ("3", "OCR"),
-            (
-                "4",
-                AppLocalization.string("카메라")
-            ),
-            (
-                "5",
-                AppLocalization.string("전·후면")
-            ),
-            (
-                "6",
-                AppLocalization.string("토치")
-            ),
-            (
-                "7",
-                AppLocalization.string("촬영")
-            ),
-            ("8", "—"),
-            (
-                "9",
-                AppLocalization.string(
-                    "이미지 설명"
-                )
-            ),
-            (
-                AppLocalization.string("별표"),
-                AppLocalization.string("줌 축소")
-            ),
-            (
-                "0",
-                AppLocalization.string("줌 초기화")
-            ),
-            (
-                AppLocalization.string("샵"),
-                AppLocalization.string("줌 확대")
-            ),
-        ]
-    }
-
-    private let columns = Array(
-        repeating:
-            GridItem(
-                .flexible(),
-                spacing: 10
-            ),
-        count: 3
-    )
-
     var body: some View {
-        HStack {
-            Spacer(minLength: 48)
+        ZStack {
+            Color.black.opacity(0.79)
+                .ignoresSafeArea()
+                .accessibilityHidden(true)
 
-            VStack(
-                alignment: .leading,
-                spacing: 16
-            ) {
-                HStack {
-                    Text("Rivo 명령 모드")
-                        .font(.title.bold())
-                    Spacer()
-                    Button(
-                        "닫기",
-                        systemImage: "xmark"
-                    ) {
-                        controlCenter
-                            .dismissCommandMode()
-                    }
-                    .labelStyle(.iconOnly)
-                    .font(.title2)
-                }
-
-                LazyVGrid(
-                    columns: columns,
-                    spacing: 10
-                ) {
-                    ForEach(
-                        Array(
-                            commands.enumerated()
-                        ),
-                        id: \.offset
-                    ) { _, command in
-                        VStack(spacing: 5) {
-                            Text(command.key)
-                                .font(
-                                    .title2
-                                    .monospaced()
-                                    .bold()
-                                )
-                            Text(command.title)
-                                .font(.subheadline)
-                                .lineLimit(1)
-                                .minimumScaleFactor(
-                                    0.75
-                                )
+            ScrollView {
+                VStack(spacing: 12) {
+                    RivoRemoteKeyGuideView(
+                        mode: .command,
+                        onDismiss: {
+                            controlCenter.dismissCommandMode()
                         }
-                        .frame(
-                            maxWidth: .infinity,
-                            minHeight: 68
-                        )
-                        .background(
-                            Color.white
-                                .opacity(0.12)
-                        )
-                        .clipShape(
-                            RoundedRectangle(
-                                cornerRadius: 14,
-                                style:
-                                    .continuous
-                            )
-                        )
-                        .accessibilityElement(
-                            children: .combine
-                        )
-                        .accessibilityLabel(
-                            AppLocalization.format(
-                                "%@, %@",
-                                command.key,
-                                command.title
-                            )
-                        )
-                    }
-                }
-
-                Text(
-                    AppLocalization.string(
-                        "2·3·4·9는 바로 실행합니다. 카메라 키는 돋보기에서 R1 뒤 사용합니다."
                     )
-                )
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                    Text(
+                        AppLocalization.string(
+                            "2·3·4·9는 바로 실행합니다. 카메라 키는 돋보기에서 R1 뒤 사용합니다."
+                        )
+                    )
+                    .visionCraftAndroidText(
+                        16,
+                        relativeTo: .footnote
+                    )
+                    .foregroundStyle(
+                        VisionCraftUI.fixedColor(0xDCDCDC)
+                    )
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                    .padding(.bottom, 24)
+                }
+                .frame(maxWidth: .infinity)
             }
-            .foregroundStyle(.white)
-            .padding(24)
-            .frame(width: 420)
-            .background(.black.opacity(0.94))
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 28,
-                    style: .continuous
-                )
-            )
-            .shadow(radius: 24)
-            .padding(24)
+
+            if let mode = controlCenter.modeNameFlash {
+                RivoRemoteModeNameFlash(mode: mode)
+                    .transition(.opacity)
+            }
         }
-        .transition(
-            .move(edge: .trailing)
-                .combined(with: .opacity)
+        .animation(
+            .easeInOut(duration: 0.16),
+            value: controlCenter.modeNameFlash
         )
+        .transition(.opacity)
     }
 }

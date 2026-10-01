@@ -301,6 +301,8 @@ nonisolated enum EPUBReadAloudNavigationUnit:
     case page
     case chapter
 
+    /// Android `NavigationUnit.labelRes`: 단어·문장·문단·페이지·목차.
+    /// `.line`은 문장 단위(`.bySentences`)로 움직이므로 Android와 같은 "문장" 라벨을 쓴다.
     var displayName: String {
         switch self {
         case .word:
@@ -309,7 +311,7 @@ nonisolated enum EPUBReadAloudNavigationUnit:
             )
         case .line:
             return AppLocalization.string(
-                "줄"
+                "문장"
             )
         case .paragraph:
             return AppLocalization.string(
@@ -321,7 +323,33 @@ nonisolated enum EPUBReadAloudNavigationUnit:
             )
         case .chapter:
             return AppLocalization.string(
-                "장"
+                "목차"
+            )
+        }
+    }
+
+    /// Android `NavigationUnit.announceText`: 단위가 바뀔 때 음성 안내 문구.
+    var announcement: String {
+        switch self {
+        case .word:
+            return AppLocalization.string(
+                "이동 단위가 단어로 변경되었습니다"
+            )
+        case .line:
+            return AppLocalization.string(
+                "이동 단위가 문장으로 변경되었습니다"
+            )
+        case .paragraph:
+            return AppLocalization.string(
+                "이동 단위가 문단으로 변경되었습니다"
+            )
+        case .page:
+            return AppLocalization.string(
+                "이동 단위가 페이지로 변경되었습니다"
+            )
+        case .chapter:
+            return AppLocalization.string(
+                "이동 단위가 목차로 변경되었습니다"
             )
         }
     }

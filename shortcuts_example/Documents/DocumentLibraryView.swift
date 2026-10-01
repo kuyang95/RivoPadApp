@@ -447,7 +447,7 @@ struct DocumentLibraryView: View {
                             .month()
                             .day()
                     )
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                 }
             }
@@ -513,7 +513,7 @@ struct DocumentLibraryView: View {
                         .month()
                         .day()
                 )
-                .font(.caption2)
+                .font(.caption)
                 .foregroundStyle(.secondary)
             }
             .contentShape(Rectangle())

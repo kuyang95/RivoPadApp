@@ -34,7 +34,7 @@ struct HWPRibbonTabBar: View {
                                     .font(.subheadline.weight(selected == tab ? .semibold : .regular))
                                     .foregroundStyle(selected == tab ? Color.accentColor : .primary)
                                     .padding(.horizontal, 16)
-                                    .frame(minHeight: 44)
+                                    .frame(minHeight: 48)
                                     .background(selected == tab ? Color.accentColor.opacity(0.12) : .clear,
                                         in: RoundedRectangle(cornerRadius: 8))
                             }
@@ -49,12 +49,12 @@ struct HWPRibbonTabBar: View {
             }
             Button { isCollapsed.toggle() } label: {
                 Image(systemName: isCollapsed ? "chevron.down" : "chevron.up")
-                    .frame(width: 44, height: 44)
+                    .frame(width: 48, height: 48)
             }
             .accessibilityLabel(isCollapsed ? "도구 펼치기" : "도구 접기")
             .accessibilityIdentifier("hwp-ribbon-collapse")
         }
-        .frame(height: 44)
+        .frame(height: 48)
         .buttonStyle(.plain)
         .background(VisionCraftUI.surface)
         .overlay(alignment: .bottom) { Divider() }
@@ -87,7 +87,7 @@ struct HWPFormattingToolbar: View {
             HStack(spacing: 4) {
                 if (section == .all || section == .table), let block = editor.activation?.block, HWPCellFormatting.supports(block) {
                     Button { showsCell = true } label: {
-                        Label("셀", systemImage: "square.grid.2x2").frame(minHeight: 44).padding(.horizontal, 8)
+                        Label("셀", systemImage: "square.grid.2x2").frame(minHeight: 48).padding(.horizontal, 8)
                     }.accessibilityIdentifier("hwp-format-cell")
                     if let onTableAction, !tableActions.isEmpty {
                         Menu {
@@ -102,7 +102,7 @@ struct HWPFormattingToolbar: View {
                                 .disabled(!tableActions.contains(.deleteTable))
                                 .accessibilityIdentifier("hwp-table-deleteTable")
                         } label: {
-                            Text("표 편집").frame(minHeight: 44).padding(.horizontal, 8)
+                            Text("표 편집").frame(minHeight: 48).padding(.horizontal, 8)
                         }.accessibilityIdentifier("hwp-format-table-structure")
                     }
                     if let onTableAction, !cellActions.isEmpty {
@@ -122,13 +122,13 @@ struct HWPFormattingToolbar: View {
                                 }
                             } header: { Text("나누면 내용은 첫 번째 셀에 남습니다.") }
                         } label: {
-                            Text("병합·분할").frame(minHeight: 44).padding(.horizontal, 8)
+                            Text("병합·분할").frame(minHeight: 48).padding(.horizontal, 8)
                         }.accessibilityIdentifier("hwp-format-cell-structure")
                     }
                     if let tableSizing, onTableResize != nil, !tableActions.isEmpty {
                         Button { sizingSelection = tableSizing() } label: {
                             Label("크기", systemImage: "arrow.up.left.and.arrow.down.right")
-                                .frame(minHeight: 44).padding(.horizontal, 8)
+                                .frame(minHeight: 48).padding(.horizontal, 8)
                         }.accessibilityIdentifier("hwp-format-table-size")
                     }
                     if section == .all { separator }
@@ -140,8 +140,8 @@ struct HWPFormattingToolbar: View {
                         HStack(spacing: 4) {
                             Text(editor.hasMixedFont ? AppLocalization.string("혼합") : editor.formattingRun.fontName ?? AppLocalization.string("글꼴"))
                                 .lineLimit(1).truncationMode(.middle)
-                            Image(systemName: "chevron.down").font(.caption2)
-                        }.frame(width: 126, height: 44)
+                            Image(systemName: "chevron.down").font(.caption)
+                        }.frame(width: 126, height: 48)
                     }
                     .accessibilityLabel("글꼴 변경")
                     .accessibilityIdentifier("hwp-format-font")
@@ -155,7 +155,7 @@ struct HWPFormattingToolbar: View {
                         }
                     } label: {
                         Text(editor.hasMixedSize ? AppLocalization.string("혼합") : String(format: "%g pt", editor.formattingRun.fontSizePoints ?? 10))
-                            .monospacedDigit().frame(minWidth: 64, minHeight: 44)
+                            .monospacedDigit().frame(minWidth: 64, minHeight: 48)
                     }
                     .accessibilityLabel("글자 크기")
                     .accessibilityIdentifier("hwp-format-size")
@@ -182,7 +182,7 @@ struct HWPFormattingToolbar: View {
                         VStack(spacing: 2) {
                             Image(systemName: "textformat")
                             Rectangle().fill(HWPFormattingColor.color(editor.formattingRun.textColorRGB ?? 0)).frame(width: 20, height: 3)
-                        }.frame(width: 44, height: 44)
+                        }.frame(width: 48, height: 48)
                     }
                     .accessibilityLabel("글자색")
                     .accessibilityIdentifier("hwp-format-color")
@@ -202,7 +202,7 @@ struct HWPFormattingToolbar: View {
                             Image(systemName: "highlighter")
                             Rectangle().fill(HWPFormattingColor.color(editor.formattingRun.backgroundColorRGB ?? 0xFFFF00))
                                 .frame(width: 20, height: 3)
-                        }.frame(width: 44, height: 44)
+                        }.frame(width: 48, height: 48)
                     }
                     .accessibilityLabel("강조색")
                     .accessibilityIdentifier("hwp-format-highlight")
@@ -223,8 +223,8 @@ struct HWPFormattingToolbar: View {
                     } label: {
                         HStack(spacing: 2) {
                             Image(systemName: "textformat")
-                            Image(systemName: "chevron.down").font(.caption2)
-                        }.frame(width: 44, height: 44)
+                            Image(systemName: "chevron.down").font(.caption)
+                        }.frame(width: 48, height: 48)
                     }
                     .accessibilityLabel("글자 효과")
                     .accessibilityIdentifier("hwp-format-effects")
@@ -244,7 +244,7 @@ struct HWPFormattingToolbar: View {
                     alignmentButton("양쪽 정렬", icon: "text.justify", alignment: .justified, id: "justify")
                     separator
                     Button { showsParagraph = true } label: {
-                        Label("문단", systemImage: "paragraph").frame(minHeight: 44).padding(.horizontal, 8)
+                        Label("문단", systemImage: "paragraph").frame(minHeight: 48).padding(.horizontal, 8)
                     }
                     .accessibilityIdentifier("hwp-format-paragraph")
                 }
@@ -319,7 +319,7 @@ struct HWPFormattingToolbar: View {
 
     private func formatButton(_ title: String, icon: String, active: Bool, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: icon).frame(width: 44, height: 44)
+            Image(systemName: icon).frame(width: 48, height: 48)
                 .background(active ? Color.accentColor.opacity(0.15) : .clear, in: RoundedRectangle(cornerRadius: 8))
                 .foregroundStyle(active ? Color.accentColor : VisionCraftUI.primaryText)
         }

@@ -29,6 +29,11 @@ final class HWPDocumentEditingTests: XCTestCase {
             ["Contents/section1.xml", "Contents/section0.xml"]
         )
         XCTAssertEqual(package.blocks.count, 3)
+        let source = WordAISnapshotBuilder.make(documentName: "원문.hwpx",
+            blocks: HWPAISource.blocks(package.blocks), selectedBlockID: package.blocks.last?.id)
+        XCTAssertEqual(source.blocks.map(\.text), package.blocks.map(\.text))
+        XCTAssertEqual(source.blocks.last?.tableGeometry?.sectionPath, "Contents/section0.xml")
+        XCTAssertFalse(source.contextWasTruncated)
         XCTAssertEqual(
             package.blocks[0].text,
             "먼저 읽는 구역\t탭\n줄바꿈-연결"

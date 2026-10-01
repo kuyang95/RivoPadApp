@@ -29,7 +29,7 @@ struct ExcelWorkbookActionsDialog: View {
     }
 
     private var actions: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: VisionCraftUI.actionRowSpacing) {
             VisionCraftDialogOptionRow(
                 title: "실행 취소",
                 systemImage: "arrow.uturn.backward",

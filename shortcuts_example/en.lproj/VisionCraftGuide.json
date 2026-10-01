@@ -14,6 +14,20 @@
     "tip": "You can use every Home feature by touch without a remote. The app explains any required permission when you first use a feature."
   },
   {
+    "id": "printed_text",
+    "group": "feature",
+    "feature": "Document scan · Text recognition",
+    "situation": "I want to enlarge text on paper or objects",
+    "icon": "doc.text.viewfinder",
+    "action": "scan",
+    "steps": [
+      "For a paper document, open Document scan from Home and capture the whole page in the camera view. With the Categories home layout, open Camera and choose Document scan from Mode at the top left.",
+      "When text recognition finishes, choose Actions → Open in text viewer.",
+      "Adjust text size, line spacing, and colors in Text viewer to read comfortably. You can also listen to the text."
+    ],
+    "tip": "For text on objects that do not suit document scanning, there is another way. Show the text in Camera, then run Tools → Text recognition from the remote control menu. When recognition finishes, use Open → Clipboard in Text viewer to read the result."
+  },
+  {
     "id": "camera",
     "group": "feature",
     "feature": "Camera",
@@ -58,12 +72,12 @@
   {
     "id": "image",
     "group": "feature",
-    "feature": "Image Description",
+    "feature": "Image analysis",
     "situation": "I want to know what is in a picture",
     "icon": "sparkles",
     "action": "image",
     "steps": [
-      "Open Image Description from Home and take a picture of the scene.",
+      "Open Image analysis from Home and take a picture of the scene.",
       "When analysis finishes, read the description or listen to it.",
       "Ask a follow-up question about the same picture. To use a saved photo, attach it to a new chat."
     ],
@@ -100,12 +114,12 @@
   {
     "id": "text",
     "group": "feature",
-    "feature": "Text Edit View",
+    "feature": "Text View",
     "situation": "I want to read and edit copied text or text in a photo",
     "icon": "text.alignleft",
     "action": "textSource",
     "steps": [
-      "Copy the text you want to read, then tap Text Edit View on Home.",
+      "Copy the text you want to read, then tap Text View on Home.",
       "Choose Clipboard. For a photo, choose Read Text from Image; for a file, choose Document.",
       "Adjust the text size, line spacing, and colors, then use reading, editing, or copying."
     ],
@@ -235,12 +249,12 @@
       "Choose VisionCraft in the share sheet. If it is not visible, look under More.",
       "Return to VisionCraft to open the material. In All Settings → Sharing from Other Apps, choose whether to start with AI Chat or Voice Question."
     ],
-    "tip": "This does not automatically read another app’s entire screen. To read visible text, copy it or take a screenshot and import it into Text Edit View."
+    "tip": "This does not automatically read another app’s entire screen. To read visible text, copy it or take a screenshot and import it into Text viewer."
   },
   {
     "id": "widgets",
     "group": "feature",
-    "feature": "Widgets, Siri, and Shortcuts",
+    "feature": "Home screen widgets",
     "situation": "I want faster access to my favorite features",
     "icon": "square.grid.2x2",
     "action": "home",
@@ -317,7 +331,7 @@
     "steps": [
       "Fit all the text in the camera view and hold the iPad steady.",
       "Reduce glare and shadows and flatten the page. Adjust the distance for small text and capture again.",
-      "Compare the recognized text with the original and correct it in Text Edit View if needed."
+      "Compare the recognized text with the original and correct it in Text viewer if needed."
     ],
     "tip": "Handwriting, crumpled paper, and complex tables can reduce accuracy. Check numbers and important details against the original even with OCR correction enabled."
   },
@@ -325,12 +339,12 @@
     "id": "ai",
     "group": "problem",
     "feature": "Troubleshooting",
-    "situation": "AI answers or image descriptions are not working",
+    "situation": "AI chat or image analysis is not working",
     "icon": "exclamationmark.bubble",
     "action": "chat",
     "steps": [
       "If prompted to prepare local AI, finish the model download and check available iPad storage.",
-      "For image descriptions and web search, check the internet connection and follow any usage or error message on screen.",
+      "For image analysis and web search, check the internet connection and follow any usage or error message on screen.",
       "Make sure the attachment opens correctly and try splitting your question into shorter requests."
     ],
     "tip": "Text AI and online image analysis or web search use different processing. If a problem continues, check the error message along with diagnostics in All Settings."

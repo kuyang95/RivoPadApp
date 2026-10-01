@@ -3,23 +3,15 @@ import UIKit
 import UniformTypeIdentifiers
 import PhotosUI
 
+/// 홈. Android `compose/MainScreen.kt`와 같은 구성: 제목 줄(앱 이름·리모컨 상태·전체 설정),
+/// 사용법 안내 카드, 그 아래 목록형(섹션 + 카드 + 설정 + 업데이트 기록) 또는 카테고리형(2x2 타일).
+/// 항목 목록은 여기에서 한 번만 정의하고 두 구성이 같이 쓴다.
 struct HomeView: View {
-    init() {
-        // 이전 설치에서 저장된 목록형 설정 때문에 새 2×2 홈이 가려지는 것을
-        // 한 번만 바로잡는다. 이후 사용자가 선택한 목록형은 그대로 유지한다.
-        let defaults = UserDefaults.standard
-        let migrationKey = "visioncraft.home.gridFirstShown.v1"
-        if !defaults.bool(forKey: migrationKey) {
-            defaults.set(HomeLayoutMode.grid.rawValue, forKey: "visioncraft.home.layout")
-            defaults.set(true, forKey: migrationKey)
-        }
-    }
-
     @EnvironmentObject private var appRouter: AppRouter
     @EnvironmentObject private var rivoRemoteManager: RivoRemoteManager
     @ObservedObject private var settings = AppSettingsStore.shared
     @ObservedObject private var appFonts = AppFontCatalogStore.shared
-    @AppStorage("visioncraft.home.layout") private var homeLayoutModeRaw = HomeLayoutMode.grid.rawValue
+    @AppStorage(HomeLayoutMode.storageKey) private var homeLayoutModeRaw = HomeLayoutMode.list.rawValue
 
     @State private var documentAppearance =
         LocalDocumentAppearanceStore().load()
@@ -33,9 +25,9 @@ struct HomeView: View {
     @State private var fileImportError: String?
     @State private var selectionDialog: HomeSelectionDialog?
     @State private var isTextSourceDialogPresented = false
+    @State private var isImageAnalysisDialogPresented = false
     @State private var textViewClipboardText: String?
     @State private var showsFontSelection = false
-    @State private var showsAllSettings = false
     @State private var openCategory: VisionCraftHomeCategory?
     @State private var hasConversations = false
 
@@ -45,18 +37,19 @@ struct HomeView: View {
                 .ignoresSafeArea()
 
             GeometryReader { geometry in
-                ScrollView {
+                Group {
                     if homeLayoutMode == .grid {
                         categoryHomeContent(availableSize: geometry.size)
                     } else {
-                        LazyVStack(alignment: .leading, spacing: 0) {
-                            androidParityHomeContent
-                            updateContent
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 0) {
+                                listHomeContent
+                            }
+                            .padding(.horizontal, 24)
+                            .padding(.top, 44)
+                            .padding(.bottom, 32)
+                            .frame(maxWidth: .infinity)
                         }
-                        .padding(.horizontal, 24)
-                        .padding(.top, 44)
-                        .padding(.bottom, 32)
-                        .frame(maxWidth: .infinity)
                     }
                 }
                 .id(homeLayoutMode)
@@ -70,25 +63,12 @@ struct HomeView: View {
                 }
             }
 
-            if let selectionDialog, !showsAllSettings {
-                VisionCraftSelectionDialog(
-                    title: selectionDialog.title,
-                    options: selectionDialog.options,
-                    selectedID:
-                        selectedID(
-                            for: selectionDialog
-                        ),
-                    onSelect: { option in
-                        select(
-                            option,
-                            for: selectionDialog
-                        )
-                    },
-                    onDismiss: {
-                        self.selectionDialog = nil
-                    }
-                )
-            }
+            HomeSettingsDialogs(
+                selectionDialog: $selectionDialog,
+                showsFontSelection: $showsFontSelection,
+                documentAppearance: $documentAppearance,
+                homeLayoutModeRaw: $homeLayoutModeRaw
+            )
 
             if isTextSourceDialogPresented {
                 VisionCraftTextSourceDialog(
@@ -106,6 +86,22 @@ struct HomeView: View {
                     onDismiss: {
                         isTextSourceDialogPresented = false
                         textViewClipboardText = nil
+                    }
+                )
+            }
+
+            if isImageAnalysisDialogPresented {
+                HomeImageAnalysisDialog(
+                    onCamera: {
+                        isImageAnalysisDialogPresented = false
+                        appRouter.route = .imageDescriptionCamera
+                    },
+                    onPhoto: {
+                        isImageAnalysisDialogPresented = false
+                        appRouter.route = .imageAnalysisPhoto
+                    },
+                    onDismiss: {
+                        isImageAnalysisDialogPresented = false
                     }
                 )
             }
@@ -159,16 +155,15 @@ struct HomeView: View {
         } message: {
             Text(fileImportError ?? "")
         }
-        .sheet(isPresented: Binding(
-            get: { showsFontSelection && !showsAllSettings },
-            set: { if !$0 { showsFontSelection = false } }
-        )) {
-            fontSelectionSheet
+        .onAppear {
+            refreshChatHistoryAvailability()
+            // 설치 후 이전 화면 상태가 남아 있어도 사용자가 고른 홈 구성을 다시 적용한다.
+            if let stored = UserDefaults.standard.string(forKey: HomeLayoutMode.storageKey),
+               HomeLayoutMode(rawValue: stored) != nil,
+               homeLayoutModeRaw != stored {
+                homeLayoutModeRaw = stored
+            }
         }
-        .fullScreenCover(isPresented: $showsAllSettings) {
-            allSettingsScreen
-        }
-        .onAppear(perform: refreshChatHistoryAvailability)
         .onChange(of: documentAppearance) { _, value in
             LocalDocumentAppearanceStore().save(value)
         }
@@ -202,52 +197,79 @@ struct HomeView: View {
     }
 
     private var isHomeDialogPresented: Bool {
-        selectionDialog != nil || openCategory != nil || isTextSourceDialogPresented || isLoadingTextViewPhoto
+        selectionDialog != nil
+            || showsFontSelection
+            || openCategory != nil
+            || isTextSourceDialogPresented
+            || isImageAnalysisDialogPresented
+            || isLoadingTextViewPhoto
     }
 
     private var homeLayoutMode: HomeLayoutMode {
-        HomeLayoutMode(rawValue: homeLayoutModeRaw) ?? .grid
+        HomeLayoutMode(rawValue: homeLayoutModeRaw) ?? .list
     }
+
+    // MARK: - 카테고리형
 
     private var homeCategories: [VisionCraftHomeCategory] {
         [
             VisionCraftHomeCategory(id: "ai", title: "AI 대화", tone: .ai, artName: "HomeTileAIChat", items: chatActions),
-            // Android MainScreen: 카테고리 타일은 카메라 기능 하나만 담아 바로 연다.
-            // 다른 카메라 기능은 카메라 화면의 더보기에서 이동할 수 있다.
+            // Android MainScreen: 카메라 타일은 카메라를 바로 연다. 문서 스캔·실시간 문자 읽기·
+            // 이미지 분석·사진 분석은 카메라의 모드 버튼에서 들어간다.
             VisionCraftHomeCategory(id: "camera", title: "카메라", tone: .camera, artName: "HomeTileCamera", items: Array(cameraActions.prefix(1))),
             VisionCraftHomeCategory(id: "reading", title: "텍스트 · 문서", tone: .reading, artName: "HomeTileReading", items: readingActions),
             VisionCraftHomeCategory(id: "link", title: "비전링크", tone: .link, artName: "HomeTilePhoneLink", items: connectionActions),
         ]
     }
 
+    /// 카테고리형은 스크롤 없이 한 화면에 맞춘다. 타일 비율 4:5를 유지하면서
+    /// 화면 높이가 부족하면 타일 묶음의 너비를 줄이고 가로 가운데에 놓는다.
     private func categoryHomeContent(availableSize: CGSize) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let columns = availableSize.width > availableSize.height ? 4 : 2
+        let categories = homeCategories
+        return VStack(alignment: .leading, spacing: 0) {
             homeTitleRow
             sectionSpacer(height: 16)
             VisionCraftHomeGuideEntry {
                 appRouter.route = .help
             }
-            Spacer(minLength: 20)
-            VisionCraftHomeCategoryGrid(
-                categories: homeCategories,
-                columns: availableSize.width > availableSize.height ? 4 : 2
-            ) { category in
-                if category.items.count == 1 {
-                    category.items[0].action()
-                } else {
-                    openCategory = category
+            sectionSpacer(height: 20)
+            GeometryReader { gridArea in
+                let gap: CGFloat = 16
+                let rows = max(1, (categories.count + columns - 1) / columns)
+                let widthLimit = max(0, (gridArea.size.width - gap * CGFloat(columns - 1)) / CGFloat(columns))
+                let heightLimit = max(0, (gridArea.size.height - 12 - gap * CGFloat(rows - 1)) / CGFloat(rows) * 4 / 5)
+                let tileWidth = min(widthLimit, heightLimit)
+                let gridWidth = tileWidth * CGFloat(columns) + gap * CGFloat(columns - 1)
+
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    VisionCraftHomeCategoryGrid(
+                        categories: categories,
+                        columns: columns
+                    ) { category in
+                        if category.items.count == 1 {
+                            category.items[0].action()
+                        } else {
+                            openCategory = category
+                        }
+                    }
+                    .frame(width: gridWidth)
+                    Spacer(minLength: 12)
                 }
+                .frame(width: gridArea.size.width, height: gridArea.size.height)
             }
-            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, minHeight: max(0, availableSize.height - 76), alignment: .topLeading)
         .padding(.horizontal, 24)
         .padding(.top, 44)
         .padding(.bottom, 32)
+        .frame(width: availableSize.width, height: availableSize.height, alignment: .topLeading)
     }
 
+    // MARK: - 목록형
+
     @ViewBuilder
-    private var androidParityHomeContent: some View {
+    private var listHomeContent: some View {
         homeTitleRow
 
         sectionSpacer(height: 16)
@@ -267,276 +289,22 @@ struct HomeView: View {
         VisionCraftHomeSectionHeader(title: "읽기와 문서", tone: .reading)
         VisionCraftHomeActionList(items: readingActions)
 
-        // 연결 항목은 헤더 없이 바로 이어 붙인다.
-        sectionSpacer(height: 16)
+        // 비전링크 카드는 섹션 제목 없이 28 띄워 이어 붙인다.
+        sectionSpacer(height: 28)
         VisionCraftHomeActionList(items: connectionActions)
 
         sectionSpacer(height: 28)
-        homeSettingsContent
-    }
-
-    @ViewBuilder
-    private var homeSettingsContent: some View {
         VisionCraftHomeSectionHeader(title: "설정", tone: .settings)
-        mainFeedbackSettings
-        sectionSpacer(height: 20)
-        voiceAndLanguageSettings
-        sectionSpacer(height: 20)
-        appearanceSettings
-        sectionSpacer(height: 20)
-        quickMenuSettings
-        sectionSpacer(height: 20)
-        documentViewerSettings
+        HomeSettingsPanel(
+            selectionDialog: $selectionDialog,
+            showsFontSelection: $showsFontSelection,
+            documentAppearance: $documentAppearance,
+            homeLayoutModeRaw: $homeLayoutModeRaw
+        )
         sectionSpacer(height: 20)
         VisionCraftHomeActionList(items: advancedSettingsActions)
-    }
 
-    private var allSettingsScreen: some View {
-        ZStack {
-            VisionCraftHomeUI.background.ignoresSafeArea()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack {
-                        Button {
-                            showsAllSettings = false
-                        } label: {
-                            Image(systemName: "arrow.left")
-                                .font(.system(size: 24, weight: .medium))
-                                .foregroundStyle(VisionCraftHomeUI.text)
-                                .frame(width: 48, height: 48)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(AppLocalization.string("뒤로"))
-                        Text(AppLocalization.string("모든 설정"))
-                            .visionCraftAndroidText(24, weight: .bold, relativeTo: .title2)
-                            .foregroundStyle(VisionCraftHomeUI.text)
-                            .accessibilityAddTraits(.isHeader)
-                            .padding(.leading, 4)
-                        Spacer(minLength: 0)
-                    }
-                    sectionSpacer(height: 20)
-                    homeSettingsContent
-                    if homeLayoutMode == .grid {
-                        updateContent
-                    }
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 12)
-                .padding(.bottom, 32)
-            }
-            if let selectionDialog {
-                VisionCraftSelectionDialog(
-                    title: selectionDialog.title,
-                    options: selectionDialog.options,
-                    selectedID: selectedID(for: selectionDialog),
-                    onSelect: { select($0, for: selectionDialog) },
-                    onDismiss: { self.selectionDialog = nil }
-                )
-            }
-        }
-        .tint(VisionCraftUI.primary)
-        .sheet(isPresented: $showsFontSelection) {
-            fontSelectionSheet
-        }
-    }
-
-    private var fontSelectionSheet: some View {
-        AppFontSelectionView(
-            catalog: appFonts,
-            languageCode: settings.appLanguage.effectiveLanguageCode
-        )
-    }
-
-    @ViewBuilder
-    private var mainFeedbackSettings: some View {
-        VisionCraftSettingsGroup {
-            VisionCraftSettingsGrid {
-                VisionCraftSettingSwitchTile(
-                    label: "효과음 피드백",
-                    hint:
-                        "버튼 조작과 기능 실행 상태를 효과음으로 알려줍니다.",
-                    isOn:
-                        $settings.soundEffectsEnabled
-                )
-                VisionCraftSettingSwitchTile(
-                    label: "음성 피드백",
-                    hint:
-                        "기능 실행 상태와 안내 메시지를 음성으로 알려줍니다.",
-                    isOn:
-                        $settings.voiceFeedbackEnabled
-                )
-                VisionCraftSettingSwitchTile(
-                    label: "OCR 오타 자동 교정",
-                    hint:
-                        "OCR로 인식한 글자의 오타를 AI가 자동으로 교정합니다.",
-                    isOn:
-                        $settings.ocrAutoCorrectionEnabled
-                )
-                VisionCraftSettingSwitchTile(
-                    label: "문서 스캔 색상 자동 보정",
-                    hint:
-                        "촬영한 문서의 배경을 밝게 하고 글자 대비를 높입니다.",
-                    isOn:
-                        $settings.documentScanColorEnhancementEnabled
-                )
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var voiceAndLanguageSettings: some View {
-        VisionCraftSettingsGroup(title: "음성 및 언어") {
-            VisionCraftSettingsGrid {
-                VisionCraftSettingValueTile(
-                    label: "음성 속도",
-                    value: settings.speechRate.androidTitle,
-                    action: {
-                        selectionDialog = .speechRate
-                    }
-                )
-                VisionCraftSettingValueTile(
-                    label: "언어",
-                    value: settings.appLanguage.title,
-                    action: {
-                        selectionDialog = .language
-                    }
-                )
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var appearanceSettings: some View {
-        VisionCraftSettingsGroup(title: "화면 및 글꼴") {
-            VisionCraftSettingsGrid {
-                VisionCraftSettingValueTile(
-                    label: "앱 글꼴",
-                    value:
-                        appFonts.selectedLabel(
-                            languageCode:
-                                settings.appLanguage
-                                .effectiveLanguageCode
-                        ),
-                    action: {
-                        showsFontSelection = true
-                    }
-                )
-                VisionCraftSettingValueTile(
-                    label: "홈 화면 구성",
-                    value: AppLocalization.string(homeLayoutMode.title),
-                    action: {
-                        selectionDialog = .homeLayout
-                    }
-                )
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var quickMenuSettings: some View {
-        VisionCraftSettingsGroup(title: "메뉴바") {
-            VisionCraftSettingsGrid {
-                VisionCraftSettingSwitchTile(
-                    label: "메뉴바 펼쳐보기",
-                    hint:
-                        "메뉴 항목을 위에서 아래로 한 번에 펼쳐 표시합니다.",
-                    isOn:
-                        $settings.rivoQuickMenuExpanded
-                )
-                VisionCraftColorSettingTile(
-                    label: "리모컨 조작 메뉴 색 조합",
-                    theme: quickMenuTheme,
-                    action: {
-                        selectionDialog = .quickMenuColor
-                    }
-                )
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var documentViewerSettings: some View {
-        VisionCraftSettingsGroup(title: "텍스트 뷰어") {
-            VisionCraftSettingsGrid {
-                VisionCraftSettingValueTile(
-                    label: "텍스트뷰어 글씨 크기",
-                    value: "\(documentAppearance.fontLevel)단계",
-                    action: {
-                        selectionDialog = .documentFontLevel
-                    }
-                )
-                VisionCraftSettingValueTile(
-                    label: "텍스트뷰어 줄 간격",
-                    value:
-                        "\(documentAppearance.lineHeightLevel)단계",
-                    action: {
-                        selectionDialog = .documentLineHeight
-                    }
-                )
-                VisionCraftColorSettingTile(
-                    label: "텍스트뷰어 색 조합",
-                    theme: documentTheme,
-                    action: {
-                        selectionDialog = .documentColor
-                    }
-                )
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var updateContent: some View {
-        if let latestReleaseNote {
-            sectionSpacer(height: 32)
-            VisionCraftHomeSectionHeader(title: "업데이트 기록", tone: .updates)
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text(latestReleaseNote.version)
-                    .font(.title3.bold())
-                    .foregroundStyle(
-                        VisionCraftHomeUI.text
-                    )
-                Text(latestReleaseNote.date)
-                    .font(.subheadline)
-                    .foregroundStyle(
-                        VisionCraftHomeUI.secondaryText
-                    )
-                ForEach(
-                    Array(
-                        latestReleaseNote.texts
-                            .prefix(3)
-                            .enumerated()
-                    ),
-                    id: \.offset
-                ) { _, text in
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("•")
-                            .accessibilityHidden(true)
-                        Text(text)
-                            .foregroundStyle(
-                                VisionCraftHomeUI.text
-                            )
-                    }
-                }
-            }
-            .padding(20)
-            .visionCraftHomeSurface()
-
-            HStack(spacing: 8) {
-                Button("이전 업데이트 기록보기") {
-                    showsAllSettings = false
-                    appRouter.route = .help
-                }
-                Button("매뉴얼 보기", systemImage: "line.3.horizontal") {
-                    showsAllSettings = false
-                    appRouter.route = .help
-                }
-            }
-            .buttonStyle(VisionCraftAndroidButtonStyle(filled: false))
-            .tint(VisionCraftUI.primary)
-            .padding(.top, 12)
-        }
+        HomeUpdateNotesSection()
     }
 
     private func sectionSpacer(height: CGFloat) -> some View {
@@ -544,6 +312,8 @@ struct HomeView: View {
             .frame(height: height)
             .accessibilityHidden(true)
     }
+
+    // MARK: - 항목 목록 (두 구성이 같이 쓴다)
 
     private var chatActions: [VisionCraftActionItem] {
         var actions = [
@@ -621,7 +391,7 @@ struct HomeView: View {
                 description:
                     "사진 속 내용을 AI가 설명해줍니다.",
                 action: {
-                    appRouter.route = .imageDescriptionCamera
+                    isImageAnalysisDialogPresented = true
                 }
             ),
             VisionCraftActionItem(
@@ -643,11 +413,12 @@ struct HomeView: View {
                 icon: "text.alignleft",
                 title: "텍스트",
                 description:
-                    "큰 글자로 읽고, 바로 고치고, 복사합니다.",
+                    "클립보드의 글자를 큰 글자로 표시합니다.",
                 action: {
-                    presentTextSourceDialog()
+                    openTextView()
                 }
             ),
+            // iPadOS 전용: 문서 작업(엑셀·워드·한글 편집).
             VisionCraftActionItem(
                 id: "files",
                 icon: "folder",
@@ -686,8 +457,28 @@ struct HomeView: View {
         ]
     }
 
+    /// iPadOS 전용 설정(스캐너·공유·독서·연결)으로 가는 카드.
+    private var advancedSettingsActions:
+        [VisionCraftActionItem] {
+        [
+            VisionCraftActionItem(
+                id: "advanced-settings",
+                icon: "gearshape",
+                title: "모든 설정",
+                description:
+                    "스캐너, 공유, 독서와 연결 설정을 엽니다.",
+                action: {
+                    appRouter.route = .settings
+                }
+            ),
+        ]
+    }
+
+    // MARK: - 제목 줄
+
+    /// Android `VcScreenTitleRow`: 왼쪽 `VisionCraft`, 오른쪽에 리모컨 연결 상태 아이콘과 설정 아이콘(간격 0).
     private var homeTitleRow: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 0) {
             Text("VisionCraft")
                 .visionCraftAndroidText(
                     24,
@@ -702,204 +493,94 @@ struct HomeView: View {
             VisionCraftHomeRemoteStatusIcon(
                 eyebrow: "리모컨 연결",
                 title: rivoHomeStatusTitle,
-                subtitle: rivoBannerSubtitle,
+                subtitle: rivoHomeStatusDetail,
                 systemImage: rivoStatusSystemImage,
                 accent: rivoStatusColor,
-                isBusy: rivoIsBusy,
                 action: {
                     appRouter.route = .rivoRemote
                 }
             )
-            Button {
-                showsAllSettings = true
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 25, weight: .medium))
-                    .foregroundStyle(VisionCraftHomeUI.icon)
-                    .frame(width: 52, height: 52)
-                    .contentShape(Rectangle())
+            VisionCraftIconButton(
+                systemImage: "gearshape",
+                label: "전체 설정"
+            ) {
+                appRouter.route = .allSettings
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(AppLocalization.string("모든 설정"))
             .accessibilityIdentifier("home.all-settings")
         }
     }
 
-    private var advancedSettingsActions:
-        [VisionCraftActionItem] {
-        [
-            VisionCraftActionItem(
-                id: "advanced-settings",
-                icon: "gearshape",
-                title: "모든 설정",
-                description:
-                    "스캐너, 공유, 독서와 연결 설정을 엽니다.",
-                action: {
-                    showsAllSettings = false
-                    appRouter.route = .settings
-                }
-            ),
-        ]
-    }
-
-    private var documentTheme: LocalDocumentColorTheme {
-        theme(at: documentAppearance.colorIndex)
-    }
-
-    private var quickMenuTheme: LocalDocumentColorTheme {
-        theme(at: settings.rivoQuickMenuColorIndex)
-    }
-
-    private func theme(at index: Int) -> LocalDocumentColorTheme {
-        let themes = LocalDocumentColorTheme.all
-        guard !themes.isEmpty else {
-            preconditionFailure("VisionCraft color themes must not be empty")
-        }
-        return themes[min(max(index, 0), themes.count - 1)]
-    }
-
-    private var latestReleaseNote: HelpReleaseNote? {
-        try? HelpContentLibrary
-            .releaseNotes(
-                language: settings.appLanguage
-            )
-            .first
-    }
-
-    private var rivoBannerSubtitle: String {
+    /// Android `VcHomeRemoteStatusIcon`: 연결됨 초록 / 연결 중 노랑 / 끊김 보조글자색.
+    private var rivoStatusTone: HomeRemoteStatusTone {
         switch rivoRemoteManager.state {
         case .ready:
-            if let type = rivoRemoteManager.connectedDeviceType {
-                return type.title
-            }
-            return AppLocalization.string(
-                "Rivo 버튼으로 앱을 조작할 수 있습니다."
-            )
+            return .connected
         case .preparing, .scanning, .connecting, .discovering:
-            return AppLocalization.string(
-                "잠시 기다려 주세요."
-            )
-        case .inactive, .disconnected:
-            return AppLocalization.string(
-                "탭하여 리모컨을 연결합니다."
-            )
-        case .permissionDenied, .unsupported, .bluetoothOff, .failed:
-            return AppLocalization.string(
-                "탭하여 문제를 확인합니다."
-            )
-        }
-    }
-
-    private var rivoIsBusy: Bool {
-        switch rivoRemoteManager.state {
-        case .preparing, .scanning, .connecting, .discovering:
-            return true
-        default:
-            return false
-        }
-    }
-
-    private var rivoStatusSystemImage: String {
-        switch rivoRemoteManager.state {
-        case .ready:
-            return "dot.radiowaves.left.and.right"
-        case .preparing, .scanning, .connecting, .discovering:
-            return "antenna.radiowaves.left.and.right"
-        case .inactive,
-             .disconnected,
-             .permissionDenied,
-             .unsupported,
-             .bluetoothOff,
-             .failed:
-            return "antenna.radiowaves.left.and.right.slash"
+            return .connecting
+        case .inactive, .disconnected, .permissionDenied, .unsupported, .bluetoothOff, .failed:
+            return .disconnected
         }
     }
 
     private var rivoHomeStatusTitle: String {
-        switch rivoRemoteManager.state {
-        case .inactive:
+        switch rivoStatusTone {
+        case .connected:
+            return AppLocalization.string("연결됨")
+        case .connecting:
+            return AppLocalization.string("연결 중")
+        case .disconnected:
             return AppLocalization.string("연결 안 됨")
-        default:
-            return rivoRemoteManager.state.title
+        }
+    }
+
+    private var rivoHomeStatusDetail: String {
+        switch rivoStatusTone {
+        case .connected:
+            return AppLocalization.string("조작 가능")
+        case .connecting:
+            return AppLocalization.string("상태 확인 중")
+        case .disconnected:
+            return AppLocalization.string("리모컨을 켜주세요")
+        }
+    }
+
+    private var rivoStatusSystemImage: String {
+        switch rivoStatusTone {
+        case .connected, .connecting:
+            return "dot.radiowaves.left.and.right"
+        case .disconnected:
+            return "antenna.radiowaves.left.and.right.slash"
         }
     }
 
     private var rivoStatusColor: Color {
-        switch rivoRemoteManager.state {
-        case .ready:
+        switch rivoStatusTone {
+        case .connected:
             return VisionCraftHomeUI.connected
-        case .permissionDenied,
-             .unsupported,
-             .bluetoothOff,
-             .failed:
-            return .red
-        case .preparing,
-             .scanning,
-             .connecting,
-             .discovering:
+        case .connecting:
             return VisionCraftHomeUI.connecting
-        case .inactive,
-             .disconnected:
+        case .disconnected:
             return VisionCraftHomeUI.secondaryText
         }
     }
 
-    private func selectedID(
-        for dialog: HomeSelectionDialog
-    ) -> String {
-        switch dialog {
-        case .speechRate:
-            return settings.speechRate.rawValue
-        case .language:
-            return settings.appLanguage.rawValue
-        case .documentFontLevel:
-            return String(documentAppearance.fontLevel)
-        case .documentLineHeight:
-            return String(documentAppearance.lineHeightLevel)
-        case .documentColor:
-            return String(documentAppearance.colorIndex)
-        case .quickMenuColor:
-            return String(settings.rivoQuickMenuColorIndex)
-        case .homeLayout:
-            return homeLayoutModeRaw
-        }
-    }
+    // MARK: - 텍스트 열기
 
-    private func select(
-        _ option: VisionCraftSelectionOption,
-        for dialog: HomeSelectionDialog
-    ) {
-        switch dialog {
-        case .speechRate:
-            if let value = AppSpeechRate(rawValue: option.id) {
-                settings.speechRate = value
-            }
-        case .language:
-            if let value = AppLanguage(rawValue: option.id) {
-                settings.appLanguage = value
-            }
-        case .documentFontLevel:
-            if let value = Int(option.id) {
-                documentAppearance.fontLevel = value
-            }
-        case .documentLineHeight:
-            if let value = Int(option.id) {
-                documentAppearance.lineHeightLevel = value
-            }
-        case .documentColor:
-            if let value = Int(option.id) {
-                documentAppearance.colorIndex = value
-            }
-        case .quickMenuColor:
-            if let value = Int(option.id) {
-                settings.rivoQuickMenuColorIndex = value
-            }
-        case .homeLayout:
-            if let value = HomeLayoutMode(rawValue: option.id) {
-                homeLayoutModeRaw = value.rawValue
-            }
+    /// Android `readingItems`: 클립보드에 글이 있으면 바로 열고, 없을 때만 원본 고르는 화면을 연다.
+    private func openTextView() {
+        if let text = HomeTextSourcePolicy.availableClipboardText(
+            UIPasteboard.general.string
+        ) {
+            appRouter.route = .textEditorText(
+                title: AppLocalization.string("클립보드 텍스트"),
+                text: text
+            )
+        } else {
+            appRouter.route = .textEditorText(
+                title: AppLocalization.string("텍스트"),
+                text: ""
+            )
         }
-        selectionDialog = nil
     }
 
     private func handleFileImport(
@@ -996,6 +677,473 @@ struct HomeView: View {
     }
 }
 
+private enum HomeRemoteStatusTone {
+    case connected, connecting, disconnected
+}
+
+// MARK: - 전체 설정 화면
+
+/// Android `AllSettingsScreen`(`HomeSettings.kt`): 뒤로 가기 + 제목 + 설정 그룹(목록형 홈과 같은 패널).
+/// 카테고리형일 때만 맨 아래에 업데이트 기록.
+struct HomeAllSettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage(HomeLayoutMode.storageKey) private var homeLayoutModeRaw = HomeLayoutMode.list.rawValue
+    @State private var documentAppearance =
+        LocalDocumentAppearanceStore().load()
+    @State private var selectionDialog: HomeSelectionDialog?
+    @State private var showsFontSelection = false
+
+    var body: some View {
+        ZStack {
+            VisionCraftHomeUI.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    VisionCraftScreenTitleRow(
+                        title: "전체 설정",
+                        onBack: { dismiss() }
+                    )
+                    Color.clear.frame(height: 20).accessibilityHidden(true)
+                    HomeSettingsPanel(
+                        selectionDialog: $selectionDialog,
+                        showsFontSelection: $showsFontSelection,
+                        documentAppearance: $documentAppearance,
+                        homeLayoutModeRaw: $homeLayoutModeRaw
+                    )
+                    if HomeLayoutMode(rawValue: homeLayoutModeRaw) == .grid {
+                        HomeUpdateNotesSection()
+                    }
+                }
+                .visionCraftScreenPadding(bottom: 32)
+            }
+            .accessibilityHidden(selectionDialog != nil || showsFontSelection)
+            .allowsHitTesting(selectionDialog == nil && !showsFontSelection)
+
+            HomeSettingsDialogs(
+                selectionDialog: $selectionDialog,
+                showsFontSelection: $showsFontSelection,
+                documentAppearance: $documentAppearance,
+                homeLayoutModeRaw: $homeLayoutModeRaw
+            )
+        }
+        .tint(VisionCraftUI.primary)
+        .toolbar(.hidden, for: .navigationBar)
+        .visionCraftHandlesBackNavigation()
+        .onChange(of: documentAppearance) { _, value in
+            LocalDocumentAppearanceStore().save(value)
+        }
+    }
+}
+
+// MARK: - 설정 패널
+
+/// Android `HomeSettingsContent`: 목록형 홈과 전체 설정 화면이 같이 쓰는 설정 그룹.
+/// 그룹은 VcPanel, 값은 VcValueButton → VcOptionDialog, 켜고 끄는 항목은 VcSwitchRow.
+struct HomeSettingsPanel: View {
+    @ObservedObject private var settings = AppSettingsStore.shared
+    @ObservedObject private var appFonts = AppFontCatalogStore.shared
+    @Binding var selectionDialog: HomeSelectionDialog?
+    @Binding var showsFontSelection: Bool
+    @Binding var documentAppearance: LocalDocumentAppearance
+    @Binding var homeLayoutModeRaw: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            mainFeedbackSettings
+            voiceAndLanguageSettings
+            appearanceSettings
+            quickMenuSettings
+            documentViewerSettings
+        }
+    }
+
+    @ViewBuilder
+    private var mainFeedbackSettings: some View {
+        VisionCraftSettingsGroup {
+            VisionCraftSettingsGrid {
+                VisionCraftSettingSwitchTile(
+                    label: "효과음 피드백",
+                    hint:
+                        "버튼 조작과 기능 실행 상태를 효과음으로 알려줍니다.",
+                    isOn:
+                        $settings.soundEffectsEnabled
+                )
+                VisionCraftSettingSwitchTile(
+                    label: "음성 피드백",
+                    hint:
+                        "기능 실행 상태와 안내 메시지를 음성으로 알려줍니다.",
+                    isOn:
+                        $settings.voiceFeedbackEnabled
+                )
+                VisionCraftSettingSwitchTile(
+                    label: "OCR 오타 자동 교정",
+                    hint:
+                        "OCR로 인식한 글자의 오타를 AI가 자동으로 교정합니다.",
+                    isOn:
+                        $settings.ocrAutoCorrectionEnabled
+                )
+                VisionCraftSettingSwitchTile(
+                    label: "문서 스캔 색상 자동 보정",
+                    hint:
+                        "촬영한 문서의 배경을 밝게 하고 글자 대비를 높입니다.",
+                    isOn:
+                        $settings.documentScanColorEnhancementEnabled
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var voiceAndLanguageSettings: some View {
+        VisionCraftSettingsGroup(title: "음성 및 언어") {
+            VisionCraftSettingsGrid {
+                VisionCraftSettingValueTile(
+                    label: "음성 속도",
+                    value: settings.speechRate.androidTitle,
+                    action: {
+                        selectionDialog = .speechRate
+                    }
+                )
+                VisionCraftSettingValueTile(
+                    label: "언어",
+                    value: settings.appLanguage.title,
+                    action: {
+                        selectionDialog = .language
+                    }
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var appearanceSettings: some View {
+        VisionCraftSettingsGroup(title: "화면 및 글꼴") {
+            VisionCraftSettingsGrid {
+                VisionCraftSettingValueTile(
+                    label: "앱 글꼴",
+                    value:
+                        appFonts.selectedLabel(
+                            languageCode:
+                                settings.appLanguage
+                                .effectiveLanguageCode
+                        ),
+                    action: {
+                        showsFontSelection = true
+                    }
+                )
+                VisionCraftSettingValueTile(
+                    label: "홈 화면 구성",
+                    value: AppLocalization.string(
+                        (HomeLayoutMode(rawValue: homeLayoutModeRaw) ?? .list).title
+                    ),
+                    action: {
+                        selectionDialog = .homeLayout
+                    }
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var quickMenuSettings: some View {
+        VisionCraftSettingsGroup(title: "메뉴바") {
+            VisionCraftSettingsGrid {
+                VisionCraftSettingSwitchTile(
+                    label: "메뉴바 펼쳐보기",
+                    hint:
+                        "메뉴 항목을 위에서 아래로 한 번에 펼쳐 표시합니다.",
+                    isOn:
+                        $settings.rivoQuickMenuExpanded
+                )
+                VisionCraftColorSettingTile(
+                    label: "리모컨 조작 메뉴 색 조합",
+                    theme: LocalDocumentColorTheme.theme(at: settings.rivoQuickMenuColorIndex),
+                    action: {
+                        selectionDialog = .quickMenuColor
+                    }
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var documentViewerSettings: some View {
+        VisionCraftSettingsGroup(title: "텍스트 뷰어") {
+            VisionCraftSettingsGrid {
+                VisionCraftSettingValueTile(
+                    label: "텍스트뷰어 글씨 크기",
+                    value: "\(documentAppearance.fontLevel)",
+                    action: {
+                        selectionDialog = .documentFontLevel
+                    }
+                )
+                VisionCraftSettingValueTile(
+                    label: "텍스트뷰어 줄 간격",
+                    value:
+                        "\(documentAppearance.lineHeightLevel)",
+                    action: {
+                        selectionDialog = .documentLineHeight
+                    }
+                )
+                VisionCraftColorSettingTile(
+                    label: "텍스트뷰어 색 조합",
+                    theme: LocalDocumentColorTheme.theme(at: documentAppearance.colorIndex),
+                    action: {
+                        selectionDialog = .documentColor
+                    }
+                )
+            }
+        }
+    }
+}
+
+/// 설정 값 고르기 다이얼로그(Android `HomeSettingsDialogs`): `VcOptionDialog` 한 벌.
+/// 색 조합은 각 줄을 그 색으로 칠하고 "가 나 다 라" 미리보기, 글꼴은 그 글꼴로 이름을 보여 준다.
+struct HomeSettingsDialogs: View {
+    @ObservedObject private var settings = AppSettingsStore.shared
+    @ObservedObject private var appFonts = AppFontCatalogStore.shared
+    @Binding var selectionDialog: HomeSelectionDialog?
+    @Binding var showsFontSelection: Bool
+    @Binding var documentAppearance: LocalDocumentAppearance
+    @Binding var homeLayoutModeRaw: String
+
+    var body: some View {
+        if let selectionDialog {
+            VisionCraftSelectionDialog(
+                title: selectionDialog.title,
+                options: selectionDialog.options,
+                selectedID: selectedID(for: selectionDialog),
+                onSelect: { select($0, for: selectionDialog) },
+                onDismiss: { self.selectionDialog = nil },
+                markSelected: selectionDialog.isColorDialog,
+                rowSpacing: selectionDialog.isColorDialog ? 8 : 0
+            )
+        }
+
+        if showsFontSelection {
+            fontSelectionDialog
+        }
+    }
+
+    /// Android `AppFontSelectorDialog`: 글꼴 이름을 그 글꼴로, 받는 중이면 "다운로드 중",
+    /// 목록을 불러오는 중·오류는 목록 위 안내. 글꼴을 받는 동안에는 닫지 않는다.
+    private var fontSelectionDialog: some View {
+        let languageCode = settings.appLanguage.effectiveLanguageCode
+        let options = appFonts.visibleOptions(languageCode: languageCode)
+        var notices: [VisionCraftSelectionNotice] = []
+        if appFonts.isManifestLoading, options.count <= 2 {
+            notices.append(VisionCraftSelectionNotice(
+                text: AppLocalization.string("폰트 목록을 불러오는 중입니다.")
+            ))
+        }
+        if let errorMessage = appFonts.errorMessage {
+            notices.append(VisionCraftSelectionNotice(
+                text: AppLocalization.format("폰트를 불러오지 못했습니다. %@", errorMessage),
+                isError: true
+            ))
+        }
+        return VisionCraftSelectionDialog(
+            title: "앱 글꼴 선택",
+            options: options.map { option in
+                VisionCraftSelectionOption(
+                    id: option.key,
+                    title: option.label(languageCode: languageCode),
+                    supportingText: appFonts.downloadingKey == option.key
+                        ? AppLocalization.string("다운로드 중")
+                        : nil,
+                    fontName: previewFontName(for: option)
+                )
+            },
+            selectedID: appFonts.effectiveOption(languageCode: languageCode).key,
+            onSelect: { selected in
+                guard appFonts.downloadingKey == nil,
+                      let option = options.first(where: { $0.key == selected.id })
+                else { return }
+                Task { @MainActor in
+                    if await appFonts.select(option) {
+                        showsFontSelection = false
+                    }
+                }
+            },
+            onDismiss: { showsFontSelection = false },
+            notices: notices
+        )
+    }
+
+    private func previewFontName(for option: AppFontOption) -> String? {
+        if option.isSystem {
+            return nil
+        }
+        if option.isBundled {
+            return AppFontCatalogStore.bundledFontName
+        }
+        if appFonts.activeRemoteKey == option.key {
+            return appFonts.activeRemoteFontName
+        }
+        return nil
+    }
+
+    private func selectedID(
+        for dialog: HomeSelectionDialog
+    ) -> String {
+        switch dialog {
+        case .speechRate:
+            return settings.speechRate.rawValue
+        case .language:
+            return settings.appLanguage.rawValue
+        case .documentFontLevel:
+            return String(documentAppearance.fontLevel)
+        case .documentLineHeight:
+            return String(documentAppearance.lineHeightLevel)
+        case .documentColor:
+            return String(documentAppearance.colorIndex)
+        case .quickMenuColor:
+            return String(settings.rivoQuickMenuColorIndex)
+        case .homeLayout:
+            return homeLayoutModeRaw
+        }
+    }
+
+    private func select(
+        _ option: VisionCraftSelectionOption,
+        for dialog: HomeSelectionDialog
+    ) {
+        switch dialog {
+        case .speechRate:
+            if let value = AppSpeechRate(rawValue: option.id) {
+                settings.speechRate = value
+            }
+        case .language:
+            if let value = AppLanguage(rawValue: option.id) {
+                settings.appLanguage = value
+            }
+        case .documentFontLevel:
+            if let value = Int(option.id) {
+                documentAppearance.fontLevel = value
+            }
+        case .documentLineHeight:
+            if let value = Int(option.id) {
+                documentAppearance.lineHeightLevel = value
+            }
+        case .documentColor:
+            if let value = Int(option.id) {
+                documentAppearance.colorIndex = value
+            }
+        case .quickMenuColor:
+            if let value = Int(option.id) {
+                settings.rivoQuickMenuColorIndex = value
+            }
+        case .homeLayout:
+            if let value = HomeLayoutMode(rawValue: option.id) {
+                homeLayoutModeRaw = value.rawValue
+            }
+        }
+        selectionDialog = nil
+    }
+}
+
+// MARK: - 업데이트 기록
+
+/// Android `HomeUpdateNotesSection` + `ChangeLogInfoUI`: 최신 버전 카드(버전 24 Bold + "(날짜)" 한 줄,
+/// 구분선, 항목마다 "- ") + "이전 업데이트 기록보기" 글자 버튼.
+struct HomeUpdateNotesSection: View {
+    @EnvironmentObject private var appRouter: AppRouter
+    @ObservedObject private var settings = AppSettingsStore.shared
+
+    var body: some View {
+        if let note = latestReleaseNote {
+            VStack(alignment: .leading, spacing: 0) {
+                Color.clear.frame(height: 32).accessibilityHidden(true)
+                VisionCraftHomeSectionHeader(title: "업데이트 기록", tone: .updates)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(note.version)
+                            .visionCraftAndroidText(24, weight: .bold, relativeTo: .title2)
+                            .foregroundStyle(VisionCraftHomeUI.text)
+                        Text("(\(note.date))")
+                            .visionCraftAndroidText(14)
+                            .foregroundStyle(VisionCraftHomeUI.secondaryText)
+                    }
+                    .accessibilityElement(children: .combine)
+                    Divider()
+                        .overlay(VisionCraftHomeUI.outline.opacity(0.4))
+                        .padding(.vertical, 8)
+                    ForEach(Array(note.texts.enumerated()), id: \.offset) { _, text in
+                        Text("- \(text)")
+                            .visionCraftAndroidText(16)
+                            .foregroundStyle(VisionCraftHomeUI.text)
+                            .padding(.leading, 16)
+                            .padding(.bottom, 4)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    VisionCraftHomeUI.surface,
+                    in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+                )
+
+                Button {
+                    appRouter.route = .releaseNotes
+                } label: {
+                    Text(AppLocalization.string("이전 업데이트 기록보기"))
+                        .visionCraftAndroidText(16, weight: .medium)
+                        .foregroundStyle(VisionCraftHomeUI.text)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 48)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(VisionCraftHomePressStyle())
+                .padding(.top, 12)
+            }
+        }
+    }
+
+    private var latestReleaseNote: HelpReleaseNote? {
+        try? HelpContentLibrary
+            .releaseNotes(
+                language: settings.appLanguage
+            )
+            .first
+    }
+}
+
+// MARK: - 이미지 분석 선택
+
+/// Android `MainScreenContent`의 이미지 분석 다이얼로그: 설명 + "촬영하기" / "사진에서".
+private struct HomeImageAnalysisDialog: View {
+    let onCamera: () -> Void
+    let onPhoto: () -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VisionCraftDialogCard(
+            title: "이미지 분석",
+            message: "촬영하거나 사진을 선택하면 내용을 설명하고 클립보드에 복사합니다.",
+            tone: .camera,
+            onDismiss: onDismiss
+        ) {
+            VisionCraftDialogOptionRow(
+                title: "촬영하기",
+                subtitle: "카메라로 찍은 장면을 설명합니다.",
+                systemImage: "camera",
+                accent: VisionCraftHomeUI.logoAccent(4),
+                action: onCamera
+            )
+            VisionCraftDialogOptionRow(
+                title: "사진에서",
+                subtitle: "저장된 사진을 골라 설명합니다.",
+                systemImage: "photo.on.rectangle",
+                accent: VisionCraftHomeUI.logoAccent(5),
+                action: onPhoto
+            )
+        }
+    }
+}
+
+// MARK: - 파일·텍스트 원본
+
 private enum HomeFileImportPurpose: Equatable {
     case general
     case textDocument
@@ -1036,6 +1184,7 @@ nonisolated enum HomeTextSourcePolicy {
     }
 }
 
+/// 리모컨·단축어에서 텍스트 원본을 고르라고 요청했을 때 쓰는 다이얼로그.
 private struct VisionCraftTextSourceDialog: View {
     let showsClipboard: Bool
     let onImage: () -> Void
@@ -1046,7 +1195,7 @@ private struct VisionCraftTextSourceDialog: View {
     var body: some View {
         VisionCraftDialogCard(
             title: "열기",
-            usesHomeStyle: true,
+            tone: .reading,
             onDismiss: onDismiss
         ) {
             if showsClipboard {
@@ -1055,6 +1204,7 @@ private struct VisionCraftTextSourceDialog: View {
                     subtitle: "복사해 둔 텍스트를 붙여 넣습니다.",
                     systemImage: "doc.on.clipboard",
                     isPrimary: true,
+                    accent: VisionCraftHomeUI.logoAccent(0),
                     action: onClipboard
                 )
             }
@@ -1062,19 +1212,23 @@ private struct VisionCraftTextSourceDialog: View {
                 title: "이미지에서 텍스트 읽어오기",
                 subtitle: "사진 앨범에서 고른 이미지의 글자를 읽어옵니다.",
                 systemImage: "photo",
+                accent: VisionCraftHomeUI.logoAccent(1),
                 action: onImage
             )
             VisionCraftDialogOptionRow(
                 title: "문서",
                 subtitle: "파일 앱에서 텍스트·문서 파일을 엽니다.",
                 systemImage: "doc.text",
+                accent: VisionCraftHomeUI.logoAccent(2),
                 action: onDocument
             )
         }
     }
 }
 
-private enum HomeSelectionDialog: String, Identifiable {
+// MARK: - 값 고르기 목록
+
+enum HomeSelectionDialog: String, Identifiable {
     case speechRate
     case language
     case documentFontLevel
@@ -1085,6 +1239,10 @@ private enum HomeSelectionDialog: String, Identifiable {
 
     var id: String {
         rawValue
+    }
+
+    var isColorDialog: Bool {
+        self == .documentColor || self == .quickMenuColor
     }
 
     var title: String {
@@ -1127,17 +1285,20 @@ private enum HomeSelectionDialog: String, Identifiable {
             return (1 ... 10).map {
                 VisionCraftSelectionOption(
                     id: String($0),
-                    title: "\($0)단계"
+                    title: "\($0)"
                 )
             }
         case .documentColor,
              .quickMenuColor:
+            // Android `ColorSetSelectorDialog`: 줄마다 그 색 조합으로 "가 나 다 라", 읽기는 색 이름.
             return LocalDocumentColorTheme.all
                 .enumerated()
                 .map { index, theme in
                     VisionCraftSelectionOption(
                         id: String(index),
-                        title: theme.displayName
+                        title: "가 나 다 라",
+                        swatch: VisionCraftSelectionSwatch(theme: theme),
+                        accessibilityLabel: theme.displayName
                     )
                 }
         case .homeLayout:
@@ -1148,9 +1309,12 @@ private enum HomeSelectionDialog: String, Identifiable {
     }
 }
 
-private enum HomeLayoutMode: String, CaseIterable {
+/// Android `HomeLayoutController`: 목록형(기본) / 카테고리형. 설정에서 고르면 바로 바뀐다.
+enum HomeLayoutMode: String, CaseIterable {
     case list
     case grid
+
+    static let storageKey = "visioncraft.home.layout"
 
     var title: String {
         switch self {
@@ -1160,7 +1324,17 @@ private enum HomeLayoutMode: String, CaseIterable {
     }
 }
 
-private extension AppSpeechRate {
+extension LocalDocumentColorTheme {
+    static func theme(at index: Int) -> LocalDocumentColorTheme {
+        let themes = LocalDocumentColorTheme.all
+        guard !themes.isEmpty else {
+            preconditionFailure("VisionCraft color themes must not be empty")
+        }
+        return themes[min(max(index, 0), themes.count - 1)]
+    }
+}
+
+extension AppSpeechRate {
     var androidTitle: String {
         switch self {
         case .slow:

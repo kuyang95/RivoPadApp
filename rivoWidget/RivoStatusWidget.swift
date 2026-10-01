@@ -1,6 +1,35 @@
-import SwiftUI
-import WidgetKit
 import AppIntents
+import SwiftUI
+import UIKit
+import WidgetKit
+
+/// 위젯 익스텐션은 앱의 `VisionCraftUI` 토큰을 가져올 수 없어 같은 값을 여기서 한 번만 정의한다.
+/// (성공 #247548/#83D4A1, 경고 #8B6517/#E8C978, 오류 #CF6679, 강조 #C0521B/#FFA05C)
+private enum WidgetPalette {
+    static let success = adaptive(0x247548, 0x83D4A1)
+    static let warning = adaptive(0x8B6517, 0xE8C978)
+    static let error = adaptive(0xCF6679, 0xCF6679)
+    static let accent = adaptive(0xC0521B, 0xFFA05C)
+
+    private static func adaptive(
+        _ light: UInt32,
+        _ dark: UInt32
+    ) -> Color {
+        Color(
+            uiColor: UIColor { traits in
+                let hex = traits.userInterfaceStyle == .dark
+                    ? dark
+                    : light
+                return UIColor(
+                    red: CGFloat((hex >> 16) & 0xFF) / 255,
+                    green: CGFloat((hex >> 8) & 0xFF) / 255,
+                    blue: CGFloat(hex & 0xFF) / 255,
+                    alpha: 1
+                )
+            }
+        )
+    }
+}
 
 private func widgetLocalized(
     _ key: String
@@ -187,7 +216,7 @@ private struct RivoStatusWidgetView: View {
                                     style: .relative
                                 )
                             }
-                            .font(.caption2)
+                            .font(.caption)
                             .foregroundStyle(
                                 .secondary
                             )
@@ -195,7 +224,7 @@ private struct RivoStatusWidgetView: View {
                             Text(
                                 "앱을 열어 상태를 확인하세요."
                             )
-                            .font(.caption2)
+                            .font(.caption)
                             .foregroundStyle(
                                 .secondary
                             )
@@ -237,13 +266,13 @@ private struct RivoStatusWidgetView: View {
     private var shortcutLinks: some View {
         HStack(spacing: 8) {
             shortcut(
-                title: "AI",
+                title: "새 대화",
                 symbol:
                     "bubble.left.and.bubble.right",
-                path: "ai"
+                path: "ai-new"
             )
             shortcut(
-                title: "스캔",
+                title: "문서 스캔",
                 symbol: "doc.viewfinder",
                 path: "scanner"
             )
@@ -253,7 +282,7 @@ private struct RivoStatusWidgetView: View {
                 path: "camera"
             )
             shortcut(
-                title: "독서",
+                title: "데이지 플레이어",
                 symbol: "book",
                 path: "reader"
             )
@@ -277,12 +306,13 @@ private struct RivoStatusWidgetView: View {
                 Text(
                     LocalizedStringKey(title)
                 )
-                    .font(.caption2)
+                    .font(.caption)
                     .fontWeight(.semibold)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .padding(.vertical, 4)
             .background(
                 Color.accentColor
                     .opacity(0.12)
@@ -358,12 +388,12 @@ private struct RivoStatusWidgetView: View {
     private var statusColor: Color {
         switch entry.snapshot?.kind {
         case .connected:
-            return .green
+            return WidgetPalette.success
         case .connecting:
-            return .orange
+            return WidgetPalette.warning
         case .unavailable,
              .failed:
-            return .red
+            return WidgetPalette.error
         case .notConnected,
              nil:
             return .secondary
@@ -410,6 +440,7 @@ enum VisionCraftWidgetShortcut:
     case documents
     case reader
     case camera
+    case textViewer
 
     static var typeDisplayRepresentation:
         TypeDisplayRepresentation {
@@ -421,13 +452,13 @@ enum VisionCraftWidgetShortcut:
             DisplayRepresentation] {
         [
             .newAIChat:
-                "새 AI 대화",
+                "새 대화",
             .chatHistory:
                 "AI 대화 기록",
             .documentScanner:
                 "문서 스캔",
             .liveTextReader:
-                "실시간 글자 읽기",
+                "실시간 문자 읽기",
             .magnifier:
                 "카메라 돋보기",
             .voiceAction:
@@ -435,22 +466,24 @@ enum VisionCraftWidgetShortcut:
             .documents:
                 "문서 열기",
             .reader:
-                "독서",
+                "데이지 플레이어",
             .camera:
-                "카메라 도구",
+                "카메라",
+            .textViewer:
+                "텍스트뷰어",
         ]
     }
 
     var title: LocalizedStringKey {
         switch self {
         case .newAIChat:
-            return "새 AI 대화"
+            return "새 대화"
         case .chatHistory:
             return "AI 대화 기록"
         case .documentScanner:
             return "문서 스캔"
         case .liveTextReader:
-            return "실시간 글자 읽기"
+            return "실시간 문자 읽기"
         case .magnifier:
             return "카메라 돋보기"
         case .voiceAction:
@@ -458,9 +491,11 @@ enum VisionCraftWidgetShortcut:
         case .documents:
             return "문서 열기"
         case .reader:
-            return "독서"
+            return "데이지 플레이어"
         case .camera:
-            return "카메라 도구"
+            return "카메라"
+        case .textViewer:
+            return "텍스트뷰어"
         }
     }
 
@@ -468,7 +503,7 @@ enum VisionCraftWidgetShortcut:
         switch self {
         case .newAIChat:
             return widgetLocalized(
-                "새 AI 대화"
+                "새 대화"
             )
         case .chatHistory:
             return widgetLocalized(
@@ -480,7 +515,7 @@ enum VisionCraftWidgetShortcut:
             )
         case .liveTextReader:
             return widgetLocalized(
-                "실시간 글자 읽기"
+                "실시간 문자 읽기"
             )
         case .magnifier:
             return widgetLocalized(
@@ -496,11 +531,15 @@ enum VisionCraftWidgetShortcut:
             )
         case .reader:
             return widgetLocalized(
-                "독서"
+                "데이지 플레이어"
             )
         case .camera:
             return widgetLocalized(
-                "카메라 도구"
+                "카메라"
+            )
+        case .textViewer:
+            return widgetLocalized(
+                "텍스트뷰어"
             )
         }
     }
@@ -525,9 +564,13 @@ enum VisionCraftWidgetShortcut:
             return "book"
         case .camera:
             return "camera"
+        case .textViewer:
+            return "doc.plaintext"
         }
     }
 
+    /// Android `WidgetActions.ACTION_OPEN_TEXT_VIEW`: 클립보드 텍스트를 텍스트뷰어로 연다.
+    /// 앱의 `AppDeepLinkRouter`가 `text-viewer`를 텍스트뷰어 진입으로 처리한다.
     var deepLinkPath: String {
         switch self {
         case .newAIChat:
@@ -548,6 +591,8 @@ enum VisionCraftWidgetShortcut:
             return "reader"
         case .camera:
             return "camera"
+        case .textViewer:
+            return "text-viewer"
         }
     }
 
@@ -738,7 +783,7 @@ struct VisionCraftShortcutWidget:
             "VisionCraft 빠른 실행"
         )
         .description(
-            "새 AI 대화, 대화 기록, 스캔, 실시간 읽기, 돋보기, 음성 명령, 문서와 독서를 바로 엽니다."
+            "새 대화, 대화 기록, 문서 스캔, 실시간 문자 읽기, 돋보기, 음성 명령, 문서, 데이지 플레이어와 텍스트뷰어를 바로 엽니다."
         )
         .supportedFamilies([
             .systemSmall
@@ -822,12 +867,41 @@ private struct LocalAIUsageWidgetSnapshot:
     }
 }
 
+/// 앱 `CloudAITokenBudgetSnapshot`(`cloudAI.tokenBudget.today.v1`)과 같은 모양. 일일 한도 100만 토큰.
+private struct CloudAITokenBudgetWidgetSnapshot:
+    Codable
+{
+    static let dailyLimit = 1_000_000
+
+    let schemaVersion: Int
+    let dayIdentifier: String
+    let usedTokens: Int
+    let updatedAt: Date
+
+    /// Android `widgetAiUsagePercent`: 남은 비율(0…100).
+    var remainingPercent: Int {
+        let remaining = max(
+            0,
+            Self.dailyLimit - usedTokens
+        )
+        return Int(
+            (
+                Double(remaining)
+                    / Double(Self.dailyLimit)
+                    * 100
+            ).rounded(.down)
+        )
+    }
+}
+
 private struct LocalAIUsageEntry:
     TimelineEntry
 {
     let date: Date
     let snapshot:
         LocalAIUsageWidgetSnapshot?
+    var cloudBudget:
+        CloudAITokenBudgetWidgetSnapshot? = nil
 }
 
 private struct LocalAIUsageProvider:
@@ -837,6 +911,8 @@ private struct LocalAIUsageProvider:
         "group.net.rivo.visioncraft"
     private static let snapshotKey =
         "localAI.usage.today.v1"
+    private static let cloudBudgetKey =
+        "cloudAI.tokenBudget.today.v1"
 
     func placeholder(
         in context: Context
@@ -856,6 +932,16 @@ private struct LocalAIUsageProvider:
                     generatedCharacters:
                         2_840,
                     inferenceSeconds: 52,
+                    updatedAt: Date()
+                ),
+            cloudBudget:
+                CloudAITokenBudgetWidgetSnapshot(
+                    schemaVersion: 1,
+                    dayIdentifier:
+                        Self.dayIdentifier(
+                            for: Date()
+                        ),
+                    usedTokens: 280_000,
                     updatedAt: Date()
                 )
         )
@@ -920,8 +1006,48 @@ private struct LocalAIUsageProvider:
             snapshot:
                 loadSnapshot(
                     at: date
-                )
+                ),
+            cloudBudget:
+                loadCloudBudget(at: date)
         )
+    }
+
+    private func loadCloudBudget(
+        at date: Date
+    ) -> CloudAITokenBudgetWidgetSnapshot? {
+        guard let defaults =
+                UserDefaults(
+                    suiteName:
+                        Self.suiteName
+                ),
+              let data =
+                defaults.data(
+                    forKey:
+                        Self.cloudBudgetKey
+                ) else {
+            return nil
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy =
+            .iso8601
+        guard let snapshot =
+                try? decoder.decode(
+                    CloudAITokenBudgetWidgetSnapshot
+                        .self,
+                    from: data
+                ),
+              snapshot.schemaVersion == 1,
+              snapshot.dayIdentifier
+                == Self.dayIdentifier(
+                    for: date
+                ),
+              snapshot.usedTokens >= 0,
+              snapshot.usedTokens
+                <= CloudAITokenBudgetWidgetSnapshot
+                    .dailyLimit else {
+            return nil
+        }
+        return snapshot
     }
 
     private func loadSnapshot(
@@ -1002,6 +1128,7 @@ private struct LocalAIUsageProvider:
     }
 }
 
+/// Android `widget_ai_daily_usage`: "AI 토큰 잔량" + 남은 비율 + 막대. 로컬 AI 완료 횟수는 보조 줄.
 private struct
     LocalAIUsageWidgetView:
         View
@@ -1017,47 +1144,46 @@ private struct
     var body: some View {
         VStack(
             alignment: .leading,
-            spacing: 7
+            spacing: 6
         ) {
             HStack {
                 Image(
                     systemName:
-                        "apple.intelligence"
+                        "sparkles"
                 )
                 .font(.title2)
-                .foregroundStyle(.indigo)
+                .foregroundStyle(WidgetPalette.accent)
                 .accessibilityHidden(true)
                 Spacer()
-                Text("일일 제한 없음")
-                    .font(.caption2)
+                Text("오늘 남은 비율")
+                    .font(.caption)
                     .fontWeight(.semibold)
-                    .foregroundStyle(
-                        .indigo
-                    )
+                    .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 0)
 
-            Text("오늘 M4 로컬 AI")
+            Text("AI 토큰 잔량")
                 .font(.caption)
                 .foregroundStyle(
                     .secondary
                 )
-            Text(
-                widgetLocalizedFormat(
-                    "%ld회 완료",
-                    completedRequests
-                )
+            Text("\(remainingPercent)%")
+                .font(.title)
+                .fontWeight(.bold)
+                .monospacedDigit()
+                .lineLimit(1)
+            ProgressView(
+                value: Double(remainingPercent),
+                total: 100
             )
-            .font(.title2)
-            .fontWeight(.bold)
-            .lineLimit(1)
-            Text(activityDetail)
-                .font(.caption2)
+            .tint(WidgetPalette.accent)
+            Text(localActivityDetail)
+                .font(.caption)
                 .foregroundStyle(
                     .secondary
                 )
-                .lineLimit(2)
+                .lineLimit(1)
         }
         .frame(
             maxWidth: .infinity,
@@ -1078,9 +1204,9 @@ private struct
         )
         .accessibilityLabel(
             widgetLocalizedFormat(
-                "오늘 M4 로컬 AI, %ld회 완료, %@, 일일 제한 없음",
-                completedRequests,
-                activityDetail
+                "AI 토큰 잔량 %ld퍼센트, %@",
+                remainingPercent,
+                localActivityDetail
             )
         )
         .accessibilityHint(
@@ -1088,64 +1214,17 @@ private struct
         )
     }
 
-    private var completedRequests:
-        Int
-    {
-        entry.snapshot?
-            .completedRequests
-            ?? 0
+    /// 예산 기록이 없으면 아직 쓰지 않은 것이라 100%.
+    private var remainingPercent: Int {
+        entry.cloudBudget?.remainingPercent ?? 100
     }
 
-    private var activityDetail:
+    private var localActivityDetail:
         String
     {
-        guard let snapshot =
-                entry.snapshot,
-              snapshot.totalRequests > 0
-        else {
-            return widgetLocalized(
-                "오늘 활동 없음"
-            )
-        }
-        if snapshot.failedRequests > 0
-            || snapshot.cancelledRequests
-                > 0 {
-            return widgetLocalizedFormat(
-                "%ld자 생성 · %@\n실패 %ld · 취소 %ld",
-                snapshot.generatedCharacters,
-                durationText(
-                    snapshot
-                    .inferenceSeconds
-                ),
-                snapshot.failedRequests,
-                snapshot
-                    .cancelledRequests
-            )
-        }
-        return widgetLocalizedFormat(
-            "%ld자 생성 · %@",
-            snapshot.generatedCharacters,
-            durationText(
-                snapshot.inferenceSeconds
-            )
-        )
-    }
-
-    private func durationText(
-        _ seconds: Double
-    ) -> String {
-        if seconds < 60 {
-            return widgetLocalizedFormat(
-                "%ld초 처리",
-                Int(seconds.rounded())
-            )
-        }
-        return widgetLocalizedFormat(
-            "%ld분 처리",
-            Int(
-                (seconds / 60)
-                    .rounded()
-            )
+        widgetLocalizedFormat(
+            "로컬 AI %ld회 완료",
+            entry.snapshot?.completedRequests ?? 0
         )
     }
 }
@@ -1166,10 +1245,10 @@ struct LocalAIUsageWidget: Widget {
             )
         }
         .configurationDisplayName(
-            "오늘 M4 로컬 AI 활동"
+            "AI 토큰 잔량"
         )
         .description(
-            "로컬 AI의 오늘 완료 응답과 처리량을 표시합니다."
+            "오늘 남은 클라우드 AI 토큰 비율과 로컬 AI 완료 횟수를 표시합니다."
         )
         .supportedFamilies([
             .systemSmall

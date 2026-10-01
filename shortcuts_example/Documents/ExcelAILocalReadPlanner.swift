@@ -1,8 +1,7 @@
 import Foundation
 
-/// Builds a read-only row lookup when the request names both the condition
-/// columns and the result column explicitly. Ambiguous questions continue to
-/// the model planner.
+/// Builds a read-only lookup for explicitly named
+/// condition/result columns. Ambiguous questions continue to the model planner.
 nonisolated enum ExcelAILocalReadPlanner {
     static func query(
         in snapshot: ExcelAIWorkbookSnapshot,

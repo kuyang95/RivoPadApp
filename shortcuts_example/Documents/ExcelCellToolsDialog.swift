@@ -43,15 +43,11 @@ struct ExcelCellToolsDialog: View {
             onDismiss: onDismiss
         ) {
             if page != .tools {
-                Button {
+                VisionCraftBackButton {
                     page = .tools
                     toCurrentColumn = false
-                } label: {
-                    Label("뒤로", systemImage: "chevron.left")
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(VisionCraftUI.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             if page != .tools && page != .annotations {
@@ -87,7 +83,7 @@ struct ExcelCellToolsDialog: View {
     }
 
     private var tools: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: VisionCraftUI.actionRowSpacing) {
             VisionCraftDialogOptionRow(
                 title: "범위 선택·복사",
                 subtitle: "여러 셀을 선택하고 복사·붙여넣기·채우기를 합니다.",
@@ -173,7 +169,7 @@ struct ExcelCellToolsDialog: View {
     }
 
     private var numberFormats: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: VisionCraftUI.actionRowSpacing) {
             ForEach(ExcelNumberFormat.allCases) { format in
                 let isSelected = !toCurrentColumn
                     && viewModel.selectedNumberFormat == format
@@ -191,7 +187,7 @@ struct ExcelCellToolsDialog: View {
     }
 
     private var dropdown: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: VisionCraftUI.actionRowSpacing) {
             if !toCurrentColumn && !viewModel.selectedDropdownValues.isEmpty {
                 Text("드롭다운 값")
                     .font(.headline)
@@ -231,7 +227,7 @@ struct ExcelCellToolsDialog: View {
     }
 
     private var conditionalFormatting: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: VisionCraftUI.actionRowSpacing) {
             VisionCraftDialogOptionRow(
                 title: toCurrentColumn ? "현재 열 데이터 전체 설정…" : "선택한 셀 조건부 서식…",
                 systemImage: "paintpalette"
@@ -249,7 +245,7 @@ struct ExcelCellToolsDialog: View {
     }
 
     private var annotations: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: VisionCraftUI.actionRowSpacing) {
             if let url = viewModel.selectedExternalHyperlinkURL {
                 VisionCraftDialogOptionRow(title: "링크 열기", systemImage: "safari") {
                     onAction(.openLink(url))

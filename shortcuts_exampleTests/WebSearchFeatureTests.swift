@@ -23,7 +23,8 @@ final class WebSearchFeatureTests: XCTestCase {
     func testConfigurationPersistsEnabledStateWithoutUserKey() {
         let store = WebSearchConfigurationStore(defaults: defaults)
 
-        XCTAssertFalse(store.isEnabled)
+        XCTAssertTrue(store.isEnabled)
+        XCTAssertTrue(store.isAutomaticChatSearchEnabled)
         store.setEnabled(true)
         XCTAssertTrue(store.isEnabled)
 
@@ -32,6 +33,11 @@ final class WebSearchFeatureTests: XCTestCase {
 
         restored.setEnabled(false)
         XCTAssertFalse(restored.isEnabled)
+        XCTAssertFalse(restored.isAutomaticChatSearchEnabled)
+
+        let disabled = WebSearchConfigurationStore(defaults: defaults)
+        XCTAssertFalse(disabled.isEnabled)
+        XCTAssertFalse(disabled.isAutomaticChatSearchEnabled)
     }
 
     func testQueryValidationEnforcesProviderLimits() throws {

@@ -539,8 +539,8 @@ extension OCRResultView {
             )
 
             Rectangle()
-                .stroke(Color.yellow, lineWidth: 2)
-                .background(Color.yellow.opacity(0.18))
+                .stroke(VisionCraftUI.warning, lineWidth: 2)
+                .background(VisionCraftUI.warning.opacity(0.18))
                 .frame(width: rect.width, height: rect.height)
                 .position(x: rect.midX, y: rect.midY)
         }

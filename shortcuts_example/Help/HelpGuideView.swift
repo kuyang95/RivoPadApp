@@ -49,7 +49,12 @@ struct HelpGuideView: View {
                 } else if filteredTopics.isEmpty {
                     ContentUnavailableView.search(text: query)
                 } else {
-                    topicRows(group: .feature)
+                    topicRows(
+                        showsFeatures
+                            ? HelpGuideContent.features(filteredTopics)
+                            : HelpGuideContent.situations(filteredTopics),
+                        showsSubtitle: showsFeatures
+                    )
                     if filteredTopics.contains(where: { $0.group == .problem }) {
                         Text(localized("문제 해결"))
                             .visionCraftAndroidText(22, weight: .semibold, relativeTo: .title2)
@@ -57,12 +62,13 @@ struct HelpGuideView: View {
                             .accessibilityAddTraits(.isHeader)
                             .padding(.top, 32)
                             .padding(.bottom, 8)
-                        topicRows(group: .problem)
+                        topicRows(filteredTopics.filter { $0.group == .problem }, showsSubtitle: false)
                     }
                 }
 
                 NavigationLink {
                     HelpCenterView(language: language)
+                        .visionCraftRouteBackButton()
                         .toolbar(.visible, for: .navigationBar)
                 } label: {
                     HStack(spacing: 12) {
@@ -156,7 +162,7 @@ struct HelpGuideView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(VisionCraftUI.secondaryText)
-                        .frame(width: 44, height: 44)
+                        .frame(width: 48, height: 48)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(localized("지우기"))
@@ -172,8 +178,9 @@ struct HelpGuideView: View {
         }
     }
 
-    private func topicRows(group: HelpGuideTopic.Group) -> some View {
-        ForEach(filteredTopics.filter { $0.group == group }) { topic in
+    /// Android `GuideRow`: 기능별 보기에서는 상황 문장을 부제로 보여 준다.
+    private func topicRows(_ topics: [HelpGuideTopic], showsSubtitle: Bool) -> some View {
+        ForEach(topics) { topic in
             NavigationLink(value: topic) {
                 HStack(spacing: 12) {
                     Image(systemName: topic.icon)
@@ -181,11 +188,18 @@ struct HelpGuideView: View {
                         .foregroundStyle(VisionCraftHomeUI.icon)
                         .frame(width: 30)
                         .accessibilityHidden(true)
-                    Text(showsFeatures && group == .feature ? topic.feature : topic.situation)
-                        .visionCraftAndroidText(18, weight: .medium, relativeTo: .headline)
-                        .foregroundStyle(VisionCraftUI.primaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .multilineTextAlignment(.leading)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(showsSubtitle ? topic.feature : topic.situation)
+                            .visionCraftAndroidText(18, weight: .medium, relativeTo: .headline)
+                            .foregroundStyle(VisionCraftUI.primaryText)
+                        if showsSubtitle {
+                            Text(topic.situation)
+                                .visionCraftAndroidText(16)
+                                .foregroundStyle(VisionCraftUI.secondaryText)
+                        }
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 16, weight: .medium))
@@ -251,6 +265,24 @@ struct HelpGuideDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(VisionCraftUI.surface, in: RoundedRectangle(cornerRadius: 12))
 
+                if HelpGuideContent.remoteManualTopicIDs.contains(topic.id) {
+                    // Android `GuideDetail`: 리모컨 항목에만 리보탭 매뉴얼 글자 버튼.
+                    NavigationLink {
+                        HelpRemoteManualView(language: language)
+                    } label: {
+                        Text(localized("리보탭 리모컨 자세히 알아보기"))
+                            .visionCraftAndroidText(16, weight: .medium)
+                            .foregroundStyle(VisionCraftUI.primary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 12)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, -8)
+                    .accessibilityIdentifier("guide.remote-manual")
+                }
+
                 Button {
                     onAction(topic.action)
                 } label: {
@@ -258,7 +290,7 @@ struct HelpGuideDetailView: View {
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity, minHeight: 28)
                 }
-                .buttonStyle(VisionCraftAndroidButtonStyle())
+                .buttonStyle(VisionCraftAndroidButtonStyle(filled: true))
                 .padding(.top, 4)
                 .accessibilityIdentifier("guide.open-feature")
             }
@@ -273,8 +305,114 @@ struct HelpGuideDetailView: View {
     }
 }
 
+/// Android `RemoteManualScreen` + `ManualScreen`: `assets/manual`을 평면 목록으로 보여 준다.
+struct HelpRemoteManualView: View {
+    let language: AppLanguage
+    private let document: HelpManualDocument?
+    private let loadError: String?
+
+    init(bundle: Bundle = .main, language: AppLanguage = .current()) {
+        self.language = language
+        do {
+            document = try HelpContentLibrary.remoteManual(bundle: bundle, language: language)
+            loadError = nil
+        } catch {
+            document = nil
+            loadError = error.localizedDescription
+        }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                if let document {
+                    manualBody(document)
+                } else {
+                    Text(localized("매뉴얼을 불러오지 못했어요. 뒤로 돌아가 다시 열어주세요."))
+                        .visionCraftAndroidText(18)
+                        .foregroundStyle(VisionCraftUI.primaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let loadError {
+                        Text(loadError)
+                            .visionCraftAndroidText(14)
+                            .foregroundStyle(VisionCraftUI.secondaryText)
+                            .padding(.top, 8)
+                    }
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .modifier(HelpGuidePageStyle(language: language, title: "매뉴얼"))
+        .accessibilityIdentifier("guide.remote-manual.screen")
+    }
+
+    @ViewBuilder
+    private func manualBody(_ document: HelpManualDocument) -> some View {
+        Text(document.title)
+            .visionCraftAndroidText(20, weight: .bold, relativeTo: .title2)
+            .foregroundStyle(VisionCraftUI.primaryText)
+            .accessibilityAddTraits(.isHeader)
+            .padding(.bottom, 8)
+        Text(String(format: localized("버전: %@"), document.version))
+            .visionCraftAndroidText(14)
+            .foregroundStyle(VisionCraftUI.primaryText)
+            .padding(.bottom, 4)
+        Text(String(format: localized("날짜: %@"), document.date))
+            .visionCraftAndroidText(14)
+            .foregroundStyle(VisionCraftUI.primaryText)
+            .padding(.bottom, 16)
+        ForEach(document.chapters) { chapter in
+            Text(chapter.name)
+                .visionCraftAndroidText(18, weight: .semibold, relativeTo: .headline)
+                .foregroundStyle(VisionCraftUI.primaryText)
+                .accessibilityAddTraits(.isHeader)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+            ForEach(chapter.sections) { section in
+                Text(section.name)
+                    .visionCraftAndroidText(16, weight: .medium)
+                    .foregroundStyle(VisionCraftUI.primaryText)
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
+                ForEach(Array(section.texts.enumerated()), id: \.offset) { _, text in
+                    manualLine(text, indent: 16)
+                        .padding(.vertical, 4)
+                }
+                ForEach(section.subsections) { subsection in
+                    Text(subsection.name)
+                        .visionCraftAndroidText(18)
+                        .foregroundStyle(VisionCraftUI.primaryText)
+                        .padding(.vertical, 2)
+                        .padding(.leading, 8)
+                    ForEach(Array(subsection.texts.enumerated()), id: \.offset) { _, text in
+                        manualLine(text, indent: 24)
+                            .padding(.vertical, 2)
+                    }
+                }
+            }
+        }
+    }
+
+    private func manualLine(_ text: String, indent: CGFloat) -> some View {
+        Text("- \(text)")
+            .visionCraftAndroidText(18)
+            .lineSpacing(6)
+            .foregroundStyle(VisionCraftUI.primaryText)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, indent)
+    }
+
+    private func localized(_ key: String) -> String {
+        AppLocalization.string(key, language: language)
+    }
+}
+
 private struct HelpGuidePageStyle: ViewModifier {
     let language: AppLanguage
+    var title = "사용 설명서"
     @Environment(\.dismiss) private var dismiss
 
     func body(content: Content) -> some View {
@@ -283,16 +421,10 @@ private struct HelpGuidePageStyle: ViewModifier {
             .tint(VisionCraftUI.primary)
             .safeAreaInset(edge: .top, spacing: 0) {
                 HStack(spacing: 4) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "arrow.left")
-                            .font(.system(size: 24, weight: .regular))
-                            .frame(width: 48, height: 48)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
+                    VisionCraftBackButton { dismiss() }
                     .accessibilityLabel(AppLocalization.string("뒤로", language: language))
                     .accessibilityIdentifier("guide.back")
-                    Text(AppLocalization.string("사용 설명서", language: language))
+                    Text(AppLocalization.string(title, language: language))
                         .visionCraftAndroidText(22, weight: .semibold, relativeTo: .title2)
                         .accessibilityAddTraits(.isHeader)
                     Spacer(minLength: 0)
@@ -302,7 +434,7 @@ private struct HelpGuidePageStyle: ViewModifier {
                 .frame(minHeight: 64)
                 .background(VisionCraftUI.background)
             }
-            .navigationTitle(AppLocalization.string("사용 설명서", language: language))
+            .navigationTitle(AppLocalization.string(title, language: language))
             .toolbar(.hidden, for: .navigationBar)
             .visionCraftHandlesBackNavigation()
     }

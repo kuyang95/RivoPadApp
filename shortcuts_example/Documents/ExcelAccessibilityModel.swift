@@ -297,6 +297,35 @@ nonisolated enum ExcelAccessibilityAnalyzer {
         let usedColumns = Array(
             Set(cells.map(\.address.column))
         ).sorted()
+        // A title and subtitle can precede a label/value summary without being
+        // merged. Its first numeric value is data, never a column heading.
+        if usedColumns.count == 2,
+           let firstPairRow = rowNumbers.first(where: { rows[$0]?.count == 2 }) {
+            let valueRows = rowNumbers.filter { $0 >= firstPairRow }
+            let isNumericSummary = valueRows.count >= 2 && valueRows.allSatisfy { row in
+                guard let pair = rows[row]?.sorted(by: { $0.address.column < $1.address.column }),
+                      pair.count == 2,
+                      pair.map(\.address.column) == usedColumns else { return false }
+                return ["s", "inlineStr", "str"].contains(pair[0].cellType ?? "")
+                    && pair[0].formula?.isEmpty != false
+                    && (pair[1].cellType == nil || pair[1].cellType == "n")
+                    && Decimal(string: pair[1].rawValue) != nil
+            }
+            if isNumericSummary {
+                return ExcelAccessibleRegion(
+                    id: supplementalID(sheet: sheet, range: bounds),
+                    name: firstRow < firstPairRow ? (rows[firstRow]?.first?.displayValue ?? sheet.name) : sheet.name,
+                    range: bounds,
+                    headerRow: nil,
+                    columns: [
+                        .init(column: usedColumns[0], title: AppLocalization.string("항목")),
+                        .init(column: usedColumns[1], title: AppLocalization.string("값")),
+                    ],
+                    rowNumbers: valueRows,
+                    isNativeTable: false
+                )
+            }
+        }
         if usedColumns.count == 2,
            rowNumbers.count > 1,
            rowNumbers.allSatisfy({ row in

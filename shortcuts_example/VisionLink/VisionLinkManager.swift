@@ -168,6 +168,11 @@ final class VisionLinkManager: ObservableObject {
         VisionLinkRemoteFeatureStatus?
     @Published private(set) var recentEvents:
         [VisionLinkEventRecord] = []
+    /// Android `VisionLinkSettingsActivity.setBusy`: 등록 해제 진행 중 표시.
+    @Published private(set) var isUnregistering = false
+    /// Android `visionlink_settings_unregister_failed`: 등록 해제 실패 문구.
+    @Published private(set) var unregisterErrorDescription:
+        String?
 
     private let server: any VisionLinkServerServing
     private let credentialStore:
@@ -193,7 +198,8 @@ final class VisionLinkManager: ObservableObject {
     private var socketGeneration = 0
     private var mediaWatchdog =
         VisionLinkMediaWatchdog()
-    private var lastMediaWatchdogTimeout:
+    /// Android `showOfferTimeoutIfWaiting` / `showFirstFrameTimeoutIfWaiting`: 화면이 "연결에 문제가 있습니다" 문구를 고르는 근거.
+    @Published private(set) var lastMediaWatchdogTimeout:
         VisionLinkMediaWatchdog.Timeout?
     private var isApplicationActive = true
     private var allowsAutomaticRecovery = true
@@ -364,12 +370,15 @@ final class VisionLinkManager: ObservableObject {
         cancelConnectionRecovery()
         stopMediaWatchdog()
         connectionTask?.cancel()
+        isUnregistering = true
+        unregisterErrorDescription = nil
         connectionTask = Task { [weak self] in
             guard let self else {
                 return
             }
             defer {
                 self.connectionTask = nil
+                self.isUnregistering = false
             }
             self.cancelSocket(reason: "unregister")
             self.stopCountdown()
@@ -392,9 +401,13 @@ final class VisionLinkManager: ObservableObject {
             } catch is CancellationError {
                 return
             } catch {
-                self.state = .failed(
-                    Self.userMessage(for: error)
-                )
+                let message = Self.userMessage(for: error)
+                self.unregisterErrorDescription =
+                    AppLocalization.format(
+                        "등록 해제에 실패했습니다. %@",
+                        message
+                    )
+                self.state = .failed(message)
             }
         }
     }
@@ -2150,6 +2163,8 @@ extension VisionLinkManager:
                     )
             )
         case .clipboardReceived(let text):
+            // Android `VisionLinkDataChannelFileReceiver`: 받은 텍스트는 기기 클립보드에도 저장한다.
+            UIPasteboard.general.string = text
             receivedClipboardText = text
             dataTransferMessage = nil
             appendEvent(

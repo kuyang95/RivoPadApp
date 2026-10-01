@@ -103,7 +103,7 @@ struct LocalModelPreparationView: View {
     private var heroColor: Color {
         failure == nil
             ? VisionCraftUI.primary
-            : .orange
+            : VisionCraftUI.warning
     }
 
     private var title: String {
@@ -224,7 +224,7 @@ struct LocalModelPreparationView: View {
                 systemImage: "wifi.exclamationmark"
             )
             .font(.headline)
-            .foregroundStyle(.orange)
+            .foregroundStyle(VisionCraftUI.warning)
 
             if let detail = failure.technicalDetail,
                !detail.isEmpty {
@@ -248,7 +248,7 @@ struct LocalModelPreparationView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(22)
         .background(
-            Color.orange.opacity(0.10),
+            VisionCraftUI.warning.opacity(0.10),
             in: RoundedRectangle(
                 cornerRadius: 18,
                 style: .continuous
@@ -259,7 +259,7 @@ struct LocalModelPreparationView: View {
                 cornerRadius: 18,
                 style: .continuous
             )
-            .stroke(Color.orange.opacity(0.35))
+            .stroke(VisionCraftUI.warning.opacity(0.35))
         }
     }
 

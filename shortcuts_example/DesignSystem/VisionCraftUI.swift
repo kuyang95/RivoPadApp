@@ -17,10 +17,32 @@ enum VisionCraftUI {
     static let linkBlue = adaptiveColor(light: 0x356AA8, dark: 0x9EC5FF)
     static let success = adaptiveColor(light: 0x247548, dark: 0x83D4A1)
     static let warning = adaptiveColor(light: 0x8B6517, dark: 0xE8C978)
+    /// Android `vc_error` / `VCColors.Error`. 오류·중지 상태에만 쓴다.
+    static let error = adaptiveColor(light: 0xCF6679, dark: 0xCF6679)
+    /// Android `vc_chat_text_disabled`: 입력칸 안내 글자(입력칸 위 4.6:1).
+    static let inputPlaceholder = adaptiveColor(light: 0x616E7F, dark: 0x8A97A8)
+    /// Android `vc_soft_overlay`: 안내 띠. 글자색 88%, 글자는 배경색.
+    static let overlay = adaptiveColor(light: 0x283546, dark: 0xF0F4FA).opacity(0.88)
+    /// Android `vc_link_success` / `vc_link_warning`: 비전링크 연결 상태 전용.
+    static let linkSuccess = adaptiveColor(light: 0x28765A, dark: 0x99D8BA)
+    static let linkWarning = adaptiveColor(light: 0x976026, dark: 0xE7BE80)
+
+    /// 접근성 계약: 누를 수 있는 것은 48pt 이상.
+    static let minTouchTarget: CGFloat = 48
+    static let minTextSize: CGFloat = 12
 
     static let contentWidth: CGFloat = 760
     static let horizontalPadding: CGFloat = 24
     static let sectionSpacing: CGFloat = 28
+    static let actionRowSpacing: CGFloat = 16
+    static let sectionHeaderBottomSpacing: CGFloat = 14
+    /// Android VcHomeSectionHeader 아래 14 + VcHomeCategoryDialog 추가 6.
+    static let cardDialogHeaderBottomSpacing = sectionHeaderBottomSpacing + 6
+
+    /// 테마를 따르지 않는 고정색(카메라 미리보기 위 버튼).
+    static func fixedColor(_ hex: UInt32) -> Color {
+        Color(uiColor: UIColor(hex: hex))
+    }
 
     private static func adaptiveColor(
         light: UInt32,
@@ -38,7 +60,23 @@ enum VisionCraftUI {
     }
 }
 
-private extension UIColor {
+/// 카메라 미리보기 위 버튼 고정색. Android `camera/CameraControls.kt` 상단과 같다.
+/// 미리보기를 가리지 않도록 띠를 깔지 않고 버튼 자체가 대비를 만든다.
+enum VisionCraftCameraUI {
+    static let surface = VisionCraftUI.fixedColor(0x171717)
+    static let pressed = VisionCraftUI.fixedColor(0x3A3A3A)
+    static let outline = Color.white
+    static let text = Color.white
+    static let secondaryText = VisionCraftUI.fixedColor(0xD6DCE6)
+    static let on = VisionCraftUI.fixedColor(0xFFA05C)
+    static let onText = VisionCraftUI.fixedColor(0x2B1200)
+    static let mode = VisionCraftUI.fixedColor(0x283546)
+    static let modeOutline = VisionCraftUI.fixedColor(0xF0F4FA)
+    static let shutterRing = VisionCraftUI.fixedColor(0x171717)
+    static let shutterPressed = VisionCraftUI.fixedColor(0xD0D0D0)
+}
+
+extension UIColor {
     convenience init(hex: UInt32) {
         self.init(
             red: CGFloat((hex >> 16) & 0xFF) / 255,
@@ -82,7 +120,7 @@ struct VisionCraftPrimaryActionPanel: View {
                     iconSize: 27
                 )
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 0) {
                     Text(AppLocalization.string(title))
                         .font(.title2.bold())
                         .foregroundStyle(VisionCraftUI.primaryText)
@@ -144,6 +182,8 @@ struct VisionCraftActionItem: Identifiable {
     let title: String
     let description: String
     var accent: Color = VisionCraftUI.primary
+    /// 현재 값 표시(예: 카메라 모드 "현재"). 있으면 테두리가 강조색이 되고 화살표 자리에 뱃지가 들어간다.
+    var badge: String? = nil
     let action: () -> Void
 }
 
@@ -207,26 +247,183 @@ struct VisionCraftActionList: View {
     }
 }
 
+/// Android `VcIconTileSize`: 목록 카드용 Large, 메뉴 줄용 Medium.
+enum VisionCraftIconTileSize {
+    case large, medium, custom(box: CGFloat, corner: CGFloat, icon: CGFloat)
+
+    var box: CGFloat {
+        switch self {
+        case .large: 52
+        case .medium: 44
+        case .custom(let box, _, _): box
+        }
+    }
+
+    var corner: CGFloat {
+        switch self {
+        case .large: 16
+        case .medium: 14
+        case .custom(_, let corner, _): corner
+        }
+    }
+
+    var icon: CGFloat {
+        switch self {
+        case .large: 30
+        case .medium: 22
+        case .custom(_, _, let icon): icon
+        }
+    }
+}
+
+/// Android `VcIconTile`: 강조색 14% 바탕의 둥근 사각 안에 아이콘.
+/// `isEnabled == false`면 바탕 글자색 6%, 아이콘 글자색 38%.
 struct VisionCraftIconTile: View {
     let systemImage: String
     let foreground: Color
     let background: Color
     var size: CGFloat = 40
     var iconSize: CGFloat = 22
+    var cornerRadius: CGFloat? = nil
+    var isEnabled = true
+
+    init(
+        systemImage: String,
+        foreground: Color,
+        background: Color,
+        size: CGFloat = 40,
+        iconSize: CGFloat = 22,
+        cornerRadius: CGFloat? = nil,
+        isEnabled: Bool = true
+    ) {
+        self.systemImage = systemImage
+        self.foreground = foreground
+        self.background = background
+        self.size = size
+        self.iconSize = iconSize
+        self.cornerRadius = cornerRadius
+        self.isEnabled = isEnabled
+    }
+
+    /// 강조색 하나로 Android 규격 크기를 그린다.
+    init(
+        systemImage: String,
+        tint: Color,
+        tileSize: VisionCraftIconTileSize = .large,
+        isEnabled: Bool = true
+    ) {
+        self.systemImage = systemImage
+        self.foreground = tint
+        self.background = tint.opacity(0.14)
+        self.size = tileSize.box
+        self.iconSize = tileSize.icon
+        self.cornerRadius = tileSize.corner
+        self.isEnabled = isEnabled
+    }
 
     var body: some View {
         Image(systemName: systemImage)
             .font(.system(size: iconSize, weight: .semibold))
-            .foregroundStyle(foreground)
+            .foregroundStyle(
+                isEnabled ? foreground : VisionCraftUI.primaryText.opacity(0.38)
+            )
             .frame(width: size, height: size)
             .background(
-                background,
+                isEnabled ? background : VisionCraftUI.primaryText.opacity(0.06),
                 in: RoundedRectangle(
-                    cornerRadius: size * 0.28,
+                    cornerRadius: cornerRadius ?? resolvedCorner,
                     style: .continuous
                 )
             )
             .accessibilityHidden(true)
+    }
+
+    private var resolvedCorner: CGFloat {
+        switch size {
+        case 52: 16
+        case 44: 14
+        default: size * 0.28
+        }
+    }
+}
+
+/// Android `VcIconButton`(`VcHomeTitleIconButton`): 52pt 정사각 터치 영역, 모서리 16,
+/// 면·테두리 없음, 아이콘 26pt. 제목 줄 오른쪽 아이콘 버튼에 쓴다.
+struct VisionCraftIconButton: View {
+    let systemImage: String
+    let label: String
+    var tint: Color = VisionCraftUI.icon
+    var statusDot: Color? = nil
+    let action: () -> Void
+
+    init(
+        systemImage: String,
+        label: String,
+        tint: Color = VisionCraftUI.icon,
+        statusDot: Color? = nil,
+        action: @escaping () -> Void
+    ) {
+        self.systemImage = systemImage
+        self.label = label
+        self.tint = tint
+        self.statusDot = statusDot
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 26, weight: .regular))
+                .foregroundStyle(tint)
+                .frame(width: 52, height: 52)
+                .overlay(alignment: .topTrailing) {
+                    if let statusDot {
+                        Circle()
+                            .fill(statusDot)
+                            .frame(width: 8, height: 8)
+                            .padding(.top, 7)
+                            .padding(.trailing, 7)
+                    }
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(VisionCraftHomePressStyle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(AppLocalization.string(label))
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// Android `VcScreenTitleRow`: 24pt Bold 제목(heading). `onBack`이 있으면 왼쪽에
+/// 48pt 뒤로 가기, `actions`에 오른쪽 아이콘 버튼(`VisionCraftIconButton`).
+struct VisionCraftScreenTitleRow<Actions: View>: View {
+    let title: String
+    var onBack: (() -> Void)? = nil
+    @ViewBuilder let actions: () -> Actions
+
+    init(
+        title: String,
+        onBack: (() -> Void)? = nil,
+        @ViewBuilder actions: @escaping () -> Actions = { EmptyView() }
+    ) {
+        self.title = title
+        self.onBack = onBack
+        self.actions = actions
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            if let onBack {
+                VisionCraftBackButton(action: onBack)
+                    .padding(.trailing, 4)
+            }
+            Text(AppLocalization.string(title))
+                .visionCraftAndroidText(24, weight: .bold, relativeTo: .title)
+                .foregroundStyle(VisionCraftUI.primaryText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityAddTraits(.isHeader)
+            actions()
+        }
     }
 }
 
@@ -348,24 +545,29 @@ struct VisionCraftBackButton: View {
     }
 
     var style: Style = .standard
+    var tint: Color?
     let action: () -> Void
 
     init(
         style: Style = .standard,
+        tint: Color? = nil,
         action: @escaping () -> Void
     ) {
         self.style = style
+        self.tint = tint
         self.action = action
     }
 
     var body: some View {
         Button(action: action) {
             Image(systemName: "chevron.left.circle")
-            .font(.system(size: 30, weight: .regular))
+            .resizable()
+            .scaledToFit()
+            .frame(width: 30, height: 30)
             .foregroundStyle(
-                style == .overlay
+                tint ?? (style == .overlay
                     ? Color.white
-                    : VisionCraftUI.primary
+                    : VisionCraftUI.primary)
             )
             .shadow(
                 color: .black.opacity(
@@ -374,10 +576,15 @@ struct VisionCraftBackButton: View {
                 radius: 4,
                 y: 1
             )
-            .frame(width: 44, height: 44)
+            .frame(
+                width: VisionCraftUI.minTouchTarget,
+                height: VisionCraftUI.minTouchTarget
+            )
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .frame(width: VisionCraftUI.minTouchTarget, height: VisionCraftUI.minTouchTarget)
+        .fixedSize()
         .accessibilityLabel(
             AppLocalization.string("뒤로가기")
         )
@@ -458,9 +665,10 @@ extension View {
         )
     }
 
+    /// Android `VcPanel`: 면 색, 모서리 16, 1pt 보조글자색 70% 테두리, 그림자 없음.
     func visionCraftSurfaceCard(
         cornerRadius: CGFloat = 16,
-        outlineOpacity: Double = 0.8
+        outlineOpacity: Double = 0.7
     ) -> some View {
         modifier(
             VisionCraftSurfaceCardModifier(
@@ -472,5 +680,24 @@ extension View {
 
     func visionCraftInputSurface() -> some View {
         modifier(VisionCraftInputSurfaceModifier())
+    }
+
+    /// Android `VcScreen`: 좌우 24pt, 위 12pt, 아래 24pt 화면 여백.
+    func visionCraftScreenPadding(bottom: CGFloat = 24) -> some View {
+        padding(.horizontal, VisionCraftUI.horizontalPadding)
+            .padding(.top, 12)
+            .padding(.bottom, bottom)
+    }
+
+    /// Android `VcPanel(error = true)`: 1.5pt 강조색 테두리(오류 안내).
+    func visionCraftErrorPanel(cornerRadius: CGFloat = 16) -> some View {
+        background(
+            VisionCraftUI.surface,
+            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(VisionCraftUI.accent, lineWidth: 1.5)
+        }
     }
 }

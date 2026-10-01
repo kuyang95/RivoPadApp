@@ -5,6 +5,7 @@
 //  Created by meee on 2/4/26.
 //
 
+import SwiftUI
 import UIKit
 
 final class DocumentViewerViewController: UIViewController {
@@ -116,7 +117,7 @@ final class DocumentViewerViewController: UIViewController {
             let layer = CAShapeLayer()
             layer.path = path.cgPath
             layer.fillColor = UIColor.clear.cgColor
-            layer.strokeColor = (i == currentIndex ? UIColor.systemBlue : UIColor.systemYellow).cgColor
+            layer.strokeColor = (i == currentIndex ? UIColor(VisionCraftUI.linkBlue) : UIColor(VisionCraftUI.warning)).cgColor
             layer.lineWidth = (i == currentIndex ? 3 : 1)
 
             overlayLayer.addSublayer(layer)
@@ -130,7 +131,7 @@ final class DocumentViewerViewController: UIViewController {
 
         // 박스 스타일 업데이트
         for (i, layer) in boxLayers.enumerated() {
-            layer.strokeColor = (i == currentIndex ? UIColor.systemBlue : UIColor.systemYellow).cgColor
+            layer.strokeColor = (i == currentIndex ? UIColor(VisionCraftUI.linkBlue) : UIColor(VisionCraftUI.warning)).cgColor
             layer.lineWidth = (i == currentIndex ? 3 : 1)
         }
 

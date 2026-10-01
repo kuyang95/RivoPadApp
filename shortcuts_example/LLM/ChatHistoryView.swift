@@ -1,10 +1,12 @@
 import SwiftUI
 
+/// Android `ConversationListScreen`: title row, "대화 n개" caption, one
+/// `VcActionRow` card per conversation and a pinned ink "새 대화" button.
 struct ChatHistoryView: View {
     @EnvironmentObject private var appRouter: AppRouter
+    @Environment(\.dismiss) private var dismiss
     @State private var conversations:
         [StoredChatConversation] = []
-    @State private var searchText = ""
     @State private var errorDescription: String?
     @State private var isLoading = true
     @State private var isMutating = false
@@ -13,10 +15,14 @@ struct ChatHistoryView: View {
     @State private var titleDraft = ""
     @State private var showsRenameDialog =
         false
-    @State private var showsDeleteAllDialog =
-        false
 
     private let historyStore: ChatHistoryStore
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter
+    }()
 
     init(
         historyStore:
@@ -30,55 +36,55 @@ struct ChatHistoryView: View {
             VisionCraftUI.background
                 .ignoresSafeArea()
 
-            if isLoading {
-                ProgressView(
-                    "데이터 불러오는 중"
+            VStack(spacing: 0) {
+                VisionCraftScreenTitleRow(
+                    title: "대화기록",
+                    onBack: { dismiss() }
                 )
-            } else if conversations.isEmpty {
-                emptyHistoryCard
-            } else {
-                conversationList
-            }
-        }
-        .visionCraftNavigationScreen()
-        .navigationTitle("대화기록")
-        .safeAreaInset(edge: .bottom) {
-            VStack(alignment: .trailing, spacing: 10) {
+                .padding(.bottom, 16)
+
+                Group {
+                    if isLoading {
+                        loadingState
+                    } else if conversations.isEmpty {
+                        emptyState
+                    } else {
+                        conversationList
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
                 if let errorDescription {
                     Text(errorDescription)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                        .visionCraftAndroidText(14)
+                        .foregroundStyle(VisionCraftUI.error)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(14)
-                        .visionCraftSurfaceCard(cornerRadius: 14)
-                        .accessibilityLabel("오류: \(errorDescription)")
+                        .visionCraftErrorPanel()
+                        .padding(.top, 12)
+                        .accessibilityLabel(
+                            AppLocalization.format(
+                                "오류: %@",
+                                errorDescription
+                            )
+                        )
                 }
 
-                HStack {
-                    Spacer()
-                    Button {
-                        appRouter.route = .localChat(conversationID: nil)
-                    } label: {
-                        Label("새 대화", systemImage: "plus")
-                            .font(.headline)
-                            .padding(.horizontal, 8)
-                            .frame(minHeight: 48)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .buttonBorderShape(
-                        .roundedRectangle(
-                            radius: 16
-                        )
-                    )
-                    .tint(
-                        VisionCraftUI.primary
-                    )
-                    .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
+                Button {
+                    appRouter.route = .localChat(conversationID: nil)
+                } label: {
+                    Text(AppLocalization.string("새 대화"))
+                        .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(VisionCraftAndroidButtonStyle(filled: true))
+                .padding(.top, 16)
+                .accessibilityIdentifier("chat-history-new")
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 8)
+            .visionCraftScreenPadding()
         }
+        .visionCraftNavigationScreen()
+        .toolbar(.hidden, for: .navigationBar)
+        .visionCraftHandlesBackNavigation()
         .alert(
             "대화 제목 수정",
             isPresented:
@@ -103,7 +109,7 @@ struct ChatHistoryView: View {
                     )
                 )
             }
-            Button("저장") {
+            Button("확인") {
                 renameConversation()
             }
             .disabled(
@@ -119,10 +125,6 @@ struct ChatHistoryView: View {
                 editingConversationID =
                     nil
             }
-        } message: {
-            Text(
-                "목록에 표시할 대화 제목을 최대 120자로 입력하세요."
-            )
         }
         .onAppear {
             Task {
@@ -131,13 +133,40 @@ struct ChatHistoryView: View {
         }
     }
 
+    private var loadingState: some View {
+        Text(AppLocalization.string("데이터를 받아오는 중입니다..."))
+            .visionCraftAndroidText(16)
+            .foregroundStyle(VisionCraftUI.secondaryText)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityAddTraits(.updatesFrequently)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 8) {
+            Text(AppLocalization.string("대화 기록이 없습니다"))
+                .visionCraftAndroidText(22, weight: .semibold, relativeTo: .title2)
+                .foregroundStyle(VisionCraftUI.primaryText)
+                .multilineTextAlignment(.center)
+            Text(
+                AppLocalization.string(
+                    "새 대화를 시작하면 여기에 저장됩니다."
+                )
+            )
+            .visionCraftAndroidText(16)
+            .foregroundStyle(VisionCraftUI.secondaryText)
+            .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     private var conversationList:
         some View
     {
         ScrollView {
             LazyVStack(
                 alignment: .leading,
-                spacing: 10
+                spacing: 16
             ) {
                 Text(
                     AppLocalization.format(
@@ -145,81 +174,19 @@ struct ChatHistoryView: View {
                         conversations.count
                     )
                 )
-                .font(.headline)
+                .visionCraftAndroidText(14, weight: .semibold, relativeTo: .subheadline)
                 .foregroundStyle(
-                    VisionCraftUI.primaryText
+                    VisionCraftUI.secondaryText
                 )
 
                 ForEach(
                     conversations
                 ) { conversation in
-                    HStack(spacing: 12) {
-                        Button {
-                            appRouter.route = .localChat(
-                                conversationID:
-                                    conversation.id
-                            )
-                        } label: {
-                            conversationRow(conversation)
-                                .frame(
-                                    maxWidth: .infinity,
-                                    alignment: .leading
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityHint(
-                            "저장된 로컬 AI 대화를 엽니다."
-                        )
-
-                        Button {
-                            beginRenaming(
-                                conversation
-                            )
-                        } label: {
-                            Image(systemName: "pencil")
-                                .font(.title3)
-                                .foregroundStyle(
-                                    VisionCraftUI.secondaryText
-                                )
-                                .frame(
-                                    width: 48,
-                                    height: 48
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("제목 수정")
-
-                        Button(
-                            role: .destructive
-                        ) {
-                            delete(
-                                ids: [
-                                    conversation.id,
-                                ]
-                            )
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.title3)
-                                .foregroundStyle(
-                                    VisionCraftUI.secondaryText
-                                )
-                                .frame(
-                                    width: 48,
-                                    height: 48
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("삭제")
-                    }
-                    .padding(14)
-                    .visionCraftSurfaceCard(
-                        cornerRadius: 12,
-                        outlineOpacity: 0.6
-                    )
+                    conversationRow(conversation)
                 }
+
+                Color.clear.frame(height: 4)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
         }
         .disabled(isMutating)
         .overlay {
@@ -227,202 +194,116 @@ struct ChatHistoryView: View {
                 ProgressView()
                     .padding(18)
                     .background(
-                        .regularMaterial,
+                        VisionCraftUI.surface,
                         in:
                             RoundedRectangle(
-                                cornerRadius: 14
+                                cornerRadius: 14,
+                                style: .continuous
                             )
                     )
             }
         }
     }
 
-    private var emptyHistoryCard: some View {
-        VStack(spacing: 12) {
-            Image(
-                systemName:
-                    "bubble.left.and.bubble.right"
-            )
-            .font(.system(size: 38))
-            .foregroundStyle(
-                VisionCraftUI.primary
-            )
-            Text("대화 기록이 없습니다")
-                .font(.title3.bold())
-                .foregroundStyle(
-                    VisionCraftUI.primaryText
-                )
-            Text(
-                "AI 새 채팅을 시작하면 여기에 저장됩니다."
-            )
-            .foregroundStyle(
-                VisionCraftUI.secondaryText
-            )
-            .multilineTextAlignment(.center)
-
-            Button("새 대화") {
-                appRouter.route =
-                    .localChat(
-                        conversationID: nil
-                    )
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity)
-        .visionCraftSurfaceCard(
-            cornerRadius: 16,
-            outlineOpacity: 0.6
-        )
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-    }
-
-    @ToolbarContentBuilder
-    private var managementToolbar:
-        some ToolbarContent
-    {
-        ToolbarItem(
-            placement: .secondaryAction
-        ) {
-            Button(
-                role: .destructive
-            ) {
-                showsDeleteAllDialog = true
-            } label: {
-                Label(
-                    "전체 삭제",
-                    systemImage: "trash"
-                )
-            }
-            .disabled(
-                conversations.isEmpty
-                    || isMutating
-            )
-        }
-    }
-
-    @ToolbarContentBuilder
-    private var featureToolbar:
-        some ToolbarContent
-    {
-        ToolbarItem(
-            placement: .topBarTrailing
-        ) {
-            NavigationLink(
-                value:
-                    AppRoute.webSearch(
-                        initialQuery: nil,
-                        autoSearch: false,
-                        speaksAnswer: false
-                    )
-            ) {
-                Label(
-                    "웹 검색",
-                    systemImage:
-                        "magnifyingglass"
-                )
-            }
-            .accessibilityHint(
-                "온라인에서 출처를 찾고 M4 로컬 AI로 답변합니다."
-            )
-        }
-        ToolbarItem(
-            placement: .topBarTrailing
-        ) {
-            NavigationLink(
-                value:
-                    AppRoute.webQuestion(
-                        initialURL: nil,
-                        autoLoad: false
-                    )
-            ) {
-                Label(
-                    "웹페이지",
-                    systemImage: "link"
-                )
-            }
-            .accessibilityHint(
-                "웹페이지 본문을 읽어 M4 로컬 AI에 질문합니다."
-            )
-        }
-        ToolbarItem(
-            placement: .topBarTrailing
-        ) {
-            NavigationLink(
-                value:
-                    AppRoute.translation(
-                        initialText: nil
-                    )
-            ) {
-                Label(
-                    "번역",
-                    systemImage:
-                        "character.book.closed"
-                )
-            }
-            .accessibilityHint(
-                "M4 로컬 AI 번역 화면을 엽니다."
-            )
-        }
-    }
-
-    private var filteredConversations:
-        [StoredChatConversation]
-    {
-        ChatHistorySearch.filtered(
-            conversations,
-            query: searchText
-        )
-    }
-
-    private var resultCountDescription:
-        String
-    {
-        let count =
-            filteredConversations.count
-        if searchText.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        ).isEmpty {
-            return AppLocalization.format(
-                "대화 %lld개",
-                count
-            )
-        }
-        return AppLocalization.format(
-            "검색 결과 %lld개",
-            count
-        )
-    }
-
+    /// Android `ConversationRow`: `VcActionRow` (corner 22, min 88,
+    /// padding 20/8/14/14, spacing 12) with a 28pt clock icon, two-line
+    /// semibold title, "yyyy-MM-dd HH:mm" date and two 48pt icon buttons.
     private func conversationRow(
         _ conversation:
             StoredChatConversation
     ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 4
-        ) {
-            Text(conversation.title)
-                .font(.body)
-                .foregroundStyle(
-                    VisionCraftUI.primaryText
+        HStack(spacing: 12) {
+            Button {
+                appRouter.route = .localChat(
+                    conversationID:
+                        conversation.id
                 )
-                .lineLimit(1)
-            Text(
-                conversation.updatedAt
-                    .formatted(
-                        date: .numeric,
-                        time: .shortened
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 24, weight: .regular))
+                        .foregroundStyle(VisionCraftUI.icon)
+                        .frame(width: 28, height: 28)
+                        .accessibilityHidden(true)
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 4
+                    ) {
+                        Text(conversation.title)
+                            .visionCraftAndroidText(18, weight: .semibold, relativeTo: .headline)
+                            .foregroundStyle(
+                                VisionCraftUI.primaryText
+                            )
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                        Text(
+                            Self.dateFormatter.string(
+                                from: conversation.updatedAt
+                            )
+                        )
+                        .visionCraftAndroidText(16)
+                        .foregroundStyle(
+                            VisionCraftUI.secondaryText
+                        )
+                        .lineLimit(1)
+                    }
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
                     )
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(VisionCraftHomePressStyle())
+            .accessibilityLabel(
+                AppLocalization.format(
+                    "%@, %@",
+                    conversation.title,
+                    Self.dateFormatter.string(
+                        from: conversation.updatedAt
+                    )
+                )
             )
-            .font(.caption)
-            .foregroundStyle(
-                VisionCraftUI.secondaryText
+            .accessibilityHint(
+                AppLocalization.string("실행")
             )
-            .lineLimit(1)
+
+            rowIconButton(
+                systemImage: "pencil",
+                label: "제목 수정"
+            ) {
+                beginRenaming(conversation)
+            }
+
+            rowIconButton(
+                systemImage: "trash",
+                label: "삭제"
+            ) {
+                delete(ids: [conversation.id])
+            }
         }
+        .padding(.leading, 20)
+        .padding(.trailing, 8)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+        .visionCraftHomeSurface()
+    }
+
+    private func rowIconButton(
+        systemImage: String,
+        label: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 22, weight: .regular))
+                .foregroundStyle(VisionCraftUI.icon)
+                .frame(width: 48, height: 48)
+                .contentShape(Circle())
+        }
+        .buttonStyle(VisionCraftHomePressStyle())
+        .accessibilityLabel(AppLocalization.string(label))
     }
 
     private func reload(
@@ -494,20 +375,6 @@ struct ChatHistoryView: View {
         }
     }
 
-    private func deleteFilteredRows(
-        at offsets: IndexSet
-    ) {
-        let visible =
-            filteredConversations
-        let ids = offsets.compactMap {
-            index in
-            visible.indices.contains(index)
-                ? visible[index].id
-                : nil
-        }
-        delete(ids: ids)
-    }
-
     private func delete(
         ids: [UUID]
     ) {
@@ -545,32 +412,6 @@ struct ChatHistoryView: View {
                 }
             }
             errorDescription = nil
-        }
-    }
-
-    private func deleteAll() {
-        Task {
-            isMutating = true
-            defer {
-                isMutating = false
-            }
-            do {
-                try await historyStore
-                    .deleteAllConversations()
-                conversations = []
-                searchText = ""
-                errorDescription = nil
-            } catch {
-                let message =
-                    AppLocalization.format(
-                        "모든 대화를 삭제하지 못했습니다: %@",
-                        error.localizedDescription
-                    )
-                await reload(
-                    showsProgress: false
-                )
-                errorDescription = message
-            }
         }
     }
 }

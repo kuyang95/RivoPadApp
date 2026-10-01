@@ -43,7 +43,7 @@ struct HWPEquationInsertionButton: View {
         } label: {
             Label("수식", systemImage: "function")
                 .font(.subheadline.weight(.semibold))
-                .frame(minWidth: 44, minHeight: 44)
+                .frame(minWidth: 48, minHeight: 48)
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
@@ -64,7 +64,7 @@ struct HWPTextBoxInsertionButton: View {
         } label: {
             Label("글상자", systemImage: "character.textbox")
                 .font(.subheadline.weight(.semibold))
-                .frame(minWidth: 44, minHeight: 44)
+                .frame(minWidth: 48, minHeight: 48)
         }
         .buttonStyle(.plain)
         .disabled(!enabled)

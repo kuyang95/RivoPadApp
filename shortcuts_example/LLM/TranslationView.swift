@@ -114,7 +114,7 @@ struct TranslationView: View {
                         .borderedProminent
                     )
                     .buttonBorderShape(.roundedRectangle(radius: 14))
-                    .tint(.red)
+                    .tint(VisionCraftUI.error)
                 } else {
                     Button(
                         "번역",
@@ -169,7 +169,7 @@ struct TranslationView: View {
                     .errorDescription {
                 Text(error)
                     .font(.footnote)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(VisionCraftUI.error)
                     .frame(
                         maxWidth: .infinity,
                         alignment: .leading

@@ -90,11 +90,14 @@ nonisolated struct StoredChatConversation:
             )
         }
 
-        let limit = 36
+        // Android `MAX_FREE_CHAT_TITLE_LENGTH`: 30 characters + "...".
+        let limit = 30
         guard normalized.count > limit else {
             return normalized
         }
-        return String(normalized.prefix(limit)) + "…"
+        return String(normalized.prefix(limit))
+            .trimmingCharacters(in: .whitespaces)
+            + "..."
     }
 
     static func normalizedTitle(

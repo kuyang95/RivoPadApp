@@ -81,7 +81,7 @@ struct ExcelWorkbookBottomBar: View {
                                         ? Color.white
                                         : VisionCraftUI.primaryText
                                 )
-                                .frame(minHeight: 44)
+                                .frame(minHeight: 48)
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -118,7 +118,7 @@ struct ExcelWorkbookBottomBar: View {
                                     lineWidth: 1
                                 )
                         }
-                        .frame(minHeight: 44)
+                        .frame(minHeight: 48)
                         .contentShape(Rectangle())
                 }
                     .buttonStyle(.plain)
@@ -138,7 +138,7 @@ struct ExcelWorkbookBottomBar: View {
         .pickerStyle(.segmented)
         .labelsHidden()
         .frame(idealWidth: pickerWidth, maxWidth: pickerWidth)
-        .frame(minHeight: 44)
+        .frame(minHeight: 48)
         .accessibilityHint(
             "간편 표는 한 행씩 읽고, 원본 셀은 엑셀 격자를 셀 단위로 표시합니다."
         )

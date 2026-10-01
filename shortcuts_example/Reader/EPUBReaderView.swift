@@ -600,38 +600,56 @@ private enum EPUBReaderTheme: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Android `ReaderTheme`: 밝게 #FFFFFF/#111111, 세피아 #F5EBD8/#2C2117, 어둡게 #111315/#F2F3F5.
+    var backgroundHex: String {
+        switch self {
+        case .light:
+            return "#FFFFFF"
+        case .sepia:
+            return "#F5EBD8"
+        case .dark:
+            return "#111315"
+        }
+    }
+
+    var foregroundHex: String {
+        switch self {
+        case .light:
+            return "#111111"
+        case .sepia:
+            return "#2C2117"
+        case .dark:
+            return "#F2F3F5"
+        }
+    }
+
     var background: Color {
         switch self {
         case .light:
-            return .white
+            return VisionCraftUI.fixedColor(0xFFFFFF)
         case .sepia:
-            return Color(
-                red: 0.96,
-                green: 0.92,
-                blue: 0.84
-            )
+            return VisionCraftUI.fixedColor(0xF5EBD8)
         case .dark:
-            return Color(
-                red: 0.07,
-                green: 0.08,
-                blue: 0.09
-            )
+            return VisionCraftUI.fixedColor(0x111315)
         }
     }
 
     var foreground: Color {
-        self == .dark
-            ? Color(
-                red: 0.95,
-                green: 0.95,
-                blue: 0.96
-            )
-            : Color(
-                red: 0.10,
-                green: 0.09,
-                blue: 0.08
-            )
+        switch self {
+        case .light:
+            return VisionCraftUI.fixedColor(0x111111)
+        case .sepia:
+            return VisionCraftUI.fixedColor(0x2C2117)
+        case .dark:
+            return VisionCraftUI.fixedColor(0xF2F3F5)
+        }
     }
+
+    /// Android `UNIFIED_HIGHLIGHT` #FFF3B0: 읽는 문장·단어 강조는 테마와 무관하게 같은 노랑.
+    static let readingHighlight =
+        VisionCraftUI.fixedColor(0xFFF3B0)
+    static let readingHighlightText =
+        VisionCraftUI.fixedColor(0x111111)
 }
 
 struct EPUBReaderView: View {
@@ -654,6 +672,12 @@ struct EPUBReaderView: View {
     @State private var sheetPlaybackCoordinator =
         EPUBReaderSheetPlaybackCoordinator()
     @State private var didTriggerAutoplay =
+        false
+    @State private var remoteModeFlash:
+        RivoRemoteKeyMode?
+    @State private var remoteModeFlashTask:
+        Task<Void, Never>?
+    @State private var didFlashRemoteMode =
         false
 
     @AppStorage("reader.epub.theme")
@@ -714,23 +738,45 @@ struct EPUBReaderView: View {
         .toolbarBackground(VisionCraftUI.background, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
+            // Android `DaisyFileOpenScreen` 제목 줄: 목차(List) · 검색(Search) · 설정(Settings).
+            // 목차가 없으면 목차 버튼은 비활성(38%).
             ToolbarItemGroup(placement: .primaryAction) {
-                Button("목차", systemImage: "list.bullet") {
-                    isContentsPresented = true
-                }
-                .disabled(viewModel.book == nil)
+                if viewModel.book != nil {
+                    VisionCraftIconButton(
+                        systemImage: "list.bullet",
+                        label: "목차",
+                        tint: hasContents
+                            ? VisionCraftUI.primaryText
+                            : VisionCraftUI.primaryText
+                                .opacity(0.38)
+                    ) {
+                        isContentsPresented = true
+                    }
+                    .disabled(!hasContents)
 
-                Button(
-                    "본문 검색",
-                    systemImage: "magnifyingglass"
-                ) {
-                    isSearchPresented = true
-                }
-                .disabled(viewModel.book == nil)
+                    VisionCraftIconButton(
+                        systemImage: "magnifyingglass",
+                        label: "검색 열기",
+                        tint: VisionCraftUI.primaryText
+                    ) {
+                        isSearchPresented = true
+                    }
 
-                Button("보기 설정", systemImage: "textformat.size") {
-                    isSettingsPresented = true
+                    VisionCraftIconButton(
+                        systemImage: "gearshape",
+                        label: "설정 열기",
+                        tint: VisionCraftUI.primaryText
+                    ) {
+                        isSettingsPresented = true
+                    }
                 }
+            }
+        }
+        .overlay {
+            if let remoteModeFlash {
+                RivoRemoteModeNameFlash(
+                    mode: remoteModeFlash
+                )
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -766,6 +812,14 @@ struct EPUBReaderView: View {
         .onChange(of: speechRate) {
             _, rate in
             mediaOverlayPlayer.setRate(rate)
+        }
+        .onChange(
+            of: mediaOverlayPlayer.navigationUnit
+        ) { _, unit in
+            // Android `DaisyReaderView`: 단위가 바뀌면 TTS 피드백으로 알린다.
+            TTSManager.shared.speakFeedback(
+                unit.announcement
+            )
         }
         .onChange(
             of: remoteControl.latestEvent
@@ -940,6 +994,14 @@ struct EPUBReaderView: View {
                             )
                         )
                         .textSelection(.enabled)
+                        .foregroundStyle(
+                            isPlayingMediaSegment(
+                                index
+                            )
+                            ? EPUBReaderTheme
+                                .readingHighlightText
+                            : theme.foreground
+                        )
                         .accessibilityLabel(
                             segment.text
                         )
@@ -948,9 +1010,8 @@ struct EPUBReaderView: View {
                             isPlayingMediaSegment(
                                 index
                             )
-                            ? Color.orange.opacity(
-                                0.16
-                            )
+                            ? EPUBReaderTheme
+                                .readingHighlight
                             : Color.clear
                         )
                         .clipShape(
@@ -1069,214 +1130,257 @@ struct EPUBReaderView: View {
         return result.matchLength
     }
 
+    /// Android `PlayerBottomBar`: 슬라이더(항상) + 시간/퍼센트 + [재생 56][이전 48][단위 알약 56][다음 48].
     private var playbackBar: some View {
-        VStack(spacing: 8) {
-            if mediaOverlayPlayer.canPlay {
-                VStack(spacing: 0) {
-                    Slider(
-                        value: Binding(
-                            get: {
-                                isSeekingPlayback
-                                    ? playbackSeekSeconds
-                                    : mediaOverlayPlayer
-                                        .timelinePositionSeconds
-                            },
-                            set: {
-                                playbackSeekSeconds =
-                                    $0
-                            }
-                        ),
-                        in: 0 ... max(
-                            mediaOverlayPlayer
-                                .totalTimelineSeconds,
-                            0.5
-                        ),
-                        onEditingChanged: {
-                            isEditing in
-                            handlePlaybackSeekEditing(
-                                isEditing
-                            )
-                        }
-                    )
-                    .disabled(
-                        mediaOverlayPlayer
-                            .totalTimelineSeconds
-                            <= 0
-                        || mediaOverlayPlayer
-                            .isLoading
-                    )
-                    .tint(VisionCraftUI.accent)
-                    .accessibilityLabel(
-                        "책 재생 위치"
-                    )
-                    .accessibilityValue(
-                        playbackTimelineDescription
-                    )
-                    .accessibilityHint(
-                        "조절을 마치면 선택한 위치로 이동합니다."
-                    )
-
-                    HStack {
-                        Text(
-                            playbackTimelineDescription
-                        )
-                        Spacer()
-                        Text(
-                            "\(playbackTimelinePercent)%"
-                        )
+        let canPlay = mediaOverlayPlayer.canPlay
+        let hasTime =
+            mediaOverlayPlayer.totalTimelineSeconds > 0
+        return VStack(spacing: 4) {
+            Slider(
+                value: Binding(
+                    get: {
+                        isSeekingPlayback
+                            ? playbackSeekSeconds
+                            : mediaOverlayPlayer
+                                .timelinePositionSeconds
+                    },
+                    set: {
+                        playbackSeekSeconds = $0
                     }
-                    .font(
-                        .caption
-                        .monospacedDigit()
+                ),
+                in: 0 ... max(
+                    mediaOverlayPlayer
+                        .totalTimelineSeconds,
+                    0.5
+                ),
+                onEditingChanged: {
+                    isEditing in
+                    handlePlaybackSeekEditing(
+                        isEditing
                     )
-                    .foregroundStyle(.secondary)
                 }
+            )
+            .disabled(
+                !canPlay
+                || !hasTime
+                || mediaOverlayPlayer.isLoading
+            )
+            .tint(VisionCraftUI.accent)
+            .opacity(canPlay ? 1 : 0.38)
+            .accessibilityLabel("책 재생 위치")
+            .accessibilityValue(
+                playbackTimelineDescription
+            )
+            .accessibilityHint(
+                "조절을 마치면 선택한 위치로 이동합니다."
+            )
+
+            HStack {
+                Text(playbackTimelineDescription)
+                Spacer()
+                Text("\(playbackTimelinePercent)%")
             }
+            .visionCraftAndroidText(
+                12,
+                relativeTo: .caption
+            )
+            .monospacedDigit()
+            .foregroundStyle(
+                VisionCraftUI.secondaryText
+            )
+            .padding(.horizontal, 14)
+            .accessibilityElement(children: .combine)
 
-            HStack(spacing: 16) {
-                Button("이전 장", systemImage: "chevron.left") {
-                    moveChapter(by: -1)
-                }
-                .disabled(viewModel.currentChapterIndex <= 0)
-
-                if mediaOverlayPlayer.canPlay {
-                    Button(
-                        "이전 \(mediaOverlayPlayer.navigationUnitDescription)",
-                        systemImage:
-                            "backward.end.fill"
-                    ) {
-                        mediaOverlayPlayer
-                            .navigate(by: -1)
-                    }
-                    .disabled(
-                        !mediaOverlayPlayer
-                            .canNavigatePrevious
-                    )
-
-                    Button(
-                        mediaOverlayPlayer.isPlaying
-                            ? AppLocalization.string(
-                                "일시정지"
+            HStack(spacing: 0) {
+                Button {
+                    mediaOverlayPlayer.togglePlayback()
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                canPlay
+                                    ? VisionCraftUI.accent
+                                    : VisionCraftUI.accent
+                                        .opacity(0.4)
                             )
-                            : AppLocalization.string(
-                                "재생"
-                            ),
-                        systemImage:
-                            mediaOverlayPlayer.isPlaying
-                            ? "pause.fill"
-                            : "play.fill"
-                    ) {
-                        mediaOverlayPlayer
-                            .togglePlayback()
-                    }
-                    .disabled(
-                        mediaOverlayPlayer.isLoading
-                    )
-                    .buttonStyle(.borderedProminent)
-                    .buttonBorderShape(.capsule)
-                    .tint(VisionCraftUI.accent)
-                    .controlSize(.large)
-
-                    Button(
-                        "다음 \(mediaOverlayPlayer.navigationUnitDescription)",
-                        systemImage:
-                            "forward.end.fill"
-                    ) {
-                        mediaOverlayPlayer
-                            .navigate(by: 1)
-                    }
-                    .disabled(
-                        !mediaOverlayPlayer
-                            .canNavigateNext
-                    )
-
-                    Button(
-                        mediaOverlayPlayer
-                            .navigationUnitDescription,
-                        systemImage:
-                            "arrow.left.arrow.right"
-                    ) {
-                        mediaOverlayPlayer
-                            .cycleNavigationUnit()
-                    }
-                    .accessibilityLabel(
-                        "탐색 단위 "
-                        + mediaOverlayPlayer
-                            .navigationUnitDescription
-                    )
-                    .accessibilityHint(
-                        "두 번 탭하면 단어, 문장, 문단, 페이지, 장 순서로 바뀝니다."
-                    )
-
-                    if mediaOverlayPlayer.isLoading {
-                        ProgressView()
-                    } else {
-                        VStack(spacing: 2) {
-                            if !mediaOverlayPlayer
-                                .playbackModeDescription
-                                .isEmpty {
-                                Text(
-                                    mediaOverlayPlayer
-                                        .playbackModeDescription
-                                )
-                                .font(.caption)
-                            }
-                            Text(
-                                mediaOverlayPlayer
-                                    .positionDescription
+                        if mediaOverlayPlayer.isLoading {
+                            ProgressView()
+                                .tint(VisionCraftUI.onAccent)
+                        } else {
+                            Image(
+                                systemName:
+                                    mediaOverlayPlayer.isPlaying
+                                    ? "pause.fill"
+                                    : "play.fill"
                             )
                             .font(
-                                .caption
-                                .monospacedDigit()
+                                .system(
+                                    size: 28,
+                                    weight: .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                VisionCraftUI.onAccent
+                                    .opacity(canPlay ? 1 : 0.4)
                             )
                         }
-                        .accessibilityElement(
-                            children: .combine
-                        )
-                        .accessibilityLabel(
-                            "읽기 방식 "
-                            + mediaOverlayPlayer
-                                .playbackModeDescription
-                            + ", 위치 "
-                            + mediaOverlayPlayer
-                                .positionDescription
-                        )
                     }
-                    if let error =
-                            mediaOverlayPlayer
-                            .errorDescription {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                            .lineLimit(2)
-                    }
+                    .frame(width: 56, height: 56)
+                    .contentShape(Circle())
                 }
-
-                Text(viewModel.chapterPositionDescription)
-                    .font(.headline.monospacedDigit())
-                    .frame(minWidth: 70)
-                    .accessibilityLabel(
-                        "장 위치 \(viewModel.chapterPositionDescription)"
-                    )
-
-                Button("다음 장", systemImage: "chevron.right") {
-                    moveChapter(by: 1)
-                }
+                .buttonStyle(.plain)
                 .disabled(
-                    guardLastChapterReached
+                    !canPlay || mediaOverlayPlayer.isLoading
                 )
+                .accessibilityLabel(
+                    mediaOverlayPlayer.isPlaying
+                        ? AppLocalization.string("일시정지")
+                        : AppLocalization.string("재생")
+                )
+                .accessibilityValue(
+                    Text(
+                        verbatim:
+                            mediaOverlayPlayer
+                            .playbackModeDescription
+                    )
+                )
+
+                Spacer().frame(width: 12)
+
+                transportButton(
+                    systemImage: "backward.end.fill",
+                    label: AppLocalization.string("이전"),
+                    isEnabled:
+                        canPlay
+                        && mediaOverlayPlayer
+                            .canNavigatePrevious
+                ) {
+                    mediaOverlayPlayer.navigate(by: -1)
+                }
+
+                Spacer().frame(width: 8)
+
+                Button {
+                    mediaOverlayPlayer
+                        .cycleNavigationUnit()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(
+                            systemName:
+                                "arrow.left.arrow.right"
+                        )
+                        .font(
+                            .system(
+                                size: 20,
+                                weight: .semibold
+                            )
+                        )
+                        Text(
+                            mediaOverlayPlayer
+                                .navigationUnitDescription
+                        )
+                        .visionCraftAndroidText(
+                            18,
+                            weight: .medium,
+                            relativeTo: .body
+                        )
+                    }
+                    .foregroundStyle(
+                        VisionCraftUI.primaryText
+                    )
+                    .padding(.horizontal, 18)
+                    .frame(minHeight: 56)
+                    .background(
+                        VisionCraftUI.accent.opacity(0.14),
+                        in: Capsule()
+                    )
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    AppLocalization.format(
+                        "이동 단위 %@",
+                        mediaOverlayPlayer
+                            .navigationUnitDescription
+                    )
+                )
+                .accessibilityHint(
+                    "두 번 탭하면 단어, 문장, 문단, 페이지, 목차 순서로 바뀝니다."
+                )
+
+                Spacer().frame(width: 8)
+
+                transportButton(
+                    systemImage: "forward.end.fill",
+                    label: AppLocalization.string("다음"),
+                    isEnabled:
+                        canPlay
+                        && mediaOverlayPlayer
+                            .canNavigateNext
+                ) {
+                    mediaOverlayPlayer.navigate(by: 1)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 4)
+
+            if let error =
+                    mediaOverlayPlayer.errorDescription {
+                Text(error)
+                    .visionCraftAndroidText(
+                        12,
+                        relativeTo: .caption
+                    )
+                    .foregroundStyle(VisionCraftUI.error)
+                    .lineLimit(2)
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+                    .padding(.horizontal, 14)
             }
         }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.roundedRectangle(radius: 12))
-        .tint(VisionCraftUI.primary)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .background(VisionCraftUI.surface)
         .overlay(alignment: .top) {
-            Divider().overlay(VisionCraftUI.outline.opacity(0.7))
+            Rectangle()
+                .fill(
+                    VisionCraftUI.secondaryText
+                        .opacity(0.7)
+                )
+                .frame(height: 1)
         }
+        .shadow(
+            color: VisionCraftHomeUI.shadow.opacity(0.5),
+            radius: 16,
+            y: -2
+        )
+    }
+
+    private func transportButton(
+        systemImage: String,
+        label: String,
+        isEnabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(
+                    .system(size: 28, weight: .semibold)
+                )
+                .foregroundStyle(
+                    isEnabled
+                        ? VisionCraftUI.primaryText
+                        : VisionCraftUI.secondaryText
+                )
+                .frame(width: 48, height: 48)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .accessibilityLabel(label)
     }
 
     private var playbackTimelineDescription:
@@ -1288,8 +1392,45 @@ struct EPUBReaderView: View {
                     at: playbackSeekSeconds
                 )
         }
+        // Android `PlayerBottomBar`: 시간 정보가 없으면 "n / 전체"(비어 있으면 "0 / 0").
+        guard mediaOverlayPlayer.totalTimelineSeconds > 0 else {
+            let position =
+                mediaOverlayPlayer.positionDescription
+            return position.isEmpty ? "0 / 0" : position
+        }
         return mediaOverlayPlayer
             .timelinePositionDescription
+    }
+
+    /// Android `hasToc`: 목차가 없으면 목차 버튼을 끈다(읽기 순서·페이지 목록만 있어도 켠다).
+    private var hasContents: Bool {
+        guard let book = viewModel.book else {
+            return false
+        }
+        return !book.navigationItems.isEmpty
+            || !book.pageListItems.isEmpty
+            || book.chapters.count > 1
+    }
+
+    /// Android `RemoteModeOverlay.showModeName(DAISY)`: 리모컨이 이 화면을 조작하기 시작하면 모드 이름을 1.15초 띄운다.
+    private func flashRemoteModeIfNeeded() {
+        guard !didFlashRemoteMode else {
+            return
+        }
+        didFlashRemoteMode = true
+        remoteModeFlashTask?.cancel()
+        remoteModeFlash = .daisy
+        remoteModeFlashTask = Task {
+            try? await Task.sleep(
+                nanoseconds:
+                    RivoRemoteKeyMode
+                    .modeNameVisibleNanoseconds
+            )
+            guard !Task.isCancelled else {
+                return
+            }
+            remoteModeFlash = nil
+        }
     }
 
     private var playbackTimelinePercent: Int {
@@ -1407,13 +1548,6 @@ struct EPUBReaderView: View {
             return
         }
         mediaOverlayPlayer.togglePlayback()
-    }
-
-    private var guardLastChapterReached: Bool {
-        guard let count = viewModel.book?.chapters.count else {
-            return true
-        }
-        return viewModel.currentChapterIndex >= count - 1
     }
 
     private var contentsSheet: some View {
@@ -1581,6 +1715,7 @@ struct EPUBReaderView: View {
         )
     }
 
+    /// Android `ReaderSearchSheet`: "본문 검색" · "검색어 입력" · 안내/개수 줄 · 2줄 스니펫(일치 부분 강조색).
     private var searchSheet: some View {
         NavigationStack {
             Group {
@@ -1588,50 +1723,86 @@ struct EPUBReaderView: View {
                     searchQuery,
                     in: viewModel.book?.chapters ?? []
                 )
-                if searchQuery.trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                ).isEmpty {
-                    ContentUnavailableView(
-                        "책 검색",
-                        systemImage: "text.magnifyingglass",
-                        description: Text(
-                            "찾을 단어나 문장을 입력하세요."
-                        )
-                    )
-                } else if results.isEmpty {
-                    ContentUnavailableView.search(
-                        text: searchQuery
-                    )
-                } else {
-                    List(results) { result in
-                        Button {
-                            selectLocation(
-                                chapterIndex:
-                                    result.chapterIndex,
-                                segmentIndex:
-                                    result.segmentIndex,
-                                highlightedResult:
-                                    result
-                            )
-                            isSearchPresented = false
-                        } label: {
-                            VStack(
-                                alignment: .leading,
-                                spacing: 6
-                            ) {
-                                Text(result.chapterTitle)
-                                    .font(.headline)
-                                highlightedText(
-                                    result.snippet,
-                                    start:
-                                        result
-                                        .matchStartInSnippet,
-                                    length:
-                                        result.matchLength
+                let isQueryEmpty =
+                    searchQuery.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ).isEmpty
+                List {
+                    Section {
+                        Text(
+                            isQueryEmpty
+                                ? AppLocalization.string(
+                                    "검색어를 입력하면 일치하는 문단을 찾습니다."
                                 )
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(3)
+                                : results.isEmpty
+                                    ? AppLocalization.string(
+                                        "일치하는 결과가 없습니다."
+                                    )
+                                    : AppLocalization.format(
+                                        "%lld개 일치",
+                                        results.count
+                                    )
+                        )
+                        .visionCraftAndroidText(
+                            14,
+                            relativeTo: .footnote
+                        )
+                        .foregroundStyle(
+                            VisionCraftUI.secondaryText
+                        )
+                        .listRowBackground(Color.clear)
+                    }
+                    if !results.isEmpty {
+                        Section {
+                            ForEach(results) { result in
+                                Button {
+                                    selectLocation(
+                                        chapterIndex:
+                                            result.chapterIndex,
+                                        segmentIndex:
+                                            result.segmentIndex,
+                                        highlightedResult:
+                                            result
+                                    )
+                                    isSearchPresented = false
+                                } label: {
+                                    VStack(
+                                        alignment: .leading,
+                                        spacing: 4
+                                    ) {
+                                        Text(result.chapterTitle)
+                                            .visionCraftAndroidText(
+                                                14,
+                                                weight: .semibold,
+                                                relativeTo: .footnote
+                                            )
+                                            .foregroundStyle(
+                                                VisionCraftUI
+                                                    .secondaryText
+                                            )
+                                            .lineLimit(1)
+                                        highlightedText(
+                                            result.snippet,
+                                            start:
+                                                result
+                                                .matchStartInSnippet,
+                                            length:
+                                                result.matchLength
+                                        )
+                                        .visionCraftAndroidText(16)
+                                        .foregroundStyle(
+                                            VisionCraftUI.primaryText
+                                        )
+                                        .lineLimit(2)
+                                    }
+                                    .frame(
+                                        maxWidth: .infinity,
+                                        minHeight: 48,
+                                        alignment: .leading
+                                    )
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -1640,7 +1811,11 @@ struct EPUBReaderView: View {
             .navigationTitle("본문 검색")
             .searchable(
                 text: $searchQuery,
-                prompt: "책에서 검색"
+                placement:
+                    .navigationBarDrawer(
+                        displayMode: .always
+                    ),
+                prompt: "검색어 입력"
             )
             .visionCraftListScreen()
             .toolbar {
@@ -1653,69 +1828,82 @@ struct EPUBReaderView: View {
         }
     }
 
+    /// Android `ReaderSettingsSheet`: 읽기 설정 — 글자 크기(%) → 줄 간격(0.00) → 테마 칩 → 음성 속도(x).
     private var settingsSheet: some View {
         NavigationStack {
-            Form {
-                Section("화면") {
-                    Picker("테마", selection: $themeID) {
-                        ForEach(EPUBReaderTheme.allCases) {
-                            theme in
-                            Text(theme.title)
-                                .tag(theme.rawValue)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    readerSettingSlider(
+                        label: "글자 크기",
+                        value: $fontScale,
+                        range: 0.8 ... 1.8,
+                        step: 0.1,
+                        valueLabel: "\(Int((fontScale * 100).rounded()))%"
+                    )
+
+                    readerSettingSlider(
+                        label: "줄 간격",
+                        value: $lineHeight,
+                        range: 1.2 ... 2.2,
+                        step: 0.1,
+                        valueLabel: String(
+                            format: "%.2f",
+                            lineHeight
+                        )
+                    )
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("테마")
+                            .visionCraftAndroidText(16)
+                            .foregroundStyle(
+                                VisionCraftUI.primaryText
+                            )
+                        HStack(spacing: 8) {
+                            ForEach(EPUBReaderTheme.allCases) {
+                                option in
+                                themeChip(option)
+                            }
                         }
                     }
-                    Slider(
-                        value: $fontScale,
-                        in: 0.8 ... 1.8,
-                        step: 0.1
-                    ) {
-                        Text("글자 크기")
-                    } minimumValueLabel: {
-                        Text("작게")
-                    } maximumValueLabel: {
-                        Text("크게")
-                    }
-                    Slider(
-                        value: $lineHeight,
-                        in: 1.2 ... 2.2,
-                        step: 0.1
-                    ) {
-                        Text("줄 간격")
-                    } minimumValueLabel: {
-                        Text("좁게")
-                    } maximumValueLabel: {
-                        Text("넓게")
-                    }
-                    Toggle(
-                        "출판물 원본 표현",
-                        isOn:
-                            $usesOriginalLayout
-                    )
-                    Text(
-                        "이미지, 표, 목록, 강조와 책 안 링크를 보존합니다. 정확한 검색·발화 강조가 필요하면 끄세요."
-                    )
-                    .font(.footnote)
-                    .foregroundStyle(
-                        .secondary
-                    )
-                }
+                    .accessibilityElement(children: .contain)
 
-                Section("음성") {
-                    Slider(
+                    readerSettingSlider(
+                        label: "음성 속도",
                         value: $speechRate,
-                        in: 0.5 ... 2.0,
-                        step: 0.1
-                    ) {
-                        Text("읽기 속도")
-                    } minimumValueLabel: {
-                        Text("느리게")
-                    } maximumValueLabel: {
-                        Text("빠르게")
+                        range: 0.5 ... 2.0,
+                        step: 0.1,
+                        valueLabel: String(
+                            format: "%.2fx",
+                            speechRate
+                        )
+                    )
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Toggle(
+                            "출판물 원본 표현",
+                            isOn: $usesOriginalLayout
+                        )
+                        .visionCraftAndroidText(16)
+                        .tint(VisionCraftHomeUI.switchOn)
+                        .frame(minHeight: 48)
+                        Text(
+                            "이미지, 표, 목록, 강조와 책 안 링크를 보존합니다. 정확한 검색·발화 강조가 필요하면 끄세요."
+                        )
+                        .visionCraftAndroidText(
+                            14,
+                            relativeTo: .footnote
+                        )
+                        .foregroundStyle(
+                            VisionCraftUI.secondaryText
+                        )
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
             }
             .visionCraftListScreen()
-            .navigationTitle("독서 설정")
+            .navigationTitle("읽기 설정")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("완료") {
@@ -1726,63 +1914,127 @@ struct EPUBReaderView: View {
         }
     }
 
+    private func readerSettingSlider(
+        label: String,
+        value: Binding<Double>,
+        range: ClosedRange<Double>,
+        step: Double,
+        valueLabel: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text(AppLocalization.string(label))
+                    .visionCraftAndroidText(16)
+                    .foregroundStyle(
+                        VisionCraftUI.primaryText
+                    )
+                Spacer()
+                Text(valueLabel)
+                    .visionCraftAndroidText(
+                        14,
+                        weight: .medium,
+                        relativeTo: .footnote
+                    )
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        VisionCraftUI.secondaryText
+                    )
+            }
+            Slider(
+                value: value,
+                in: range,
+                step: step
+            )
+            .tint(VisionCraftUI.accent)
+            .accessibilityLabel(
+                AppLocalization.string(label)
+            )
+            .accessibilityValue(valueLabel)
+        }
+    }
+
+    /// Android `ThemeOption`: 알약 칩, 선택 시 강조색 14% 채움 + 2pt 강조색 테두리.
+    private func themeChip(
+        _ option: EPUBReaderTheme
+    ) -> some View {
+        let isSelected = option == theme
+        return Button {
+            themeID = option.rawValue
+        } label: {
+            Text(option.title)
+                .visionCraftAndroidText(16)
+                .foregroundStyle(
+                    isSelected
+                        ? VisionCraftUI.accent
+                        : VisionCraftUI.primaryText
+                )
+                .padding(.horizontal, 16)
+                .frame(minHeight: 48)
+                .background(
+                    isSelected
+                        ? VisionCraftUI.accent.opacity(0.14)
+                        : Color.clear,
+                    in: Capsule()
+                )
+                .overlay {
+                    Capsule()
+                        .strokeBorder(
+                            isSelected
+                                ? VisionCraftUI.accent
+                                : VisionCraftUI.secondaryText
+                                    .opacity(0.55),
+                            lineWidth: isSelected ? 2 : 1
+                        )
+                }
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(
+            isSelected ? [.isSelected] : []
+        )
+    }
+
+    /// 검색 일치는 강조색 굵게(Android `ReaderSearchSheet`), 읽는 단어는 #FFF3B0 배경(Android `UNIFIED_HIGHLIGHT`).
     private func highlightedText(
         _ text: String,
         start: Int?,
         length: Int,
         utf16Range: NSRange? = nil
     ) -> Text {
-        let highlightedRange:
-            Range<String.Index>?
-        if let utf16Range {
-            highlightedRange =
-                Range(
-                    utf16Range,
-                    in: text
-                )
-        } else if let start,
-                  start >= 0,
-                  length > 0,
-                  let lower = text.index(
-                      text.startIndex,
-                      offsetBy: start,
-                      limitedBy: text.endIndex
-                  ),
-                  let upper = text.index(
-                      lower,
-                      offsetBy: length,
-                      limitedBy: text.endIndex
-                  ) {
-            highlightedRange =
-                lower ..< upper
-        } else {
-            highlightedRange = nil
+        var attributed = AttributedString(text)
+        if let utf16Range,
+           let stringRange = Range(utf16Range, in: text),
+           let range = Range(stringRange, in: attributed) {
+            attributed[range].backgroundColor =
+                EPUBReaderTheme.readingHighlight
+            attributed[range].foregroundColor =
+                EPUBReaderTheme.readingHighlightText
+            return Text(attributed)
         }
-        guard let highlightedRange else {
+        guard let start,
+              start >= 0,
+              length > 0,
+              let lower = text.index(
+                  text.startIndex,
+                  offsetBy: start,
+                  limitedBy: text.endIndex
+              ),
+              let upper = text.index(
+                  lower,
+                  offsetBy: length,
+                  limitedBy: text.endIndex
+              ),
+              let range = Range(
+                  lower ..< upper,
+                  in: attributed
+              ) else {
             return Text(text)
         }
-        let lower = highlightedRange.lowerBound
-        let upper = highlightedRange.upperBound
-        let prefix = Text(
-            String(
-                text[text.startIndex ..< lower]
-            )
-        )
-        let match = Text(
-            String(
-                text[highlightedRange]
-            )
-        )
-        .bold()
-        .foregroundColor(.orange)
-        let suffix = Text(
-            String(
-                text[upper ..< text.endIndex]
-            )
-        )
-        return Text(
-            "\(prefix)\(match)\(suffix)"
-        )
+        attributed[range].foregroundColor =
+            VisionCraftUI.accent
+        attributed[range].inlinePresentationIntent =
+            .stronglyEmphasized
+        return Text(attributed)
     }
 
     private func isPlayingMediaSegment(
@@ -1827,20 +2079,20 @@ struct EPUBReaderView: View {
         switch theme {
         case .light:
             colors = (
-                "#FFFFFF",
-                "#1A1714",
+                theme.backgroundHex,
+                theme.foregroundHex,
                 "#005FCC"
             )
         case .sepia:
             colors = (
-                "#F5EBD6",
-                "#2C2117",
+                theme.backgroundHex,
+                theme.foregroundHex,
                 "#7A3E00"
             )
         case .dark:
             colors = (
-                "#121417",
-                "#F2F2F5",
+                theme.backgroundHex,
+                theme.foregroundHex,
                 "#66AFFF"
             )
         }
@@ -1912,6 +2164,7 @@ struct EPUBReaderView: View {
                 event.action else {
             return
         }
+        flashRemoteModeIfNeeded()
         switch action {
         case .previous:
             mediaOverlayPlayer.navigate(by: -1)

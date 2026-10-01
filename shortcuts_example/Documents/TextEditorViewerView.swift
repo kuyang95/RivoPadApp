@@ -7,7 +7,7 @@ import UIKit
 /// 일반 PDF/문서 뷰어와 분리해, 가져온 텍스트를 큰 글자로 보고 바로 편집하는
 /// 흐름과 화면 구성을 유지한다.
 struct TextEditorViewerView: View {
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var appRouter: AppRouter
     @EnvironmentObject private var remoteControl:
         RivoScreenRemoteControlCenter
@@ -38,6 +38,9 @@ struct TextEditorViewerView: View {
     @State private var currentLineIndex = 0
     @State private var scrollTargetIndex = 0
     @State private var scrollRevision: UInt64 = 0
+    /// Android `showClipboard`: the 클립보드 choice is only offered while the
+    /// clipboard actually holds text.
+    @State private var clipboardHasText = false
 
     init(fileURL: URL) {
         let store = LocalDocumentAppearanceStore()
@@ -82,6 +85,11 @@ struct TextEditorViewerView: View {
 
             mainContent
 
+            if showsOpenSourcePage {
+                openSourcePage
+                    .transition(.opacity)
+            }
+
             if isMenuPresented {
                 TextEditorMenuOverlay(
                     hasText: hasText,
@@ -116,10 +124,20 @@ struct TextEditorViewerView: View {
             }
         }
         .animation(.easeOut(duration: 0.16), value: isMenuPresented)
-        .navigationBarBackButtonHidden(true)
-        .toolbar(.hidden, for: .navigationBar)
+        // The route back button stays; the editor bar itself has no back.
+        .visionCraftNavigationScreen()
         .task {
             await loadInitialContentIfNeeded()
+        }
+        .onAppear {
+            refreshClipboardState()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: UIApplication.didBecomeActiveNotification
+            )
+        ) { _ in
+            refreshClipboardState()
         }
         .onDisappear {
             stopReading()
@@ -162,8 +180,8 @@ struct TextEditorViewerView: View {
             case .success:
                 showFeedback(
                     exportContentType == .pdf
-                        ? AppLocalization.string("PDF를 저장했습니다.")
-                        : AppLocalization.string("TXT를 저장했습니다.")
+                        ? AppLocalization.string("PDF 파일로 내보냈습니다.")
+                        : AppLocalization.string("TXT 파일로 내보냈습니다.")
                 )
             case .failure(let error):
                 sourceError = error.localizedDescription
@@ -212,19 +230,15 @@ struct TextEditorViewerView: View {
                 .padding(.horizontal, 14)
                 .padding(.top, 10)
 
-            if hasText || isEditing {
-                TextEditorCanvas(
-                    text: $viewModel.text,
-                    isEditing: isEditing,
-                    appearance: appearance,
-                    background: editorBackground,
-                    foreground: editorForeground,
-                    scrollTargetIndex: scrollTargetIndex,
-                    scrollRevision: scrollRevision
-                )
-            } else {
-                openSourcePage
-            }
+            TextEditorCanvas(
+                text: $viewModel.text,
+                isEditing: isEditing,
+                appearance: appearance,
+                background: editorBackground,
+                foreground: editorForeground,
+                scrollTargetIndex: scrollTargetIndex,
+                scrollRevision: scrollRevision
+            )
         }
         .padding(.bottom, 14)
         .overlay(alignment: .bottom) {
@@ -248,13 +262,16 @@ struct TextEditorViewerView: View {
         }
     }
 
+    /// Android `EditorMenuBar`: menu button on the left (48pt circle),
+    /// pause while reading, nothing else. The route back button is above.
     private var editorTopBar: some View {
         HStack(spacing: 6) {
-            VisionCraftBackButton {
-                dismiss()
+            editorTopButton(
+                title: "에디터 메뉴 열기",
+                systemImage: "line.3.horizontal"
+            ) {
+                isMenuPresented = true
             }
-
-            Spacer()
 
             if isReading {
                 editorTopButton(
@@ -265,16 +282,13 @@ struct TextEditorViewerView: View {
                 )
             }
 
-            editorTopButton(
-                title: "에디터 메뉴 열기",
-                systemImage: "line.3.horizontal"
-            ) {
-                isMenuPresented = true
-            }
+            Spacer()
         }
         .frame(maxWidth: .infinity)
     }
 
+    /// Android `TopBarIconButton`: 48pt, surface fill + outline; the menu
+    /// button is a circle with a 2pt border, the pause button a 12pt rect.
     private func editorTopButton(
         title: String,
         systemImage: String,
@@ -283,10 +297,13 @@ struct TextEditorViewerView: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 19, weight: .bold))
-                .frame(width: 44, height: 44)
-                .foregroundStyle(editorBackground)
-                .background(editorForeground)
+                .font(.system(size: 20, weight: .bold))
+                .frame(
+                    width: VisionCraftUI.minTouchTarget,
+                    height: VisionCraftUI.minTouchTarget
+                )
+                .foregroundStyle(VisionCraftUI.primaryText)
+                .background(VisionCraftUI.surface)
                 .clipShape(
                     isCircular
                         ? AnyShape(Circle())
@@ -300,77 +317,103 @@ struct TextEditorViewerView: View {
                 .overlay {
                     if isCircular {
                         Circle()
-                            .stroke(editorForeground, lineWidth: 2)
+                            .stroke(VisionCraftUI.outline, lineWidth: 2)
+                    } else {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(VisionCraftUI.outline, lineWidth: 1)
                     }
                 }
+                .contentShape(
+                    isCircular
+                        ? AnyShape(Circle())
+                        : AnyShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                )
         }
         .buttonStyle(.plain)
         .accessibilityLabel(AppLocalization.string(title))
     }
 
-    /// An empty viewer asks where the text should come from, the way Android
-    /// does, instead of showing a blank page the user cannot act on.
+    /// Android: the page stays while the text is empty, even after a
+    /// cancelled picker, and the route back button closes the viewer.
+    private var showsOpenSourcePage: Bool {
+        !viewModel.isLoading
+            && viewModel.errorDescription == nil
+            && !hasText
+            && !isEditing
+    }
+
+    /// Android `OpenSourcePage`: theme background, faint illustration behind,
+    /// 28pt bold heading and three outlined `VcHomeSoftButton`s (max 320).
     private var openSourcePage: some View {
-        VStack(spacing: 18) {
-            Spacer(minLength: 0)
+        ZStack {
+            VisionCraftUI.background
+                .ignoresSafeArea()
 
-            Text(AppLocalization.string("어떤 텍스트를 열까요?"))
-                .font(.system(size: 26, weight: .bold))
-                .foregroundStyle(editorForeground)
-                .multilineTextAlignment(.center)
-                .accessibilityAddTraits(.isHeader)
+            Image("TextOpenSourceIllustration")
+                .resizable()
+                .scaledToFit()
+                .padding(.horizontal, 40)
+                .opacity(colorScheme == .dark ? 0.08 : 0.12)
+                .accessibilityHidden(true)
 
-            openSourceButton(
-                title: "클립보드",
-                systemImage: "doc.on.clipboard",
-                hint: "복사해 둔 텍스트를 붙여 넣습니다."
-            ) {
-                replaceContentFromClipboard()
-            }
-            openSourceButton(
-                title: "이미지에서 텍스트 읽어오기",
-                systemImage: "photo",
-                hint: "사진 앨범에서 고른 이미지의 글자를 읽어옵니다."
-            ) {
-                isPhotoPickerPresented = true
-            }
-            openSourceButton(
-                title: "문서",
-                systemImage: "doc.text",
-                hint: "파일 앱에서 텍스트·문서 파일을 엽니다."
-            ) {
-                isDocumentImporterPresented = true
-            }
+            GeometryReader { geometry in
+                ScrollView {
+                VStack(spacing: 14) {
+                    Text(AppLocalization.string("어떤 텍스트를 열까요?"))
+                        .visionCraftAndroidText(28, weight: .bold, relativeTo: .title)
+                        .foregroundStyle(VisionCraftUI.primaryText)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityAddTraits(.isHeader)
+                        .padding(.bottom, 18)
 
-            Spacer(minLength: 0)
+                    if clipboardHasText {
+                        openSourceButton(
+                            title: "클립보드",
+                            hint: "복사해 둔 텍스트를 붙여 넣습니다."
+                        ) {
+                            replaceContentFromClipboard()
+                        }
+                    }
+                    openSourceButton(
+                        title: "이미지에서 텍스트 읽어오기",
+                        hint: "사진 앨범에서 고른 이미지의 글자를 읽어옵니다."
+                    ) {
+                        isPhotoPickerPresented = true
+                    }
+                    openSourceButton(
+                        title: "문서",
+                        hint: "파일 앱에서 텍스트·문서 파일을 엽니다."
+                    ) {
+                        isDocumentImporterPresented = true
+                    }
+                }
+                .padding(.horizontal, 48)
+                .padding(.vertical, 32)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: geometry.size.height)
+                }
+            }
         }
-        .padding(.horizontal, 28)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func openSourceButton(
         title: String,
-        systemImage: String,
         hint: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            Label(
-                AppLocalization.string(title),
-                systemImage: systemImage
-            )
-            .font(.system(size: 19, weight: .bold))
-            .foregroundStyle(editorBackground)
-            .frame(maxWidth: 460)
-            .frame(height: 64)
-            .background(editorForeground, in: RoundedRectangle(
-                cornerRadius: 16,
-                style: .continuous
-            ))
+            Text(AppLocalization.string(title))
+                .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(VisionCraftAndroidButtonStyle())
+        .frame(maxWidth: 320)
         .accessibilityLabel(AppLocalization.string(title))
         .accessibilityHint(AppLocalization.string(hint))
+    }
+
+    private func refreshClipboardState() {
+        clipboardHasText = UIPasteboard.general.hasStrings
     }
 
     @ViewBuilder
@@ -512,7 +555,7 @@ struct TextEditorViewerView: View {
         guard let text = HomeTextSourcePolicy.availableClipboardText(
             UIPasteboard.general.string
         ) else {
-            showFeedback(AppLocalization.string("클립보드가 비어 있습니다."))
+            showFeedback(AppLocalization.string("클립보드가 비었습니다."))
             return
         }
         viewModel.text = text
@@ -634,7 +677,7 @@ struct TextEditorViewerView: View {
         guard hasText else { return }
         UIPasteboard.general.string = viewModel.text
         showFeedback(
-            AppLocalization.string("문서 텍스트를 복사했습니다.")
+            AppLocalization.string("결과를 클립보드에 복사했습니다.")
         )
     }
 
@@ -958,25 +1001,26 @@ private struct TextEditorMenuOverlay: View {
             VisionCraftUI.background
                 .ignoresSafeArea()
             VStack(spacing: 16) {
-                HStack(spacing: 12) {
-                    Text(AppLocalization.string("메뉴"))
-                        .font(.title.bold())
-                        .foregroundStyle(VisionCraftUI.primaryText)
-                    Spacer()
+                // Android `VcScreenTitleRow(title = 메뉴)` + 48pt close.
+                VisionCraftScreenTitleRow(title: "메뉴") {
                     Button(action: onDismiss) {
                         Image(systemName: "xmark")
-                            .font(.headline.bold())
-                            .frame(width: 44, height: 44)
-                            .background(
-                                VisionCraftUI.surfaceVariant,
-                                in: RoundedRectangle(
-                                    cornerRadius: 12,
-                                    style: .continuous
-                                )
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(VisionCraftUI.primaryText)
+                            .frame(
+                                width: VisionCraftUI.minTouchTarget,
+                                height: VisionCraftUI.minTouchTarget
                             )
+                            .background(VisionCraftUI.surface, in: Circle())
+                            .overlay {
+                                Circle()
+                                    .stroke(VisionCraftUI.outline, lineWidth: 2)
+                            }
+                            .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("취소")
+                    .accessibilityLabel(AppLocalization.string("취소"))
+                    .padding(.leading, 12)
                 }
 
                 ScrollView {
@@ -1022,13 +1066,24 @@ private struct TextEditorMenuOverlay: View {
                                     } label: {
                                         // 배경·프레임을 라벨 안에 둬야
                                         // 칸 전체가 터치 영역이 된다.
+                                        // Android `FontLevelButton`: selected =
+                                        // 2pt accent outline + accent text.
                                         Text(String(level))
-                                            .font(.headline)
-                                            .foregroundStyle(VisionCraftUI.primaryText)
+                                            .visionCraftAndroidText(
+                                                16,
+                                                weight: appearance.fontLevel == level
+                                                    ? .bold
+                                                    : .medium
+                                            )
+                                            .foregroundStyle(
+                                                appearance.fontLevel == level
+                                                    ? VisionCraftUI.accent
+                                                    : VisionCraftUI.primaryText
+                                            )
                                             .frame(maxWidth: .infinity, minHeight: 48)
                                             .background(
                                                 appearance.fontLevel == level
-                                                    ? VisionCraftUI.primary.opacity(0.16)
+                                                    ? VisionCraftUI.accent.opacity(0.16)
                                                     : Color.clear,
                                                 in: RoundedRectangle(
                                                     cornerRadius: 12,
@@ -1042,9 +1097,9 @@ private struct TextEditorMenuOverlay: View {
                                                 )
                                                 .stroke(
                                                     appearance.fontLevel == level
-                                                        ? VisionCraftUI.primary
-                                                        : VisionCraftUI.outline,
-                                                    lineWidth: 1
+                                                        ? VisionCraftUI.accent
+                                                        : VisionCraftUI.secondaryText.opacity(0.55),
+                                                    lineWidth: appearance.fontLevel == level ? 2 : 1
                                                 )
                                             }
                                             .contentShape(
@@ -1111,7 +1166,7 @@ private struct TextEditorMenuOverlay: View {
 
                         menuSection(title: "도구") {
                             TextEditorMenuActionRow(
-                                title: "AI 채팅",
+                                title: "AI 질문",
                                 systemImage: "bubble.left.and.bubble.right",
                                 isEnabled: hasText,
                                 action: onAskAI
@@ -1151,17 +1206,19 @@ private struct TextEditorMenuOverlay: View {
         ].displayName
     }
 
+    /// Android `MenuSection`: small secondary heading (titleSmall).
     private func menuSection<Content: View>(
         title: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(spacing: 0) {
             Text(AppLocalization.string(title))
-                .font(.title3.bold())
-                .foregroundStyle(VisionCraftUI.primaryText)
+                .visionCraftAndroidText(14, weight: .semibold, relativeTo: .subheadline)
+                .foregroundStyle(VisionCraftUI.secondaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.vertical, 10)
+                .accessibilityAddTraits(.isHeader)
             content()
         }
         .background(VisionCraftUI.surface)

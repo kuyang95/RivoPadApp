@@ -171,7 +171,7 @@ struct WebSearchView: View {
                     .buttonStyle(
                         .borderedProminent
                     )
-                    .tint(.red)
+                    .tint(VisionCraftUI.error)
 
                     ProgressView()
                         .accessibilityLabel(
@@ -215,7 +215,7 @@ struct WebSearchView: View {
                         "exclamationmark.triangle"
                 )
                 .font(.footnote)
-                .foregroundStyle(.orange)
+                .foregroundStyle(VisionCraftUI.warning)
             } else if !configuration.isEnabled {
                 Label(
                     "온라인 웹 검색이 꺼져 있습니다.",
@@ -223,13 +223,16 @@ struct WebSearchView: View {
                         "exclamationmark.triangle"
                 )
                 .font(.footnote)
-                .foregroundStyle(.orange)
+                .foregroundStyle(VisionCraftUI.warning)
 
-                Button(
-                    "온라인 웹 검색 켜기",
-                    systemImage: "globe"
-                ) {
+                Button {
                     showsWebSearchConsent = true
+                } label: {
+                    Label(
+                        "온라인 웹 검색 켜기",
+                        systemImage: "globe"
+                    )
+                    .frame(minHeight: VisionCraftUI.minTouchTarget)
                 }
                 .buttonStyle(.bordered)
                 .confirmationDialog(
@@ -262,7 +265,7 @@ struct WebSearchView: View {
                 "exclamationmark.triangle"
         )
         .font(.footnote)
-        .foregroundStyle(.red)
+        .foregroundStyle(VisionCraftUI.error)
         .accessibilityLabel(
             "오류: \(error)"
         )
@@ -298,7 +301,7 @@ struct WebSearchView: View {
                         "checkmark.shield"
                 )
                 .font(.headline)
-                .foregroundStyle(.green)
+                .foregroundStyle(VisionCraftUI.success)
 
                 Spacer()
 

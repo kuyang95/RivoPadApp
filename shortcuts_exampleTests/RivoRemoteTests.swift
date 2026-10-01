@@ -912,24 +912,23 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         )
 
         XCTAssertEqual(
-            controlCenter.items.map(\.title),
+            controlCenter.items.map(\.id),
             [
-                "뒤로",
-                "재생/일시정지",
-                "이전",
-                "다음",
-                "이동 단위 이전",
-                "이동 단위 다음",
-                "목차",
-                "본문 검색",
-                "설정",
+                "reader.playPause",
+                "reader.previous",
+                "reader.next",
+                "reader.previousUnit",
+                "reader.nextUnit",
+                "reader.contents",
+                "reader.search",
+                "reader.settings",
             ]
         )
 
         _ = controlCenter.receive(
             button(.l1, action: .pressed)
         )
-        controlCenter.focusItem(at: 7)
+        controlCenter.focusItem(at: 6)
 
         XCTAssertEqual(
             controlCenter.receive(
@@ -940,7 +939,7 @@ final class RivoRemoteControlCenterTests: XCTestCase {
                 .publicationReader(.showSearch)
             )
         )
-        XCTAssertFalse(
+        XCTAssertTrue(
             controlCenter.isMenuPresented
         )
     }
@@ -953,20 +952,19 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         )
 
         XCTAssertEqual(
-            controlCenter.items.map(\.title),
+            controlCenter.items.map(\.id),
             [
-                "뒤로",
-                "원래 색상",
-                "대비 색상",
-                "글자 크기",
-                "줄 간격",
+                "document.originalColor",
+                "document.color",
+                "document.font",
+                "document.lineHeight",
             ]
         )
 
         _ = controlCenter.receive(
             button(.l1, action: .pressed)
         )
-        controlCenter.focusItem(at: 3)
+        controlCenter.focusItem(at: 2)
 
         XCTAssertEqual(
             controlCenter.receive(
@@ -1004,7 +1002,7 @@ final class RivoRemoteControlCenterTests: XCTestCase {
                 )
             )
         )
-        XCTAssertFalse(
+        XCTAssertTrue(
             controlCenter.isMenuPresented
         )
     }
@@ -1019,7 +1017,6 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         XCTAssertEqual(
             controlCenter.items.map(\.id),
             [
-                "camera.back",
                 "camera.tools",
                 "camera.zoom",
                 "camera.contrast",
@@ -1029,14 +1026,14 @@ final class RivoRemoteControlCenterTests: XCTestCase {
             ]
         )
         XCTAssertEqual(
-            controlCenter.items[1].title,
+            controlCenter.items[0].title,
             "도구"
         )
 
         _ = controlCenter.receive(
             button(.l1, action: .pressed)
         )
-        controlCenter.focusItem(at: 2)
+        controlCenter.focusItem(at: 1)
         XCTAssertEqual(
             controlCenter.receive(
                 button(.two, action: .pressed)
@@ -1069,16 +1066,39 @@ final class RivoRemoteControlCenterTests: XCTestCase {
             .liveTextReader
         )
         XCTAssertEqual(
-            controlCenter.items[6].title,
-            "라이트"
+            controlCenter.items[5].title,
+            AppLocalization.string("라이트 켜기")
         )
         XCTAssertEqual(
-            controlCenter.items[6].command,
+            controlCenter.items[5].command,
             .screen(
                 .liveTextReader,
                 .magnifier(.toggleTorch)
             )
         )
+    }
+
+    func testCameraMenuTracksReportedHardwareStateInsteadOfAssumingToggleSuccess() throws {
+        let controlCenter = RivoRemoteControlCenter()
+        controlCenter.updateActiveScreen(.magnifier)
+        controlCenter.noteMagnifierState(isTorchOn: true, isFrontCamera: false)
+        let torchIndex = try XCTUnwrap(controlCenter.items.firstIndex { $0.id == "camera.torch" })
+        let cameraIndex = try XCTUnwrap(controlCenter.items.firstIndex { $0.id == "camera.switch" })
+
+        XCTAssertEqual(controlCenter.items[torchIndex].title, AppLocalization.string("라이트 끄기"))
+        XCTAssertEqual(controlCenter.activateItem(at: torchIndex), .screen(.magnifier, .magnifier(.toggleTorch)))
+        // A rejected hardware command must not change the reported state.
+        XCTAssertEqual(controlCenter.items[torchIndex].title, AppLocalization.string("라이트 끄기"))
+
+        // Touch controls, direct remote keys and returning to the camera all
+        // publish the actual device state through this same callback.
+        controlCenter.noteMagnifierState(isTorchOn: false, isFrontCamera: true)
+        XCTAssertEqual(controlCenter.items[torchIndex].title, AppLocalization.string("라이트 켜기"))
+        XCTAssertEqual(controlCenter.items[cameraIndex].title, AppLocalization.string("후면 카메라"))
+        _ = controlCenter.activateItem(at: cameraIndex)
+        XCTAssertEqual(controlCenter.items[cameraIndex].title, AppLocalization.string("후면 카메라"))
+        controlCenter.noteMagnifierState(isTorchOn: false, isFrontCamera: false)
+        XCTAssertEqual(controlCenter.items[cameraIndex].title, AppLocalization.string("전면 카메라"))
     }
 
     func testQuickMenuUsesAndroidFourSixNavigation() {
@@ -1441,7 +1461,7 @@ final class RivoRemoteControlCenterTests: XCTestCase {
         )
         XCTAssertEqual(
             controlCenter.feedback,
-            "명령 모드 닫힘"
+            AppLocalization.string("명령 모드 닫힘")
         )
     }
 

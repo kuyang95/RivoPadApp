@@ -6433,10 +6433,9 @@ final class ExcelWorkbookDocumentTests: XCTestCase {
         }
 
         XCTAssertEqual(appliedPlan?.changeCount, 1)
-        XCTAssertEqual(chat.messages.count, 2)
+        XCTAssertEqual(chat.messages.count, 1)
         XCTAssertEqual(chat.messages[0].role, .assistant)
-        XCTAssertEqual(chat.messages[1].role, .notice)
-        XCTAssertEqual(chat.messages[1].text, "1개 셀을 수정했습니다.")
+        XCTAssertEqual(chat.spokenResponse?.id, chat.messages[0].id)
     }
 
     @MainActor

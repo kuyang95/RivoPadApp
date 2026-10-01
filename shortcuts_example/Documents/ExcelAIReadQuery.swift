@@ -1,34 +1,21 @@
 import Foundation
 
-/// Schema-sized context for interpreting a question. No row counts or partial
-/// records are offered as possible answers at this stage.
+/// Original cell contents and mechanical query targets. Actual calculations
+/// still run against the complete sheet on device.
 nonisolated struct ExcelAIReadQueryContext: Encodable {
-    struct Sheet: Encodable {
+    struct Region {
+        struct Column { let number: Int; let title: String }
         let id: String
-        let name: String
-        let position: Int
-    }
-    struct Region: Encodable {
-        struct Column: Encodable {
-            let number: Int
-            let title: String
-            let storageTypes: [String]
-            let exampleValues: [String]
-        }
-        let id: String
-        let name: String
-        let sheetID: String
-        let sheetName: String
         let columns: [Column]
     }
     let userRequest: String
     let recentConversation: [ExcelAIChatTurn]
     let queryScope: String
     let previousQuery: ExcelAIReadQuery?
-    let sheets: [Sheet]
     let regions: [Region]
+    let source: ExcelAISourceData
     private let snapshotRevision: String
-    private enum CodingKeys: String, CodingKey { case userRequest, recentConversation, queryScope, previousQuery, sheets, regions }
+    private enum CodingKeys: String, CodingKey { case userRequest, recentConversation, queryScope, previousQuery, sheets, regions, cells, contextWasTruncated }
 
     init(request: String, snapshot: ExcelAIWorkbookSnapshot, history: [ExcelAIChatTurn]) {
         userRequest = request
@@ -38,7 +25,6 @@ nonisolated struct ExcelAIReadQueryContext: Encodable {
         let contextPrefixes = ["그럼", "그러면", "그거", "그것", "이거", "이것", "방금", "앞에서", "위에서", "거기", "그품목", "그제품", "then", "whatabout", "those", "that", "それ", "では", "じゃあ"]
         let workbook = snapshot.localWorkbook
         let listedSheets = snapshot.workbookContext?.sheets ?? []
-        sheets = listedSheets.map { .init(id: $0.id, name: $0.name, position: $0.position) }
         let requestsSheets = normalized.contains("시트") || normalized.contains("sheet") || normalized.contains("tab")
             || listedSheets.contains {
                 let name = $0.name.lowercased().filter { !$0.isWhitespace && !$0.isPunctuation }
@@ -58,24 +44,23 @@ nonisolated struct ExcelAIReadQueryContext: Encodable {
         // rather than reconstructing it from a possibly abbreviated answer.
         recentConversation = queryScope == "conversation" ? Array(history.suffix(8)) : []
         previousQuery = queryScope == "worksheet" || queryScope == "workbook" ? nil : history.last(where: { $0.role == "assistant" && $0.query != nil })?.query
-        let sourceSheets = queryScope == "workbook" ? (workbook?.sheets ?? []) : [snapshot.localQuerySheet].compactMap { $0 }
-        regions = sourceSheets.flatMap { sheet -> [Region] in
-            let accessible = ExcelAccessibilityAnalyzer.regions(in: sheet)
-            return accessible.map { region in
-                Region(id: region.id, name: region.name, sheetID: sheet.partPath, sheetName: sheet.name,
-                       columns: region.columns.map { column in
-                    let cells = ExcelAIQueryData.dataRows(region.rowNumbers, regionID: region.id, sheet: sheet).prefix(20).compactMap { row in
-                        sheet.cell(at: ExcelCellAddress(row: row, column: column.column))
-                    }
-                    let examples = sheet.partPath == snapshot.sheetPartPath
-                        ? snapshot.valueGroups.filter { $0.regionID == region.id && $0.column == column.column }.map(\.value)
-                        : []
-                    return Region.Column(number: column.column, title: column.title,
-                        storageTypes: Set(cells.map { $0.cellType == nil || $0.cellType == "n" ? "number" : "text" }).sorted(),
-                        exampleValues: Array((examples.isEmpty ? Array(Set(cells.prefix(3).map(\.rawValue))).sorted() : examples).prefix(8)))
-                })
-            }
+        let includeWorkbook = queryScope == "workbook" || previousQuery?.sheetTargets.isEmpty == false
+        source = ExcelAISourceData(snapshot: snapshot, includeWorkbook: includeWorkbook)
+        regions = snapshot.regions.map { region in
+            Region(id: region.id, columns: region.columns.map { .init(number: $0.number, title: $0.title) })
         }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(userRequest, forKey: .userRequest)
+        try c.encode(recentConversation, forKey: .recentConversation)
+        try c.encode(queryScope, forKey: .queryScope)
+        try c.encodeIfPresent(previousQuery, forKey: .previousQuery)
+        try c.encode(source.sheets, forKey: .sheets)
+        try c.encode(source.regions, forKey: .regions)
+        try c.encode(source.cells, forKey: .cells)
+        try c.encode(source.contextWasTruncated, forKey: .contextWasTruncated)
     }
 
     func resolved(_ proposedQuery: ExcelAIReadQuery) throws -> ExcelAIReadQuery {

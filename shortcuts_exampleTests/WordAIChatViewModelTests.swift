@@ -30,8 +30,8 @@ final class WordAIChatViewModelTests: XCTestCase {
         XCTAssertEqual(applied.count, 1)
         XCTAssertEqual(applied.first?.operations, command().operations)
         XCTAssertNil(chat.pendingPlan)
-        XCTAssertEqual(chat.messages.map(\.role), [.assistant, .notice])
-        XCTAssertEqual(chat.messages.last?.text, "적용 완료")
+        XCTAssertEqual(chat.messages.map(\.role), [.assistant])
+        XCTAssertEqual(chat.spokenResponse?.text, "사진 동아리로 변경했습니다.")
         chat.applyPending { _ in
             XCTFail("자동으로 적용한 수정안을 다시 적용하면 안 됩니다.")
             return "중복 적용"

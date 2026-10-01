@@ -43,7 +43,7 @@ struct HWPImageInsertionButton: View {
         } label: {
             Label("그림", systemImage: "photo")
                 .font(.subheadline.weight(.semibold))
-                .frame(minWidth: 44, minHeight: 44)
+                .frame(minWidth: 48, minHeight: 48)
         }
         .buttonStyle(.plain)
         .disabled(!enabled)

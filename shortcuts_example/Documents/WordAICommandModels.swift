@@ -8,6 +8,7 @@ nonisolated struct WordAIDocumentSnapshot: Encodable, Sendable {
         let text: String
         let tableLocation: String?
         let isEditable: Bool
+        var tableGeometry: WordDocumentTableLocation? = nil
     }
 
     struct Retrieval: Encodable, Sendable {
@@ -25,6 +26,7 @@ nonisolated struct WordAIDocumentSnapshot: Encodable, Sendable {
     let retrieval: Retrieval?
     let revision: String
     var formContext: WordAIFormContext? = nil
+    var supportedOperations: [String] = ["replaceText", "setStyle"]
 
     func block(id: String) -> Block? {
         blocks.first { $0.id == id }
@@ -140,10 +142,15 @@ nonisolated enum WordAISnapshotBuilder {
                     tableLocation:
                         block.tableLocation?
                         .accessibilityDescription,
-                    isEditable: block.isEditable
+                    isEditable: block.isEditable,
+                    tableGeometry: block.tableLocation
                 )
             )
         }
+        // Selection affects inclusion in an oversized document, never the
+        // original reading order transmitted to the model.
+        let order = Dictionary(uniqueKeysWithValues: blocks.enumerated().map { ($0.element.id, $0.offset) })
+        snapshots.sort { order[$0.id, default: 0] < order[$1.id, default: 0] }
         let included = Set(snapshots.map(\.id))
         return WordAIDocumentSnapshot(
             documentName: documentName,
@@ -158,7 +165,11 @@ nonisolated enum WordAISnapshotBuilder {
     static func revision(blocks: [WordDocumentBlock]) -> String {
         var hash: UInt64 = 14_695_981_039_346_656_037
         for block in blocks {
-            let value = "\(block.id)|\(block.styleID ?? "Normal")|\(block.text)"
+            let geometry = block.tableLocation.map { location in
+                let parent = location.parent.map { "\($0.table),\($0.row),\($0.column)" } ?? ""
+                return "\(location.sectionPath ?? "")|\(location.table),\(location.row),\(location.column),\(location.paragraph)|\(location.rowSpan),\(location.columnSpan)|\(parent)"
+            } ?? ""
+            let value = "\(block.id)|\(block.styleID ?? "Normal")|\(block.text)|\(geometry)|\(block.isEditable)"
             for byte in value.utf8 {
                 hash ^= UInt64(byte)
                 hash &*= 1_099_511_628_211
@@ -343,6 +354,7 @@ nonisolated enum WordAICommandValidator {
         for operation in plan.operations {
             guard let block = snapshot.block(id: operation.blockID),
                   block.isEditable,
+                  snapshot.supportedOperations.contains(operation.kind.rawValue),
                   snapshot.formContext?.permits(operation) ?? true,
                   seen.insert("\(operation.kind.rawValue):\(operation.blockID)")
                     .inserted else {

@@ -56,10 +56,10 @@ struct HWPAccessibleRowButton: View {
                             Text(fieldNames[cell.id] ?? cell.columnDescription)
                                 .font(.subheadline.weight(.semibold))
                             if fieldNames[cell.id] != nil {
-                                Text(cell.columnDescription).font(.caption2)
+                                Text(cell.columnDescription).font(.caption)
                             }
                             if let merge = cell.mergeDescription {
-                                Text(merge).font(.caption2)
+                                Text(merge).font(.caption)
                             }
                         }
                         .foregroundStyle(VisionCraftUI.secondaryText)

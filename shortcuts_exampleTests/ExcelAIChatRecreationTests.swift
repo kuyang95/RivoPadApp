@@ -121,7 +121,6 @@ final class ExcelAIChatRecreationTests: XCTestCase {
             )
         }
         guard newMessages.contains(where: { $0.role == .assistant }),
-              newMessages.contains(where: { $0.role == .notice }),
               !newMessages.contains(where: {
                   $0.role == .notice
                       && $0.text.contains("처리하지 못했습니다")

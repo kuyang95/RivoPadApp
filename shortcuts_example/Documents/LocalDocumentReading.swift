@@ -182,82 +182,82 @@ nonisolated struct LocalDocumentColorTheme:
 
     static let all: [Self] = [
         Self(
-            name: "검정 바탕 흰색",
+            name: "검은 바탕에 흰 글씨",
             backgroundHex: 0x000000,
             foregroundHex: 0xFFFFFF
         ),
         Self(
-            name: "흰색 바탕 검정",
+            name: "흰 바탕에 검은 글씨",
             backgroundHex: 0xFFFFFF,
             foregroundHex: 0x000000
         ),
         Self(
-            name: "파랑 바탕 흰색",
+            name: "파란 바탕에 흰 글씨",
             backgroundHex: 0x4472C4,
             foregroundHex: 0xFFFFFF
         ),
         Self(
-            name: "짙은 회색 바탕 노랑",
+            name: "짙은 회색 바탕에 노란 글씨",
             backgroundHex: 0x222222,
             foregroundHex: 0xFFFF00
         ),
         Self(
-            name: "검정 바탕 초록",
+            name: "검은 바탕에 초록 글씨",
             backgroundHex: 0x000000,
             foregroundHex: 0x00FF00
         ),
         Self(
-            name: "흰색 바탕 빨강",
+            name: "흰 바탕에 빨간 글씨",
             backgroundHex: 0xFFFFFF,
             foregroundHex: 0xCC0000
         ),
         Self(
-            name: "남색 바탕 분홍",
+            name: "짙은 남색 바탕에 연분홍 글씨",
             backgroundHex: 0x000080,
             foregroundHex: 0xFFDDEE
         ),
         Self(
-            name: "검정 바탕 청록",
+            name: "검은 바탕에 청록 글씨",
             backgroundHex: 0x000000,
             foregroundHex: 0x00FFFF
         ),
         Self(
-            name: "보라 바탕 흰색",
+            name: "보라 바탕에 흰 글씨",
             backgroundHex: 0x330066,
             foregroundHex: 0xFFFFFF
         ),
         Self(
-            name: "초록 바탕 연노랑",
+            name: "짙은 초록 바탕에 연노랑 글씨",
             backgroundHex: 0x003300,
             foregroundHex: 0xFFFF99
         ),
         Self(
-            name: "적갈색 바탕 노랑",
+            name: "짙은 빨강 바탕에 노란 글씨",
             backgroundHex: 0x990000,
             foregroundHex: 0xFFFF66
         ),
         Self(
-            name: "검정 바탕 하늘색",
+            name: "어두운 회색 바탕에 하늘색 글씨",
             backgroundHex: 0x1A1A1A,
             foregroundHex: 0x99CCFF
         ),
         Self(
-            name: "짙은 파랑 바탕 크림",
+            name: "남색 바탕에 미색 글씨",
             backgroundHex: 0x002B5C,
             foregroundHex: 0xFFFACD
         ),
         Self(
-            name: "청록 바탕 밝은 청록",
+            name: "짙은 청록 바탕에 연한 청록 글씨",
             backgroundHex: 0x00334D,
             foregroundHex: 0xAFFFFF
         ),
         Self(
-            name: "진청록 바탕 회색",
+            name: "청록 바탕에 밝은 회색 글씨",
             backgroundHex: 0x005555,
             foregroundHex: 0xEEEEEE
         ),
         Self(
-            name: "검정 바탕 주황",
+            name: "어두운 회색 바탕에 주황 글씨",
             backgroundHex: 0x1C1C1C,
             foregroundHex: 0xFFA500
         ),
