@@ -891,59 +891,28 @@ final class ExcelWorkbookViewModel: ObservableObject {
               let selectedAddress else {
             return false
         }
-        let values = normalizedDropdownValues(rawValues)
-        guard values.count >= 2 else {
-            status = AppLocalization.string(
-                "드롭다운 값은 서로 다른 항목을 2개 이상 입력하세요."
-            )
-            return false
-        }
-        guard values.allSatisfy({
-            !$0.contains(",") && !$0.contains("\"")
-        }) else {
-            status = AppLocalization.string(
-                "드롭다운 항목에는 쉼표와 큰따옴표를 사용할 수 없습니다."
-            )
-            return false
-        }
-        guard values.joined(separator: ",").utf16.count <= 253 else {
-            status = AppLocalization.string(
-                "드롭다운 항목 전체가 너무 깁니다. 항목 수나 글자 수를 줄여 주세요."
-            )
-            return false
-        }
-
         let sheet = workbook.sheets[selectedSheetIndex]
         let canonical = sheet.canonicalAddress(for: selectedAddress)
-        let addresses = validationTargetAddresses(
-            selection: canonical,
-            toCurrentColumn: toCurrentColumn,
-            in: sheet
-        )
-        guard !addresses.isEmpty else {
+        let addresses = ExcelSheetPartEditing.targetAddresses(
+            selection: canonical, selectedRange: selectedRange, toCurrentColumn: toCurrentColumn, in: sheet)
+        let change: ExcelDocumentChange
+        do {
+            change = try ExcelSheetPartEditing.settingDropdown(
+                values: rawValues, allowsBlank: allowsBlank, at: addresses, sheetIndex: selectedSheetIndex, in: workbook)
+        } catch {
+            switch error {
+            case .tooFewDropdownValues:
+                status = AppLocalization.string("드롭다운 값은 서로 다른 항목을 2개 이상 입력하세요.")
+            case .invalidDropdownCharacters:
+                status = AppLocalization.string("드롭다운 항목에는 쉼표와 큰따옴표를 사용할 수 없습니다.")
+            case .dropdownTooLong:
+                status = AppLocalization.string("드롭다운 항목 전체가 너무 깁니다. 항목 수나 글자 수를 줄여 주세요.")
+            default:
+                break
+            }
             return false
         }
-        let ranges = ExcelCellRange.verticalRanges(for: addresses)
-        let oldRules = sheet.dataValidations
-        var newRules = oldRules.compactMap { $0.removing(ranges) }
-        newRules.append(
-            .inlineList(
-                ranges: ranges,
-                values: values,
-                allowsBlank: allowsBlank
-            )
-        )
-        apply(
-            MutationGroup(
-                sheetIndex: selectedSheetIndex,
-                cells: [],
-                oldDataValidations: oldRules,
-                newDataValidations: newRules
-            ),
-            forward: true,
-            registeringUndo: true,
-            workbook: &workbook
-        )
+        apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
         updateValidationWarning(in: workbook.sheets[selectedSheetIndex])
         status = toCurrentColumn
@@ -968,33 +937,16 @@ final class ExcelWorkbookViewModel: ObservableObject {
         }
         let sheet = workbook.sheets[selectedSheetIndex]
         let canonical = sheet.canonicalAddress(for: selectedAddress)
-        let addresses = validationTargetAddresses(
-            selection: canonical,
-            toCurrentColumn: toCurrentColumn,
-            in: sheet
-        )
-        let ranges = ExcelCellRange.verticalRanges(for: addresses)
-        let oldRules = sheet.dataValidations
-        let newRules = oldRules.compactMap { rule in
-            rule.type == "list" ? rule.removing(ranges) : rule
-        }
-        guard newRules != oldRules else {
+        let addresses = ExcelSheetPartEditing.targetAddresses(
+            selection: canonical, selectedRange: selectedRange, toCurrentColumn: toCurrentColumn, in: sheet)
+        guard let change = ExcelSheetPartEditing.removingDropdown(
+            at: addresses, sheetIndex: selectedSheetIndex, in: workbook) else {
             status = AppLocalization.string(
                 "선택한 범위에 제거할 드롭다운이 없습니다."
             )
             return
         }
-        apply(
-            MutationGroup(
-                sheetIndex: selectedSheetIndex,
-                cells: [],
-                oldDataValidations: oldRules,
-                newDataValidations: newRules
-            ),
-            forward: true,
-            registeringUndo: true,
-            workbook: &workbook
-        )
+        apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
         updateValidationWarning(in: workbook.sheets[selectedSheetIndex])
         status = toCurrentColumn
@@ -1023,17 +975,13 @@ final class ExcelWorkbookViewModel: ObservableObject {
     ) -> Bool {
         guard allowEditing() else { return false }
         endEditorTextEditing()
-        let comparisonValue = rawComparisonValue.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
-        guard !comparisonValue.isEmpty else {
-            status = AppLocalization.string("비교할 값을 입력하세요.")
-            return false
-        }
-        guard !kind.requiresNumber || Double(comparisonValue) != nil else {
-            status = AppLocalization.string(
-                "보다 큼·작음 규칙에는 숫자를 입력하세요."
-            )
+        let comparisonValue: String
+        do {
+            comparisonValue = try ExcelSheetPartEditing.validatedComparisonValue(rawComparisonValue, for: kind)
+        } catch {
+            status = error == .missingComparisonValue
+                ? AppLocalization.string("비교할 값을 입력하세요.")
+                : AppLocalization.string("보다 큼·작음 규칙에는 숫자를 입력하세요.")
             return false
         }
         guard var workbook,
@@ -1043,59 +991,14 @@ final class ExcelWorkbookViewModel: ObservableObject {
         }
         let sheet = workbook.sheets[selectedSheetIndex]
         let canonical = sheet.canonicalAddress(for: selectedAddress)
-        let addresses = validationTargetAddresses(
-            selection: canonical,
-            toCurrentColumn: toCurrentColumn,
-            in: sheet
-        )
-        guard !addresses.isEmpty else {
+        let addresses = ExcelSheetPartEditing.targetAddresses(
+            selection: canonical, selectedRange: selectedRange, toCurrentColumn: toCurrentColumn, in: sheet)
+        guard let change = try? ExcelSheetPartEditing.settingConditionalFormatting(
+            kind: kind, comparisonValue: comparisonValue, highlight: highlight, at: addresses,
+            sheetIndex: selectedSheetIndex, workbook: workbook, registry: registry) else {
             return false
         }
-        let ranges = ExcelCellRange.verticalRanges(for: addresses)
-        let oldBlocks = sheet.conditionalFormatting
-        let oldDifferentialStyles = workbook.differentialStyles
-        let oldDifferentialStyleEdits = differentialStyleEdits
-        // Rules accumulate like in Excel; only a rule with the same
-        // condition and value is replaced (e.g. to change its color).
-        var newBlocks = oldBlocks.compactMap { block in
-            block.isSameRule(kind: kind, comparisonValue: comparisonValue)
-                ? block.removing(ranges)
-                : block
-        }
-        let styleIndex = differentialStyleIndex(
-            for: highlight.style,
-            workbook: &workbook
-        )
-        let priority = oldBlocks.flatMap(\.rules).map(\.priority).max()
-            .map { $0 + 1 } ?? 1
-        newBlocks.append(
-            ExcelConditionalFormattingBlock(
-                ranges: ranges,
-                rules: [
-                    ExcelConditionalFormattingRule(
-                        kind: kind,
-                        comparisonValue: comparisonValue,
-                        differentialStyleIndex: styleIndex,
-                        priority: priority
-                    ),
-                ]
-            )
-        )
-        apply(
-            MutationGroup(
-                sheetIndex: selectedSheetIndex,
-                cells: [],
-                oldDifferentialStyles: oldDifferentialStyles,
-                newDifferentialStyles: workbook.differentialStyles,
-                oldDifferentialStyleEdits: oldDifferentialStyleEdits,
-                newDifferentialStyleEdits: differentialStyleEdits,
-                oldConditionalFormatting: oldBlocks,
-                newConditionalFormatting: newBlocks
-            ),
-            forward: true,
-            registeringUndo: true,
-            workbook: &workbook
-        )
+        apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
         status = toCurrentColumn
             ? AppLocalization.format(
@@ -1119,31 +1022,16 @@ final class ExcelWorkbookViewModel: ObservableObject {
         }
         let sheet = workbook.sheets[selectedSheetIndex]
         let canonical = sheet.canonicalAddress(for: selectedAddress)
-        let addresses = validationTargetAddresses(
-            selection: canonical,
-            toCurrentColumn: toCurrentColumn,
-            in: sheet
-        )
-        let ranges = ExcelCellRange.verticalRanges(for: addresses)
-        let oldBlocks = sheet.conditionalFormatting
-        let newBlocks = oldBlocks.compactMap { $0.removing(ranges) }
-        guard newBlocks != oldBlocks else {
+        let addresses = ExcelSheetPartEditing.targetAddresses(
+            selection: canonical, selectedRange: selectedRange, toCurrentColumn: toCurrentColumn, in: sheet)
+        guard let change = ExcelSheetPartEditing.removingConditionalFormatting(
+            at: addresses, sheetIndex: selectedSheetIndex, in: workbook) else {
             status = AppLocalization.string(
                 "선택한 범위에 제거할 기본 조건부 서식이 없습니다."
             )
             return
         }
-        apply(
-            MutationGroup(
-                sheetIndex: selectedSheetIndex,
-                cells: [],
-                oldConditionalFormatting: oldBlocks,
-                newConditionalFormatting: newBlocks
-            ),
-            forward: true,
-            registeringUndo: true,
-            workbook: &workbook
-        )
+        apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
         status = toCurrentColumn
             ? AppLocalization.string("현재 열의 기본 조건부 서식을 제거했습니다.")
@@ -1167,104 +1055,24 @@ final class ExcelWorkbookViewModel: ObservableObject {
               let selectedAddress else {
             return false
         }
-        let target = rawTarget.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
-        if !target.isEmpty,
-           !isSupportedHyperlinkTarget(target) {
+        let change: ExcelDocumentChange
+        do {
+            guard let edited = try ExcelSheetPartEditing.settingAnnotations(
+                hyperlinkTarget: rawTarget, hyperlinkTooltip: rawTooltip, noteText: rawNoteText,
+                noteAuthor: rawAuthor, at: selectedAddress, sheetIndex: selectedSheetIndex, in: workbook
+            ) else {
+                status = AppLocalization.string("바뀐 링크나 메모가 없습니다.")
+                return false
+            }
+            change = edited
+        } catch {
             status = AppLocalization.string(
                 "웹 주소는 http:// 또는 https://로 시작해야 합니다. 이메일·전화 링크와 #시트!셀 내부 링크도 사용할 수 있습니다."
             )
             return false
         }
-        let tooltip = rawTooltip.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
-        let noteText = rawNoteText.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
-        let author = rawAuthor.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        ).isEmpty ? "VisionCraft" : rawAuthor.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
-
-        let sheet = workbook.sheets[selectedSheetIndex]
-        let address = sheet.canonicalAddress(for: selectedAddress)
-        let targetRange = ExcelCellRange(start: address, end: address)
-        let oldAnnotations = sheet.annotations
-        var newAnnotations = oldAnnotations
-        let existingHyperlink = oldAnnotations.hyperlink(at: address)
-        newAnnotations.hyperlinks = oldAnnotations.hyperlinks.flatMap { link in
-            guard link.contains(address) else {
-                return [link]
-            }
-            return link.range.subtracting(targetRange).map { remaining in
-                var copy = link
-                copy.range = remaining
-                return copy
-            }
-        }
-        if !target.isEmpty {
-            let isExternal = !target.hasPrefix("#")
-            newAnnotations.hyperlinks.append(
-                ExcelCellHyperlink(
-                    range: targetRange,
-                    target: target,
-                    tooltip: tooltip.isEmpty ? nil : tooltip,
-                    display: existingHyperlink?.display,
-                    relationshipID: isExternal
-                        ? existingHyperlink?.relationshipID
-                            ?? "rIdVCHyperlink" + UUID().uuidString
-                                .replacingOccurrences(of: "-", with: "")
-                        : nil,
-                    isExternal: isExternal
-                )
-            )
-        }
-
-        newAnnotations.notes.removeAll { $0.address == address }
-        if !noteText.isEmpty {
-            if newAnnotations.commentsPartPath == nil {
-                let token = UUID().uuidString.replacingOccurrences(
-                    of: "-",
-                    with: ""
-                )
-                newAnnotations.commentsPartPath = "xl/commentsVC"
-                    + token + ".xml"
-                newAnnotations.vmlDrawingPartPath =
-                    "xl/drawings/vmlDrawingVC" + token + ".vml"
-                newAnnotations.commentsRelationshipID =
-                    "rIdVCComments" + token
-                newAnnotations.vmlDrawingRelationshipID =
-                    "rIdVCVML" + token
-            }
-            if !newAnnotations.authors.contains(author) {
-                newAnnotations.authors.append(author)
-            }
-            newAnnotations.notes.append(
-                ExcelCellNote(
-                    address: address,
-                    author: author,
-                    text: noteText
-                )
-            )
-        }
-        guard newAnnotations != oldAnnotations else {
-            status = AppLocalization.string("바뀐 링크나 메모가 없습니다.")
-            return false
-        }
-        apply(
-            MutationGroup(
-                sheetIndex: selectedSheetIndex,
-                cells: [],
-                oldAnnotations: oldAnnotations,
-                newAnnotations: newAnnotations
-            ),
-            forward: true,
-            registeringUndo: true,
-            workbook: &workbook
-        )
+        let address = workbook.sheets[selectedSheetIndex].canonicalAddress(for: selectedAddress)
+        apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
         status = AppLocalization.format(
             "%@ 셀의 링크·메모를 수정했습니다.",
@@ -1286,53 +1094,12 @@ final class ExcelWorkbookViewModel: ObservableObject {
             )
             return false
         }
-        let sheet = workbook.sheets[selectedSheetIndex]
-        let oldObjects = sheet.drawingObjects
-        var newObjects = oldObjects
-        let token = UUID().uuidString.replacingOccurrences(of: "-", with: "")
-        if newObjects.drawingPartPath == nil {
-            newObjects.drawingPartPath = "xl/drawings/drawingVC"
-                + token + ".xml"
-            newObjects.drawingRelationshipID = "rIdVCDrawing" + token
-        }
-        guard let drawingPath = newObjects.drawingPartPath else {
+        let start = selectedAddress ?? ExcelCellAddress(row: 1, column: 1)
+        guard let change = ExcelDrawingEditing.addingImage(
+            prepared, at: start, sheetIndex: selectedSheetIndex, in: workbook) else {
             return false
         }
-        let start = selectedAddress ?? ExcelCellAddress(row: 1, column: 1)
-        let end = ExcelCellAddress(
-            row: min(start.row + 5, 1_048_576),
-            column: min(start.column + 2, 16_384)
-        )
-        let relationshipID = "rIdVCImage" + token
-        let imageNumber = newObjects.images.count + 1
-        newObjects.images.append(
-            ExcelSheetImage(
-                id: drawingPath + "#" + relationshipID,
-                name: AppLocalization.format("이미지 %lld", imageNumber),
-                alternativeText: AppLocalization.string(
-                    "스프레드시트에 추가한 이미지"
-                ),
-                anchor: ExcelDrawingAnchor(start: start, end: end),
-                relationshipID: relationshipID,
-                mediaPartPath: "xl/media/imageVC" + token
-                    + "." + prepared.extensionName,
-                contentType: prepared.contentType,
-                data: prepared.data,
-                originalAnchorXML: nil,
-                displayOrder: (oldObjects.images.map(\.displayOrder) + oldObjects.charts.map(\.displayOrder)).max().map { $0 + 1 } ?? 0
-            )
-        )
-        apply(
-            MutationGroup(
-                sheetIndex: selectedSheetIndex,
-                cells: [],
-                oldDrawingObjects: oldObjects,
-                newDrawingObjects: newObjects
-            ),
-            forward: true,
-            registeringUndo: true,
-            workbook: &workbook
-        )
+        apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
         status = AppLocalization.format(
             "%@ 셀을 시작 위치로 이미지를 추가했습니다.",
@@ -1350,88 +1117,45 @@ final class ExcelWorkbookViewModel: ObservableObject {
               workbook.sheets.indices.contains(selectedSheetIndex) else {
             return false
         }
-        let sheet = workbook.sheets[selectedSheetIndex]
-        let oldObjects = sheet.drawingObjects
-        guard let index = oldObjects.images.firstIndex(where: {
-            $0.id == id
-        }) else {
+        guard workbook.sheets[selectedSheetIndex].drawingObjects.images.contains(where: { $0.id == id }) else {
             return false
         }
-        let existingContentType = oldObjects.images[index].contentType
-        let preferredContentType = ["image/png", "image/jpeg"].contains(
-            existingContentType
-        ) ? existingContentType : nil
         guard let prepared = preparedImage(
             data,
-            preferredContentType: preferredContentType
+            preferredContentType: ExcelDrawingEditing.preferredReplacementContentType(
+                id: id, sheetIndex: selectedSheetIndex, in: workbook)
         ) else {
             status = AppLocalization.string(
                 "이미지를 교체하지 못했습니다. PNG 또는 JPEG 사진을 선택해 주세요."
             )
             return false
         }
-        var newObjects = oldObjects
-        newObjects.images[index].data = prepared.data
-        // A source image may be shared by other pictures or worksheets.
-        if prepared.data != oldObjects.images[index].data {
-            newObjects.images[index].mediaPartPath = "xl/media/imageVC" + UUID().uuidString.replacingOccurrences(of: "-", with: "") + "." + prepared.extensionName
-        }
-        newObjects.images[index].contentType = prepared.contentType
-        guard newObjects != oldObjects else {
+        let result = ExcelDrawingEditing.replacingImage(id: id, with: prepared, sheetIndex: selectedSheetIndex, in: workbook)
+        if case .unchanged = result {
             status = AppLocalization.string("같은 이미지입니다.")
             return false
         }
-        apply(
-            MutationGroup(
-                sheetIndex: selectedSheetIndex,
-                cells: [],
-                oldDrawingObjects: oldObjects,
-                newDrawingObjects: newObjects
-            ),
-            forward: true,
-            registeringUndo: true,
-            workbook: &workbook
-        )
+        guard case .changed(let change, let name) = result else { return false }
+        apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
-        status = AppLocalization.format(
-            "%@을(를) 교체했습니다.",
-            newObjects.images[index].name
-        )
+        status = AppLocalization.format("%@을(를) 교체했습니다.", name)
         return true
     }
 
     func removeSheetImage(id: String) {
-        guard allowEditing() else { return }
+        guard allowEditing() else { return  }
         endEditorTextEditing()
         guard !isLargeWorkbook,
               var workbook,
               workbook.sheets.indices.contains(selectedSheetIndex) else {
-            return
+            return 
         }
-        let oldObjects = workbook.sheets[selectedSheetIndex].drawingObjects
-        let partPath = workbook.sheets[selectedSheetIndex].partPath
-        guard let image = oldObjects.images.first(where: { $0.id == id }) else {
-            return
-        }
-        var newObjects = oldObjects
-        newObjects.images.removeAll { $0.id == id }
-        clearNewDrawingIdentityIfEmpty(
-            &newObjects,
-            original: originalDrawingObjects[partPath] ?? .empty
-        )
-        apply(
-            MutationGroup(
-                sheetIndex: selectedSheetIndex,
-                cells: [],
-                oldDrawingObjects: oldObjects,
-                newDrawingObjects: newObjects
-            ),
-            forward: true,
-            registeringUndo: true,
-            workbook: &workbook
-        )
+        let result = ExcelDrawingEditing.removingImage(
+            id: id, sheetIndex: selectedSheetIndex, in: workbook, registry: registry)
+        guard case .changed(let change, let name) = result else { return  }
+        apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
-        status = AppLocalization.format("%@을(를) 삭제했습니다.", image.name)
+        status = AppLocalization.format("%@을(를) 삭제했습니다.", name)
     }
 
     @discardableResult
@@ -1443,52 +1167,15 @@ final class ExcelWorkbookViewModel: ObservableObject {
         guard allowEditing() else { return false }
         endEditorTextEditing()
         guard !isLargeWorkbook,
-              kind.isEditable,
               var workbook,
               workbook.sheets.indices.contains(selectedSheetIndex) else {
             return false
         }
-        let sheet = workbook.sheets[selectedSheetIndex]
-        let oldObjects = sheet.drawingObjects
-        var newObjects = oldObjects
-        let token = UUID().uuidString.replacingOccurrences(of: "-", with: "")
-        if newObjects.drawingPartPath == nil {
-            newObjects.drawingPartPath = "xl/drawings/drawingVC"
-                + token + ".xml"
-            newObjects.drawingRelationshipID = "rIdVCDrawing" + token
-        }
-        guard let drawingPath = newObjects.drawingPartPath else {
-            return false
-        }
-        let shapeNumber = newObjects.shapes.count + 1
-        let name = rawName.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        ).isEmpty
-            ? AppLocalization.format("도형 %lld", shapeNumber)
-            : rawName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let start = selectedAddress ?? ExcelCellAddress(row: 1, column: 1)
-        let end = ExcelCellAddress(
-            row: min(start.row + 4, 1_048_576),
-            column: min(start.column + 3, 16_384)
-        )
-        newObjects.shapes.append(
-            ExcelSheetShape(
-                id: drawingPath + "#shapeVC" + token,
-                nonVisualID: 0,
-                name: name,
-                text: rawText,
-                kind: kind,
-                fillARGB: kind == .line ? nil : "D9EAF7",
-                lineARGB: "4472C4",
-                anchor: ExcelDrawingAnchor(start: start, end: end),
-                originalAnchorXML: nil
-            )
-        )
-        applyDrawingObjectsChange(
-            old: oldObjects,
-            new: newObjects,
-            workbook: &workbook
-        )
+        let result = ExcelDrawingEditing.addingShape(
+            name: rawName, text: rawText, kind: kind, at: selectedAddress ?? ExcelCellAddress(row: 1, column: 1),
+            sheetIndex: selectedSheetIndex, in: workbook)
+        guard case .changed(let change, let name) = result else { return false }
+        apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
         status = AppLocalization.format("%@을(를) 추가했습니다.", name)
         return true
@@ -1504,62 +1191,37 @@ final class ExcelWorkbookViewModel: ObservableObject {
         guard allowEditing() else { return false }
         endEditorTextEditing()
         guard !isLargeWorkbook,
-              kind.isEditable,
               var workbook,
               workbook.sheets.indices.contains(selectedSheetIndex) else {
             return false
         }
-        let oldObjects = workbook.sheets[selectedSheetIndex].drawingObjects
-        guard let index = oldObjects.shapes.firstIndex(where: {
-            $0.id == id
-        }) else { return false }
-        var newObjects = oldObjects
-        let name = rawName.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        ).isEmpty ? oldObjects.shapes[index].name : rawName
-        newObjects.shapes[index].name = name
-        newObjects.shapes[index].text = text
-        newObjects.shapes[index].kind = kind
-        guard newObjects != oldObjects else {
+        let result = ExcelDrawingEditing.updatingShape(
+            id: id, name: rawName, text: text, kind: kind, sheetIndex: selectedSheetIndex, in: workbook)
+        if case .unchanged = result {
             status = AppLocalization.string("바뀐 도형 설정이 없습니다.")
             return false
         }
-        applyDrawingObjectsChange(
-            old: oldObjects,
-            new: newObjects,
-            workbook: &workbook
-        )
+        guard case .changed(let change, let name) = result else { return false }
+        apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
         status = AppLocalization.format("%@을(를) 수정했습니다.", name)
         return true
     }
 
     func removeSheetShape(id: String) {
-        guard allowEditing() else { return }
+        guard allowEditing() else { return  }
         endEditorTextEditing()
         guard !isLargeWorkbook,
               var workbook,
               workbook.sheets.indices.contains(selectedSheetIndex) else {
-            return
+            return 
         }
-        let oldObjects = workbook.sheets[selectedSheetIndex].drawingObjects
-        let partPath = workbook.sheets[selectedSheetIndex].partPath
-        guard let shape = oldObjects.shapes.first(where: {
-            $0.id == id
-        }) else { return }
-        var newObjects = oldObjects
-        newObjects.shapes.removeAll { $0.id == id }
-        clearNewDrawingIdentityIfEmpty(
-            &newObjects,
-            original: originalDrawingObjects[partPath] ?? .empty
-        )
-        applyDrawingObjectsChange(
-            old: oldObjects,
-            new: newObjects,
-            workbook: &workbook
-        )
+        let result = ExcelDrawingEditing.removingShape(
+            id: id, sheetIndex: selectedSheetIndex, in: workbook, registry: registry)
+        guard case .changed(let change, let name) = result else { return  }
+        apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
-        status = AppLocalization.format("%@을(를) 삭제했습니다.", shape.name)
+        status = AppLocalization.format("%@을(를) 삭제했습니다.", name)
     }
 
     @discardableResult
@@ -1571,77 +1233,24 @@ final class ExcelWorkbookViewModel: ObservableObject {
         guard allowEditing() else { return false }
         endEditorTextEditing()
         guard !isLargeWorkbook,
-              kind.isEditable,
               var workbook,
               workbook.sheets.indices.contains(selectedSheetIndex) else {
             return false
         }
-        let sheet = workbook.sheets[selectedSheetIndex]
-        guard let sourceRange = validatedChartRange(
-            sourceReference,
-            in: sheet
-        ) else {
+        let result: ExcelDrawingEditResult
+        do {
+            result = try ExcelDrawingEditing.addingChart(
+                title: rawTitle, kind: kind, sourceReference: sourceReference, sheetIndex: selectedSheetIndex, in: workbook)
+        } catch {
             status = AppLocalization.string(
                 "차트 범위는 머리글과 데이터가 포함된 두 행 이상의 셀 범위로 입력해 주세요."
             )
             return false
         }
-        let oldObjects = sheet.drawingObjects
-        var newObjects = oldObjects
-        let token = UUID().uuidString.replacingOccurrences(of: "-", with: "")
-        if newObjects.drawingPartPath == nil {
-            newObjects.drawingPartPath = "xl/drawings/drawingVC"
-                + token + ".xml"
-            newObjects.drawingRelationshipID = "rIdVCDrawing" + token
-        }
-        guard let drawingPath = newObjects.drawingPartPath else {
-            return false
-        }
-        let relationshipID = "rIdVCChart" + token
-        let chartNumber = newObjects.charts.count + 1
-        let title = rawTitle.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        ).isEmpty
-            ? AppLocalization.format("차트 %lld", chartNumber)
-            : rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        let startColumn = sourceRange.end.column <= 16_377
-            ? sourceRange.end.column + 1
-            : sourceRange.start.column
-        let start = ExcelCellAddress(
-            row: min(
-                sourceRange.start.row + newObjects.charts.count * 13,
-                1_048_563
-            ),
-            column: startColumn
-        )
-        let end = ExcelCellAddress(
-            row: min(start.row + 12, 1_048_576),
-            column: min(start.column + 6, 16_384)
-        )
-        newObjects.charts.append(
-            ExcelSheetChart(
-                id: drawingPath + "#" + relationshipID,
-                name: title,
-                title: title,
-                kind: kind,
-                sourceRange: sourceRange,
-                sheetName: sheet.name,
-                anchor: ExcelDrawingAnchor(start: start, end: end),
-                relationshipID: relationshipID,
-                chartPartPath: "xl/charts/chartVC" + token + ".xml",
-                originalAnchorXML: nil,
-                originalChartXML: nil,
-                displayOrder: (oldObjects.images.map(\.displayOrder) + oldObjects.charts.map(\.displayOrder)).max().map { $0 + 1 } ?? 0
-            )
-        )
-        newObjects.chartCount = newObjects.charts.count
-        applyDrawingObjectsChange(
-            old: oldObjects,
-            new: newObjects,
-            workbook: &workbook
-        )
+        guard case .changed(let change, let name) = result else { return false }
+        apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
-        status = AppLocalization.format("%@을(를) 추가했습니다.", title)
+        status = AppLocalization.format("%@을(를) 추가했습니다.", name)
         return true
     }
 
@@ -1655,93 +1264,51 @@ final class ExcelWorkbookViewModel: ObservableObject {
         guard allowEditing() else { return false }
         endEditorTextEditing()
         guard !isLargeWorkbook,
-              kind.isEditable,
               var workbook,
               workbook.sheets.indices.contains(selectedSheetIndex) else {
             return false
         }
-        let sheet = workbook.sheets[selectedSheetIndex]
-        guard let sourceRange = validatedChartRange(
-            sourceReference,
-            in: sheet
-        ) else {
+        let result: ExcelDrawingEditResult
+        do {
+            result = try ExcelDrawingEditing.updatingChart(
+                id: id, title: rawTitle, kind: kind, sourceReference: sourceReference, sheetIndex: selectedSheetIndex,
+                in: workbook)
+        } catch {
             status = AppLocalization.string(
                 "차트 범위는 머리글과 데이터가 포함된 두 행 이상의 셀 범위로 입력해 주세요."
             )
             return false
         }
-        let oldObjects = sheet.drawingObjects
-        guard let index = oldObjects.charts.firstIndex(where: {
-            $0.id == id
-        }) else {
-            return false
-        }
-        var newObjects = oldObjects
-        let title = rawTitle.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        ).isEmpty
-            ? oldObjects.charts[index].name
-            : rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        newObjects.charts[index].title = title
-        newObjects.charts[index].name = title
-        newObjects.charts[index].kind = kind
-        newObjects.charts[index].sourceRange = sourceRange
-        newObjects.charts[index].sheetName = sheet.name
-        guard newObjects != oldObjects else {
+        if case .unchanged = result {
             status = AppLocalization.string("바뀐 차트 설정이 없습니다.")
             return false
         }
-        newObjects.charts[index].originalChartXML = nil
-        applyDrawingObjectsChange(
-            old: oldObjects,
-            new: newObjects,
-            workbook: &workbook
-        )
+        guard case .changed(let change, let name) = result else { return false }
+        apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
-        status = AppLocalization.format("%@을(를) 수정했습니다.", title)
+        status = AppLocalization.format("%@을(를) 수정했습니다.", name)
         return true
     }
 
     func removeSheetChart(id: String) {
-        guard allowEditing() else { return }
+        guard allowEditing() else { return  }
         endEditorTextEditing()
         guard !isLargeWorkbook,
               var workbook,
               workbook.sheets.indices.contains(selectedSheetIndex) else {
-            return
+            return 
         }
-        let oldObjects = workbook.sheets[selectedSheetIndex].drawingObjects
-        let partPath = workbook.sheets[selectedSheetIndex].partPath
-        guard let chart = oldObjects.charts.first(where: {
-            $0.id == id
-        }) else {
-            return
-        }
-        var newObjects = oldObjects
-        newObjects.charts.removeAll { $0.id == id }
-        newObjects.chartCount = newObjects.charts.count
-        clearNewDrawingIdentityIfEmpty(
-            &newObjects,
-            original: originalDrawingObjects[partPath] ?? .empty
-        )
-        applyDrawingObjectsChange(
-            old: oldObjects,
-            new: newObjects,
-            workbook: &workbook
-        )
+        let result = ExcelDrawingEditing.removingChart(
+            id: id, sheetIndex: selectedSheetIndex, in: workbook, registry: registry)
+        guard case .changed(let change, let name) = result else { return  }
+        apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
-        status = AppLocalization.format("%@을(를) 삭제했습니다.", chart.title)
+        status = AppLocalization.format("%@을(를) 삭제했습니다.", name)
     }
 
     func pivotFieldNames(sourceReference: String) -> [String] {
-        guard let sheet = selectedSheet,
-              let range = validatedPivotSourceRange(
-                sourceReference,
-                in: sheet
-              ) else {
-            return []
-        }
-        return pivotFieldNames(in: range, sheet: sheet)
+        guard let sheet = selectedSheet else { return [] }
+        return ExcelPivotEditing.fieldNames(sourceReference: sourceReference, in: sheet)
     }
 
     @discardableResult
@@ -1761,100 +1328,33 @@ final class ExcelWorkbookViewModel: ObservableObject {
               workbook.sheets.indices.contains(selectedSheetIndex) else {
             return false
         }
-        let sheet = workbook.sheets[selectedSheetIndex]
-        guard let sourceRange = validatedPivotSourceRange(
-            sourceReference,
-            in: sheet
-        ),
-        let destination = validatedPivotDestination(
-            destinationReference
-        ) else {
-            status = AppLocalization.string(
-                "피벗 원본 범위와 결과 시작 셀을 확인해 주세요."
-            )
+        let edit: ExcelPivotEdit
+        do {
+            edit = try ExcelPivotEditing.adding(
+                name: rawName, sourceReference: sourceReference, destinationReference: destinationReference,
+                rowFieldIndex: rowFieldIndex, dataFieldIndex: dataFieldIndex, aggregation: aggregation,
+                refreshOnLoad: refreshOnLoad, sheetIndex: selectedSheetIndex, workbook: workbook, registry: registry)
+        } catch {
+            switch error {
+            case .invalidRanges:
+                status = AppLocalization.string("피벗 원본 범위와 결과 시작 셀을 확인해 주세요.")
+            case .invalidFields:
+                status = AppLocalization.string("행 필드와 값 필드는 서로 다른 열로 선택해 주세요.")
+            case .exceedsSheetLimits:
+                status = AppLocalization.string("피벗 결과가 Excel의 최대 행·열 범위를 넘습니다.")
+            case .destinationOccupied:
+                status = AppLocalization.string(
+                    "피벗 결과 범위가 원본 데이터나 기존 셀과 겹칩니다. 다른 시작 셀을 선택해 주세요."
+                )
+            case .invalidName:
+                break
+            }
             return false
         }
-        let fieldNames = pivotFieldNames(in: sourceRange, sheet: sheet)
-        guard fieldNames.indices.contains(rowFieldIndex),
-              fieldNames.indices.contains(dataFieldIndex),
-              rowFieldIndex != dataFieldIndex else {
-            status = AppLocalization.string(
-                "행 필드와 값 필드는 서로 다른 열로 선택해 주세요."
-            )
-            return false
-        }
-        let name = uniquePivotName(rawName, in: workbook)
-        guard let summary = pivotSummary(
-            title: name,
-            sourceRange: sourceRange,
-            destination: destination,
-            rowFieldIndex: rowFieldIndex,
-            dataFieldIndex: dataFieldIndex,
-            aggregation: aggregation,
-            fieldNames: fieldNames,
-            sheet: sheet
-        ) else {
-            return false
-        }
-        guard !rangesOverlap(sourceRange, summary.range),
-              pivotDestinationIsAvailable(
-                summary.range,
-                replacing: nil,
-                in: sheet
-              ) else {
-            status = AppLocalization.string(
-                "피벗 결과 범위가 원본 데이터나 기존 셀과 겹칩니다. 다른 시작 셀을 선택해 주세요."
-            )
-            return false
-        }
-        let token = UUID().uuidString.replacingOccurrences(of: "-", with: "")
-        let cacheID = (workbook.sheets
-            .flatMap(\.pivotTables)
-            .map(\.cacheID)
-            .max() ?? -1) + 1
-        let partPath = "xl/pivotTables/pivotTableVC" + token + ".xml"
-        let pivot = ExcelPivotTable(
-            id: partPath,
-            name: name,
-            relationshipID: "rIdVCPivot" + token,
-            partPath: partPath,
-            cacheID: cacheID,
-            cacheDefinitionPath:
-                "xl/pivotCache/pivotCacheDefinitionVC" + token + ".xml",
-            cacheRelationshipID: "rIdVCCache" + token,
-            workbookCacheRelationshipID: "rIdVCWorkbookCache" + token,
-            sourceSheetName: sheet.name,
-            sourceRange: sourceRange,
-            destinationRange: summary.range,
-            fieldNames: fieldNames,
-            rowFieldIndex: rowFieldIndex,
-            dataFieldIndex: dataFieldIndex,
-            aggregation: aggregation,
-            refreshOnLoad: refreshOnLoad,
-            originalPivotXML: nil,
-            originalCacheXML: nil
-        )
-        let oldPivots = sheet.pivotTables
-        let newPivots = oldPivots + [pivot]
-        let mutations = pivotSummaryMutations(
-            summary.values,
-            clearing: nil,
-            in: sheet
-        )
-        apply(
-            MutationGroup(
-                sheetIndex: selectedSheetIndex,
-                cells: mutations,
-                oldPivotTables: oldPivots,
-                newPivotTables: newPivots
-            ),
-            forward: true,
-            registeringUndo: true,
-            workbook: &workbook
-        )
-        expandSheetBounds(for: mutations, workbook: &workbook)
+        apply(MutationGroup(change: edit.change), forward: true, registeringUndo: true, workbook: &workbook)
+        edit.finish(workbook: &workbook)
         self.workbook = workbook
-        status = AppLocalization.format("%@을(를) 추가했습니다.", name)
+        status = AppLocalization.format("%@을(를) 추가했습니다.", edit.name)
         return true
     }
 
@@ -1876,481 +1376,108 @@ final class ExcelWorkbookViewModel: ObservableObject {
               workbook.sheets.indices.contains(selectedSheetIndex) else {
             return false
         }
-        let sheet = workbook.sheets[selectedSheetIndex]
-        guard let index = sheet.pivotTables.firstIndex(where: {
-            $0.id == id
-        }) else {
+        guard workbook.sheets[selectedSheetIndex].pivotTables.contains(where: { $0.id == id }) else {
             return false
         }
-        let oldPivot = sheet.pivotTables[index]
-        var newPivot = oldPivot
-        let trimmedName = rawName.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
-        guard !trimmedName.isEmpty,
-              !workbook.sheets.flatMap(\.pivotTables).contains(where: {
-                $0.id != id
-                    && $0.name.caseInsensitiveCompare(trimmedName)
-                        == .orderedSame
-              }) else {
-            status = AppLocalization.string(
-                "피벗 이름은 비어 있지 않고 다른 피벗과 달라야 합니다."
-            )
-            return false
-        }
-        newPivot.name = String(trimmedName.prefix(255))
-        newPivot.refreshOnLoad = refreshOnLoad
-
-        var mutations = [CellMutation]()
-        if oldPivot.supportsFieldEditing {
-            guard let sourceRange = validatedPivotSourceRange(
-                sourceReference,
-                in: sheet
-            ),
-            let destination = validatedPivotDestination(
-                destinationReference
+        let edit: ExcelPivotEdit
+        do {
+            guard let updated = try ExcelPivotEditing.updating(
+                id: id, name: rawName, sourceReference: sourceReference, destinationReference: destinationReference,
+                rowFieldIndex: rowFieldIndex, dataFieldIndex: dataFieldIndex, aggregation: aggregation,
+                refreshOnLoad: refreshOnLoad, sheetIndex: selectedSheetIndex, workbook: workbook, registry: registry
             ) else {
-                status = AppLocalization.string(
-                    "피벗 원본 범위와 결과 시작 셀을 확인해 주세요."
-                )
+                status = AppLocalization.string("바뀐 피벗 설정이 없습니다.")
                 return false
             }
-            let fieldNames = pivotFieldNames(in: sourceRange, sheet: sheet)
-            guard fieldNames.indices.contains(rowFieldIndex),
-                  fieldNames.indices.contains(dataFieldIndex),
-                  rowFieldIndex != dataFieldIndex,
-                  let summary = pivotSummary(
-                    title: newPivot.name,
-                    sourceRange: sourceRange,
-                    destination: destination,
-                    rowFieldIndex: rowFieldIndex,
-                    dataFieldIndex: dataFieldIndex,
-                    aggregation: aggregation,
-                    fieldNames: fieldNames,
-                    sheet: sheet
-                  ),
-                  !rangesOverlap(sourceRange, summary.range),
-                  pivotDestinationIsAvailable(
-                    summary.range,
-                    replacing: oldPivot.destinationRange,
-                    in: sheet
-                  ) else {
-                status = AppLocalization.string(
-                    "필드 설정 또는 결과 범위를 확인해 주세요."
-                )
-                return false
+            edit = updated
+        } catch {
+            switch error {
+            case .invalidName:
+                status = AppLocalization.string("피벗 이름은 비어 있지 않고 다른 피벗과 달라야 합니다.")
+            case .invalidRanges:
+                status = AppLocalization.string("피벗 원본 범위와 결과 시작 셀을 확인해 주세요.")
+            case .invalidFields, .exceedsSheetLimits, .destinationOccupied:
+                status = AppLocalization.string("필드 설정 또는 결과 범위를 확인해 주세요.")
             }
-            newPivot.sourceSheetName = sheet.name
-            newPivot.sourceRange = sourceRange
-            newPivot.destinationRange = summary.range
-            newPivot.fieldNames = fieldNames
-            newPivot.rowFieldIndex = rowFieldIndex
-            newPivot.dataFieldIndex = dataFieldIndex
-            newPivot.aggregation = aggregation
-            mutations = pivotSummaryMutations(
-                summary.values,
-                clearing: oldPivot.destinationRange,
-                in: sheet
-            )
-        }
-        var newPivots = sheet.pivotTables
-        newPivots[index] = newPivot
-        guard newPivot != oldPivot || !mutations.isEmpty else {
-            status = AppLocalization.string("바뀐 피벗 설정이 없습니다.")
             return false
         }
-        apply(
-            MutationGroup(
-                sheetIndex: selectedSheetIndex,
-                cells: mutations,
-                oldPivotTables: sheet.pivotTables,
-                newPivotTables: newPivots
-            ),
-            forward: true,
-            registeringUndo: true,
-            workbook: &workbook
-        )
-        expandSheetBounds(for: mutations, workbook: &workbook)
+        apply(MutationGroup(change: edit.change), forward: true, registeringUndo: true, workbook: &workbook)
+        edit.finish(workbook: &workbook)
         self.workbook = workbook
-        status = AppLocalization.format("%@을(를) 수정했습니다.", newPivot.name)
+        status = AppLocalization.format("%@을(를) 수정했습니다.", edit.name)
         return true
     }
 
     func removePivotTable(id: String) {
-        guard allowEditing() else { return }
+        guard allowEditing() else { return  }
         endEditorTextEditing()
         guard !isLargeWorkbook,
               var workbook,
               workbook.sheets.indices.contains(selectedSheetIndex) else {
+            return 
+        }
+        guard let edit = ExcelPivotEditing.removing(
+            id: id, sheetIndex: selectedSheetIndex, workbook: workbook, registry: registry) else {
             return
         }
-        let sheet = workbook.sheets[selectedSheetIndex]
-        guard let pivot = sheet.pivotTables.first(where: {
-            $0.id == id
-        }) else {
-            return
-        }
-        var newPivots = sheet.pivotTables
-        newPivots.removeAll { $0.id == id }
-        let mutations = pivotSummaryMutations(
-            [:],
-            clearing: pivot.destinationRange,
-            in: sheet
-        )
-        apply(
-            MutationGroup(
-                sheetIndex: selectedSheetIndex,
-                cells: mutations,
-                oldPivotTables: sheet.pivotTables,
-                newPivotTables: newPivots
-            ),
-            forward: true,
-            registeringUndo: true,
-            workbook: &workbook
-        )
+        apply(MutationGroup(change: edit.change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
-        status = AppLocalization.format("%@을(를) 삭제했습니다.", pivot.name)
+        status = AppLocalization.format("%@을(를) 삭제했습니다.", edit.name)
     }
 
-    private func validatedPivotSourceRange(
-        _ reference: String,
-        in sheet: ExcelWorksheet
-    ) -> ExcelCellRange? {
-        guard let range = ExcelCellRange(
-            reference.trimmingCharacters(in: .whitespacesAndNewlines)
-        ),
-        range.end.row > range.start.row,
-        range.end.row <= max(sheet.maximumRow, 1),
-        range.end.column <= max(sheet.maximumColumn, 1),
-        range.end.column - range.start.column < 12,
-        range.end.row - range.start.row <= 50_000 else {
-            return nil
-        }
-        return range
-    }
 
-    private func validatedPivotDestination(
-        _ reference: String
-    ) -> ExcelCellAddress? {
-        let first = reference.split(separator: ":", maxSplits: 1)
-            .first.map(String.init) ?? reference
-        return ExcelCellAddress(
-            first.trimmingCharacters(in: .whitespacesAndNewlines)
-        )
-    }
 
-    private func pivotFieldNames(
-        in range: ExcelCellRange,
-        sheet: ExcelWorksheet
-    ) -> [String] {
-        (range.start.column ... range.end.column).map { column in
-            let value = sheet.cells[
-                ExcelCellAddress(row: range.start.row, column: column)
-            ]?.displayValue.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            ) ?? ""
-            return value.isEmpty
-                ? ExcelCellAddress.columnName(column)
-                : value
-        }
-    }
 
-    private func pivotSummary(
-        title: String,
-        sourceRange: ExcelCellRange,
-        destination: ExcelCellAddress,
-        rowFieldIndex: Int,
-        dataFieldIndex: Int,
-        aggregation: ExcelPivotAggregation,
-        fieldNames: [String],
-        sheet: ExcelWorksheet
-    ) -> (range: ExcelCellRange, values: [ExcelCellAddress: ExcelCellInput])? {
-        let rowColumn = sourceRange.start.column + rowFieldIndex
-        let dataColumn = sourceRange.start.column + dataFieldIndex
-        var totals = [String: Double]()
-        for row in (sourceRange.start.row + 1) ... sourceRange.end.row {
-            let keyCell = sheet.cells[
-                ExcelCellAddress(row: row, column: rowColumn)
-            ]
-            let rawKey = keyCell?.displayValue.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            ) ?? ""
-            let key = rawKey.isEmpty
-                ? AppLocalization.string("(빈 셀)")
-                : rawKey
-            let valueCell = sheet.cells[
-                ExcelCellAddress(row: row, column: dataColumn)
-            ]
-            switch aggregation {
-            case .sum:
-                let normalized = (valueCell?.rawValue ?? "")
-                    .replacingOccurrences(of: ",", with: "")
-                if let number = Double(normalized), number.isFinite {
-                    totals[key, default: 0] += number
-                }
-            case .count:
-                if !(valueCell?.displayValue.trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                ).isEmpty ?? true) {
-                    totals[key, default: 0] += 1
-                }
-            }
-        }
-        let keys = totals.keys.sorted {
-            $0.localizedStandardCompare($1) == .orderedAscending
-        }
-        let endRow = destination.row + keys.count + 2
-        let endColumn = destination.column + 1
-        guard endRow <= ExcelWorkbookDocument.maximumExcelRows,
-              endColumn <= ExcelWorkbookDocument.maximumExcelColumns else {
-            status = AppLocalization.string(
-                "피벗 결과가 Excel의 최대 행·열 범위를 넘습니다."
-            )
-            return nil
-        }
-        let range = ExcelCellRange(
-            start: destination,
-            end: ExcelCellAddress(row: endRow, column: endColumn)
-        )
-        var values = [ExcelCellAddress: ExcelCellInput]()
-        values[destination] = .text(title)
-        values[ExcelCellAddress(
-            row: destination.row + 1,
-            column: destination.column
-        )] = .text(fieldNames[rowFieldIndex])
-        values[ExcelCellAddress(
-            row: destination.row + 1,
-            column: destination.column + 1
-        )] = .text(aggregation.title + " - " + fieldNames[dataFieldIndex])
-        var grandTotal = 0.0
-        for (offset, key) in keys.enumerated() {
-            let row = destination.row + offset + 2
-            let value = totals[key] ?? 0
-            grandTotal += value
-            values[ExcelCellAddress(
-                row: row,
-                column: destination.column
-            )] = .text(key)
-            values[ExcelCellAddress(
-                row: row,
-                column: destination.column + 1
-            )] = .number(pivotNumberText(value, aggregation: aggregation))
-        }
-        values[ExcelCellAddress(
-            row: endRow,
-            column: destination.column
-        )] = .text(AppLocalization.string("총합계"))
-        values[ExcelCellAddress(
-            row: endRow,
-            column: destination.column + 1
-        )] = .number(pivotNumberText(grandTotal, aggregation: aggregation))
-        return (range, values)
-    }
 
-    private func pivotNumberText(
-        _ value: Double,
-        aggregation: ExcelPivotAggregation
-    ) -> String {
-        if aggregation == .count || value.rounded() == value {
-            return String(Int64(value))
-        }
-        return String(value)
-    }
 
-    private func pivotSummaryMutations(
-        _ values: [ExcelCellAddress: ExcelCellInput],
-        clearing range: ExcelCellRange?,
-        in sheet: ExcelWorksheet
-    ) -> [CellMutation] {
-        var inputs = [ExcelCellAddress: ExcelCellInput]()
-        if let range,
-           (range.end.row - range.start.row + 1)
-            * (range.end.column - range.start.column + 1) <= 10_000 {
-            for row in range.start.row ... range.end.row {
-                for column in range.start.column ... range.end.column {
-                    inputs[ExcelCellAddress(row: row, column: column)] = .blank
-                }
-            }
-        }
-        inputs.merge(values) { _, new in new }
-        return inputs.sorted { $0.key < $1.key }.map { address, input in
-            makeMutation(
-                address: address,
-                input: input,
-                styleIndex: sheet.cells[address]?.styleIndex
-                    ?? styleForNewCell(
-                        column: address.column,
-                        row: address.row,
-                        in: sheet
-                    ),
-                sheet: sheet
-            )
-        }
-    }
 
-    private func pivotDestinationIsAvailable(
-        _ range: ExcelCellRange,
-        replacing oldRange: ExcelCellRange?,
-        in sheet: ExcelWorksheet
-    ) -> Bool {
-        !sheet.cells.contains { address, cell in
-            range.contains(address)
-                && !(oldRange?.contains(address) ?? false)
-                && !cell.displayValue.trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                ).isEmpty
-        }
-    }
 
-    private func rangesOverlap(
-        _ lhs: ExcelCellRange,
-        _ rhs: ExcelCellRange
-    ) -> Bool {
-        lhs.start.row <= rhs.end.row
-            && rhs.start.row <= lhs.end.row
-            && lhs.start.column <= rhs.end.column
-            && rhs.start.column <= lhs.end.column
-    }
 
-    private func uniquePivotName(
-        _ rawName: String,
-        in workbook: ExcelWorkbook
-    ) -> String {
-        let existing = Set(
-            workbook.sheets.flatMap(\.pivotTables).map {
-                $0.name.lowercased()
-            }
-        )
-        let trimmed = rawName.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
-        let base = String((trimmed.isEmpty
-            ? AppLocalization.string("피벗 테이블")
-            : trimmed).prefix(240))
-        guard existing.contains(base.lowercased()) else {
-            return base
-        }
-        var index = 2
-        while existing.contains("\(base) \(index)".lowercased()) {
-            index += 1
-        }
-        return "\(base) \(index)"
-    }
 
-    private func expandSheetBounds(
-        for mutations: [CellMutation],
-        workbook: inout ExcelWorkbook
-    ) {
-        guard !mutations.isEmpty else { return }
-        workbook.sheets[selectedSheetIndex].maximumRow = max(
-            workbook.sheets[selectedSheetIndex].maximumRow,
-            mutations.map(\.address.row).max() ?? 1
-        )
-        workbook.sheets[selectedSheetIndex].maximumColumn = max(
-            workbook.sheets[selectedSheetIndex].maximumColumn,
-            mutations.map(\.address.column).max() ?? 1
-        )
-    }
 
-    @discardableResult
     func updateDrawingPlacement(_ selection: ExcelDrawingSelection, expected: ExcelDrawingAnchor, anchor: ExcelDrawingAnchor) -> Bool {
         guard !isSaving, allowEditing(), !isLargeWorkbook, var book = workbook,
               book.sheets.indices.contains(selectedSheetIndex), book.sheets[selectedSheetIndex].partPath == selection.sheetPath,
-              anchor.start.row >= 1, anchor.start.row <= 2000, anchor.start.column >= 1, anchor.start.column <= 200,
-              anchor.end.row >= anchor.start.row, anchor.end.row <= 2001, anchor.end.column >= anchor.start.column, anchor.end.column <= 201,
-              (anchor.end.row > anchor.start.row || anchor.toOffset.y > anchor.fromOffset.y),
-              (anchor.end.column > anchor.start.column || anchor.toOffset.x > anchor.fromOffset.x),
-              [anchor.fromOffset.x, anchor.fromOffset.y, anchor.toOffset.x, anchor.toOffset.y].allSatisfy({ $0 >= 0 && $0 <= 100_000_000_000 }),
-              anchor.extent == nil, anchor.absolutePosition == nil else { return false }
+              ExcelDrawingEditing.isEditablePlacement(anchor) else { return false }
         endEditorTextEditing()
-        let old = book.sheets[selectedSheetIndex].drawingObjects
-        var next = old
-        if let index = next.images.firstIndex(where: { $0.id == selection.id }), next.images[index].anchor == expected {
-            next.images[index].anchor = anchor
-        } else if let index = next.charts.firstIndex(where: { $0.id == selection.id }), next.charts[index].anchor == expected {
-            next.charts[index].anchor = anchor
-        } else { return false }
-        guard old != next else { return true }
-        applyDrawingObjectsChange(old: old, new: next, workbook: &book)
-        workbook = book
-        status = AppLocalization.string("개체의 위치와 크기를 바꿨습니다. 실행 취소로 되돌릴 수 있습니다.")
-        return true
+        switch ExcelDrawingEditing.placing(
+            id: selection.id, expected: expected, anchor: anchor, sheetIndex: selectedSheetIndex, in: book) {
+        case .notFound:
+            return false
+        case .unchanged:
+            return true
+        case .changed(let change, _):
+            apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &book)
+            workbook = book
+            status = AppLocalization.string("개체의 위치와 크기를 바꿨습니다. 실행 취소로 되돌릴 수 있습니다.")
+            return true
+        }
     }
 
-    @discardableResult
     func updateSheetImageDescription(_ selection: ExcelDrawingSelection, name: String, alternativeText: String) -> Bool {
         guard !isSaving, allowEditing(), !isLargeWorkbook, var book = workbook,
               book.sheets.indices.contains(selectedSheetIndex), book.sheets[selectedSheetIndex].partPath == selection.sheetPath else { return false }
         endEditorTextEditing()
-        let old = book.sheets[selectedSheetIndex].drawingObjects
-        var next = old
-        guard let index = next.images.firstIndex(where: { $0.id == selection.id }) else { return false }
-        let title = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        next.images[index].name = title.isEmpty ? old.images[index].name : title
-        next.images[index].alternativeText = alternativeText.isEmpty ? nil : alternativeText
-        guard next != old else { return true }
-        applyDrawingObjectsChange(old: old, new: next, workbook: &book)
-        workbook = book
-        return true
-    }
-
-    private func applyDrawingObjectsChange(
-        old: ExcelWorksheetDrawingObjects,
-        new: ExcelWorksheetDrawingObjects,
-        workbook: inout ExcelWorkbook
-    ) {
-        apply(
-            MutationGroup(
-                sheetIndex: selectedSheetIndex,
-                cells: [],
-                oldDrawingObjects: old,
-                newDrawingObjects: new
-            ),
-            forward: true,
-            registeringUndo: true,
-            workbook: &workbook
-        )
-    }
-
-    private func clearNewDrawingIdentityIfEmpty(
-        _ objects: inout ExcelWorksheetDrawingObjects,
-        original: ExcelWorksheetDrawingObjects
-    ) {
-        guard objects.images.isEmpty,
-              objects.charts.isEmpty,
-              objects.shapes.isEmpty,
-              objects.otherDrawingObjectCount == 0,
-              original.drawingPartPath == nil else {
-            return
+        switch ExcelDrawingEditing.describingImage(
+            id: selection.id, name: name, alternativeText: alternativeText, sheetIndex: selectedSheetIndex, in: book) {
+        case .notFound:
+            return false
+        case .unchanged:
+            return true
+        case .changed(let change, _):
+            apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &book)
+            workbook = book
+            return true
         }
-        objects.drawingPartPath = nil
-        objects.drawingRelationshipID = nil
     }
 
-    private func validatedChartRange(
-        _ reference: String,
-        in sheet: ExcelWorksheet
-    ) -> ExcelCellRange? {
-        guard let range = ExcelCellRange(
-            reference.trimmingCharacters(in: .whitespacesAndNewlines)
-        ),
-        range.end.row > range.start.row,
-        range.end.row <= max(sheet.maximumRow, 1),
-        range.end.column <= max(sheet.maximumColumn, 1),
-        range.end.column - range.start.column < 12 else {
-            return nil
-        }
-        return range
-    }
+
+
 
     private func preparedImage(
         _ data: Data,
         preferredContentType: String? = nil
-    ) -> (
-        data: Data,
-        contentType: String,
-        extensionName: String
-    )? {
+    ) -> ExcelPreparedImage? {
         guard !data.isEmpty,
               data.count <= 20 * 1_024 * 1_024,
               let image = UIImage(data: data) else {
@@ -2360,39 +1487,29 @@ final class ExcelWorkbookViewModel: ObservableObject {
             guard let encoded = image.jpegData(compressionQuality: 0.9) else {
                 return nil
             }
-            return (encoded, "image/jpeg", "jpg")
+            return ExcelPreparedImage(data: encoded, contentType: "image/jpeg", extensionName: "jpg")
         }
         if preferredContentType == "image/png" {
             guard let encoded = image.pngData() else {
                 return nil
             }
-            return (encoded, "image/png", "png")
+            return ExcelPreparedImage(data: encoded, contentType: "image/png", extensionName: "png")
         }
         if data.starts(with: [0xFF, 0xD8, 0xFF]) {
-            return (data, "image/jpeg", "jpg")
+            return ExcelPreparedImage(data: data, contentType: "image/jpeg", extensionName: "jpg")
         }
         if data.starts(with: [
             0x89, 0x50, 0x4E, 0x47,
             0x0D, 0x0A, 0x1A, 0x0A,
         ]) {
-            return (data, "image/png", "png")
+            return ExcelPreparedImage(data: data, contentType: "image/png", extensionName: "png")
         }
         guard let encoded = image.pngData() else {
             return nil
         }
-        return (encoded, "image/png", "png")
+        return ExcelPreparedImage(data: encoded, contentType: "image/png", extensionName: "png")
     }
 
-    private func isSupportedHyperlinkTarget(_ target: String) -> Bool {
-        if target.hasPrefix("#") {
-            return target.count > 1
-        }
-        guard let components = URLComponents(string: target),
-              let scheme = components.scheme?.lowercased() else {
-            return false
-        }
-        return ["http", "https", "mailto", "tel"].contains(scheme)
-    }
 
     func applyNumberFormat(
         _ format: ExcelNumberFormat,
@@ -2406,102 +1523,34 @@ final class ExcelWorkbookViewModel: ObservableObject {
             return
         }
         let sheet = workbook.sheets[selectedSheetIndex]
-        let oldStyles = workbook.styles
-        let oldStyleEdits = styleEdits
         let canonicalSelection = sheet.canonicalAddress(
             for: selectedAddress
         )
         let requestedAddresses: [ExcelCellAddress]
         if toCurrentColumn {
-            guard let region = ExcelAccessibilityAnalyzer
-                .regions(in: sheet)
-                .first(where: {
-                    $0.contains(canonicalSelection)
-                        && $0.columns.contains(where: {
-                            $0.column == canonicalSelection.column
-                        })
-                }) else {
+            guard let addresses = ExcelSheetPartEditing.columnDataAddresses(selection: canonicalSelection, in: sheet) else {
                 return
             }
-            requestedAddresses = region.rowNumbers.map {
-                ExcelCellAddress(
-                    row: $0,
-                    column: canonicalSelection.column
-                )
-            }
+            requestedAddresses = addresses
         } else {
             guard (selectedRange?.cellCount ?? 1) <= 20000 else { return }
             requestedAddresses = selectedRange?.addresses ?? [canonicalSelection]
         }
-
-        let addresses = Array(
-            Set(requestedAddresses.map {
-                sheet.canonicalAddress(for: $0)
-            })
-        ).sorted()
-        var mutations = [CellMutation]()
-        for address in addresses {
-            guard let oldCell = sheet.cell(at: address) else {
-                continue
-            }
-            let newStyleIndex = styleIndex(
-                for: format,
-                replacing: oldCell.styleIndex,
-                workbook: &workbook
-            )
-            guard newStyleIndex != oldCell.styleIndex else {
-                continue
-            }
-            var newCell = oldCell
-            newCell.styleIndex = newStyleIndex
-            newCell.displayValue = ExcelValueFormatter.displayValue(
-                oldCell.rawValue,
-                type: oldCell.cellType,
-                style: workbook.style(at: newStyleIndex),
-                uses1904DateSystem: workbook.uses1904DateSystem
-            )
-            let oldEdit = edits[sheet.partPath]?[address]
-            mutations.append(
-                CellMutation(
-                    address: address,
-                    oldCell: oldCell,
-                    newCell: newCell,
-                    oldEdit: oldEdit,
-                    newEdit: ExcelCellEdit(
-                        input: oldEdit?.input
-                            ?? input(preserving: oldCell),
-                        styleIndex: newStyleIndex,
-                        preservesExistingContent:
-                            oldEdit?.preservesExistingContent ?? true
-                    )
-                )
-            )
-        }
-        guard !mutations.isEmpty else {
+        guard let change = ExcelCellEditing.formattingNumbers(
+            format, at: requestedAddresses, sheetIndex: selectedSheetIndex, workbook: workbook, registry: registry
+        ) else {
             status = AppLocalization.string(
                 "선택한 셀에 이미 같은 표시 형식이 적용되어 있습니다."
             )
             return
         }
-        apply(
-            MutationGroup(
-                sheetIndex: selectedSheetIndex,
-                cells: mutations,
-                oldStyles: oldStyles,
-                newStyles: workbook.styles,
-                oldStyleEdits: oldStyleEdits,
-                newStyleEdits: styleEdits
-            ),
-            forward: true,
-            registeringUndo: true,
-            workbook: &workbook
-        )
+        apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
         syncEditorText(using: workbook.sheets[selectedSheetIndex])
         status = toCurrentColumn
             ? AppLocalization.format(
                 "현재 열의 %lld개 데이터 셀을 %@ 표시 형식으로 바꿨습니다.",
-                mutations.count,
+                change.cells.count,
                 format.title
             )
             : AppLocalization.format(
@@ -2602,62 +1651,21 @@ final class ExcelWorkbookViewModel: ObservableObject {
               workbook.sheets.indices.contains(selectedSheetIndex) else {
             return
         }
-        let sheet = workbook.sheets[selectedSheetIndex]
-        let oldStyles = workbook.styles
-        let oldStyleEdits = styleEdits
-        var mutations = [CellMutation]()
-        for field in fields where field.value != field.originalValue {
-            let address = sheet.canonicalAddress(
-                for: ExcelCellAddress(
-                    row: row,
-                    column: field.column
-                )
-            )
-            let styleIndex = sheet.cell(at: address)?.styleIndex
-                ?? styleForNewCell(
-                    column: address.column,
-                    row: address.row,
-                    in: sheet
-                )
-            let resolved = resolvedUserInput(
-                field.value,
-                styleIndex: styleIndex,
-                workbook: &workbook
-            )
-            mutations.append(
-                makeMutation(
-                    address: address,
-                    input: resolved.input,
-                    styleIndex: resolved.styleIndex,
-                    sheet: sheet,
-                    workbook: workbook
-                )
-            )
-        }
-        guard !mutations.isEmpty else {
+        guard let change = ExcelRowEditing.updating(
+            row: row,
+            values: fields.filter { $0.value != $0.originalValue }.map { ($0.column, $0.value) },
+            sheetIndex: selectedSheetIndex, workbook: workbook, registry: registry
+        ) else {
             return
         }
-        let stylesChanged = workbook.styles.count != oldStyles.count
-        apply(
-            MutationGroup(
-                sheetIndex: selectedSheetIndex,
-                cells: mutations,
-                oldStyles: stylesChanged ? oldStyles : nil,
-                newStyles: stylesChanged ? workbook.styles : nil,
-                oldStyleEdits: stylesChanged ? oldStyleEdits : nil,
-                newStyleEdits: stylesChanged ? styleEdits : nil
-            ),
-            forward: true,
-            registeringUndo: true,
-            workbook: &workbook
-        )
+        apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
-        selectedAddress = mutations.first?.address
+        selectedAddress = change.cells.first?.address
         syncEditorText(using: workbook.sheets[selectedSheetIndex])
         status = AppLocalization.format(
             "%lld행의 %lld개 값을 수정했습니다. 저장하면 XLSX 파일에 반영됩니다.",
             row,
-            mutations.count
+            change.cells.count
         )
     }
 
@@ -2669,112 +1677,22 @@ final class ExcelWorkbookViewModel: ObservableObject {
             return
         }
         let sheet = workbook.sheets[selectedSheetIndex]
-        let table = selectedAddress.flatMap {
-            sheet.table(containing: $0)
-        }
-        let preferredRow = (table?.range.end.row ?? sheet.maximumRow) + 1
-        let fieldColumns = Set(fields.map(\.column))
-        let preferredRowIsOccupied = sheet.cells.keys.contains {
-            $0.row == preferredRow
-                && fieldColumns.contains($0.column)
-        }
-        let newRow = preferredRowIsOccupied
-            ? max(sheet.maximumRow + 1, preferredRow)
-            : preferredRow
-        guard newRow <= ExcelWorkbookDocument.maximumExcelRows else {
+        let appended: ExcelRowEditing.Appended
+        do {
+            guard let result = try ExcelRowEditing.appending(
+                values: fields.map { ($0.column, $0.value) }, near: selectedAddress,
+                sheetIndex: selectedSheetIndex, workbook: workbook, registry: registry
+            ) else { return }
+            appended = result
+        } catch {
             status = AppLocalization.string(
                 "Excel의 최대 행 수를 초과해 행을 추가할 수 없습니다."
             )
             return
         }
-        var mutations: [CellMutation] = []
-        let oldStyles = workbook.styles
-        let oldStyleEdits = styleEdits
-        for field in fields {
-            let address = ExcelCellAddress(
-                row: newRow,
-                column: field.column
-            )
-            let trimmedValue = field.value.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-            var styleIndex = styleForNewCell(
-                column: field.column,
-                row: newRow,
-                in: sheet
-            )
-            let input: ExcelCellInput
-            if !trimmedValue.isEmpty {
-                let resolved = resolvedUserInput(
-                    field.value,
-                    styleIndex: styleIndex,
-                    workbook: &workbook
-                )
-                input = resolved.input
-                styleIndex = resolved.styleIndex
-            } else if let previousCell = sheet.cells[
-                ExcelCellAddress(
-                    row: max(newRow - 1, 1),
-                    column: field.column
-                )
-            ],
-            let formula = previousCell.formula {
-                input = .formula(
-                    ExcelFormulaTranslator.shiftingRelativeRows(
-                        in: formula,
-                        by: 1
-                    )
-                )
-            } else {
-                continue
-            }
-            mutations.append(
-                makeMutation(
-                    address: address,
-                    input: input,
-                    styleIndex: styleIndex,
-                    sheet: sheet,
-                    workbook: workbook
-                )
-            )
-        }
-        guard !mutations.isEmpty else {
-            return
-        }
-        let stylesChanged = workbook.styles.count != oldStyles.count
-        apply(
-            MutationGroup(
-                sheetIndex: selectedSheetIndex,
-                cells: mutations,
-                oldStyles: stylesChanged ? oldStyles : nil,
-                newStyles: stylesChanged ? workbook.styles : nil,
-                oldStyleEdits: stylesChanged ? oldStyleEdits : nil,
-                newStyleEdits: stylesChanged ? styleEdits : nil
-            ),
-            forward: true,
-            registeringUndo: true,
-            workbook: &workbook
-        )
-        workbook.sheets[selectedSheetIndex].maximumRow = max(
-            workbook.sheets[selectedSheetIndex].maximumRow,
-            newRow
-        )
-        workbook.sheets[selectedSheetIndex].maximumColumn = max(
-            workbook.sheets[selectedSheetIndex].maximumColumn,
-            mutations.map(\.address.column).max() ?? 1
-        )
-        if let table,
-           let tableIndex = workbook.sheets[selectedSheetIndex]
-            .tables.firstIndex(where: { $0.id == table.id }) {
-            workbook.sheets[selectedSheetIndex]
-                .tables[tableIndex].range = ExcelCellRange(
-                    start: table.range.start,
-                    end: ExcelCellAddress(
-                        row: max(table.range.end.row, newRow),
-                        column: table.range.end.column
-                    )
-                )
-        }
+        let newRow = appended.row
+        apply(MutationGroup(change: appended.change), forward: true, registeringUndo: true, workbook: &workbook)
+        appended.finish(workbook: &workbook)
         self.workbook = workbook
         if isLargeWorkbook {
             largeAddedRows[sheet.partPath, default: []].insert(newRow)
@@ -2783,7 +1701,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
         }
         selectedAddress = ExcelCellAddress(
             row: newRow,
-            column: mutations.first?.address.column ?? 1
+            column: appended.change.cells.first?.address.column ?? 1
         )
         syncEditorText(using: workbook.sheets[selectedSheetIndex])
         status = AppLocalization.format(
@@ -2862,116 +1780,56 @@ final class ExcelWorkbookViewModel: ObservableObject {
         guard let text = supplied == nil ? UIPasteboard.general.string : "" else { status = AppLocalization.string("붙여넣을 표나 텍스트가 없습니다."); return }
         let clip = supplied ?? (rangeClipboard?.changeCount == UIPasteboard.general.changeCount ? rangeClipboard : nil)
         let values = clip?.values ?? ExcelTabularClipboard.decode(text).map { $0.map { ExcelClipboardValue(text: $0, styleIndex: nil) } }
-        guard let width = values.first?.count, width > 0, !values.isEmpty else { return }
-        let repeated = width == 1 && values.count == 1 && clip?.isCut != true
-        let rows = repeated ? (selectedRange?.end.row ?? target.row) - target.row + 1 : values.count
-        let columns = repeated ? (selectedRange?.end.column ?? target.column) - target.column + 1 : width
-        let destination = ExcelCellRange(start: target, end: ExcelCellAddress(row: target.row + rows - 1, column: target.column + columns - 1))
-        guard destination.cellCount <= 20000, destination.end.row <= 1048576, destination.end.column <= 16384 else { status = AppLocalization.string("붙여넣을 범위가 너무 큽니다."); return }
-        var updates: [Int: [ExcelCellAddress: ExcelClipboardValue]] = [:]
-        if let clip, clip.isCut {
-            guard original.sheets.indices.contains(clip.sheetIndex), !original.sheets[clip.sheetIndex].protection.isEnabled else { return }
-            // A cut is deferred, so refuse to clear source cells edited since copying.
-            for (r, row) in clip.values.enumerated() {
-                for (c, value) in row.enumerated() {
-                    let address = ExcelCellAddress(row: clip.range.start.row + r, column: clip.range.start.column + c)
-                    guard (original.sheets[clip.sheetIndex].cells[address]?.editText ?? "") == value.text else { status = AppLocalization.string("잘라낼 원본이 변경되었습니다. 범위를 다시 선택해 주세요."); return }
-                    updates[clip.sheetIndex, default: [:]][address] = ExcelClipboardValue(text: "", styleIndex: nil)
-                }
-            }
+        let plan: (updates: [Int: [ExcelCellAddress: ExcelClipboardValue]], destination: ExcelCellRange)
+        do {
+            plan = try ExcelRangeOperations.pasting(
+                values, clipboard: clip, at: target, selection: selectedRange, sheetIndex: selectedSheetIndex, in: original)
+        } catch .destinationTooLarge {
+            status = AppLocalization.string("붙여넣을 범위가 너무 큽니다."); return
+        } catch .cutSourceChanged {
+            status = AppLocalization.string("잘라낼 원본이 변경되었습니다. 범위를 다시 선택해 주세요."); return
+        } catch .crossSheetFormulaCut {
+            status = AppLocalization.string("수식이 포함된 범위의 시트 간 잘라내기는 복사·붙여넣기를 사용해 주세요."); return
+        } catch {
+            return
         }
-        for r in 0 ..< rows {
-            for c in 0 ..< columns {
-                let value = values[repeated ? 0 : r][repeated ? 0 : c]
-                let address = ExcelCellAddress(row: target.row + r, column: target.column + c)
-                var pasted = value.text
-                let isFormula: Bool
-                if case .formula = value.input { isFormula = true } else { isFormula = value.input == nil && pasted.hasPrefix("=") }
-                if isFormula, let clip, !clip.isCut {
-                    let source = ExcelCellAddress(row: clip.range.start.row + (repeated ? 0 : r), column: clip.range.start.column + (repeated ? 0 : c))
-                    pasted = "=" + ExcelFormulaReferenceEditing.copied(String(pasted.dropFirst()), from: source, to: address)
-                }
-                updates[selectedSheetIndex, default: [:]][address] = ExcelClipboardValue(text: pasted, styleIndex: clip == nil ? original.sheets[selectedSheetIndex].cells[address]?.styleIndex : value.styleIndex, input: isFormula ? .formula(String(pasted.dropFirst())) : value.input)
-            }
-        }
-        if let clip, clip.isCut {
-            let sourceName = original.sheets[clip.sheetIndex].name
-            let destinationName = original.sheets[selectedSheetIndex].name
-            if sourceName != destinationName && clip.values.flatMap({ $0 }).contains(where: { $0.text.hasPrefix("=") }) {
-                status = AppLocalization.string("수식이 포함된 범위의 시트 간 잘라내기는 복사·붙여넣기를 사용해 주세요."); return
-            }
-            for (index, sheet) in original.sheets.enumerated() {
-                let addresses = Set(sheet.cells.keys).union(updates[index]?.keys.map { $0 } ?? [])
-                for address in addresses {
-                    let cell = sheet.cells[address]
-                    let effective = updates[index]?[address]?.text ?? cell?.editText ?? ""
-                    let currentInput = updates[index]?[address].map { $0.input ?? ExcelCellInput(userText: $0.text) } ?? cell.map { input(preserving: $0) }
-                    guard case .formula = currentInput else { continue }
-                    let moved = "=" + ExcelFormulaReferenceEditing.moved(String(effective.dropFirst()), source: clip.range, sourceSheet: sourceName, destination: target, destinationSheet: destinationName, formulaSheet: sheet.name)
-                    if moved != effective { updates[index, default: [:]][address] = ExcelClipboardValue(text: moved, styleIndex: updates[index]?[address]?.styleIndex ?? cell?.styleIndex, input: .formula(String(moved.dropFirst()))) }
-                }
-            }
-        }
-        if applyRangeUpdates(updates) {
-            selectedAddress = target; selectionEnd = destination.end
+        if applyRangeUpdates(plan.updates) {
+            selectedAddress = target; selectionEnd = plan.destination.end
             if clip?.isCut == true { rangeClipboard = nil }
             status = AppLocalization.string("선택한 위치에 붙여넣었습니다.")
         }
     }
 
     func clearSelection() {
-        guard let range = selectedRange, range.cellCount <= 20000 else { return }
+        guard let range = selectedRange, range.cellCount <= ExcelRangeOperations.maximumCells else { return }
         if range.cellCount == 1 || selectedSheet?.mergedRange(containing: range.start) == range { clearSelectedCell(); return }
-        let updates = Dictionary(uniqueKeysWithValues: range.addresses.map { ($0, ExcelClipboardValue(text: "", styleIndex: selectedSheet?.cells[$0]?.styleIndex)) })
+        guard let sheet = selectedSheet, let updates = ExcelRangeOperations.clearing(range, in: sheet) else { return }
         if applyRangeUpdates([selectedSheetIndex: updates]) { status = AppLocalization.string("선택 범위의 값을 지웠습니다.") }
     }
 
     func fillSelection(across: Bool) {
-        guard let range = selectedRange, let sheet = selectedSheet, range.cellCount > 1, range.cellCount <= 20000 else { return }
-        var updates: [ExcelCellAddress: ExcelClipboardValue] = [:]
-        for address in range.addresses {
-            let seed = ExcelCellAddress(row: across ? address.row : range.start.row, column: across ? range.start.column : address.column)
-            let second = ExcelCellAddress(row: across ? seed.row : seed.row + 1, column: across ? seed.column + 1 : seed.column)
-            let offset = across ? address.column - seed.column : address.row - seed.row
-            guard offset > 0 else { continue }
-            let original = sheet.cells[seed]
-            var text = original?.editText ?? ""
-            if let formula = original?.formula { text = "=" + ExcelFormulaReferenceEditing.copied(formula, from: seed, to: address) }
-            else if let first = Double(text), let nextText = sheet.cells[second]?.rawValue, let next = Double(nextText), range.contains(second) {
-                text = String(first + Double(offset) * (next - first))
-            }
-            let preserved = original.map { input(preserving: $0) }
-            let newInput: ExcelCellInput? = original?.formula != nil ? .formula(String(text.dropFirst())) : text == original?.editText ? preserved : ExcelCellInput(userText: text)
-            updates[address] = ExcelClipboardValue(text: text, styleIndex: original?.styleIndex, input: newInput)
-        }
+        guard let range = selectedRange, let sheet = selectedSheet,
+              let updates = ExcelRangeOperations.filling(range, in: sheet, across: across) else { return }
         if applyRangeUpdates([selectedSheetIndex: updates]) { status = AppLocalization.string("선택 범위를 채웠습니다.") }
     }
 
     @discardableResult private func applyRangeUpdates(_ updates: [Int: [ExcelCellAddress: ExcelClipboardValue]]) -> Bool {
         guard allowEditing(), !isLargeWorkbook, var next = workbook else { return false }
-        guard updates.values.reduce(0, { $0 + $1.count }) <= 20000, updates.values.contains(where: { !$0.isEmpty }) else {
+        do {
+            try ExcelRangeOperations.validate(updates, in: next)
+        } catch .tooManyCellsOrEmpty {
             status = AppLocalization.string("한 번에 편집할 범위는 20,000셀 이하로 선택해 주세요."); return false
+        } catch {
+            endEditorTextEditing()
+            status = error == .uneditableSheet
+                ? AppLocalization.string("편집할 수 없는 시트가 포함되어 있습니다.")
+                : AppLocalization.string("병합 셀이나 배열 수식이 포함된 범위는 이 작업을 사용할 수 없습니다.")
+            return false
         }
         endEditorTextEditing()
         let old = captureEditingState(next)
-        for (index, values) in updates {
-            guard next.sheets.indices.contains(index), !next.sheets[index].protection.isEnabled, !next.sheets[index].didTruncate else { status = AppLocalization.string("편집할 수 없는 시트가 포함되어 있습니다."); return false }
-            let sheet = next.sheets[index]
-            if values.keys.contains(where: { sheet.cells[$0]?.spillAnchor != nil || sheet.canonicalAddress(for: $0) != $0 }) || values.count > 1 && sheet.mergedRanges.contains(where: { merged in values.keys.contains(where: merged.contains) }) {
-                status = AppLocalization.string("병합 셀이나 배열 수식이 포함된 범위는 이 작업을 사용할 수 없습니다."); return false
-            }
-        }
         for (index, values) in updates.sorted(by: { $0.key < $1.key }) {
-            let sheet = next.sheets[index]
-            let mutations = values.sorted { $0.key < $1.key }.map { address, value -> CellMutation in
-                let validStyle = value.styleIndex.flatMap { next.styles.indices.contains($0) ? $0 : nil }
-                let resolved = value.input.map { (input: $0, styleIndex: validStyle) } ?? resolvedUserInput(value.text, styleIndex: validStyle, workbook: &next)
-                let mutation = makeMutation(address: address, input: resolved.input, styleIndex: resolved.styleIndex, sheet: sheet, workbook: next)
-                if mutation.newCell == nil, let styleIndex = resolved.styleIndex {
-                    return CellMutation(address: address, oldCell: mutation.oldCell, newCell: ExcelCell(address: address, rawValue: "", displayValue: "", formula: nil, styleIndex: styleIndex, cellType: nil), oldEdit: mutation.oldEdit, newEdit: mutation.newEdit)
-                }
-                return mutation
-            }
+            let mutations = ExcelRangeOperations.mutations(for: values, sheetIndex: index, workbook: &next, registry: &registry)
             _ = apply(MutationGroup(sheetIndex: index, cells: mutations), forward: true, registeringUndo: false, workbook: &next)
         }
         let new = captureEditingState(next)
@@ -2997,13 +1855,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
     func replaceFound(all: Bool, replacement: String) {
         guard !findText.isEmpty, let sheet = selectedSheet else { return }
         let addresses = all ? findResults : selectedAddress.map { [$0] } ?? []
-        var updates: [ExcelCellAddress: ExcelClipboardValue] = [:]
-        for address in addresses {
-            guard let cell = sheet.cells[address], cell.editText.range(of: findText, options: [.caseInsensitive, .diacriticInsensitive]) != nil else { continue }
-            let newText = cell.editText.replacingOccurrences(of: findText, with: replacement, options: [.caseInsensitive, .diacriticInsensitive])
-            let literal = ["s", "inlineStr", "str"].contains(cell.cellType ?? "") && cell.formula == nil
-            updates[address] = ExcelClipboardValue(text: newText, styleIndex: cell.styleIndex, input: literal ? .text(newText) : nil)
-        }
+        let updates = ExcelRangeOperations.replacing(findText, with: replacement, at: addresses, in: sheet)
         if !updates.isEmpty, applyRangeUpdates([selectedSheetIndex: updates]) { status = AppLocalization.string("찾은 내용을 바꿨습니다.") }
     }
 
@@ -3066,15 +1918,13 @@ final class ExcelWorkbookViewModel: ObservableObject {
         status = AppLocalization.string("시트를 변경하는 중…")
         defer { isSaving = false }
         do {
-            let input = try await exportData()
+            let source = editingBaseData ?? sourceData
+            let registry = registry
             let result = try await Task.detached(priority: .userInitiated) {
-                let result = try ExcelSheetManagement.applying(edit, to: input, workbook: original, selectedSheetPath: active)
-                var loaded = try ExcelWorkbookDocument.load(from: result.data)
-                guard !loaded.sheets.contains(where: { $0.didTruncate }) else { throw ExcelEditingError("이 편집으로 일반 문서의 행·열 표시 한도를 넘습니다.") }
-                _ = Self.refreshDerivedFormulaValues(in: &loaded, edits: [:])
-                return (result, loaded)
+                try ExcelStructuralEditing.applying(
+                    edit, source: source, workbook: original, registry: registry, selectedSheetPath: active)
             }.value
-            guard result.0.data != input else { status = AppLocalization.string("변경할 내용이 없습니다."); return true }
+            guard result.changed else { status = AppLocalization.string("변경할 내용이 없습니다."); return true }
             installEditingBase(result.0.data, workbook: result.1)
             workbook = result.1
             selectedSheetIndex = result.1.sheets.firstIndex { $0.partPath == result.0.selectedSheetPath } ?? 0
@@ -3111,14 +1961,12 @@ final class ExcelWorkbookViewModel: ObservableObject {
         defer { isSaving = false }
         do {
             let old = captureEditingState(original)
-            let input = try await exportData()
+            let source = editingBaseData ?? sourceData
+            let registry = registry
             let sheetIndex = selectedSheetIndex
             let result = try await Task.detached(priority: .userInitiated) {
-                let data = try ExcelAdvancedWorkbookEditing.applying(edit, to: input, workbook: original, sheetIndex: sheetIndex)
-                var loaded = try ExcelWorkbookDocument.load(from: data)
-                guard !loaded.sheets.contains(where: { $0.didTruncate }) else { throw ExcelEditingError("이 편집으로 일반 문서의 행·열 표시 한도를 넘습니다.") }
-                _ = Self.refreshDerivedFormulaValues(in: &loaded, edits: [:])
-                return (data, loaded)
+                try ExcelStructuralEditing.applying(
+                    edit, source: source, workbook: original, registry: registry, sheetIndex: sheetIndex)
             }.value
             installEditingBase(result.0, workbook: result.1)
             let next = captureEditingState(result.1)
@@ -3574,471 +2422,18 @@ final class ExcelWorkbookViewModel: ObservableObject {
         }
 
         let sheetIndex = selectedSheetIndex
-        let sourceSheet = workbook.sheets[sheetIndex]
-        guard !sourceSheet.protection.isEnabled else {
-            throw ExcelAICommandValidationError.protectedWorksheet
-        }
-        let regions = ExcelAccessibilityAnalyzer.regions(in: sourceSheet)
-        let oldStyles = workbook.styles
-        let oldStyleEdits = styleEdits
-        let oldDifferentialStyles = workbook.differentialStyles
-        let oldDifferentialStyleEdits = differentialStyleEdits
-        var mutations = [CellMutation]()
-        var newTables = sourceSheet.tables
-        var createdTableFirstAddress: ExcelCellAddress?
-
-        let existingTableNumbers = workbook.sheets
-            .flatMap(\.tables)
-            .compactMap { table -> Int? in
-                let name = URL(fileURLWithPath: table.partPath)
-                    .deletingPathExtension()
-                    .lastPathComponent
-                guard name.hasPrefix("table") else { return nil }
-                return Int(name.dropFirst("table".count))
-            }
-        var nextTableNumber = (existingTableNumbers.max() ?? 0) + 1
-        var usedTableNames = Set(
-            workbook.sheets.flatMap(\.tables).map {
-                $0.name.lowercased()
-            }
-        )
-        let rangesOverlap: (ExcelCellRange, ExcelCellRange) -> Bool = {
-            lhs,
-            rhs in
-            lhs.start.row <= rhs.end.row
-                && lhs.end.row >= rhs.start.row
-                && lhs.start.column <= rhs.end.column
-                && lhs.end.column >= rhs.start.column
-        }
-
-        for createdTable in plan.createdTables {
-            let start = ExcelCellAddress(
-                row: createdTable.startRow,
-                column: createdTable.startColumn
-            )
-            let range = ExcelCellRange(
-                start: start,
-                end: ExcelCellAddress(
-                    row: createdTable.startRow
-                        + createdTable.blankRowCount,
-                    column: createdTable.startColumn
-                        + createdTable.headers.count - 1
-                )
-            )
-            guard !sourceSheet.cells.keys.contains(where: range.contains),
-                  !sourceSheet.mergedRanges.contains(where: {
-                      rangesOverlap(range, $0)
-                  }),
-                  !newTables.contains(where: {
-                      rangesOverlap(range, $0.range)
-                  }) else {
-                throw ExcelAIApplyError.invalidTarget
-            }
-
-            while usedTableNames.contains(
-                "table\(nextTableNumber)".lowercased()
-            ) {
-                nextTableNumber += 1
-            }
-            let tableName = "Table\(nextTableNumber)"
-            let table = ExcelTable(
-                id: String(nextTableNumber),
-                name: tableName,
-                range: range,
-                partPath: "xl/tables/table\(nextTableNumber).xml",
-                columnNames: createdTable.headers,
-                headerRowCount: 1,
-                totalsRowCount: 0
-            )
-            nextTableNumber += 1
-            usedTableNames.insert(tableName.lowercased())
-            newTables.append(table)
-            createdTableFirstAddress = createdTableFirstAddress ?? start
-
-            for (offset, header) in createdTable.headers.enumerated() {
-                let address = ExcelCellAddress(
-                    row: createdTable.startRow,
-                    column: createdTable.startColumn + offset
-                )
-                mutations.append(
-                    makeMutation(
-                        address: address,
-                        input: .text(header),
-                        styleIndex: styleForNewCell(
-                            column: address.column,
-                            row: address.row,
-                            in: sourceSheet
-                        ),
-                        sheet: sourceSheet
-                    )
-                )
-            }
-        }
-
-        for edit in plan.edits {
-            let requested = ExcelCellAddress(row: edit.row, column: edit.column)
-            let address = sourceSheet.canonicalAddress(for: requested)
-            let isExplicit = plan.explicitAddresses.contains(requested)
-            if !isExplicit {
-                guard let region = regions.first(where: {
-                    let rowIsEditable = $0.isNativeTable
-                        ? edit.row > ($0.headerRow ?? $0.range.start.row)
-                            && $0.range.contains(requested)
-                        : $0.rowNumbers.contains(edit.row)
-                    return rowIsEditable
-                        && $0.columns.contains(where: {
-                            $0.column == edit.column
-                        })
-                }) else {
-                    throw ExcelAIApplyError.invalidTarget
-                }
-                let rowIsEditable = region.isNativeTable
-                    ? address.row > (region.headerRow ?? region.range.start.row)
-                        && region.range.contains(address)
-                    : region.rowNumbers.contains(address.row)
-                guard rowIsEditable,
-                      region.columns.contains(where: {
-                          $0.column == address.column
-                      }) else {
-                    throw ExcelAIApplyError.invalidTarget
-                }
-            } else {
-                guard requested.row <= ExcelWorkbookDocument.maximumExcelRows else {
-                    throw ExcelAIApplyError.rowLimitExceeded
-                }
-            }
-            let baseStyleIndex = sourceSheet.cell(at: address)?.styleIndex
-                ?? styleForNewCell(
-                    column: address.column,
-                    row: address.row,
-                    in: sourceSheet
-                )
-            let resolved = resolvedUserInput(
-                edit.newValue,
-                styleIndex: baseStyleIndex,
-                workbook: &workbook
-            )
-            mutations.append(
-                makeMutation(
-                    address: address,
-                    input: resolved.input,
-                    styleIndex: resolved.styleIndex,
-                    sheet: sourceSheet,
-                    workbook: workbook
-                )
-            )
-        }
-
-        var nextRowByRegion = Dictionary(
-            uniqueKeysWithValues: regions.map {
-                ($0.id, $0.range.end.row + 1)
-            }
-        )
-        var appendedEndRowByRegion = [String: Int]()
-        var reservedRows = Set<Int>()
-
-        for appendedRow in plan.appendedRows {
-            guard let region = regions.first(where: {
-                $0.id == appendedRow.regionID
-            }) else {
-                throw ExcelAIApplyError.invalidTarget
-            }
-            let columnNumbers = Set(region.columns.map(\.column))
-            let newRow = nextRowByRegion[region.id]
-                ?? region.range.end.row + 1
-            let rowIsOccupied: (Int) -> Bool = { row in
-                reservedRows.contains(row)
-                    || sourceSheet.cells.keys.contains {
-                        $0.row == row
-                            && columnNumbers.contains($0.column)
-                    }
-            }
-            if rowIsOccupied(newRow) {
-                throw ExcelAIApplyError.appendTargetOccupied
-            }
-            guard newRow <= ExcelWorkbookDocument.maximumExcelRows else {
-                throw ExcelAIApplyError.rowLimitExceeded
-            }
-            reservedRows.insert(newRow)
-            nextRowByRegion[region.id] = newRow + 1
-            appendedEndRowByRegion[region.id] = max(
-                appendedEndRowByRegion[region.id] ?? 0,
-                newRow
-            )
-
-            let valuesByColumn = Dictionary(
-                uniqueKeysWithValues: appendedRow.values.map {
-                    ($0.column, $0.newValue)
-                }
-            )
-            for column in region.columns {
-                var styleIndex = styleForNewCell(
-                    column: column.column,
-                    row: newRow,
-                    in: sourceSheet
-                )
-                let input: ExcelCellInput
-                if let value = valuesByColumn[column.column] {
-                    let resolved = resolvedUserInput(
-                        value,
-                        styleIndex: styleIndex,
-                        workbook: &workbook
-                    )
-                    input = resolved.input
-                    styleIndex = resolved.styleIndex
-                } else if let previousCell = sourceSheet.cells[
-                    ExcelCellAddress(
-                        row: region.range.end.row,
-                        column: column.column
-                    )
-                ], let formula = previousCell.formula {
-                    input = .formula(
-                        ExcelFormulaTranslator.shiftingRelativeRows(
-                            in: formula,
-                            by: newRow - region.range.end.row
-                        )
-                    )
-                } else {
-                    continue
-                }
-                let address = ExcelCellAddress(
-                    row: newRow,
-                    column: column.column
-                )
-                mutations.append(
-                    makeMutation(
-                        address: address,
-                        input: input,
-                        styleIndex: styleIndex,
-                        sheet: sourceSheet,
-                        workbook: workbook
-                    )
-                )
-            }
-        }
-
-        // Edits are canonicalized to merged-range anchors above, so two
-        // plan entries can resolve to one address. Reject instead of
-        // trapping in `Dictionary(uniqueKeysWithValues:)`.
-        var mutationsByAddress = [ExcelCellAddress: CellMutation]()
-        for mutation in mutations {
-            guard mutationsByAddress
-                .updateValue(mutation, forKey: mutation.address) == nil
-            else {
-                throw ExcelAIApplyError.conflictingEdits
-            }
-        }
-        var newDataValidations = sourceSheet.dataValidations
-        var newConditionalFormatting = sourceSheet.conditionalFormatting
-
-        for action in plan.actions {
-            guard action.addresses.allSatisfy({ address in
-                regions.contains(where: { region in
-                    let rowIsEditable = region.isNativeTable
-                        ? address.row
-                            > (region.headerRow ?? region.range.start.row)
-                            && region.range.contains(address)
-                        : region.rowNumbers.contains(address.row)
-                    return rowIsEditable
-                        && region.columns.contains(where: {
-                            $0.column == address.column
-                        })
-                })
-            }) else {
-                throw ExcelAIApplyError.invalidTarget
-            }
-            let ranges = ExcelCellRange.verticalRanges(
-                for: action.addresses
-            )
-            switch action {
-            case .setNumberFormat(let addresses, let format):
-                for address in addresses {
-                    let existingMutation = mutationsByAddress[address]
-                    guard let currentCell = existingMutation?.newCell
-                            ?? sourceSheet.cell(at: address) else {
-                        continue
-                    }
-                    let newStyleIndex = styleIndex(
-                        for: format,
-                        replacing: currentCell.styleIndex,
-                        workbook: &workbook
-                    )
-                    guard newStyleIndex != currentCell.styleIndex else {
-                        continue
-                    }
-                    var updatedCell = currentCell
-                    updatedCell.styleIndex = newStyleIndex
-                    updatedCell.displayValue = ExcelValueFormatter.displayValue(
-                        currentCell.rawValue,
-                        type: currentCell.cellType,
-                        style: workbook.style(at: newStyleIndex),
-                        uses1904DateSystem: workbook.uses1904DateSystem
-                    )
-                    // Carry over the unsaved edit for this cell (from an
-                    // earlier turn) so its content and its
-                    // `preservesExistingContent` flag survive; otherwise a
-                    // cell that only exists in memory would be written as
-                    // a style-only patch and fail to save.
-                    let currentEdit = existingMutation?.newEdit
-                        ?? edits[sourceSheet.partPath]?[address]
-                    mutationsByAddress[address] = CellMutation(
-                        address: address,
-                        oldCell: existingMutation?.oldCell
-                            ?? sourceSheet.cell(at: address),
-                        newCell: updatedCell,
-                        oldEdit: existingMutation?.oldEdit
-                            ?? edits[sourceSheet.partPath]?[address],
-                        newEdit: ExcelCellEdit(
-                            input: currentEdit?.input
-                                ?? input(preserving: currentCell),
-                            styleIndex: newStyleIndex,
-                            preservesExistingContent:
-                                currentEdit?.preservesExistingContent ?? true,
-                            cachedValue: currentEdit?.cachedValue,
-                            cachedType: currentEdit?.cachedType,
-                            formulaSpillRange:
-                                currentEdit?.formulaSpillRange
-                        )
-                    )
-                }
-
-            case .setDropdown(_, let values, let allowsBlank):
-                newDataValidations = newDataValidations.compactMap {
-                    $0.removing(ranges)
-                }
-                newDataValidations.append(
-                    .inlineList(
-                        ranges: ranges,
-                        values: values,
-                        allowsBlank: allowsBlank
-                    )
-                )
-
-            case .removeDropdown:
-                newDataValidations = newDataValidations.compactMap { rule in
-                    rule.type == "list" ? rule.removing(ranges) : rule
-                }
-
-            case .setConditionalFormatting(
-                _,
-                let kind,
-                let comparisonValue,
-                let highlight
-            ):
-                newConditionalFormatting = newConditionalFormatting
-                    .compactMap { block in
-                        block.isSameRule(
-                            kind: kind,
-                            comparisonValue: comparisonValue
-                        ) ? block.removing(ranges) : block
-                    }
-                let styleIndex = differentialStyleIndex(
-                    for: highlight.style,
-                    workbook: &workbook
-                )
-                let priority = newConditionalFormatting
-                    .flatMap(\.rules)
-                    .map(\.priority)
-                    .max()
-                    .map { $0 + 1 } ?? 1
-                newConditionalFormatting.append(
-                    ExcelConditionalFormattingBlock(
-                        ranges: ranges,
-                        rules: [
-                            ExcelConditionalFormattingRule(
-                                kind: kind,
-                                comparisonValue: comparisonValue,
-                                differentialStyleIndex: styleIndex,
-                                priority: priority
-                            ),
-                        ]
-                    )
-                )
-
-            case .removeConditionalFormatting:
-                newConditionalFormatting = newConditionalFormatting
-                    .compactMap { $0.removing(ranges) }
-            }
-        }
-
-        mutations = mutationsByAddress.values.sorted {
-            $0.address < $1.address
-        }
-        let dataValidationsChanged =
-            newDataValidations != sourceSheet.dataValidations
-        let conditionalFormattingChanged =
-            newConditionalFormatting != sourceSheet.conditionalFormatting
-        guard !mutations.isEmpty
-                || dataValidationsChanged
-                || conditionalFormattingChanged else {
-            throw ExcelAIApplyError.noChanges
-        }
+        let edit = try ExcelAIPlanApplication.edit(
+            plan, sheetIndex: sheetIndex, workbook: workbook, registry: registry)
         apply(
-            MutationGroup(
-                sheetIndex: sheetIndex,
-                cells: mutations,
-                oldStyles: oldStyles,
-                newStyles: workbook.styles,
-                oldStyleEdits: oldStyleEdits,
-                newStyleEdits: styleEdits,
-                oldDifferentialStyles: oldDifferentialStyles,
-                newDifferentialStyles: workbook.differentialStyles,
-                oldDifferentialStyleEdits: oldDifferentialStyleEdits,
-                newDifferentialStyleEdits: differentialStyleEdits,
-                oldDataValidations: dataValidationsChanged
-                    ? sourceSheet.dataValidations : nil,
-                newDataValidations: dataValidationsChanged
-                    ? newDataValidations : nil,
-                oldConditionalFormatting: conditionalFormattingChanged
-                    ? sourceSheet.conditionalFormatting : nil,
-                newConditionalFormatting: conditionalFormattingChanged
-                    ? newConditionalFormatting : nil,
-                oldTables: plan.createdTables.isEmpty
-                    ? nil : sourceSheet.tables,
-                newTables: plan.createdTables.isEmpty
-                    ? nil : newTables
-            ),
+            MutationGroup(change: edit.change),
             forward: true,
             registeringUndo: true,
             workbook: &workbook
         )
-        workbook.sheets[sheetIndex].maximumRow = max(
-            workbook.sheets[sheetIndex].maximumRow,
-            mutations.map(\.address.row).max() ?? 1,
-            plan.createdTables.map {
-                $0.startRow + $0.blankRowCount
-            }.max() ?? 1
-        )
-        workbook.sheets[sheetIndex].maximumColumn = max(
-            workbook.sheets[sheetIndex].maximumColumn,
-            mutations.map(\.address.column).max() ?? 1,
-            plan.createdTables.map {
-                $0.startColumn + $0.headers.count - 1
-            }.max() ?? 1
-        )
-        for (regionID, endRow) in appendedEndRowByRegion {
-            guard regionID.hasPrefix("table:"),
-                  let tableIndex = workbook.sheets[sheetIndex]
-                    .tables.firstIndex(where: {
-                        "table:" + $0.id == regionID
-                    }) else {
-                continue
-            }
-            let table = workbook.sheets[sheetIndex].tables[tableIndex]
-            workbook.sheets[sheetIndex].tables[tableIndex].range =
-                ExcelCellRange(
-                    start: table.range.start,
-                    end: ExcelCellAddress(
-                        row: max(table.range.end.row, endRow),
-                        column: table.range.end.column
-                    )
-                )
-        }
+        edit.finish(workbook: &workbook)
 
         self.workbook = workbook
-        selectedAddress = createdTableFirstAddress
-            ?? mutations.first?.address
-            ?? plan.actions.first?.addresses.first
+        selectedAddress = edit.focusAddress
         syncEditorText(using: workbook.sheets[sheetIndex])
         updateValidationWarning(in: workbook.sheets[sheetIndex])
         requestAccessibilityFocus()
@@ -4061,11 +2456,16 @@ final class ExcelWorkbookViewModel: ObservableObject {
               workbook.sheets.indices.contains(selectedSheetIndex) else {
             return
         }
-        let sheet = workbook.sheets[selectedSheetIndex]
-        let address = sheet.canonicalAddress(for: requestedAddress)
-        if let owner = sheet.cells[address]?.spillAnchor,
-           owner != address {
-            editorText = sheet.cells[address]?.displayValue ?? ""
+        let change: ExcelDocumentChange
+        do {
+            guard let typed = try ExcelCellEditing.typing(
+                userText, at: requestedAddress, sheetIndex: selectedSheetIndex, workbook: workbook, registry: registry
+            ) else { return }
+            change = typed
+        } catch {
+            guard case .spilledResult(let owner) = error else { return }
+            let address = workbook.sheets[selectedSheetIndex].canonicalAddress(for: requestedAddress)
+            editorText = workbook.sheets[selectedSheetIndex].cells[address]?.displayValue ?? ""
             status = AppLocalization.format(
                 "%@은(는) %@ 수식의 Spill 결과입니다. 원본 셀에서 수정해 주세요.",
                 address.reference,
@@ -4073,38 +2473,8 @@ final class ExcelWorkbookViewModel: ObservableObject {
             )
             return
         }
-        guard (sheet.cell(at: address)?.editText ?? "") != userText else {
-            return
-        }
-        let baseStyleIndex = sheet.cell(at: address)?.styleIndex
-            ?? styleForNewCell(
-                column: address.column,
-                row: address.row,
-                in: sheet
-            )
-        let oldStyles = workbook.styles
-        let oldStyleEdits = styleEdits
-        let resolved = resolvedUserInput(
-            userText,
-            styleIndex: baseStyleIndex,
-            workbook: &workbook
-        )
-        let mutation = makeMutation(
-            address: address,
-            input: resolved.input,
-            styleIndex: resolved.styleIndex,
-            sheet: sheet,
-            workbook: workbook
-        )
-        let stylesChanged = workbook.styles.count != oldStyles.count
-        let group = MutationGroup(
-            sheetIndex: selectedSheetIndex,
-            cells: [mutation],
-            oldStyles: stylesChanged ? oldStyles : nil,
-            newStyles: stylesChanged ? workbook.styles : nil,
-            oldStyleEdits: stylesChanged ? oldStyleEdits : nil,
-            newStyleEdits: stylesChanged ? styleEdits : nil
-        )
+        let address = change.cells[0].address
+        let group = MutationGroup(change: change)
         if coalescingEditorChanges,
            let session = editorMutationSession,
            session.sheetIndex == selectedSheetIndex,
@@ -4142,14 +2512,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
                 )
             }
         }
-        workbook.sheets[selectedSheetIndex].maximumRow = max(
-            workbook.sheets[selectedSheetIndex].maximumRow,
-            address.row
-        )
-        workbook.sheets[selectedSheetIndex].maximumColumn = max(
-            workbook.sheets[selectedSheetIndex].maximumColumn,
-            address.column
-        )
+        ExcelCellEditing.extendUsedRange(to: address, sheetIndex: selectedSheetIndex, workbook: &workbook)
         self.workbook = workbook
         if synchronizingEditorText {
             editorText = workbook.sheets[selectedSheetIndex]
@@ -4335,45 +2698,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
         ExcelCellEditing.differentialStyleIndex(for: style, workbook: &workbook, registry: &registry)
     }
 
-    private func normalizedDropdownValues(
-        _ rawValues: [String]
-    ) -> [String] {
-        var seen = Set<String>()
-        return rawValues.compactMap { rawValue in
-            let value = rawValue.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-            guard !value.isEmpty,
-                  seen.insert(value).inserted else {
-                return nil
-            }
-            return value
-        }
-    }
 
-    private func validationTargetAddresses(
-        selection: ExcelCellAddress,
-        toCurrentColumn: Bool,
-        in sheet: ExcelWorksheet
-    ) -> [ExcelCellAddress] {
-        guard toCurrentColumn else {
-            guard let range = selectedRange, range.cellCount <= 20000 else { return [selection] }
-            return Array(Set(range.addresses.map { sheet.canonicalAddress(for: $0) })).sorted()
-        }
-        guard let region = ExcelAccessibilityAnalyzer
-            .regions(in: sheet)
-            .first(where: {
-                $0.contains(selection)
-                    && $0.columns.contains(where: {
-                        $0.column == selection.column
-                    })
-            }) else {
-            return []
-        }
-        return region.rowNumbers.map {
-            ExcelCellAddress(row: $0, column: selection.column)
-        }
-    }
 
     private func updateValidationWarning(in sheet: ExcelWorksheet) {
         guard let selectedAddress else {
@@ -8387,13 +6712,7 @@ extension ExcelWorkbookViewModel {
             try require(applyRangeUpdates([selectedSheetIndex: [address: .init(text: op.value!, styleIndex: sheet.cells[address]?.styleIndex)]]))
             highlighted = .init(start: address, end: address)
         case .replaceText:
-            var updates: [ExcelCellAddress: ExcelClipboardValue] = [:]
-            for address in range!.addresses {
-                guard let cell = sheet.cells[address], cell.editText.range(of: op.value!, options: [.caseInsensitive, .diacriticInsensitive]) != nil else { continue }
-                let text = cell.editText.replacingOccurrences(of: op.value!, with: op.replacement!, options: [.caseInsensitive, .diacriticInsensitive])
-                let literal = ["s", "str", "inlineStr"].contains(cell.cellType ?? "") && cell.formula == nil
-                updates[address] = .init(text: text, styleIndex: cell.styleIndex, input: literal ? .text(text) : nil)
-            }
+            let updates = ExcelRangeOperations.replacing(op.value!, with: op.replacement!, at: range!.addresses, in: sheet)
             if !updates.isEmpty { try require(applyRangeUpdates([selectedSheetIndex: updates])) }
             let refs = ExcelAIReferences(sheetPartPath: sheet.partPath, sheetName: sheet.name, addresses: updates.keys.sorted())
             return .init(message: AppLocalization.format("%@ · %@: %lld셀을 바꿨습니다.", sheet.name, range!.reference, updates.count), references: updates.isEmpty ? nil : refs)
