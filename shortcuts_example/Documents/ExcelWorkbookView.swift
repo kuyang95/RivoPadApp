@@ -57,44 +57,16 @@ final class ExcelWorkbookViewModel: ObservableObject {
         let pivotTableEdits: [String: [ExcelPivotTable]]
     }
 
-    private nonisolated struct CellMutation {
-        let address: ExcelCellAddress
-        let oldCell: ExcelCell?
-        let newCell: ExcelCell?
-        let oldEdit: ExcelCellEdit?
-        let newEdit: ExcelCellEdit?
-    }
+    private typealias CellMutation = ExcelCellMutation
 
+    /// Undo history entry: an engine document change, or a full snapshot.
     private nonisolated struct MutationGroup {
         let id = UUID()
-        let sheetIndex: Int
-        let cells: [CellMutation]
-        let oldStyles: [ExcelCellStyle]?
-        let newStyles: [ExcelCellStyle]?
-        let oldStyleEdits: [Int: ExcelStyleEdit]?
-        let newStyleEdits: [Int: ExcelStyleEdit]?
-        let oldDifferentialStyles: [ExcelDifferentialStyle]?
-        let newDifferentialStyles: [ExcelDifferentialStyle]?
-        let oldDifferentialStyleEdits:
-            [Int: ExcelDifferentialStyleEdit]?
-        let newDifferentialStyleEdits:
-            [Int: ExcelDifferentialStyleEdit]?
-        let oldDataValidations: [ExcelDataValidationRule]?
-        let newDataValidations: [ExcelDataValidationRule]?
-        let oldConditionalFormatting:
-            [ExcelConditionalFormattingBlock]?
-        let newConditionalFormatting:
-            [ExcelConditionalFormattingBlock]?
-        let oldAnnotations: ExcelWorksheetAnnotations?
-        let newAnnotations: ExcelWorksheetAnnotations?
-        let oldDrawingObjects: ExcelWorksheetDrawingObjects?
-        let newDrawingObjects: ExcelWorksheetDrawingObjects?
-        let oldPivotTables: [ExcelPivotTable]?
-        let newPivotTables: [ExcelPivotTable]?
+        let change: ExcelDocumentChange
         let oldDocumentState: EditingState?
         let newDocumentState: EditingState?
-        let oldTables: [ExcelTable]?
-        let newTables: [ExcelTable]?
+        var sheetIndex: Int { change.sheetIndex }
+        var cells: [CellMutation] { change.cells }
 
         init(
             sheetIndex: Int,
@@ -126,30 +98,26 @@ final class ExcelWorkbookViewModel: ObservableObject {
             oldTables: [ExcelTable]? = nil,
             newTables: [ExcelTable]? = nil
         ) {
-            self.sheetIndex = sheetIndex
-            self.cells = cells
             self.oldDocumentState = oldDocumentState
             self.newDocumentState = newDocumentState
-            self.oldStyles = oldStyles
-            self.newStyles = newStyles
-            self.oldStyleEdits = oldStyleEdits
-            self.newStyleEdits = newStyleEdits
-            self.oldDifferentialStyles = oldDifferentialStyles
-            self.newDifferentialStyles = newDifferentialStyles
-            self.oldDifferentialStyleEdits = oldDifferentialStyleEdits
-            self.newDifferentialStyleEdits = newDifferentialStyleEdits
-            self.oldDataValidations = oldDataValidations
-            self.newDataValidations = newDataValidations
-            self.oldConditionalFormatting = oldConditionalFormatting
-            self.newConditionalFormatting = newConditionalFormatting
-            self.oldAnnotations = oldAnnotations
-            self.newAnnotations = newAnnotations
-            self.oldDrawingObjects = oldDrawingObjects
-            self.newDrawingObjects = newDrawingObjects
-            self.oldPivotTables = oldPivotTables
-            self.newPivotTables = newPivotTables
-            self.oldTables = oldTables
-            self.newTables = newTables
+            change = ExcelDocumentChange(
+                sheetIndex: sheetIndex, cells: cells, oldStyles: oldStyles, newStyles: newStyles,
+                oldStyleEdits: oldStyleEdits, newStyleEdits: newStyleEdits,
+                oldDifferentialStyles: oldDifferentialStyles, newDifferentialStyles: newDifferentialStyles,
+                oldDifferentialStyleEdits: oldDifferentialStyleEdits,
+                newDifferentialStyleEdits: newDifferentialStyleEdits,
+                oldDataValidations: oldDataValidations, newDataValidations: newDataValidations,
+                oldConditionalFormatting: oldConditionalFormatting, newConditionalFormatting: newConditionalFormatting,
+                oldAnnotations: oldAnnotations, newAnnotations: newAnnotations,
+                oldDrawingObjects: oldDrawingObjects, newDrawingObjects: newDrawingObjects,
+                oldPivotTables: oldPivotTables, newPivotTables: newPivotTables,
+                oldTables: oldTables, newTables: newTables)
+        }
+
+        init(change: ExcelDocumentChange) {
+            self.change = change
+            oldDocumentState = nil
+            newDocumentState = nil
         }
     }
 
@@ -282,30 +250,73 @@ final class ExcelWorkbookViewModel: ObservableObject {
     // and history intact, so undo can still restore values from before it.
     private var lastAutosavedData: Data?
     private var autosavedHistoryIDs: [UUID]?
-    private var edits: [String: [ExcelCellAddress: ExcelCellEdit]] = [:]
-    private var styleEdits: [Int: ExcelStyleEdit] = [:]
-    private var originalDataValidations:
-        [String: [ExcelDataValidationRule]] = [:]
-    private var validationEdits:
-        [String: [ExcelDataValidationRule]] = [:]
-    private var originalConditionalFormatting:
-        [String: [ExcelConditionalFormattingBlock]] = [:]
-    private var conditionalFormattingEdits:
-        [String: [ExcelConditionalFormattingBlock]] = [:]
-    private var differentialStyleEdits:
-        [Int: ExcelDifferentialStyleEdit] = [:]
-    private var originalAnnotations:
-        [String: ExcelWorksheetAnnotations] = [:]
-    private var annotationEdits:
-        [String: ExcelWorksheetAnnotations] = [:]
-    private var originalDrawingObjects:
-        [String: ExcelWorksheetDrawingObjects] = [:]
-    private var drawingObjectEdits:
-        [String: ExcelWorksheetDrawingObjects] = [:]
-    private var originalPivotTables:
-        [String: [ExcelPivotTable]] = [:]
-    private var pivotTableEdits:
-        [String: [ExcelPivotTable]] = [:]
+    /// Pending edits; the shared engine owns the rules that change them.
+    private var registry = ExcelEditRegistry()
+    private var edits: [String: [ExcelCellAddress: ExcelCellEdit]] {
+        get { registry.cells }
+        _modify { yield &registry.cells }
+        set { registry.cells = newValue }
+    }
+    private var styleEdits: [Int: ExcelStyleEdit] {
+        get { registry.styles }
+        _modify { yield &registry.styles }
+        set { registry.styles = newValue }
+    }
+    private var originalDataValidations: [String: [ExcelDataValidationRule]] {
+        get { registry.originalDataValidations }
+        _modify { yield &registry.originalDataValidations }
+        set { registry.originalDataValidations = newValue }
+    }
+    private var validationEdits: [String: [ExcelDataValidationRule]] {
+        get { registry.dataValidations }
+        _modify { yield &registry.dataValidations }
+        set { registry.dataValidations = newValue }
+    }
+    private var originalConditionalFormatting: [String: [ExcelConditionalFormattingBlock]] {
+        get { registry.originalConditionalFormatting }
+        _modify { yield &registry.originalConditionalFormatting }
+        set { registry.originalConditionalFormatting = newValue }
+    }
+    private var conditionalFormattingEdits: [String: [ExcelConditionalFormattingBlock]] {
+        get { registry.conditionalFormatting }
+        _modify { yield &registry.conditionalFormatting }
+        set { registry.conditionalFormatting = newValue }
+    }
+    private var differentialStyleEdits: [Int: ExcelDifferentialStyleEdit] {
+        get { registry.differentialStyles }
+        _modify { yield &registry.differentialStyles }
+        set { registry.differentialStyles = newValue }
+    }
+    private var originalAnnotations: [String: ExcelWorksheetAnnotations] {
+        get { registry.originalAnnotations }
+        _modify { yield &registry.originalAnnotations }
+        set { registry.originalAnnotations = newValue }
+    }
+    private var annotationEdits: [String: ExcelWorksheetAnnotations] {
+        get { registry.annotations }
+        _modify { yield &registry.annotations }
+        set { registry.annotations = newValue }
+    }
+    private var originalDrawingObjects: [String: ExcelWorksheetDrawingObjects] {
+        get { registry.originalDrawingObjects }
+        _modify { yield &registry.originalDrawingObjects }
+        set { registry.originalDrawingObjects = newValue }
+    }
+    private var drawingObjectEdits: [String: ExcelWorksheetDrawingObjects] {
+        get { registry.drawingObjects }
+        _modify { yield &registry.drawingObjects }
+        set { registry.drawingObjects = newValue }
+    }
+    private var originalPivotTables: [String: [ExcelPivotTable]] {
+        get { registry.originalPivotTables }
+        _modify { yield &registry.originalPivotTables }
+        set { registry.originalPivotTables = newValue }
+    }
+    private var pivotTableEdits: [String: [ExcelPivotTable]] {
+        get { registry.pivotTables }
+        _modify { yield &registry.pivotTables }
+        set { registry.pivotTables = newValue }
+    }
     private var undoStack: [MutationGroup] = []
     private var redoStack: [MutationGroup] = []
     private var editorMutationSession: EditorMutationSession?
@@ -641,31 +652,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
                 : nil
             let loadedWorkbook = result.2
             workbook = loadedWorkbook
-            originalDataValidations = Dictionary(
-                uniqueKeysWithValues: result.2.sheets.map {
-                    ($0.partPath, $0.dataValidations)
-                }
-            )
-            originalConditionalFormatting = Dictionary(
-                uniqueKeysWithValues: result.2.sheets.map {
-                    ($0.partPath, $0.conditionalFormatting)
-                }
-            )
-            originalAnnotations = Dictionary(
-                uniqueKeysWithValues: result.2.sheets.map {
-                    ($0.partPath, $0.annotations)
-                }
-            )
-            originalDrawingObjects = Dictionary(
-                uniqueKeysWithValues: result.2.sheets.map {
-                    ($0.partPath, $0.drawingObjects)
-                }
-            )
-            originalPivotTables = Dictionary(
-                uniqueKeysWithValues: result.2.sheets.map {
-                    ($0.partPath, $0.pivotTables)
-                }
-            )
+            registry.setOriginals(from: result.2)
             largeWorkbookCache = result.3
             configureInitialLargeWindows(using: result.1)
             selectedSheetIndex = 0
@@ -3111,20 +3098,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
 
     private func installEditingBase(_ data: Data, workbook: ExcelWorkbook) {
         editingBaseData = data
-        edits.removeAll()
-        styleEdits.removeAll()
-        validationEdits.removeAll()
-        conditionalFormattingEdits.removeAll()
-        differentialStyleEdits.removeAll()
-        annotationEdits.removeAll()
-        drawingObjectEdits.removeAll()
-        pivotTableEdits.removeAll()
-
-        originalDataValidations = Dictionary(uniqueKeysWithValues: workbook.sheets.map { ($0.partPath, $0.dataValidations) })
-        originalConditionalFormatting = Dictionary(uniqueKeysWithValues: workbook.sheets.map { ($0.partPath, $0.conditionalFormatting) })
-        originalAnnotations = Dictionary(uniqueKeysWithValues: workbook.sheets.map { ($0.partPath, $0.annotations) })
-        originalDrawingObjects = Dictionary(uniqueKeysWithValues: workbook.sheets.map { ($0.partPath, $0.drawingObjects) })
-        originalPivotTables = Dictionary(uniqueKeysWithValues: workbook.sheets.map { ($0.partPath, $0.pivotTables) })
+        registry.rebaseline(to: workbook)
     }
 
     @discardableResult
@@ -3309,36 +3283,14 @@ final class ExcelWorkbookViewModel: ObservableObject {
         do {
             let inputData = editingBaseData ?? sourceData
             let expectedFileData = lastAutosavedData ?? sourceData
-            let pendingEdits = serializedEdits()
-            let pendingStyleEdits = serializedStyleEdits()
-            let pendingValidationEdits = serializedValidationEdits()
-            let pendingConditionalFormattingEdits =
-                serializedConditionalFormattingEdits()
-            let pendingDifferentialStyleEdits =
-                serializedDifferentialStyleEdits()
-            let pendingAnnotationEdits = serializedAnnotationEdits()
-            let pendingDrawingEdits = serializedDrawingEdits()
-            let pendingPivotEdits = serializedPivotEdits()
+            let pendingEdits = registry
             let destination = fileURL
             let writeContents = writeContents
             let preflight = largeWorkbookPreflight
             let savedResult = try await Task.detached(
                 priority: .userInitiated
             ) {
-                let data = try ExcelWorkbookDocument.applying(
-                    pendingEdits,
-                    to: inputData,
-                    workbook: workbook,
-                    styleEdits: pendingStyleEdits,
-                    validationEdits: pendingValidationEdits,
-                    conditionalFormattingEdits:
-                        pendingConditionalFormattingEdits,
-                    differentialStyleEdits:
-                        pendingDifferentialStyleEdits,
-                    annotationEdits: pendingAnnotationEdits,
-                    drawingEdits: pendingDrawingEdits,
-                    pivotEdits: pendingPivotEdits
-                )
+                let data = try pendingEdits.applying(to: inputData, workbook: workbook)
                 try writeContents(destination, data, expectedFileData)
                 let cache: ExcelLargeWorkbookCache?
                 if let preflight {
@@ -3384,39 +3336,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
                     )
             }
             if !preservingHistory {
-                edits.removeAll()
-                styleEdits.removeAll()
-                validationEdits.removeAll()
-                conditionalFormattingEdits.removeAll()
-                differentialStyleEdits.removeAll()
-                annotationEdits.removeAll()
-                drawingObjectEdits.removeAll()
-                pivotTableEdits.removeAll()
-                originalDataValidations = Dictionary(
-                    uniqueKeysWithValues: workbook.sheets.map {
-                        ($0.partPath, $0.dataValidations)
-                    }
-                )
-                originalConditionalFormatting = Dictionary(
-                    uniqueKeysWithValues: workbook.sheets.map {
-                        ($0.partPath, $0.conditionalFormatting)
-                    }
-                )
-                originalAnnotations = Dictionary(
-                    uniqueKeysWithValues: workbook.sheets.map {
-                        ($0.partPath, $0.annotations)
-                    }
-                )
-                originalDrawingObjects = Dictionary(
-                    uniqueKeysWithValues: workbook.sheets.map {
-                        ($0.partPath, $0.drawingObjects)
-                    }
-                )
-                originalPivotTables = Dictionary(
-                    uniqueKeysWithValues: workbook.sheets.map {
-                        ($0.partPath, $0.pivotTables)
-                    }
-                )
+                registry.rebaseline(to: workbook)
                 undoStack.removeAll()
                 redoStack.removeAll()
             }
@@ -3456,28 +3376,9 @@ final class ExcelWorkbookViewModel: ObservableObject {
             throw ExcelWorkbookDocumentError.cannotSave
         }
         let sourceData = editingBaseData ?? sourceData
-        let edits = serializedEdits()
-        let styleEdits = serializedStyleEdits()
-        let validationEdits = serializedValidationEdits()
-        let conditionalFormattingEdits =
-            serializedConditionalFormattingEdits()
-        let differentialStyleEdits = serializedDifferentialStyleEdits()
-        let annotationEdits = serializedAnnotationEdits()
-        let drawingEdits = serializedDrawingEdits()
-        let pivotEdits = serializedPivotEdits()
+        let registry = registry
         return try await Task.detached(priority: .userInitiated) {
-            try ExcelWorkbookDocument.applying(
-                edits,
-                to: sourceData,
-                workbook: workbook,
-                styleEdits: styleEdits,
-                validationEdits: validationEdits,
-                conditionalFormattingEdits: conditionalFormattingEdits,
-                differentialStyleEdits: differentialStyleEdits,
-                annotationEdits: annotationEdits,
-                drawingEdits: drawingEdits,
-                pivotEdits: pivotEdits
-            )
+            try registry.applying(to: sourceData, workbook: workbook)
         }.value
     }
 
@@ -4269,55 +4170,17 @@ final class ExcelWorkbookViewModel: ObservableObject {
         sheet: ExcelWorksheet,
         workbook styleSource: ExcelWorkbook? = nil
     ) -> CellMutation {
-        let edit = ExcelCellEdit(
-            input: input,
-            styleIndex: styleIndex
-        )
-        return CellMutation(
-            address: address,
-            oldCell: sheet.cells[address],
-            newCell: cell(
-                address: address,
-                input: input,
-                styleIndex: styleIndex,
-                workbook: styleSource
-            ),
-            oldEdit: edits[sheet.partPath]?[address],
-            newEdit: edit
-        )
+        ExcelCellEditing.mutation(
+            address: address, input: input, styleIndex: styleIndex, sheet: sheet,
+            workbook: styleSource ?? workbook, registry: registry)
     }
 
-    /// Turns typed text into a cell input. Unambiguous dates such as
-    /// `2024-03-05` become date serials with a date style so they display,
-    /// sort, and calculate like dates entered in Excel. Cells formatted as
-    /// text keep the literal.
     private func resolvedUserInput(
         _ userText: String,
         styleIndex: Int?,
         workbook: inout ExcelWorkbook
     ) -> (input: ExcelCellInput, styleIndex: Int?) {
-        let input = ExcelCellInput(userText: userText)
-        guard case .text(let text) = input,
-              let serial = ExcelDateInput.serial(
-                  fromUserText: text,
-                  uses1904DateSystem: workbook.uses1904DateSystem
-              ) else {
-            return (input, styleIndex)
-        }
-        let currentFormat = ExcelNumberFormat.matching(
-            workbook.style(at: styleIndex)
-        )
-        if currentFormat == .text {
-            return (input, styleIndex)
-        }
-        let dateStyleIndex = currentFormat == .date
-            ? styleIndex
-            : self.styleIndex(
-                for: .date,
-                replacing: styleIndex,
-                workbook: &workbook
-            )
-        return (.number(serial), dateStyleIndex)
+        ExcelCellEditing.resolvedInput(userText, styleIndex: styleIndex, workbook: &workbook, registry: &registry)
     }
 
     private func cell(
@@ -4326,65 +4189,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
         styleIndex: Int?,
         workbook styleSource: ExcelWorkbook? = nil
     ) -> ExcelCell? {
-        let workbook = styleSource ?? self.workbook
-        switch input {
-        case .blank:
-            return nil
-        case .text(let value):
-            return ExcelCell(
-                address: address,
-                rawValue: value,
-                displayValue: value,
-                formula: nil,
-                styleIndex: styleIndex,
-                cellType: "inlineStr"
-            )
-        case .number(let value):
-            let style = workbook?.style(at: styleIndex) ?? .plain
-            return ExcelCell(
-                address: address,
-                rawValue: value,
-                displayValue: ExcelValueFormatter.displayValue(
-                    value,
-                    type: nil,
-                    style: style,
-                    uses1904DateSystem:
-                        workbook?.uses1904DateSystem ?? false
-                ),
-                formula: nil,
-                styleIndex: styleIndex,
-                cellType: nil
-            )
-        case .boolean(let value):
-            return ExcelCell(
-                address: address,
-                rawValue: value ? "TRUE" : "FALSE",
-                displayValue: value
-                    ? AppLocalization.string("참")
-                    : AppLocalization.string("거짓"),
-                formula: nil,
-                styleIndex: styleIndex,
-                cellType: "b"
-            )
-        case .error(let value):
-            return ExcelCell(
-                address: address,
-                rawValue: value,
-                displayValue: value,
-                formula: nil,
-                styleIndex: styleIndex,
-                cellType: "e"
-            )
-        case .formula(let formula):
-            return ExcelCell(
-                address: address,
-                rawValue: "",
-                displayValue: "=" + formula,
-                formula: formula,
-                styleIndex: styleIndex,
-                cellType: nil
-            )
-        }
+        ExcelCellEditing.cell(address: address, input: input, styleIndex: styleIndex, workbook: styleSource ?? workbook)
     }
 
     @discardableResult
@@ -4403,152 +4208,19 @@ final class ExcelWorkbookViewModel: ObservableObject {
         guard workbook.sheets.indices.contains(group.sheetIndex) else {
             return group
         }
-        let path = workbook.sheets[group.sheetIndex].partPath
-        if let styles = forward ? group.newStyles : group.oldStyles {
-            workbook.styles = styles
-        }
-        if let registry = forward
-            ? group.newStyleEdits
-            : group.oldStyleEdits {
-            styleEdits = registry
-        }
-        if let styles = forward
-            ? group.newDifferentialStyles
-            : group.oldDifferentialStyles {
-            workbook.differentialStyles = styles
-        }
-        if let registry = forward
-            ? group.newDifferentialStyleEdits
-            : group.oldDifferentialStyleEdits {
-            differentialStyleEdits = registry
-        }
-        for mutation in group.cells {
-            let cell = forward ? mutation.newCell : mutation.oldCell
-            let edit = forward ? mutation.newEdit : mutation.oldEdit
-            workbook.sheets[group.sheetIndex].cells[mutation.address] = cell
-            if let edit {
-                edits[path, default: [:]][mutation.address] = edit
-            } else {
-                edits[path]?[mutation.address] = nil
-                if edits[path]?.isEmpty == true {
-                    edits[path] = nil
-                }
-            }
-        }
-        if let rules = forward
-            ? group.newDataValidations
-            : group.oldDataValidations {
-            workbook.sheets[group.sheetIndex].dataValidations = rules
-            let original = originalDataValidations[path] ?? []
-            if rules == original {
-                validationEdits[path] = nil
-            } else {
-                validationEdits[path] = rules
-            }
-        }
-        if let blocks = forward
-            ? group.newConditionalFormatting
-            : group.oldConditionalFormatting {
-            workbook.sheets[group.sheetIndex].conditionalFormatting = blocks
-            let original = originalConditionalFormatting[path] ?? []
-            if blocks == original {
-                conditionalFormattingEdits[path] = nil
-            } else {
-                conditionalFormattingEdits[path] = blocks
-            }
-        }
-        if let annotations = forward
-            ? group.newAnnotations
-            : group.oldAnnotations {
-            workbook.sheets[group.sheetIndex].annotations = annotations
-            let original = originalAnnotations[path] ?? .empty
-            if annotations == original {
-                annotationEdits[path] = nil
-            } else {
-                annotationEdits[path] = annotations
-            }
-        }
-        if let drawingObjects = forward
-            ? group.newDrawingObjects
-            : group.oldDrawingObjects {
-            workbook.sheets[group.sheetIndex].drawingObjects = drawingObjects
-            let original = originalDrawingObjects[path] ?? .empty
-            if drawingObjects == original {
-                drawingObjectEdits[path] = nil
-            } else {
-                drawingObjectEdits[path] = drawingObjects
-            }
-        }
-        if let pivotTables = forward
-            ? group.newPivotTables
-            : group.oldPivotTables {
-            workbook.sheets[group.sheetIndex].pivotTables = pivotTables
-            workbook.sheets[group.sheetIndex]
-                .drawingObjects.pivotTableCount = pivotTables.count
-            let original = originalPivotTables[path] ?? []
-            if pivotTables == original {
-                pivotTableEdits[path] = nil
-            } else {
-                pivotTableEdits[path] = pivotTables
-            }
-        }
-        if let tables = forward
-            ? group.newTables
-            : group.oldTables {
-            workbook.sheets[group.sheetIndex].tables = tables
-        }
-        var effectiveGroup = group
-        if forward, !group.cells.isEmpty, !isLargeWorkbook {
-            let recalculated = Self.formulaRecalculationMutations(
-                for: group,
-                sheetIndex: group.sheetIndex,
-                workbook: workbook,
-                edits: edits
-            )
-            lastFormulaRecalculationCount = recalculated.mutations.count
-            unsupportedFormulaCount = recalculated.unsupportedCount
-            if !recalculated.mutations.isEmpty {
-                for mutation in recalculated.mutations {
-                    workbook.sheets[group.sheetIndex]
-                        .cells[mutation.address] = mutation.newCell
-                    if let edit = mutation.newEdit {
-                        edits[path, default: [:]][mutation.address] = edit
-                    }
-                }
-                effectiveGroup = replacingCells(
-                    in: group,
-                    with: mergedMutations(
-                        primary: group.cells,
-                        recalculated: recalculated.mutations
-                    )
-                )
-            }
+        let applied = group.change.apply(
+            forward: forward, workbook: &workbook, registry: &registry, recalculate: !isLargeWorkbook)
+        if let count = applied.recalculatedCount {
+            lastFormulaRecalculationCount = count
+            unsupportedFormulaCount = applied.unsupportedFormulaCount ?? 0
         } else if !forward {
             lastFormulaRecalculationCount = 0
         }
         if !group.cells.isEmpty, !isLargeWorkbook {
-            lastFormulaRecalculationCount += refreshDerivedFormulaValues(
-                excluding: group.sheetIndex,
-                in: &workbook
-            )
+            lastFormulaRecalculationCount += applied.derivedRecalculatedCount
         }
-        if forward {
-            let populated = effectiveGroup.cells.compactMap {
-                $0.newCell == nil ? nil : $0.address
-            }
-            if let maximumRow = populated.map(\.row).max() {
-                workbook.sheets[group.sheetIndex].maximumRow = max(
-                    workbook.sheets[group.sheetIndex].maximumRow,
-                    maximumRow
-                )
-            }
-            if let maximumColumn = populated.map(\.column).max() {
-                workbook.sheets[group.sheetIndex].maximumColumn = max(
-                    workbook.sheets[group.sheetIndex].maximumColumn,
-                    maximumColumn
-                )
-            }
-        }
+        // Recalculated formula cells join the undo entry; otherwise keep it as is.
+        let effectiveGroup = (applied.recalculatedCount ?? 0) > 0 ? MutationGroup(change: applied.change) : group
         if registeringUndo {
             undoStack.append(effectiveGroup)
             redoStack.removeAll()
@@ -4557,109 +4229,6 @@ final class ExcelWorkbookViewModel: ObservableObject {
         return effectiveGroup
     }
 
-    private nonisolated static func formulaRecalculationMutations(
-        for group: MutationGroup,
-        sheetIndex: Int,
-        workbook: ExcelWorkbook,
-        edits: [String: [ExcelCellAddress: ExcelCellEdit]]
-    ) -> (mutations: [CellMutation], unsupportedCount: Int) {
-        let sheet = workbook.sheets[sheetIndex]
-        let calculation = ExcelFormulaCalculator.recalculate(
-            cells: sheet.cells,
-            styles: workbook.styles,
-            uses1904DateSystem: workbook.uses1904DateSystem,
-            mergedRanges: sheet.mergedRanges,
-            tableRanges: sheet.tables.map(\.range),
-            workbook: workbook,
-            currentSheetName: sheet.name
-        )
-        let directlyEdited = Set(group.cells.map(\.address))
-        var mutations = calculation.values.sorted {
-            $0.key < $1.key
-        }.compactMap { address, result -> CellMutation? in
-            let current = sheet.cells[address]
-            let currentEdit = edits[sheet.partPath]?[address]
-            if let formula = current?.formula, !formula.isEmpty {
-                let spillRange = calculation.spillRanges[address]
-                let valueChanged = current?.rawValue != result.rawValue
-                    || current?.displayValue != result.displayValue
-                    || current?.cellType != result.cellType
-                    || current?.spillAnchor
-                        != (spillRange == nil ? nil : address)
-                    || current?.spillRange != spillRange
-                let cachedValueChanged = directlyEdited.contains(address)
-                    && (currentEdit?.cachedValue != result.cachedXMLValue
-                        || currentEdit?.cachedType != result.cachedXMLType
-                        || currentEdit?.formulaSpillRange != spillRange)
-                guard valueChanged || cachedValueChanged else { return nil }
-                var updated = current!
-                updated.rawValue = result.rawValue
-                updated.displayValue = result.displayValue
-                updated.cellType = result.cellType
-                updated.spillAnchor = spillRange == nil ? nil : address
-                updated.spillRange = spillRange
-                return CellMutation(
-                    address: address,
-                    oldCell: current,
-                    newCell: updated,
-                    oldEdit: currentEdit,
-                    newEdit: ExcelCellEdit(
-                        input: .formula(formula),
-                        styleIndex: current?.styleIndex,
-                        cachedValue: result.cachedXMLValue,
-                        cachedType: result.cachedXMLType,
-                        formulaSpillRange: spillRange
-                    )
-                )
-            }
-            guard let owner = calculation.spillOwners[address],
-                  owner != address else { return nil }
-            let styleIndex = current?.styleIndex
-                ?? sheet.cells[owner]?.styleIndex
-            let updated = ExcelCell(
-                address: address,
-                rawValue: result.rawValue,
-                displayValue: result.displayValue,
-                formula: nil,
-                styleIndex: styleIndex,
-                cellType: result.cellType,
-                spillAnchor: owner,
-                spillRange: nil
-            )
-            let valueChanged = current?.rawValue != updated.rawValue
-                || current?.displayValue != updated.displayValue
-                || current?.cellType != updated.cellType
-                || current?.styleIndex != updated.styleIndex
-                || current?.spillAnchor != owner
-            guard valueChanged else { return nil }
-            return CellMutation(
-                address: address,
-                oldCell: current,
-                newCell: updated,
-                oldEdit: currentEdit,
-                newEdit: ExcelCellEdit(
-                    input: spillInput(result),
-                    styleIndex: styleIndex
-                )
-            )
-        }
-        for address in calculation.clearedSpillAddresses.sorted() {
-            guard !calculation.values.keys.contains(address),
-                  let current = sheet.cells[address] else { continue }
-            mutations.append(CellMutation(
-                address: address,
-                oldCell: current,
-                newCell: nil,
-                oldEdit: edits[sheet.partPath]?[address],
-                newEdit: ExcelCellEdit(
-                    input: .blank,
-                    styleIndex: current.styleIndex
-                )
-            ))
-        }
-        mutations.sort { $0.address < $1.address }
-        return (mutations, calculation.unsupportedFormulaCount)
-    }
 
     private func refreshDerivedFormulaValues(
         excluding excludedSheetIndex: Int? = nil,
@@ -4676,135 +4245,17 @@ final class ExcelWorkbookViewModel: ObservableObject {
         in workbook: inout ExcelWorkbook,
         edits: [String: [ExcelCellAddress: ExcelCellEdit]]
     ) -> Int {
-        var totalChanges = 0
-        let maximumPasses = min(max(workbook.sheets.count, 1), 3)
-        for _ in 0 ..< maximumPasses {
-            var passChanges = 0
-            for sheetIndex in workbook.sheets.indices
-                where sheetIndex != excludedSheetIndex {
-                let result = formulaRecalculationMutations(
-                    for: MutationGroup(
-                        sheetIndex: sheetIndex,
-                        cells: []
-                    ),
-                    sheetIndex: sheetIndex,
-                    workbook: workbook,
-                    edits: edits
-                )
-                for mutation in result.mutations {
-                    workbook.sheets[sheetIndex]
-                        .cells[mutation.address] = mutation.newCell
-                }
-                passChanges += result.mutations.count
-            }
-            totalChanges += passChanges
-            if passChanges == 0 { break }
-        }
-        return totalChanges
+        ExcelRecalculation.refreshDerivedValues(excluding: excludedSheetIndex, in: &workbook, edits: edits)
     }
 
-    private nonisolated static func spillInput(
-        _ value: ExcelFormulaCalculatedValue
-    ) -> ExcelCellInput {
-        switch value.cachedXMLType {
-        case "b":
-            return .boolean(value.cachedXMLValue == "1")
-        case "e":
-            return .error(value.cachedXMLValue)
-        case "str":
-            return .text(value.rawValue)
-        default:
-            return .number(value.cachedXMLValue)
-        }
-    }
 
-    private func mergedMutations(
-        primary: [CellMutation],
-        recalculated: [CellMutation]
-    ) -> [CellMutation] {
-        var result = primary
-        var indexes = Dictionary(
-            uniqueKeysWithValues: primary.enumerated().map {
-                ($0.element.address, $0.offset)
-            }
-        )
-        for mutation in recalculated {
-            if let index = indexes[mutation.address] {
-                let original = result[index]
-                result[index] = CellMutation(
-                    address: mutation.address,
-                    oldCell: original.oldCell,
-                    newCell: mutation.newCell,
-                    oldEdit: original.oldEdit,
-                    newEdit: mutation.newEdit
-                )
-            } else {
-                indexes[mutation.address] = result.count
-                result.append(mutation)
-            }
-        }
-        return result
-    }
 
-    private func replacingCells(
-        in group: MutationGroup,
-        with cells: [CellMutation]
-    ) -> MutationGroup {
-        MutationGroup(
-            sheetIndex: group.sheetIndex,
-            cells: cells,
-            oldStyles: group.oldStyles,
-            newStyles: group.newStyles,
-            oldStyleEdits: group.oldStyleEdits,
-            newStyleEdits: group.newStyleEdits,
-            oldDifferentialStyles: group.oldDifferentialStyles,
-            newDifferentialStyles: group.newDifferentialStyles,
-            oldDifferentialStyleEdits:
-                group.oldDifferentialStyleEdits,
-            newDifferentialStyleEdits:
-                group.newDifferentialStyleEdits,
-            oldDataValidations: group.oldDataValidations,
-            newDataValidations: group.newDataValidations,
-            oldConditionalFormatting: group.oldConditionalFormatting,
-            newConditionalFormatting: group.newConditionalFormatting,
-            oldAnnotations: group.oldAnnotations,
-            newAnnotations: group.newAnnotations,
-            oldDrawingObjects: group.oldDrawingObjects,
-            newDrawingObjects: group.newDrawingObjects,
-            oldPivotTables: group.oldPivotTables,
-            newPivotTables: group.newPivotTables
-        )
-    }
 
     private func coalescing(
         _ initial: MutationGroup,
         with latest: MutationGroup
     ) -> MutationGroup {
-        let initialByAddress = Dictionary(
-            uniqueKeysWithValues: initial.cells.map { ($0.address, $0) }
-        )
-        let latestByAddress = Dictionary(
-            uniqueKeysWithValues: latest.cells.map { ($0.address, $0) }
-        )
-        let addresses = Set(initialByAddress.keys)
-            .union(latestByAddress.keys)
-            .sorted()
-        let cells = addresses.compactMap { address -> CellMutation? in
-            guard let first = initialByAddress[address]
-                    ?? latestByAddress[address],
-                  let last = latestByAddress[address]
-                    ?? initialByAddress[address] else {
-                return nil
-            }
-            return CellMutation(
-                address: address,
-                oldCell: first.oldCell,
-                newCell: last.newCell,
-                oldEdit: first.oldEdit,
-                newEdit: last.newEdit
-            )
-        }
-        return replacingCells(in: initial, with: cells)
+        MutationGroup(change: initial.change.coalescing(with: latest.change))
     }
 
     private var formulaRecalculationStatusSuffix: String {
@@ -4869,120 +4320,19 @@ final class ExcelWorkbookViewModel: ObservableObject {
         }
     }
 
-    private func serializedEdits() -> [ExcelWorksheetEdits] {
-        edits.map {
-            ExcelWorksheetEdits(
-                partPath: $0.key,
-                cells: $0.value
-            )
-        }
-    }
 
-    private func serializedStyleEdits() -> [ExcelStyleEdit] {
-        let referencedIndexes = Set(
-            edits.values
-                .flatMap(\.values)
-                .compactMap(\.styleIndex)
-        )
-        guard let highestReferencedIndex = referencedIndexes
-            .filter({ styleEdits[$0] != nil })
-            .max() else {
-            return []
-        }
-        return styleEdits.values
-            .filter { $0.styleIndex <= highestReferencedIndex }
-            .sorted { $0.styleIndex < $1.styleIndex }
-    }
 
-    private func serializedValidationEdits()
-        -> [ExcelWorksheetValidationEdits] {
-        validationEdits.map {
-            ExcelWorksheetValidationEdits(
-                partPath: $0.key,
-                rules: $0.value
-            )
-        }
-    }
 
-    private func serializedConditionalFormattingEdits()
-        -> [ExcelWorksheetConditionalFormattingEdits] {
-        conditionalFormattingEdits.map {
-            ExcelWorksheetConditionalFormattingEdits(
-                partPath: $0.key,
-                blocks: $0.value
-            )
-        }
-    }
 
-    private func serializedDifferentialStyleEdits()
-        -> [ExcelDifferentialStyleEdit] {
-        let referencedIndexes = Set(
-            conditionalFormattingEdits.values
-                .flatMap { $0 }
-                .flatMap(\.rules)
-                .map(\.differentialStyleIndex)
-        )
-        guard let highestReferencedIndex = referencedIndexes
-            .filter({ differentialStyleEdits[$0] != nil })
-            .max() else {
-            return []
-        }
-        return differentialStyleEdits.values
-            .filter { $0.styleIndex <= highestReferencedIndex }
-            .sorted { $0.styleIndex < $1.styleIndex }
-    }
 
-    private func serializedAnnotationEdits()
-        -> [ExcelWorksheetAnnotationEdits] {
-        annotationEdits.map { partPath, annotations in
-            let original = originalAnnotations[partPath] ?? .empty
-            return ExcelWorksheetAnnotationEdits(
-                partPath: partPath,
-                annotations: annotations,
-                writesHyperlinks: annotations.hyperlinks
-                    != original.hyperlinks,
-                writesNotes: annotations.notes != original.notes
-                    || annotations.authors != original.authors
-            )
-        }
-    }
 
-    private func serializedDrawingEdits()
-        -> [ExcelWorksheetDrawingEdits] {
-        drawingObjectEdits.map { partPath, current in
-            ExcelWorksheetDrawingEdits(
-                partPath: partPath,
-                original: originalDrawingObjects[partPath] ?? .empty,
-                current: current
-            )
-        }
-    }
 
-    private func serializedPivotEdits()
-        -> [ExcelWorksheetPivotEdits] {
-        pivotTableEdits.map { partPath, current in
-            ExcelWorksheetPivotEdits(
-                partPath: partPath,
-                original: originalPivotTables[partPath] ?? [],
-                current: current
-            )
-        }
-    }
 
     private func differentialStyleIndex(
         for style: ExcelDifferentialStyle,
         workbook: inout ExcelWorkbook
     ) -> Int {
-        if let existing = workbook.differentialStyles.firstIndex(of: style) {
-            return existing
-        }
-        let index = workbook.differentialStyles.count
-        workbook.differentialStyles.append(style)
-        differentialStyleEdits[index] = ExcelDifferentialStyleEdit(
-            styleIndex: index,
-            style: style
-        )
-        return index
+        ExcelCellEditing.differentialStyleIndex(for: style, workbook: &workbook, registry: &registry)
     }
 
     private func normalizedDropdownValues(
@@ -5055,55 +4405,11 @@ final class ExcelWorkbookViewModel: ObservableObject {
         replacing currentStyleIndex: Int?,
         workbook: inout ExcelWorkbook
     ) -> Int? {
-        if ExcelNumberFormat.matching(
-            workbook.style(at: currentStyleIndex)
-        ) == format {
-            return currentStyleIndex
-        }
-        let baseStyleIndex: Int?
-        if let currentStyleIndex,
-           let pendingStyle = styleEdits[currentStyleIndex] {
-            baseStyleIndex = pendingStyle.baseStyleIndex
-        } else {
-            baseStyleIndex = currentStyleIndex
-        }
-        if let existing = styleEdits.values.first(where: {
-            $0.baseStyleIndex == baseStyleIndex
-                && $0.numberFormat == format
-        }) {
-            return existing.styleIndex
-        }
-        let baseStyle = workbook.style(at: baseStyleIndex)
-        let newStyleIndex = workbook.styles.count
-        var newStyle = baseStyle
-        newStyle.numberFormatID = format.displayNumberFormatID
-        newStyle.numberFormatCode = format.formatCode
-        workbook.styles.append(newStyle)
-        styleEdits[newStyleIndex] = ExcelStyleEdit(
-            styleIndex: newStyleIndex,
-            baseStyleIndex: baseStyleIndex,
-            numberFormat: format
-        )
-        return newStyleIndex
+        ExcelCellEditing.styleIndex(for: format, replacing: currentStyleIndex, workbook: &workbook, registry: &registry)
     }
 
     private func input(preserving cell: ExcelCell) -> ExcelCellInput {
-        if let formula = cell.formula,
-           !formula.isEmpty {
-            return .formula(formula)
-        }
-        if cell.cellType == "b" {
-            return .boolean(
-                cell.rawValue == "1"
-                    || cell.rawValue.caseInsensitiveCompare("TRUE")
-                        == .orderedSame
-            )
-        }
-        if cell.cellType == nil || cell.cellType == "n",
-           Double(cell.rawValue) != nil {
-            return .number(cell.rawValue)
-        }
-        return .text(cell.rawValue)
+        ExcelCellEditing.input(preserving: cell)
     }
 
     private func configureInitialLargeWindows(
@@ -5415,26 +4721,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
         row: Int,
         in sheet: ExcelWorksheet
     ) -> Int? {
-        guard row > 1 else {
-            return sheet.cells[
-                ExcelCellAddress(row: row, column: column)
-            ]?.styleIndex
-        }
-        for candidateRow in stride(
-            from: row - 1,
-            through: max(1, row - 20),
-            by: -1
-        ) {
-            if let style = sheet.cells[
-                ExcelCellAddress(
-                    row: candidateRow,
-                    column: column
-                )
-            ]?.styleIndex {
-                return style
-            }
-        }
-        return nil
+        ExcelCellEditing.styleForNewCell(column: column, row: row, in: sheet)
     }
 
     private func workbookStatus(_ workbook: ExcelWorkbook) -> String {
