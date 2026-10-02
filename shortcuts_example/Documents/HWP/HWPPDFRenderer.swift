@@ -1,3 +1,4 @@
+import RivoDocumentEngine
 import PDFKit
 import SwiftUI
 import UIKit

@@ -1,3 +1,4 @@
+import RivoDocumentEngine
 import XCTest
 import UIKit
 @testable import shortcuts_example

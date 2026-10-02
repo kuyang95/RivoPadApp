@@ -1,3 +1,4 @@
+import RivoDocumentEngine
 import CryptoKit
 import Foundation
 import SwiftUI

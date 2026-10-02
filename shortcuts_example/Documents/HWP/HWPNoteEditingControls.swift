@@ -1,3 +1,4 @@
+import RivoDocumentEngine
 import SwiftUI
 
 struct HWPNoteButton: View {

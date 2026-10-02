@@ -1,4 +1,5 @@
 #if DEBUG
+import RivoDocumentEngine
 import Combine
 import PDFKit
 import SwiftUI

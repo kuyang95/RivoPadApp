@@ -1,3 +1,4 @@
+import RivoDocumentEngine
 import FirebaseAILogic
 import Foundation
 

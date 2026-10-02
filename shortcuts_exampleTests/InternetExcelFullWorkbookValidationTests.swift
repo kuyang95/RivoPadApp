@@ -1,3 +1,4 @@
+import RivoDocumentEngine
 import XCTest
 import ZIPFoundation
 @testable import shortcuts_example

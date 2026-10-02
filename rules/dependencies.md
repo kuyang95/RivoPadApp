@@ -1,8 +1,8 @@
 # 의존성 / 라이브러리 버전
 
-점검일 2026-09-29 · 기준 코드 `babc3875`
+점검일 2026-10-01 · 기준 코드 `babc3875`
 
-`Podfile.lock` + `shortcuts_example.xcworkspace/xcshareddata/swiftpm/Package.resolved` 출처.
+`Podfile.lock`, `shortcuts_example.xcworkspace/xcshareddata/swiftpm/Package.resolved`, Xcode 프로젝트의 로컬 패키지 참조, `Packages/RivoDocumentEngine/Package.swift` 출처.
 
 ## CocoaPods (`Podfile`)
 
@@ -32,15 +32,19 @@ xcodebuild test -workspace shortcuts_example.xcworkspace -scheme shortcuts_examp
 
 ## SwiftPM (`Package.resolved`, pbxproj `XCRemoteSwiftPackageReference`)
 
-직접 참조 5개:
+원격 직접 참조 5개 + 로컬 직접 참조 1개:
 
 | 패키지 | 버전 | 링크 product | 용도 |
 |---|---|---|---|
 | `ml-explore/mlx-swift-lm` | `3.31.4` | `MLXLLM`, `MLXVLM`, `MLXLMCommon`, `MLXEmbedders` | 로컬 LLM/VLM 추론 (`LLMService`) — 전이 `mlx-swift 0.31.6` |
 | `microsoft/onnxruntime-swift-package-manager` | `1.24.2` | `onnxruntime` (`import OnnxRuntimeBindings`) | LCNet/UVDoc ONNX 추론 (`ScannerONNXSession`, Core ML EP 옵션) |
 | `GetStream/stream-video-swift-webrtc` | `145.12.0` | `StreamWebRTC` | VisionLink WebRTC 수신 (`VisionLinkWebRTCReceiver`) |
-| `weichsel/ZIPFoundation` | `0.9.20` | `ZIPFoundation` | EPUB/HWPX/XLSX/DOCX 압축 해제 (라이선스 `ThirdParty/ZIPFoundation-LICENSE.txt`) |
+| `weichsel/ZIPFoundation` | `0.9.20` | `ZIPFoundation` | 앱의 EPUB/첨부 XLSX 텍스트 추출 등 (라이선스 `ThirdParty/ZIPFoundation-LICENSE.txt`) |
 | `huggingface/swift-transformers` | `1.3.4` | `Hub`, `Tokenizers` | 모델 다운로드(`HubApi`)·토크나이저 — 전이 `swift-huggingface 0.10.1`, `swift-jinja 2.5.0` |
+
+로컬 `Packages/RivoDocumentEngine`의 product `RivoDocumentEngine`을 본 앱과 테스트 타깃이 링크한다. XLSX/HWP/HWPX 문서 엔진과 관련 Word/OLE 추출 코드를 포함한다. Swift tools 6.2, Swift 5 language mode, iOS 26.2/macOS 15를 선언한다. `Vendor/ZIPFoundation`은 같은 0.9.20(`22787ffb59de99e5dc1fbfe80b19c97a904ad48d`)을 별도 모듈 `RivoZIPFoundation`으로 포함한다. CZlib을 호스트 OS와 무관하게 선언하고, Android libc import·CP437·funopen non-null callback·fwrite·lchmod API 차이를 보정한다. 이 코어 패키지에는 Firebase/MLX/ONNX가 연결되지 않는다.
+
+HWP 글자 측정·이미지 변환·지역화 계약은 `Support/DocumentEnginePlatform.swift`, 기존 Apple 구현은 앱의 `Documents/DocumentEngineAppleServices.swift`에 있다. `shortcuts_exampleApp.init`에서 테스트 실행 분기보다 먼저 설치한다. Android 파일 처리 실행기는 `Tools/DocumentEngine/AndroidProbe`, 빌드/실행/비교 절차는 `Tools/DocumentEngine/build-and-run-android.sh`다. Swift 호스트와 Android SDK 버전을 맞추고 NDK sysroot를 먼저 설정한다. `--swift-sdk aarch64-unknown-linux-android34`로 대상별 SDK를 선택한다. Kotlin/JNI·Android 글자 측정·이미지 서비스는 별도 앱 구현 대상이다.
 
 전이 의존성: `swift-collections 1.3.0`, `swift-numerics 1.1.1`, `swift-crypto 4.5.2`, `swift-asn1 1.7.2`, `swift-argument-parser 1.8.2`, `swift-syntax 603.0.2`, `yyjson 0.12.0`, `EventSource 1.5.1`.
 
@@ -82,6 +86,8 @@ Apple `FoundationModels`, `Translation` 프레임워크는 사용하지 않는�
 ## 테스트
 
 `shortcuts_exampleTests/` 115개 항목 (XCTest). 라이브 AI 테스트는 컴파일 플래그 게이트: `EXCEL_AI_LIVE_RECREATE`, `EXCEL_AI_LIVE_EVAL`, `WORD_AI_LIVE_*` → `OTHER_SWIFT_FLAGS='$(inherited) -D<FLAG>'`. 결과 파일은 `xcrun devicectl device copy from --domain-type appDataContainer --domain-identifier net.rivo.visioncraft` 로 가져온다.
+
+공용 엔진의 앱 없는 테스트는 `swift test --package-path Packages/RivoDocumentEngine`이다. `Tests/RivoDocumentEngineTests/Fixtures`는 기존 문서 샘플을 사용하며, XLSX 편집·계산·차트 보존, HWP/HWPX 무편집 저장 보존, UTF-16/탭 위치를 검사한다. CoreText를 사용하는 편집·재조판은 기존 앱 XCTest와 실기 iPad에서 확인한다. 패키지 테스트 통과가 Android 네이티브 화면·입력·글꼴 측정 검증을 대신하지 않는다.
 
 ## 저장소 내 기타 도구
 

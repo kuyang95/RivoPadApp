@@ -1,3 +1,4 @@
+import RivoDocumentEngine
 import XCTest
 import FirebaseAILogic
 import UIKit

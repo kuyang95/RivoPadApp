@@ -1,3 +1,4 @@
+import RivoDocumentEngine
 import UIKit
 
 nonisolated enum HWPFontResolutionKind: String, Hashable, Sendable {

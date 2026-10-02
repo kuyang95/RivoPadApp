@@ -1,3 +1,4 @@
+import RivoDocumentEngine
 import Foundation
 import UIKit
 import XCTest

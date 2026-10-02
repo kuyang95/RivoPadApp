@@ -1,3 +1,4 @@
+import RivoDocumentEngine
 import CoreText
 import Combine
 import SwiftUI

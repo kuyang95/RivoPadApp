@@ -1,3 +1,4 @@
+import RivoDocumentEngine
 import Foundation
 
 /// Shared, bounded local extraction for structured document formats that do

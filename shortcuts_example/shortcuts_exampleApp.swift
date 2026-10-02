@@ -5,6 +5,7 @@
 //  Created by meee on 1/30/26.
 //
 import SwiftUI
+import RivoDocumentEngine
 import UniformTypeIdentifiers
 import UIKit
 
@@ -39,6 +40,7 @@ struct shortcuts_exampleApp: App {
     @State private var sharedInboxError: String?
 
     init() {
+        DocumentEngineAppleServices.install()
         //UIApplication.shared.isIdleTimerDisabled = true
 
         guard ProcessInfo.processInfo.environment[

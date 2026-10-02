@@ -1,3 +1,4 @@
+import RivoDocumentEngine
 import SwiftUI
 
 nonisolated struct HWPEquationObjectEditingContext: Sendable {

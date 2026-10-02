@@ -1,3 +1,4 @@
+import RivoDocumentEngine
 import Combine
 import PhotosUI
 import SwiftUI

@@ -1,3 +1,4 @@
+import RivoDocumentEngine
 import PDFKit
 import UIKit
 import Vision
