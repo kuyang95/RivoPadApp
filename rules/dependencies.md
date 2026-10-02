@@ -2,7 +2,7 @@
 
 점검일 2026-10-01 · 기준 코드 `babc3875`
 
-`Podfile.lock`, `shortcuts_example.xcworkspace/xcshareddata/swiftpm/Package.resolved`, Xcode 프로젝트의 로컬 패키지 참조, `Packages/RivoDocumentEngine/Package.swift` 출처.
+`Podfile.lock`, `shortcuts_example.xcworkspace/xcshareddata/swiftpm/Package.resolved`, Xcode 프로젝트의 로컬 패키지 참조, GitHub `kuyang95/VisionCraftDocumentEngine`의 `Package.swift` 출처.
 
 ## CocoaPods (`Podfile`)
 
@@ -42,7 +42,7 @@ xcodebuild test -workspace shortcuts_example.xcworkspace -scheme shortcuts_examp
 | `weichsel/ZIPFoundation` | `0.9.20` | `ZIPFoundation` | 앱의 EPUB/첨부 XLSX 텍스트 추출 등 (라이선스 `ThirdParty/ZIPFoundation-LICENSE.txt`) |
 | `huggingface/swift-transformers` | `1.3.4` | `Hub`, `Tokenizers` | 모델 다운로드(`HubApi`)·토크나이저 — 전이 `swift-huggingface 0.10.1`, `swift-jinja 2.5.0` |
 
-`Packages/RivoDocumentEngine`은 private 저장소 `kuyang95/VisionCraftDocumentEngine`의 git submodule이며, Xcode는 로컬 패키지로 참조한다. 새로 clone하면 `git submodule update --init`이 필요하다. 엔진 수정은 그 저장소에 커밋·push한 뒤 이 저장소에서 submodule 커밋을 갱신한다. product `RivoDocumentEngine`을 본 앱과 테스트 타깃이 링크한다. XLSX/HWP/HWPX 문서 엔진과 관련 Word/OLE 추출 코드를 포함한다. Swift tools 6.2, Swift 5 language mode, iOS 26.2/macOS 15를 선언한다. `Vendor/ZIPFoundation`은 같은 0.9.20(`22787ffb59de99e5dc1fbfe80b19c97a904ad48d`)을 별도 모듈 `RivoZIPFoundation`으로 포함한다. CZlib을 호스트 OS와 무관하게 선언하고, Android libc import·CP437·funopen non-null callback·fwrite·lchmod API 차이를 보정한다. 이 코어 패키지에는 Firebase/MLX/ONNX가 연결되지 않는다.
+엔진은 private 저장소 `kuyang95/VisionCraftDocumentEngine`이다. Xcode 프로젝트는 원격 패키지(`main` 브랜치)로 선언하고, 실제로 쓰는 엔진 커밋은 `Package.resolved`가 고정한다. 빌드하려면 Xcode에 GitHub 계정 로그인이 필요하다. 엔진을 고치면서 앱에 바로 반영하려면 `Tools/engine-source.sh local [경로]`로 로컬 clone(폴더 이름은 `VisionCraftDocumentEngine`, 위치는 자유, 기본 `../../VisionCraftDocumentEngine`)을 워크스페이스에 추가해 원격 패키지를 덮어쓴다. 로컬 모드 동안 워크스페이스와 `Package.resolved`는 skip-worktree로 커밋에서 제외되고, `Tools/engine-source.sh remote`가 원래 `Package.resolved`를 복원한다. 새 엔진 커밋을 쓰려면 엔진을 push한 뒤 원격 모드에서 패키지를 업데이트하고 `Package.resolved`를 커밋한다. `Tools/engine-source.sh status`로 현재 모드를 확인한다. product `RivoDocumentEngine`을 본 앱과 테스트 타깃이 링크한다. XLSX/HWP/HWPX 문서 엔진과 관련 Word/OLE 추출 코드를 포함한다. Swift tools 6.2, Swift 5 language mode, iOS 26.2/macOS 15를 선언한다. `Vendor/ZIPFoundation`은 같은 0.9.20(`22787ffb59de99e5dc1fbfe80b19c97a904ad48d`)을 별도 모듈 `RivoZIPFoundation`으로 포함한다. CZlib을 호스트 OS와 무관하게 선언하고, Android libc import·CP437·funopen non-null callback·fwrite·lchmod API 차이를 보정한다. 이 코어 패키지에는 Firebase/MLX/ONNX가 연결되지 않는다.
 
 HWP 글자 측정·이미지 변환·지역화 계약은 `Support/DocumentEnginePlatform.swift`, 기존 Apple 구현은 앱의 `Documents/DocumentEngineAppleServices.swift`에 있다. `shortcuts_exampleApp.init`에서 테스트 실행 분기보다 먼저 설치한다. Android 파일 처리 실행기는 엔진 저장소의 `Tools/AndroidProbe`, 빌드/실행/비교 절차는 `Tools/build-and-run-android.sh`다. Swift 호스트와 Android SDK 버전을 맞추고 NDK sysroot를 먼저 설정한다. `--swift-sdk aarch64-unknown-linux-android34`로 대상별 SDK를 선택한다. Kotlin/JNI·Android 글자 측정·이미지 서비스는 별도 앱 구현 대상이다.
 
@@ -87,7 +87,7 @@ Apple `FoundationModels`, `Translation` 프레임워크는 사용하지 않는�
 
 `shortcuts_exampleTests/` 115개 항목 (XCTest). 라이브 AI 테스트는 컴파일 플래그 게이트: `EXCEL_AI_LIVE_RECREATE`, `EXCEL_AI_LIVE_EVAL`, `WORD_AI_LIVE_*` → `OTHER_SWIFT_FLAGS='$(inherited) -D<FLAG>'`. 결과 파일은 `xcrun devicectl device copy from --domain-type appDataContainer --domain-identifier net.rivo.visioncraft` 로 가져온다.
 
-공용 엔진의 앱 없는 테스트는 `swift test --package-path Packages/RivoDocumentEngine`이다. `Tests/RivoDocumentEngineTests/Fixtures`는 기존 문서 샘플을 사용하며, XLSX 편집·계산·차트 보존, HWP/HWPX 무편집 저장 보존, UTF-16/탭 위치를 검사한다. CoreText를 사용하는 편집·재조판은 기존 앱 XCTest와 실기 iPad에서 확인한다. 패키지 테스트 통과가 Android 네이티브 화면·입력·글꼴 측정 검증을 대신하지 않는다.
+공용 엔진의 앱 없는 테스트는 엔진 폴더에서 `swift test`이다. `Tests/RivoDocumentEngineTests/Fixtures`는 기존 문서 샘플을 사용하며, XLSX 편집·계산·차트 보존, HWP/HWPX 무편집 저장 보존, UTF-16/탭 위치를 검사한다. CoreText를 사용하는 편집·재조판은 기존 앱 XCTest와 실기 iPad에서 확인한다. 패키지 테스트 통과가 Android 네이티브 화면·입력·글꼴 측정 검증을 대신하지 않는다.
 
 ## 저장소 내 기타 도구
 

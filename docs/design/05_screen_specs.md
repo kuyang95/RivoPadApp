@@ -93,7 +93,7 @@
 
 ## 엑셀 요약 영역
 
-파일: `Packages/RivoDocumentEngine/Sources/RivoDocumentEngine/ExcelAccessibilityModel.swift` · `ExcelAccessibilityAnalyzer`.
+파일: 엔진 저장소 `VisionCraftDocumentEngine`의 `Sources/RivoDocumentEngine/ExcelAccessibilityModel.swift` · `ExcelAccessibilityAnalyzer`.
 
 - 제목·부제 아래에 항목과 숫자가 나란히 있는 2열 요약은 간편 표에서 "항목 / 값"으로 읽는다. 첫 항목과 숫자도 데이터 행에 포함하며, 숫자를 열 제목으로 사용하지 않는다.
 - AI 단순 값 질문은 원본 셀을 읽고 직접 답하며, 반환된 근거 주소의 셀을 표시한다. 셀 주소·실제 값·수식·병합 범위를 보존해 전달하고, 간편 표용 추정 열 제목은 AI 입력에 넣지 않는다.

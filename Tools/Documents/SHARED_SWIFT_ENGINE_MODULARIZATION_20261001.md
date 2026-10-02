@@ -2,7 +2,7 @@
 
 작업일 2026-10-01 · 브랜치 `codex/shared-document-engine` · 모듈화 전 작업 폴더를 보존한 뒤 구현
 
-> 2026-10-02: 패키지는 private 저장소 `kuyang95/VisionCraftDocumentEngine`으로 분리돼 `Packages/RivoDocumentEngine`에 submodule로 들어간다. 아래의 `Tools/DocumentEngine/*`(AndroidProbe·스크립트·extraction-map·ExportDeclarations)은 그 저장소의 `Tools/*`로 옮겨졌다. 이 문서의 경로는 작성 당시 기준이다.
+> 2026-10-02: 패키지는 private 저장소 `kuyang95/VisionCraftDocumentEngine`으로 분리됐다. iOS 앱은 GitHub 원격 패키지로 참조하고 `Tools/engine-source.sh local`로 로컬 clone을 덮어쓸 수 있다(`rules/dependencies.md`). 아래의 `Packages/RivoDocumentEngine/*`는 그 저장소 루트, `Tools/DocumentEngine/*`(AndroidProbe·스크립트·extraction-map·ExportDeclarations)은 그 저장소의 `Tools/*`에 해당한다. 이 문서의 경로는 작성 당시 기준이다.
 
 **문서 코어를 `RivoDocumentEngine` 패키지로 분리했고, 기존 iOS 앱을 그 패키지에 연결했다. 같은 공용 코드는 Android arm64 기기에서도 빌드·실행돼 XLSX 편집·계산·저장, HWP/HWPX 원본 내용 보존을 수행했다.** Android 화면·한글 입력·글자 측정·이미지 처리·JNI 연결은 별도 앱 구현 단계로 남는다. 숫자·날짜 표시에서 실제 차이를 발견했으며 아래에 원인을 좁혀 기록했다.
 

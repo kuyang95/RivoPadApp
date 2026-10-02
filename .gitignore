@@ -16,4 +16,3 @@ output/
 **/__pycache__/
 *.pyc
 *.xcuserstate
-Packages/RivoDocumentEngine/.swiftpm/xcode/xcuserdata/

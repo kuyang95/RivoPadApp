@@ -1,5 +1,5 @@
 {
-  "originHash" : "4d45d76c6959e9906543716c6fa0bb89f869a4a375fee93960d2dd58cf4a9e1a",
+  "originHash" : "ab07f71d4ee8e7d0ac548f269397e49981a62cc5fbfd1bb276928fbf5627fff5",
   "pins" : [
     {
       "identity" : "eventsource",
@@ -125,6 +125,15 @@
       "state" : {
         "revision" : "c21fdcde390313a6d98d8e33a346f2c3486c3ab0",
         "version" : "1.3.4"
+      }
+    },
+    {
+      "identity" : "visioncraftdocumentengine",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/kuyang95/VisionCraftDocumentEngine",
+      "state" : {
+        "branch" : "main",
+        "revision" : "33a4a51deab302f062f6108a3b0f1bf7f422a187"
       }
     },
     {

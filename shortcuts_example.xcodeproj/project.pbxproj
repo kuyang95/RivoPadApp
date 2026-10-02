@@ -269,7 +269,8 @@
 			);
 			name = shortcuts_exampleTests;
 			packageProductDependencies = (
-				A0DE00010000000000000003 /* RivoDocumentEngine */,				9EA600032FA6000100000003 /* ZIPFoundation */,
+				A0DE00010000000000000003 /* RivoDocumentEngine */,
+				9EA600032FA6000100000003 /* ZIPFoundation */,
 			);
 			productName = shortcuts_exampleTests;
 			productReference = 9E5CB1002F6B000100000001 /* shortcuts_exampleTests.xctest */;
@@ -358,7 +359,8 @@
 			);
 			name = shortcuts_example;
 			packageProductDependencies = (
-				A0DE00010000000000000003 /* RivoDocumentEngine */,				9EA600032FA6000100000003 /* ZIPFoundation */,
+				A0DE00010000000000000003 /* RivoDocumentEngine */,
+				9EA600032FA6000100000003 /* ZIPFoundation */,
 				9E0351472F4BF88000D864AF /* MLXEmbedders */,
 				A93500010000000000000002 /* Tokenizers */,
 				A93500010000000000000004 /* Hub */,
@@ -412,7 +414,7 @@
 			mainGroup = 9E901E8E2F2C4D010028581D;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				A0DE00010000000000000004 /* XCLocalSwiftPackageReference RivoDocumentEngine */,
+				A0DE00010000000000000004 /* XCRemoteSwiftPackageReference "VisionCraftDocumentEngine" */,
 				A93500010000000000000005 /* XCRemoteSwiftPackageReference "swift-transformers" */,
 				9EA600012FA6000100000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 				9E0351462F4BF88000D864AF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
@@ -1159,11 +1161,15 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		A0DE00010000000000000004 /* XCLocalSwiftPackageReference RivoDocumentEngine */ = {isa = XCLocalSwiftPackageReference; relativePath = Packages/RivoDocumentEngine; };
-/* End XCLocalSwiftPackageReference section */
-
 /* Begin XCRemoteSwiftPackageReference section */
+		A0DE00010000000000000004 /* XCRemoteSwiftPackageReference "VisionCraftDocumentEngine" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/kuyang95/VisionCraftDocumentEngine";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 		9E0351462F4BF88000D864AF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm/";
@@ -1207,7 +1213,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		A0DE00010000000000000003 /* RivoDocumentEngine */ = {isa = XCSwiftPackageProductDependency; productName = RivoDocumentEngine; };
+		A0DE00010000000000000003 /* RivoDocumentEngine */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A0DE00010000000000000004 /* XCRemoteSwiftPackageReference "VisionCraftDocumentEngine" */;
+			productName = RivoDocumentEngine;
+		};
 		9E0351472F4BF88000D864AF /* MLXEmbedders */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9E0351462F4BF88000D864AF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
