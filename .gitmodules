@@ -1,0 +1,3 @@
+[submodule "Packages/RivoDocumentEngine"]
+	path = Packages/RivoDocumentEngine
+	url = https://github.com/kuyang95/VisionCraftDocumentEngine.git
