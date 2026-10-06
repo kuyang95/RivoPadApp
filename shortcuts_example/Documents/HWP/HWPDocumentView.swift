@@ -240,13 +240,7 @@ final class HWPDocumentViewModel: ObservableObject {
               blocks[index].isEditable else { return }
         let original = blocks[index]
         if original != edited {
-            var updated = blocks
-            updated[index] = edited
-            updated = HWPCellFormatting.propagating(edited, from: original, in: updated)
-            updated = HWPListFormatting.renumbering(updated)
-            if HWPFlowLayout.needsReflow(from: original, to: edited) {
-                updated = HWPFlowLayout.reflowingEdit(updated, before: blocks, startingAt: edited.id, layouts: pageLayouts)
-            }
+            let updated = HWPBlockEditing.committing(edited, in: blocks, layouts: pageLayouts)
             apply(MutationGroup(before: blocks, after: updated, oldSelection: selectedBlockID, newSelection: edited.id),
                 forward: true, registeringUndo: true)
         }
@@ -1028,10 +1022,8 @@ final class HWPDocumentViewModel: ObservableObject {
             }
         }
         if forward, registeringUndo, !group.mutations.isEmpty {
-            var updated = blocks
-            for mutation in group.mutations { updated[mutation.index] = mutation.newBlock }
-            updated = HWPFlowLayout.reflowingEdits(updated, before: blocks,
-                changedIDs: group.mutations.map { $0.newBlock.id }, layouts: pageLayouts)
+            let updated = HWPBlockEditing.replacing(
+                group.mutations.map { ($0.index, $0.newBlock) }, in: blocks, layouts: pageLayouts)
             apply(MutationGroup(before: blocks, after: updated, oldSelection: selectedBlockID,
                 newSelection: group.mutations.first?.newBlock.id), forward: true, registeringUndo: true)
             return
