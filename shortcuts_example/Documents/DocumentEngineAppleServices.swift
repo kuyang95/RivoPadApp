@@ -10,7 +10,13 @@ nonisolated enum DocumentEngineAppleServices {
         DocumentEnginePlatform.configure(
             textMeasurement: AppleHWPTextMeasurementProvider(),
             imageProcessing: AppleDocumentImageProvider(),
-            localize: { AppLocalization.string($0) },
+            // The app catalog first; the engine's own table covers keys it lacks.
+            localize: { key in
+                let language = AppLanguage.current()
+                let localized = AppLocalization.string(key, language: language)
+                guard localized == key, let code = language.localizationCode else { return localized }
+                return DocumentEngineStrings.localized(key, language: code)
+            },
             locale: { AppLanguage.current().locale })
     }
 }
