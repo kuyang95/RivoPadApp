@@ -35,9 +35,9 @@
 | server_endpoints.md | 2026-09-29 | `babc3875` |
 | firebase_services.md | 2026-09-29 | `babc3875` |
 | gemini_ai.md | 2026-09-29 | `babc3875` |
-| ble_protocol.md | 2026-09-29 | `babc3875` |
+| ble_protocol.md | 2026-10-06 | `c0b9f54a` |
 | dependencies.md | 2026-10-01 | `babc3875` |
-| persistence.md | 2026-09-29 | `babc3875` |
+| persistence.md | 2026-10-06 | `c0b9f54a` |
 | scanner_pipeline.md | 2026-09-29 | `babc3875` |
 | visionlink.md | 2026-09-29 | `babc3875` |
 

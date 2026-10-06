@@ -41,6 +41,7 @@ nonisolated enum RivoConnectionDiagnosticStage:
     case notifications
     case ready
     case disconnected
+    // Keep this raw value to decode diagnostics recorded by older versions.
     case reconnecting
     case packets
     case timeSync
@@ -190,49 +191,6 @@ nonisolated enum RivoTimeSyncState:
     }
 }
 
-nonisolated struct RivoReconnectAttempt:
-    Equatable,
-    Sendable
-{
-    let number: Int
-    let delay: TimeInterval
-
-    var title: String {
-        let seconds = Int(delay.rounded())
-        return AppLocalization.format(
-            "%lld초 뒤 자동으로 다시 연결합니다. %lld번째 재시도",
-            seconds,
-            number
-        )
-    }
-}
-
-nonisolated struct RivoReconnectBackoff:
-    Equatable,
-    Sendable
-{
-    static let delays: [TimeInterval] = [
-        1, 2, 4, 8, 16, 30
-    ]
-
-    private(set) var failureCount = 0
-
-    mutating func nextAttempt() -> RivoReconnectAttempt {
-        let delay = Self.delays[
-            min(failureCount, Self.delays.count - 1)
-        ]
-        failureCount += 1
-        return RivoReconnectAttempt(
-            number: failureCount,
-            delay: delay
-        )
-    }
-
-    mutating func reset() {
-        failureCount = 0
-    }
-}
-
 nonisolated enum RivoDeviceSelectionPolicy {
     static func strongestDevice(
         in devices: [RivoDiscoveredDevice]
@@ -243,165 +201,8 @@ nonisolated enum RivoDeviceSelectionPolicy {
         }
     }
 
-    static func reconnectIdentifier(
-        pending: UUID?,
-        saved: UUID?
-    ) -> UUID? {
-        pending ?? saved
-    }
-
-    static func shouldAutomaticallyConnect(
-        discovered identifier: UUID,
-        saved: UUID?,
-        requiresManualSelection: Bool
-    ) -> Bool {
-        !requiresManualSelection
-            && identifier == saved
-    }
-
     private static func rankedSignal(_ signal: Int) -> Int {
         signal == 127 ? Int.min : signal
-    }
-}
-
-nonisolated enum RivoRestoredPeripheralState:
-    Int,
-    Equatable,
-    Hashable,
-    Sendable
-{
-    case connected
-    case connecting
-    case disconnected
-    case disconnecting
-}
-
-nonisolated struct RivoRestoredPeripheralCandidate:
-    Equatable,
-    Sendable
-{
-    let identifier: UUID
-    let state: RivoRestoredPeripheralState
-}
-
-nonisolated enum RivoRestorationAction:
-    Equatable,
-    Sendable
-{
-    case resumeServices
-    case awaitConnection
-    case connect
-    case awaitDisconnection
-
-    var diagnosticTitle: String {
-        switch self {
-        case .resumeServices:
-            return AppLocalization.string(
-                "연결된 서비스 검색을 재개합니다."
-            )
-        case .awaitConnection:
-            return AppLocalization.string(
-                "진행 중인 연결을 기다립니다."
-            )
-        case .connect:
-            return AppLocalization.string(
-                "복원된 기기에 다시 연결합니다."
-            )
-        case .awaitDisconnection:
-            return AppLocalization.string(
-                "연결 해제가 끝난 뒤 다시 연결합니다."
-            )
-        }
-    }
-}
-
-nonisolated struct RivoRestorationDecision:
-    Equatable,
-    Sendable
-{
-    let candidate:
-        RivoRestoredPeripheralCandidate
-    let action: RivoRestorationAction
-}
-
-nonisolated enum RivoRestorationPolicy {
-    static func shouldPrepareCentralManager(
-        savedIdentifier: UUID?,
-        hasActivatedBluetooth: Bool
-    ) -> Bool {
-        savedIdentifier != nil
-            || hasActivatedBluetooth
-    }
-
-    static func decision(
-        candidates:
-            [RivoRestoredPeripheralCandidate],
-        savedIdentifier: UUID?
-    ) -> RivoRestorationDecision? {
-        guard !candidates.isEmpty else {
-            return nil
-        }
-        let selected =
-            savedIdentifier.flatMap {
-                saved in
-                candidates.first {
-                    $0.identifier == saved
-                }
-            }
-            ?? candidates.enumerated()
-                .min {
-                    lhs,
-                    rhs in
-                    let leftRank =
-                        rank(lhs.element.state)
-                    let rightRank =
-                        rank(rhs.element.state)
-                    if leftRank == rightRank {
-                        return lhs.offset
-                            < rhs.offset
-                    }
-                    return leftRank < rightRank
-                }?
-                .element
-        guard let selected else {
-            return nil
-        }
-        return RivoRestorationDecision(
-            candidate: selected,
-            action: action(
-                for: selected.state
-            )
-        )
-    }
-
-    private static func rank(
-        _ state: RivoRestoredPeripheralState
-    ) -> Int {
-        switch state {
-        case .connected:
-            return 0
-        case .connecting:
-            return 1
-        case .disconnected:
-            return 2
-        case .disconnecting:
-            return 3
-        }
-    }
-
-    private static func action(
-        for state: RivoRestoredPeripheralState
-    ) -> RivoRestorationAction {
-        switch state {
-        case .connected:
-            return .resumeServices
-        case .connecting:
-            return .awaitConnection
-        case .disconnected:
-            return .connect
-        case .disconnecting:
-            return .awaitDisconnection
-        }
     }
 }
 
@@ -451,13 +252,8 @@ final class RivoRemoteManager:
     @preconcurrency CBPeripheralDelegate
 {
     private enum DefaultsKey {
-        static let peripheralIdentifier =
-            "rivo.remote.peripheralIdentifier"
-        static let deviceType = "rivo.remote.deviceType"
         static let connectionDiagnostics =
             "rivo.remote.connectionDiagnostics"
-        static let hasActivatedBluetooth =
-            "rivo.remote.hasActivatedBluetooth"
     }
 
     private static let uartWriteCharacteristic = CBUUID(
@@ -466,8 +262,6 @@ final class RivoRemoteManager:
     private static let uartNotifyCharacteristic = CBUUID(
         string: "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
     )
-    private static let restorationIdentifier =
-        "net.rivo.visioncraft.rivo-central"
 
     @Published private(set) var state: RivoBluetoothState =
         .inactive {
@@ -491,30 +285,17 @@ final class RivoRemoteManager:
         RivoTimeSyncState = .idle
     @Published private(set) var connectionDiagnostics:
         [RivoConnectionDiagnostic] = []
-    @Published private(set) var reconnectAttempt:
-        RivoReconnectAttempt?
 
     private let defaults: UserDefaults
     private var centralManager: CBCentralManager?
     private var peripherals: [UUID: CBPeripheral] = [:]
     private var discoveredTypes: [UUID: RivoDeviceType] = [:]
     private var activePeripheral: CBPeripheral?
-    private var pendingRestoredPeripheralIdentifier:
-        UUID?
-    private var restoredOperationIsActive = false
     private var writeCharacteristic: CBCharacteristic?
     private var notifyCharacteristic: CBCharacteristic?
     private var assembler = RivoPacketAssembler()
     private var wantsScan = false
-    private var shouldReconnect = false
     private var connectionTimeoutTask: Task<Void, Never>?
-    private var reconnectTask: Task<Void, Never>?
-    private var reconnectBackoff = RivoReconnectBackoff()
-    private var pendingPreferredPeripheralIdentifier:
-        UUID?
-    private var requiresManualDeviceSelection = false
-    private var intentionallyDisconnectingIdentifiers =
-        Set<UUID>()
     private var periodicTimeSyncTask:
         Task<Void, Never>?
     private var automaticTimeSyncPeripheralIdentifier:
@@ -530,37 +311,18 @@ final class RivoRemoteManager:
         )
         restoreConnectionDiagnostics()
 
-        if savedPeripheralIdentifier != nil {
-            shouldReconnect = true
-            recordDiagnostic(
-                .info,
-                stage: .reconnecting,
-                message:
-                    AppLocalization.string(
-                        "저장된 Rivo 자동 연결을 준비합니다."
-                    )
-            )
-        }
-        if RivoRestorationPolicy
-            .shouldPrepareCentralManager(
-                savedIdentifier:
-                    savedPeripheralIdentifier,
-                hasActivatedBluetooth:
-                    defaults.bool(
-                        forKey:
-                            DefaultsKey
-                            .hasActivatedBluetooth
-                    )
-            ) {
-            prepareCentralManager(
-                showPowerAlert: false
-            )
+        // Remove preferences from versions that automatically reconnected.
+        for key in [
+            "rivo.remote.peripheralIdentifier",
+            "rivo.remote.deviceType",
+            "rivo.remote.hasActivatedBluetooth"
+        ] {
+            defaults.removeObject(forKey: key)
         }
     }
 
     deinit {
         connectionTimeoutTask?.cancel()
-        reconnectTask?.cancel()
         periodicTimeSyncTask?.cancel()
     }
 
@@ -578,143 +340,26 @@ final class RivoRemoteManager:
         )
     }
 
-    var canReturnToSavedDevice: Bool {
-        guard let pending =
-                pendingPreferredPeripheralIdentifier,
-              let saved = savedPeripheralIdentifier else {
-            return false
-        }
-        return pending != saved
-    }
-
     func activateAndScan() {
-        guard !state.isReady else {
-            return
-        }
-        guard reconnectTask == nil else {
-            return
-        }
         switch state {
-        case .preparing,
-             .scanning,
-             .connecting,
-             .discovering:
+        case .ready, .preparing, .scanning, .connecting, .discovering:
             return
         default:
-            break
-        }
-        resetReconnectBackoff()
-        wantsScan = true
-        shouldReconnect = true
-        prepareCentralManager()
-        guard let centralManager,
-              centralManager.state == .poweredOn else {
-            return
-        }
-        if reconnectIdentifier != nil {
-            attemptSavedConnection()
-        } else {
             startScanning()
         }
     }
 
     func startScanning() {
-        pendingPreferredPeripheralIdentifier = nil
-        pendingRestoredPeripheralIdentifier = nil
-        restoredOperationIsActive = false
-        requiresManualDeviceSelection = false
-        resetReconnectBackoff()
+        guard !state.isReady else {
+            return
+        }
+        cancelActiveConnection()
         beginScanning()
     }
 
     func searchForAnotherDevice() {
-        connectionTimeoutTask?.cancel()
-        reconnectTask?.cancel()
-        reconnectTask = nil
-        resetReconnectBackoff()
-        pendingPreferredPeripheralIdentifier = nil
-        pendingRestoredPeripheralIdentifier = nil
-        restoredOperationIsActive = false
-        requiresManualDeviceSelection = true
-        wantsScan = true
-        shouldReconnect = true
-        periodicTimeSyncTask?.cancel()
-        automaticTimeSyncPeripheralIdentifier = nil
-        timeSyncState = .idle
-        writeCharacteristic = nil
-        notifyCharacteristic = nil
-        connectedDeviceType = nil
-        assembler.reset()
-
-        if let activePeripheral {
-            intentionallyDisconnectingIdentifiers.insert(
-                activePeripheral.identifier
-            )
-            centralManager?.cancelPeripheralConnection(
-                activePeripheral
-            )
-        }
-        recordDiagnostic(
-            .info,
-            stage: .scanning,
-            message:
-                AppLocalization.string(
-                    "기존 선호 기기는 보존하고 다른 Rivo를 찾습니다."
-                )
-        )
+        disconnect()
         beginScanning()
-    }
-
-    func retryConnectionNow() {
-        guard !state.isReady else {
-            return
-        }
-        reconnectTask?.cancel()
-        reconnectTask = nil
-        resetReconnectBackoff()
-        wantsScan = true
-        shouldReconnect = true
-        recordDiagnostic(
-            .info,
-            stage: .reconnecting,
-            message:
-                AppLocalization.string(
-                    "사용자가 Rivo 연결을 지금 다시 시도합니다."
-                )
-        )
-        prepareCentralManager()
-        guard let centralManager else {
-            return
-        }
-        guard centralManager.state == .poweredOn else {
-            updateState(for: centralManager.state)
-            return
-        }
-        if reconnectIdentifier != nil {
-            attemptSavedConnection()
-        } else {
-            beginScanning()
-        }
-    }
-
-    func reconnectSavedDevice() {
-        guard savedPeripheralIdentifier != nil else {
-            return
-        }
-        pendingPreferredPeripheralIdentifier = nil
-        requiresManualDeviceSelection = false
-        reconnectTask?.cancel()
-        reconnectTask = nil
-        resetReconnectBackoff()
-        recordDiagnostic(
-            .info,
-            stage: .reconnecting,
-            message:
-                AppLocalization.string(
-                    "새 기기 선택을 취소하고 저장된 Rivo로 돌아갑니다."
-                )
-        )
-        retryConnectionNow()
     }
 
     private func beginScanning() {
@@ -723,7 +368,6 @@ final class RivoRemoteManager:
             return
         }
         wantsScan = true
-        shouldReconnect = true
 
         guard centralManager.state == .poweredOn else {
             updateState(for: centralManager.state)
@@ -757,109 +401,72 @@ final class RivoRemoteManager:
 
     func stopScanning() {
         wantsScan = false
-        shouldReconnect = false
-        pendingPreferredPeripheralIdentifier = nil
-        pendingRestoredPeripheralIdentifier = nil
-        restoredOperationIsActive = false
-        requiresManualDeviceSelection = false
-        reconnectTask?.cancel()
-        reconnectTask = nil
-        reconnectAttempt = nil
         centralManager?.stopScan()
         if case .scanning = state {
             state = .inactive
             recordDiagnostic(
                 .info,
                 stage: .scanning,
-                message:
-                    AppLocalization.string(
-                        "사용자가 검색을 중지했습니다."
-                    )
+                message: AppLocalization.string("사용자가 검색을 중지했습니다.")
             )
         }
     }
 
     func connect(to device: RivoDiscoveredDevice) {
-        guard let peripheral = peripherals[device.id],
-              let centralManager else {
-            let message =
-                AppLocalization.string(
-                    "검색 결과가 만료되었습니다. 다시 검색해 주세요."
-                )
-            state = .failed(message)
-            recordDiagnostic(
-                .failure,
-                stage: .connecting,
-                message: message
-            )
+        guard let centralManager,
+              centralManager.state == .poweredOn else {
+            if let centralManager {
+                updateState(for: centralManager.state)
+            }
             return
         }
-        resetReconnectBackoff()
-        pendingRestoredPeripheralIdentifier = nil
-        restoredOperationIsActive = false
-        pendingPreferredPeripheralIdentifier = device.id
-        requiresManualDeviceSelection = false
+        guard let peripheral = peripherals[device.id] else {
+            let message = AppLocalization.string(
+                "검색 결과가 만료되었습니다. 다시 검색해 주세요."
+            )
+            state = .failed(message)
+            recordDiagnostic(.failure, stage: .connecting, message: message)
+            return
+        }
         discoveredTypes[device.id] = device.type
         connect(peripheral, using: centralManager)
     }
 
     func disconnect() {
         wantsScan = false
-        shouldReconnect = false
-        pendingPreferredPeripheralIdentifier = nil
-        pendingRestoredPeripheralIdentifier = nil
-        restoredOperationIsActive = false
-        requiresManualDeviceSelection = false
-        connectionTimeoutTask?.cancel()
-        reconnectTask?.cancel()
-        reconnectTask = nil
-        resetReconnectBackoff()
-        periodicTimeSyncTask?.cancel()
-        automaticTimeSyncPeripheralIdentifier =
-            nil
-        timeSyncState = .idle
-        guard let activePeripheral else {
-            state = .disconnected
-            recordDiagnostic(
-                .info,
-                stage: .disconnected,
-                message:
-                    AppLocalization.string(
-                        "연결할 Rivo가 없습니다."
-                    )
-            )
-            return
-        }
-        centralManager?.cancelPeripheralConnection(
-            activePeripheral
-        )
+        centralManager?.stopScan()
+        cancelActiveConnection()
         state = .disconnected
         recordDiagnostic(
             .info,
             stage: .disconnected,
-            message:
-                AppLocalization.string(
-                    "사용자가 Rivo 연결을 끊었습니다."
-                )
+            message: AppLocalization.string("사용자가 Rivo 연결을 끊었습니다.")
         )
     }
 
-    func forgetDevice() {
-        disconnect()
-        defaults.removeObject(
-            forKey: DefaultsKey.peripheralIdentifier
-        )
-        defaults.removeObject(
-            forKey: DefaultsKey.deviceType
-        )
-        connectedDeviceType = nil
+    private func clearActiveConnection() {
+        connectionTimeoutTask?.cancel()
+        connectionTimeoutTask = nil
+        periodicTimeSyncTask?.cancel()
+        periodicTimeSyncTask = nil
+        activePeripheral?.delegate = nil
         activePeripheral = nil
         writeCharacteristic = nil
         notifyCharacteristic = nil
+        connectedDeviceType = nil
+        automaticTimeSyncPeripheralIdentifier = nil
         timeSyncState = .idle
-        recentEvents = []
-        latestInputBatch = []
-        state = .inactive
+        pendingCharacteristicDiscoveryCount = 0
+        didFinishCharacteristicDiscovery = false
+        assembler.reset()
+    }
+
+    private func cancelActiveConnection() {
+        let peripheral = activePeripheral
+        clearActiveConnection()
+        if let peripheral {
+            centralManager?.cancelPeripheralConnection(peripheral)
+        }
     }
 
     func clearEventHistory() {
@@ -929,144 +536,33 @@ final class RivoRemoteManager:
         }
     }
 
-    private var savedPeripheralIdentifier: UUID? {
-        guard let rawValue = defaults.string(
-            forKey: DefaultsKey.peripheralIdentifier
-        ) else {
-            return nil
-        }
-        return UUID(uuidString: rawValue)
-    }
-
-    private var savedDeviceType: RivoDeviceType? {
-        guard let rawValue = defaults.string(
-            forKey: DefaultsKey.deviceType
-        ) else {
-            return nil
-        }
-        return RivoDeviceType(rawValue: rawValue)
-    }
-
-    private var reconnectIdentifier: UUID? {
-        RivoDeviceSelectionPolicy.reconnectIdentifier(
-            pending:
-                pendingPreferredPeripheralIdentifier,
-            saved: savedPeripheralIdentifier
-        )
-    }
-
-    private func prepareCentralManager(
-        showPowerAlert: Bool = true
-    ) {
+    private func prepareCentralManager() {
         guard centralManager == nil else {
             return
         }
         state = .preparing
-        defaults.set(
-            true,
-            forKey:
-                DefaultsKey
-                .hasActivatedBluetooth
-        )
         recordDiagnostic(
             .info,
             stage: .bluetooth,
-            message:
-                AppLocalization.string(
-                    "Bluetooth 중앙 장치를 준비합니다."
-                )
+            message: AppLocalization.string("Bluetooth 중앙 장치를 준비합니다.")
         )
         centralManager = CBCentralManager(
             delegate: self,
             queue: nil,
-            options: [
-                CBCentralManagerOptionRestoreIdentifierKey:
-                    Self.restorationIdentifier,
-                CBCentralManagerOptionShowPowerAlertKey:
-                    showPowerAlert
-            ]
+            options: [CBCentralManagerOptionShowPowerAlertKey: true]
         )
-    }
-
-    private func attemptSavedConnection() {
-        guard let centralManager,
-              centralManager.state == .poweredOn,
-              let identifier = reconnectIdentifier else {
-            beginScanning()
-            return
-        }
-
-        let restored = centralManager.retrievePeripherals(
-            withIdentifiers: [identifier]
-        )
-        guard let peripheral = restored.first else {
-            recordDiagnostic(
-                .warning,
-                stage: .reconnecting,
-                message:
-                    AppLocalization.string(
-                        "저장된 Rivo를 찾지 못해 주변 검색으로 전환합니다."
-                    )
-            )
-            beginScanning()
-            return
-        }
-        if identifier == savedPeripheralIdentifier,
-           let savedDeviceType {
-            discoveredTypes[identifier] =
-                savedDeviceType
-        }
-        peripherals[identifier] = peripheral
-        recordDiagnostic(
-            .info,
-            stage: .reconnecting,
-            message:
-                pendingPreferredPeripheralIdentifier
-                    == identifier
-                ? AppLocalization.string(
-                    "선택한 Rivo에 다시 연결합니다."
-                )
-                : AppLocalization.string(
-                    "저장된 Rivo에 다시 연결합니다."
-                )
-        )
-        connect(peripheral, using: centralManager)
     }
 
     private func connect(
         _ peripheral: CBPeripheral,
         using centralManager: CBCentralManager
     ) {
-        pendingRestoredPeripheralIdentifier =
-            nil
         centralManager.stopScan()
         wantsScan = false
-        connectionTimeoutTask?.cancel()
-        reconnectTask?.cancel()
-        reconnectTask = nil
-        reconnectAttempt = nil
-
-        if let activePeripheral,
-           activePeripheral.identifier != peripheral.identifier {
-            intentionallyDisconnectingIdentifiers.insert(
-                activePeripheral.identifier
-            )
-            centralManager.cancelPeripheralConnection(
-                activePeripheral
-            )
-        }
+        cancelActiveConnection()
 
         self.activePeripheral = peripheral
         peripheral.delegate = self
-        writeCharacteristic = nil
-        notifyCharacteristic = nil
-        pendingCharacteristicDiscoveryCount = 0
-        didFinishCharacteristicDiscovery = false
-        periodicTimeSyncTask?.cancel()
-        automaticTimeSyncPeripheralIdentifier =
-            nil
-        timeSyncState = .idle
-        assembler.reset()
         state = .connecting(displayName(for: peripheral))
         recordDiagnostic(
             .info,
@@ -1096,10 +592,8 @@ final class RivoRemoteManager:
                   !self.state.isReady else {
                 return
             }
-            if let peripheral = self.activePeripheral {
-                self.centralManager?
-                    .cancelPeripheralConnection(peripheral)
-            }
+            let stage = self.connectionTimeoutStage
+            self.cancelActiveConnection()
             let message =
                 AppLocalization.string(
                     "Rivo 연결 또는 준비 시간이 10초를 초과했습니다."
@@ -1107,51 +601,10 @@ final class RivoRemoteManager:
             self.state = .failed(message)
             self.recordDiagnostic(
                 .failure,
-                stage: self.connectionTimeoutStage,
+                stage: stage,
                 message: message
             )
-            self.scheduleReconnect()
         }
-    }
-
-    private func scheduleReconnect() {
-        guard shouldReconnect,
-              reconnectTask == nil else {
-            return
-        }
-        let attempt = reconnectBackoff.nextAttempt()
-        reconnectAttempt = attempt
-        recordDiagnostic(
-            .info,
-            stage: .reconnecting,
-            message: attempt.title
-        )
-        reconnectTask = Task { [weak self] in
-            try? await Task.sleep(
-                nanoseconds:
-                    UInt64(
-                        attempt.delay
-                            * 1_000_000_000
-                    )
-            )
-            guard !Task.isCancelled,
-                  let self,
-                  self.shouldReconnect else {
-                return
-            }
-            self.reconnectTask = nil
-            self.reconnectAttempt = nil
-            if self.reconnectIdentifier != nil {
-                self.attemptSavedConnection()
-            } else {
-                self.beginScanning()
-            }
-        }
-    }
-
-    private func resetReconnectBackoff() {
-        reconnectBackoff.reset()
-        reconnectAttempt = nil
     }
 
     private func displayName(
@@ -1163,8 +616,7 @@ final class RivoRemoteManager:
            ).isEmpty {
             return name
         }
-        if let type = discoveredTypes[peripheral.identifier]
-            ?? savedDeviceType {
+        if let type = discoveredTypes[peripheral.identifier] {
             return type.title
         }
         return AppLocalization.string(
@@ -1183,112 +635,6 @@ final class RivoRemoteManager:
         .first
     }
 
-    private func restoredState(
-        for state: CBPeripheralState
-    ) -> RivoRestoredPeripheralState {
-        switch state {
-        case .connected:
-            return .connected
-        case .connecting:
-            return .connecting
-        case .disconnected:
-            return .disconnected
-        case .disconnecting:
-            return .disconnecting
-        @unknown default:
-            return .disconnected
-        }
-    }
-
-    @discardableResult
-    private func resumePendingRestoredPeripheral(
-        using central: CBCentralManager
-    ) -> Bool {
-        guard let identifier =
-                pendingRestoredPeripheralIdentifier,
-              let peripheral =
-                peripherals[identifier] else {
-            pendingRestoredPeripheralIdentifier =
-                nil
-            return false
-        }
-        pendingRestoredPeripheralIdentifier =
-            nil
-        shouldReconnect = true
-        wantsScan = false
-        activePeripheral = peripheral
-        peripheral.delegate = self
-        writeCharacteristic = nil
-        notifyCharacteristic = nil
-        pendingCharacteristicDiscoveryCount = 0
-        didFinishCharacteristicDiscovery = false
-        periodicTimeSyncTask?.cancel()
-        automaticTimeSyncPeripheralIdentifier =
-            nil
-        timeSyncState = .idle
-        assembler.reset()
-
-        switch peripheral.state {
-        case .connected:
-            resetReconnectBackoff()
-            connectionTimeoutTask?.cancel()
-            state = .discovering(
-                displayName(for: peripheral)
-            )
-            recordDiagnostic(
-                .info,
-                stage: .services,
-                message:
-                    AppLocalization.string(
-                        "복원된 Rivo의 GATT 서비스를 다시 확인합니다."
-                    )
-            )
-            peripheral.discoverServices(nil)
-        case .connecting:
-            state = .connecting(
-                displayName(for: peripheral)
-            )
-            recordDiagnostic(
-                .info,
-                stage: .connecting,
-                message:
-                    AppLocalization.string(
-                        "iPadOS가 진행 중이던 Rivo 연결을 기다립니다."
-                    )
-            )
-            scheduleConnectionTimeout(
-                for: peripheral.identifier
-            )
-        case .disconnected:
-            recordDiagnostic(
-                .info,
-                stage: .reconnecting,
-                message:
-                    AppLocalization.string(
-                        "복원된 Rivo가 끊겨 있어 다시 연결합니다."
-                    )
-            )
-            connect(
-                peripheral,
-                using: central
-            )
-        case .disconnecting:
-            state = .disconnected
-            recordDiagnostic(
-                .info,
-                stage: .reconnecting,
-                message:
-                    AppLocalization.string(
-                        "복원된 Rivo의 연결 해제가 끝나기를 기다립니다."
-                    )
-            )
-        @unknown default:
-            state = .disconnected
-            scheduleReconnect()
-        }
-        return true
-    }
-
     private func markReadyIfPossible() {
         guard !state.isReady,
               let peripheral = activePeripheral,
@@ -1297,26 +643,13 @@ final class RivoRemoteManager:
               notifyCharacteristic.isNotifying,
               let type = discoveredTypes[
                   peripheral.identifier
-              ] ?? savedDeviceType else {
+              ] else {
             return
         }
 
         connectionTimeoutTask?.cancel()
-        reconnectTask?.cancel()
-        reconnectTask = nil
-        resetReconnectBackoff()
+        connectionTimeoutTask = nil
         connectedDeviceType = type
-        defaults.set(
-            peripheral.identifier.uuidString,
-            forKey: DefaultsKey.peripheralIdentifier
-        )
-        defaults.set(
-            type.rawValue,
-            forKey: DefaultsKey.deviceType
-        )
-        pendingPreferredPeripheralIdentifier = nil
-        requiresManualDeviceSelection = false
-        restoredOperationIsActive = false
         state = .ready(displayName(for: peripheral))
         recordDiagnostic(
             .success,
@@ -1461,9 +794,7 @@ final class RivoRemoteManager:
                 stage: .characteristics,
                 message: message
             )
-            centralManager?.cancelPeripheralConnection(
-                peripheral
-            )
+            cancelActiveConnection()
             return
         }
         recordDiagnostic(
@@ -1511,45 +842,13 @@ final class RivoRemoteManager:
                         "Bluetooth를 사용할 수 있습니다."
                     )
             )
-            if let centralManager,
-               resumePendingRestoredPeripheral(
-                   using: centralManager
-               ) {
-                return
-            }
-            if restoredOperationIsActive {
-                if let activePeripheral {
-                    switch activePeripheral.state {
-                    case .connected,
-                         .connecting,
-                         .disconnecting:
-                        return
-                    case .disconnected:
-                        break
-                    @unknown default:
-                        break
-                    }
-                }
-                if wantsScan,
-                   centralManager?.isScanning == true {
-                    state = .scanning
-                    return
-                }
-                restoredOperationIsActive = false
-            }
-            if shouldReconnect,
-               reconnectIdentifier != nil {
-                attemptSavedConnection()
-            } else if wantsScan {
-                startScanning()
-            } else {
+            if wantsScan {
+                beginScanning()
+            } else if activePeripheral == nil {
                 state = .inactive
             }
         case .poweredOff:
-            connectionTimeoutTask?.cancel()
-            reconnectTask?.cancel()
-            reconnectTask = nil
-            reconnectAttempt = nil
+            clearActiveConnection()
             state = .bluetoothOff
             recordDiagnostic(
                 .warning,
@@ -1560,10 +859,7 @@ final class RivoRemoteManager:
                     )
             )
         case .unauthorized:
-            connectionTimeoutTask?.cancel()
-            reconnectTask?.cancel()
-            reconnectTask = nil
-            reconnectAttempt = nil
+            clearActiveConnection()
             state = .permissionDenied
             recordDiagnostic(
                 .failure,
@@ -1574,10 +870,7 @@ final class RivoRemoteManager:
                     )
             )
         case .unsupported:
-            connectionTimeoutTask?.cancel()
-            reconnectTask?.cancel()
-            reconnectTask = nil
-            reconnectAttempt = nil
+            clearActiveConnection()
             state = .unsupported
             recordDiagnostic(
                 .failure,
@@ -1588,7 +881,7 @@ final class RivoRemoteManager:
                     )
             )
         case .resetting:
-            connectionTimeoutTask?.cancel()
+            clearActiveConnection()
             state = .preparing
             recordDiagnostic(
                 .warning,
@@ -1630,119 +923,25 @@ final class RivoRemoteManager:
 
     func centralManager(
         _ central: CBCentralManager,
-        willRestoreState dict: [String: Any]
-    ) {
-        let restored = dict[
-            CBCentralManagerRestoredStatePeripheralsKey
-        ] as? [CBPeripheral] ?? []
-        let candidates = restored.map {
-            RivoRestoredPeripheralCandidate(
-                identifier: $0.identifier,
-                state:
-                    restoredState(
-                        for: $0.state
-                    )
-            )
-        }
-        guard let decision =
-                RivoRestorationPolicy
-                .decision(
-                    candidates: candidates,
-                    savedIdentifier:
-                        savedPeripheralIdentifier
-                ),
-              let peripheral =
-                restored.first(
-                    where: {
-                        $0.identifier
-                            == decision
-                            .candidate
-                            .identifier
-                    }
-                ) else {
-            let restoredScan =
-                central.isScanning
-                || dict[
-                    CBCentralManagerRestoredStateScanServicesKey
-                ] != nil
-                || dict[
-                    CBCentralManagerRestoredStateScanOptionsKey
-                ] != nil
-            guard restoredScan else {
-                return
-            }
-            wantsScan = true
-            shouldReconnect = true
-            restoredOperationIsActive = true
-            state = .scanning
-            recordDiagnostic(
-                .info,
-                stage: .reconnecting,
-                message:
-                    AppLocalization.string(
-                        "iPadOS가 복원한 Rivo 검색을 이어받았습니다."
-                    )
-            )
-            return
-        }
-        shouldReconnect = true
-        wantsScan = false
-        restoredOperationIsActive = true
-        for item in restored {
-            peripherals[item.identifier] = item
-        }
-        activePeripheral = peripheral
-        peripheral.delegate = self
-        if peripheral.identifier
-                == savedPeripheralIdentifier,
-           let savedDeviceType {
-            discoveredTypes[
-                peripheral.identifier
-            ] = savedDeviceType
-        }
-        pendingRestoredPeripheralIdentifier =
-            peripheral.identifier
-        recordDiagnostic(
-            .info,
-            stage: .reconnecting,
-            message:
-                AppLocalization.format(
-                    "iPadOS가 복원한 Rivo 연결을 이어받았습니다. %@",
-                    decision.action.diagnosticTitle
-                )
-        )
-
-        if central.state == .poweredOn {
-            _ = resumePendingRestoredPeripheral(
-                using: central
-            )
-        }
-    }
-
-    func centralManager(
-        _ central: CBCentralManager,
         didDiscover peripheral: CBPeripheral,
         advertisementData: [String: Any],
         rssi RSSI: NSNumber
     ) {
+        guard wantsScan, case .scanning = state else {
+            return
+        }
         let advertisedServices = advertisementData[
             CBAdvertisementDataServiceUUIDsKey
         ] as? [CBUUID] ?? []
         let advertisedName = advertisementData[
             CBAdvertisementDataLocalNameKey
         ] as? String
-        let savedTypeForPeripheral =
-            savedPeripheralIdentifier
-                == peripheral.identifier
-                ? savedDeviceType
-                : nil
         guard let match =
                 RivoAdvertisementClassifier.match(
                     serviceUUIDs:
                         advertisedServices.map(\.uuidString),
                     advertisedName: advertisedName,
-                    peripheralName: peripheral.name,
-                    savedType: savedTypeForPeripheral
+                    peripheralName: peripheral.name
                 ) else {
             return
         }
@@ -1780,26 +979,16 @@ final class RivoRemoteManager:
         discoveredDevices.sort {
             $0.signalStrength > $1.signalStrength
         }
-
-        if RivoDeviceSelectionPolicy
-            .shouldAutomaticallyConnect(
-                discovered:
-                    peripheral.identifier,
-                saved: savedPeripheralIdentifier,
-                requiresManualSelection:
-                    requiresManualDeviceSelection
-            ) {
-            connect(peripheral, using: central)
-        }
     }
 
     func centralManager(
         _ central: CBCentralManager,
         didConnect peripheral: CBPeripheral
     ) {
-        pendingRestoredPeripheralIdentifier =
-            nil
-        restoredOperationIsActive = false
+        guard activePeripheral?.identifier == peripheral.identifier else {
+            central.cancelPeripheralConnection(peripheral)
+            return
+        }
         activePeripheral = peripheral
         peripheral.delegate = self
         state = .discovering(displayName(for: peripheral))
@@ -1828,8 +1017,10 @@ final class RivoRemoteManager:
         didFailToConnect peripheral: CBPeripheral,
         error: Error?
     ) {
-        restoredOperationIsActive = false
-        connectionTimeoutTask?.cancel()
+        guard activePeripheral?.identifier == peripheral.identifier else {
+            return
+        }
+        clearActiveConnection()
         let message = connectionErrorMessage(
             error,
             fallback:
@@ -1843,7 +1034,6 @@ final class RivoRemoteManager:
             stage: .connecting,
             message: message
         )
-        scheduleReconnect()
     }
 
     func centralManager(
@@ -1851,45 +1041,14 @@ final class RivoRemoteManager:
         didDisconnectPeripheral peripheral: CBPeripheral,
         error: Error?
     ) {
-        restoredOperationIsActive = false
-        if intentionallyDisconnectingIdentifiers
-            .remove(peripheral.identifier) != nil {
-            if activePeripheral?.identifier
-                == peripheral.identifier {
-                activePeripheral = nil
-            }
-            recordDiagnostic(
-                .info,
-                stage: .disconnected,
-                message:
-                    AppLocalization.format(
-                        "%@ 연결을 기기 전환을 위해 종료했습니다.",
-                        displayName(for: peripheral)
-                    )
-            )
-            if central.isScanning {
-                state = .scanning
-            }
+        guard activePeripheral?.identifier == peripheral.identifier else {
             return
         }
-        connectionTimeoutTask?.cancel()
-        writeCharacteristic = nil
-        notifyCharacteristic = nil
-        periodicTimeSyncTask?.cancel()
-        automaticTimeSyncPeripheralIdentifier =
-            nil
-        timeSyncState = .idle
-        assembler.reset()
-        pendingCharacteristicDiscoveryCount = 0
-        didFinishCharacteristicDiscovery = false
-        if !shouldReconnect,
-           savedPeripheralIdentifier == nil {
-            state = .inactive
-        } else {
-            state = error.map {
-                .failed($0.localizedDescription)
-            } ?? .disconnected
-        }
+        let name = displayName(for: peripheral)
+        clearActiveConnection()
+        state = error.map {
+            .failed($0.localizedDescription)
+        } ?? .disconnected
         recordDiagnostic(
             error == nil ? .info : .failure,
             stage: .disconnected,
@@ -1898,17 +1057,19 @@ final class RivoRemoteManager:
                 fallback:
                     AppLocalization.format(
                         "%@ 연결이 끊겼습니다.",
-                        displayName(for: peripheral)
+                        name
                     )
             )
         )
-        scheduleReconnect()
     }
 
     func peripheral(
         _ peripheral: CBPeripheral,
         didDiscoverServices error: Error?
     ) {
+        guard activePeripheral?.identifier == peripheral.identifier else {
+            return
+        }
         if let error {
             let message = connectionErrorMessage(
                 error,
@@ -1923,9 +1084,7 @@ final class RivoRemoteManager:
                 stage: .services,
                 message: message
             )
-            centralManager?.cancelPeripheralConnection(
-                peripheral
-            )
+            cancelActiveConnection()
             return
         }
         let services = peripheral.services ?? []
@@ -1940,9 +1099,7 @@ final class RivoRemoteManager:
                 stage: .services,
                 message: message
             )
-            centralManager?.cancelPeripheralConnection(
-                peripheral
-            )
+            cancelActiveConnection()
             return
         }
         if let type = deviceType(
@@ -1978,6 +1135,9 @@ final class RivoRemoteManager:
         didDiscoverCharacteristicsFor service: CBService,
         error: Error?
     ) {
+        guard activePeripheral?.identifier == peripheral.identifier else {
+            return
+        }
         pendingCharacteristicDiscoveryCount = max(
             pendingCharacteristicDiscoveryCount - 1,
             0
@@ -2022,6 +1182,9 @@ final class RivoRemoteManager:
             CBCharacteristic,
         error: Error?
     ) {
+        guard activePeripheral?.identifier == peripheral.identifier else {
+            return
+        }
         if let error {
             let message = connectionErrorMessage(
                 error,
@@ -2036,9 +1199,7 @@ final class RivoRemoteManager:
                 stage: .notifications,
                 message: message
             )
-            centralManager?.cancelPeripheralConnection(
-                peripheral
-            )
+            cancelActiveConnection()
             return
         }
         guard characteristic.isNotifying else {
@@ -2052,9 +1213,7 @@ final class RivoRemoteManager:
                 stage: .notifications,
                 message: message
             )
-            centralManager?.cancelPeripheralConnection(
-                peripheral
-            )
+            cancelActiveConnection()
             return
         }
         recordDiagnostic(
@@ -2073,6 +1232,9 @@ final class RivoRemoteManager:
         didUpdateValueFor characteristic: CBCharacteristic,
         error: Error?
     ) {
+        guard activePeripheral?.identifier == peripheral.identifier else {
+            return
+        }
         guard error == nil,
               characteristic.uuid
                 == Self.uartNotifyCharacteristic,
@@ -2142,6 +1304,9 @@ final class RivoRemoteManager:
         didWriteValueFor characteristic: CBCharacteristic,
         error: Error?
     ) {
+        guard activePeripheral?.identifier == peripheral.identifier else {
+            return
+        }
         guard characteristic.uuid
                 == Self.uartWriteCharacteristic,
               case .sending = timeSyncState else {

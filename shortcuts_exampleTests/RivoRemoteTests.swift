@@ -4,83 +4,41 @@ import XCTest
 
 @testable import shortcuts_example
 
+@MainActor
+final class RivoManualConnectionTests: XCTestCase {
+    func testPreviouslyConnectedDeviceDoesNotActivateBluetoothOnLaunch() {
+        let suiteName = "RivoManualConnectionTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(UUID().uuidString, forKey: "rivo.remote.peripheralIdentifier")
+        defaults.set("mini", forKey: "rivo.remote.deviceType")
+        defaults.set(true, forKey: "rivo.remote.hasActivatedBluetooth")
+
+        let manager = RivoRemoteManager(defaults: defaults)
+
+        XCTAssertEqual(manager.state, .inactive)
+        XCTAssertNil(manager.connectedDeviceName)
+        XCTAssertTrue(manager.connectionDiagnostics.isEmpty)
+        XCTAssertNil(defaults.object(forKey: "rivo.remote.peripheralIdentifier"))
+        XCTAssertNil(defaults.object(forKey: "rivo.remote.deviceType"))
+        XCTAssertNil(defaults.object(forKey: "rivo.remote.hasActivatedBluetooth"))
+    }
+
+    func testBluetoothActivationHistoryDoesNotStartSearchOnLaunch() {
+        let suiteName = "RivoManualConnectionTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(true, forKey: "rivo.remote.hasActivatedBluetooth")
+
+        let manager = RivoRemoteManager(defaults: defaults)
+
+        XCTAssertEqual(manager.state, .inactive)
+        XCTAssertTrue(manager.discoveredDevices.isEmpty)
+        XCTAssertTrue(manager.connectionDiagnostics.isEmpty)
+    }
+}
+
 final class RivoRemoteProtocolTests: XCTestCase {
-    func testReconnectBackoffGrowsAndCapsUntilReset() {
-        var backoff = RivoReconnectBackoff()
-        let attempts = (0 ..< 8).map { _ in
-            backoff.nextAttempt()
-        }
-
-        XCTAssertEqual(
-            attempts.map(\.delay),
-            [1, 2, 4, 8, 16, 30, 30, 30]
-        )
-        XCTAssertEqual(
-            attempts.map(\.number),
-            Array(1 ... 8)
-        )
-        XCTAssertEqual(
-            attempts[2].title,
-            "4초 뒤 자동으로 다시 연결합니다. 3번째 재시도"
-        )
-
-        backoff.reset()
-
-        XCTAssertEqual(
-            backoff.nextAttempt(),
-            RivoReconnectAttempt(
-                number: 1,
-                delay: 1
-            )
-        )
-    }
-
-    func testDeviceSelectionKeepsSavedFallbackButHonorsManualScan() {
-        let saved = UUID()
-        let pending = UUID()
-
-        XCTAssertEqual(
-            RivoDeviceSelectionPolicy
-                .reconnectIdentifier(
-                    pending: pending,
-                    saved: saved
-                ),
-            pending
-        )
-        XCTAssertEqual(
-            RivoDeviceSelectionPolicy
-                .reconnectIdentifier(
-                    pending: nil,
-                    saved: saved
-                ),
-            saved
-        )
-        XCTAssertTrue(
-            RivoDeviceSelectionPolicy
-                .shouldAutomaticallyConnect(
-                    discovered: saved,
-                    saved: saved,
-                    requiresManualSelection: false
-                )
-        )
-        XCTAssertFalse(
-            RivoDeviceSelectionPolicy
-                .shouldAutomaticallyConnect(
-                    discovered: saved,
-                    saved: saved,
-                    requiresManualSelection: true
-                )
-        )
-        XCTAssertFalse(
-            RivoDeviceSelectionPolicy
-                .shouldAutomaticallyConnect(
-                    discovered: pending,
-                    saved: saved,
-                    requiresManualSelection: false
-                )
-        )
-    }
-
     func testDeviceSelectionShowsOnlyStrongestValidSignal() {
         let weak = RivoDiscoveredDevice(
             id: UUID(),
@@ -113,98 +71,6 @@ final class RivoRemoteProtocolTests: XCTestCase {
         XCTAssertNil(
             RivoDeviceSelectionPolicy.strongestDevice(in: [])
         )
-    }
-
-    func testRestorationPrefersSavedDeviceAndMapsEveryState()
-    {
-        let saved = UUID()
-        let connected = UUID()
-        let candidates = [
-            RivoRestoredPeripheralCandidate(
-                identifier: connected,
-                state: .connected
-            ),
-            RivoRestoredPeripheralCandidate(
-                identifier: saved,
-                state: .disconnected
-            ),
-        ]
-
-        XCTAssertTrue(
-            RivoRestorationPolicy
-                .shouldPrepareCentralManager(
-                    savedIdentifier: saved,
-                    hasActivatedBluetooth: false
-                )
-        )
-        XCTAssertTrue(
-            RivoRestorationPolicy
-                .shouldPrepareCentralManager(
-                    savedIdentifier: nil,
-                    hasActivatedBluetooth: true
-                )
-        )
-        XCTAssertFalse(
-            RivoRestorationPolicy
-                .shouldPrepareCentralManager(
-                    savedIdentifier: nil,
-                    hasActivatedBluetooth: false
-                )
-        )
-        XCTAssertEqual(
-            RivoRestorationPolicy.decision(
-                candidates: candidates,
-                savedIdentifier: saved
-            ),
-            RivoRestorationDecision(
-                candidate: candidates[1],
-                action: .connect
-            )
-        )
-        XCTAssertEqual(
-            RivoRestorationPolicy.decision(
-                candidates: candidates,
-                savedIdentifier: nil
-            ),
-            RivoRestorationDecision(
-                candidate: candidates[0],
-                action: .resumeServices
-            )
-        )
-
-        let expectedActions:
-            [
-                RivoRestoredPeripheralState:
-                    RivoRestorationAction
-            ] = [
-                .connected:
-                    .resumeServices,
-                .connecting:
-                    .awaitConnection,
-                .disconnected:
-                    .connect,
-                .disconnecting:
-                    .awaitDisconnection,
-            ]
-        for (state, action)
-            in expectedActions {
-            let candidate =
-                RivoRestoredPeripheralCandidate(
-                    identifier: UUID(),
-                    state: state
-                )
-            XCTAssertEqual(
-                RivoRestorationPolicy
-                    .decision(
-                        candidates: [candidate],
-                        savedIdentifier: nil
-                    ),
-                RivoRestorationDecision(
-                    candidate: candidate,
-                    action: action
-                )
-            )
-        }
     }
 
     func testTimePacketMatchesAndroidSignedChecksumRange() {
@@ -489,18 +355,6 @@ final class RivoRemoteProtocolTests: XCTestCase {
                 serviceUUIDs: [],
                 advertisedName: "Arrival Mini",
                 peripheralName: nil
-            )
-        )
-        XCTAssertEqual(
-            RivoAdvertisementClassifier.match(
-                serviceUUIDs: [],
-                advertisedName: "Rivo",
-                peripheralName: nil,
-                savedType: .three
-            ),
-            RivoAdvertisementMatch(
-                type: .three,
-                source: .savedDevice
             )
         )
     }

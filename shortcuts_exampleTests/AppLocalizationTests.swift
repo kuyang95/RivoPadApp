@@ -969,13 +969,6 @@ final class AppLocalizationTests:
             "Connecting to Rivo Mini"
         )
         XCTAssertEqual(
-            RivoReconnectAttempt(
-                number: 3,
-                delay: 4
-            ).title,
-            "Reconnect automatically in 4 seconds. Attempt 3"
-        )
-        XCTAssertEqual(
             RivoDiscoverySource
                 .advertisedName.title,
             "Advertised Name"
@@ -989,12 +982,6 @@ final class AppLocalizationTests:
                 )
                 .summary,
             "Star Double Press"
-        )
-        XCTAssertEqual(
-            RivoRestorationAction
-                .resumeServices
-                .diagnosticTitle,
-            "Resume discovery of connected services."
         )
         XCTAssertEqual(
             RivoRemoteControlCenter()

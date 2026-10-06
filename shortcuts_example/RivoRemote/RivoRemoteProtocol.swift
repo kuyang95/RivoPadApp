@@ -64,7 +64,6 @@ nonisolated enum RivoDiscoverySource:
     case serviceUUID
     case advertisedName
     case peripheralName
-    case savedDevice
 
     var title: String {
         switch self {
@@ -79,10 +78,6 @@ nonisolated enum RivoDiscoverySource:
         case .peripheralName:
             return AppLocalization.string(
                 "기기 이름"
-            )
-        case .savedDevice:
-            return AppLocalization.string(
-                "저장된 기기 정보"
             )
         }
     }
@@ -100,8 +95,7 @@ nonisolated enum RivoAdvertisementClassifier {
     static func match(
         serviceUUIDs: [String],
         advertisedName: String?,
-        peripheralName: String?,
-        savedType: RivoDeviceType? = nil
+        peripheralName: String?
     ) -> RivoAdvertisementMatch? {
         if let type = serviceUUIDs.lazy.compactMap({
             RivoDeviceType.from(serviceUUID: $0)
@@ -127,12 +121,6 @@ nonisolated enum RivoAdvertisementClassifier {
             return RivoAdvertisementMatch(
                 type: type,
                 source: .peripheralName
-            )
-        }
-        if let savedType {
-            return RivoAdvertisementMatch(
-                type: savedType,
-                source: .savedDevice
             )
         }
         return nil

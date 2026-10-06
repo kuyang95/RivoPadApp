@@ -1,6 +1,6 @@
 # 영속 데이터 (UserDefaults / App Group / 파일 / Keychain / Assets)
 
-점검일 2026-09-29 · 기준 코드 `babc3875`
+점검일 2026-10-06 · 기준 코드 `c0b9f54a`
 
 Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 데이터는 전부 **JSON 파일** 또는 **UserDefaults(Codable 인코딩)**.
 
@@ -28,7 +28,7 @@ Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 �
 | `reader.epub.progress.<base64(bookID)>` / `reader.epub.chapter.<base64(bookID)>` | 진행률 / 챕터 | 〃 `progressKey` / `chapterKey` |
 | `RecentOriginalDocumentStore.records.v1` | JSON, 최대 100건 | `Documents/RecentOriginalDocumentStore.swift` |
 | `AuthorizedDocumentLibrary.bookmark.v1` / `AuthorizedDocumentLibrary.folderName.v1` | security-scoped bookmark Data / String | `Documents/AuthorizedDocumentLibrary.swift` — 사용자가 고른 문서 폴더 |
-| `rivo.remote.peripheralIdentifier` / `rivo.remote.deviceType` / `rivo.remote.connectionDiagnostics` / `rivo.remote.hasActivatedBluetooth` | UUID 문자열 / `three`·`mini` / JSON / Bool | `RivoRemote/RivoRemoteManager.swift` · `DefaultsKey`. `hasActivatedBluetooth` 또는 저장 기기가 있어야 앱 시작 시 CBCentralManager 를 만든다 (`RivoRestorationPolicy`) |
+| `rivo.remote.connectionDiagnostics` | JSON, 최근 80건 | `RivoRemote/RivoRemoteManager.swift` · `DefaultsKey`. 기기 UUID·타입·Bluetooth 활성화 이력은 저장하지 않고, 초기화 시 이전 버전의 `rivo.remote.peripheralIdentifier` / `rivo.remote.deviceType` / `rivo.remote.hasActivatedBluetooth` 값을 제거한다 |
 | `LocalDocumentAppearance.v1` | `LocalDocumentAppearance` JSON (fontLevel, lineHeightLevel, colorIndex, showsLineSeparators) — 문서 뷰어 글자/줄간격/색상 | `Documents/LocalDocumentReading.swift` |
 
 ## App Group `group.net.rivo.visioncraft`

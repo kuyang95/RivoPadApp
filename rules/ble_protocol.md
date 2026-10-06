@@ -1,6 +1,6 @@
 # BLE 프로토콜 (Rivo 리모컨)
 
-점검일 2026-09-29 · 기준 코드 `babc3875`
+점검일 2026-10-06 · 기준 코드 `c0b9f54a`
 
 iPad 앱은 BLE 페리페럴 **Rivo Three / Rivo Mini** 키패드의 버튼 입력을 받아 앱 내부 기능을 조작한다. 구현은 `shortcuts_example/RivoRemote/`. Android 와 같은 펌웨어 프로토콜.
 
@@ -12,10 +12,9 @@ iPad 앱은 BLE 페리페럴 **Rivo Three / Rivo Mini** 키패드의 버튼 입�
 |---|---|---|
 | 쓰기 특성 (앱 → 기기) | `6E400004-B5A3-F393-E0A9-E50E24DCCA9E` (`uartWriteCharacteristic`) | 시간 동기화 패킷 쓰기. Nordic 표준 RX(`…0002`)가 아닌 `…0004` — 리보 펌웨어 비표준, 변경 금지 |
 | notify 특성 (기기 → 앱) | `6E400003-B5A3-F393-E0A9-E50E24DCCA9E` (`uartNotifyCharacteristic`) | 버튼 패킷 notify (`setNotifyValue(true)`) |
-| 복원 식별자 | `net.rivo.visioncraft.rivo-central` (`CBCentralManagerOptionRestoreIdentifierKey`) | 백그라운드 복원. Info.plist `UIBackgroundModes` = `bluetooth-central` |
+| 백그라운드 동작 | Info.plist `UIBackgroundModes` = `bluetooth-central` | 사용자가 연결한 기기의 버튼 수신 유지. 중앙 장치 복원 식별자는 사용하지 않음 |
 | 스캔 | `scanForPeripherals(withServices: nil, options: [AllowDuplicates: false])` | 서비스 필터 없이 스캔 후 아래 분류기로 선별 |
-| 연결 타임아웃 | 10초 (`scheduleConnectionTimeout`, `Task.sleep 10_000_000_000ns`) | |
-| 재연결 백오프 | `RivoReconnectBackoff.delays = [1, 2, 4, 8, 16, 30]` 초 | 실패 횟수만큼 진행, 마지막 값 유지 |
+| 연결 타임아웃 | 10초 (`scheduleConnectionTimeout`, `Task.sleep 10_000_000_000ns`) | 실패 후 사용자가 다시 선택해야 연결 |
 | 쓰기 타입 | 특성이 `.writeWithoutResponse` 지원 시 우선, 아니면 `.withResponse` (`syncTime`) | |
 
 CCC descriptor 를 직접 쓰지 않는다 (CoreBluetooth 가 처리) — Android 문서의 `00002902-…` 항목은 iOS 에 없음.
@@ -29,7 +28,21 @@ CCC descriptor 를 직접 쓰지 않는다 (CoreBluetooth 가 처리) — Androi
 | `.three` (Rivo Three) | `f120` 또는 `0000f120…` | `rivo3`, `rivothree` |
 | `.mini` (Rivo Mini) | `f121` 또는 `0000f121…` | `rivomini` |
 
-우선순위: 서비스 UUID → 광고 이름 → 페리페럴 이름 → 저장된 기기 타입 (`RivoDiscoverySource`). 저장 키는 [persistence.md](persistence.md) (`rivo.remote.peripheralIdentifier`, `rivo.remote.deviceType`).
+우선순위: 서비스 UUID → 광고 이름 → 페리페럴 이름 (`RivoDiscoverySource`). 저장 기기 정보로 식별하거나 자동 연결하지 않는다.
+
+## 수동 연결 흐름
+
+`RivoRemoteManager.swift` · `RivoRemoteManager`, `RivoDeviceSelectionPolicy`. 화면 진입은 `RivoRemoteView.swift` · `RivoRemoteView`의 `activateAndScan` 호출.
+
+- 앱 전역에서 매니저를 유지한다(`shortcuts_exampleApp.swift` · `shortcuts_exampleApp`). 초기 상태는 `inactive`이며 앱 시작 시 중앙 장치를 만들지 않는다. 리모컨 화면에 진입하거나 검색 버튼을 누르면 중앙 장치를 준비하고 주변 검색을 시작한다.
+- 발견한 기기는 사용자가 선택해야 연결한다. 검색 결과는 내부에 여러 기기를 보관하지만 화면에는 `strongestDiscoveredDevice` 한 대만 표시한다. RSSI `127`은 유효하지 않은 신호값으로 취급해 최하위로 둔다.
+- 연결 시작 시 검색을 중지하고 10초 타이머를 시작한다. BLE 연결 후 전체 GATT 서비스를 검색하고 각 서비스에서 UART 쓰기·알림 특성을 찾는다. 쓰기 특성, 활성화된 알림 구독, 기기 타입이 모두 있어야 `ready`가 된다.
+- 연결 실패·연결 해제·준비 타임아웃 후 자동 재연결하지 않는다. 사용자가 검색 결과의 기기를 다시 선택한다. 주변 검색 자체에는 시간 제한이 없다.
+- Bluetooth가 꺼지거나 재설정되면 현재 연결 정보를 정리한다. 다시 켜졌을 때 검색 요청이 남아 있으면 검색만 재개하며, 연결은 사용자의 선택을 기다린다.
+- `disconnect`는 검색·연결을 종료하고 `stopScanning`은 검색을 중지한다. `searchForAnotherDevice`는 현재 연결을 종료하고 주변 검색으로 전환한다. 연결 준비 중에는 검색·기기 선택 버튼을 비활성화한다.
+- 기기 UUID·타입·Bluetooth 활성화 이력을 저장하지 않는다. 이전 버전의 `rivo.remote.peripheralIdentifier`, `rivo.remote.deviceType`, `rivo.remote.hasActivatedBluetooth` 값은 매니저 초기화 시 제거한다.
+- CoreBluetooth 중앙 장치 상태 복원을 사용하지 않는다. 앱 재시작 후에는 다시 수동 연결한다. 종료한 연결의 지연된 콜백은 현재 연결 상태에 반영하지 않는다.
+- 연결 준비 후 시간을 자동 전송한다. 전송 성공 후 12시간마다 다시 전송을 예약하며 연결 해제 시 취소한다(`noteTimePacketSent`, `schedulePeriodicTimeSync`). 단계별 연결 진단은 최근 80건을 UserDefaults에 보관한다(`recordDiagnostic`). 과거 진단의 `reconnecting` 값은 디코딩 호환을 위해 유지한다.
 
 ## 패킷 조립 / 파싱
 

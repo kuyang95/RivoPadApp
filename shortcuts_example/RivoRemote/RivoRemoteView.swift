@@ -67,31 +67,6 @@ struct RivoRemoteView: View {
                 .accessibilityElement(children: .combine)
             }
 
-            if let reconnectAttempt =
-                manager.reconnectAttempt {
-                HStack {
-                    ProgressView()
-                    Text(reconnectAttempt.title)
-                }
-                .accessibilityElement(children: .combine)
-
-                Button(
-                    "지금 다시 연결",
-                    systemImage: "bolt.horizontal.circle"
-                ) {
-                    manager.retryConnectionNow()
-                }
-
-                if manager.canReturnToSavedDevice {
-                    Button(
-                        "저장된 리모컨으로 돌아가기",
-                        systemImage: "arrow.uturn.backward.circle"
-                    ) {
-                        manager.reconnectSavedDevice()
-                    }
-                }
-            }
-
             stateActions
         }
     }
@@ -122,14 +97,6 @@ struct RivoRemoteView: View {
             ) {
                 manager.searchForAnotherDevice()
             }
-
-            Button(
-                "이 리모컨 지우기",
-                systemImage: "trash",
-                role: .destructive
-            ) {
-                manager.forgetDevice()
-            }
         } else if manager.state == .scanning {
             HStack {
                 ProgressView()
@@ -138,7 +105,7 @@ struct RivoRemoteView: View {
             Button("검색 중지", systemImage: "stop.fill") {
                 manager.stopScanning()
             }
-        } else if manager.reconnectAttempt == nil {
+        } else {
             Button(
                 "Rivo 리모컨 검색",
                 systemImage: "antenna.radiowaves.left.and.right"
@@ -146,6 +113,16 @@ struct RivoRemoteView: View {
                 manager.startScanning()
             }
             .font(.headline)
+            .disabled(isConnecting)
+        }
+    }
+
+    private var isConnecting: Bool {
+        switch manager.state {
+        case .preparing, .connecting, .discovering:
+            return true
+        default:
+            return false
         }
     }
 
@@ -204,6 +181,7 @@ struct RivoRemoteView: View {
                 .accessibilityHint("이 리모컨에 연결합니다.")
             }
         }
+        .disabled(isConnecting)
     }
 
     private var controlsSection: some View {

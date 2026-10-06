@@ -120,10 +120,10 @@
 
 @chapter Rivo Remote
 @section Connection
-@text Select the Rivo connection status at the top of the Home screen to view scanning, automatic connection to a saved device, and diagnostics.
+@text Select the Rivo connection status at the top of the Home screen to search for and choose a remote.
 @text Rivo Three and Mini families are identified primarily by service UUID and secondarily by known device names.
-@text If iPadOS removes the app in the background, ongoing scanning and connection can be restored within the permitted CoreBluetooth scope. Restoration is unavailable after you force-quit from the app switcher.
-@text After a disconnection, retries use exponential backoff while preserving the saved preferred device.
+@text Choose the remote manually each time you connect. Restarting the app or turning Bluetooth back on does not connect automatically.
+@text If a connection fails or disconnects, search again and select the remote on the Remote Connection screen. The app does not retry automatically.
 @section Control Inside VisionCraft
 @text Rivo buttons control the in-app quick menu, AI voice input, Magnifier, Live Reading, Scanner, Documents, and EPUB or DAISY screens.
 @text In Settings under In-App Quick Menu, choose between a vertical list of every item and a horizontal previous-current-next view, and select one of the same 16 high-contrast color combinations as Android. These settings apply only inside VisionCraft, not over other apps.
@@ -208,6 +208,6 @@
 @text The first time you use Siri or a deep link, iPadOS may ask whether to open it in VisionCraft.
 @text While a model is preparing, keep the app in the foreground and check available storage and network status.
 @section When a Connection Fails
-@text For Rivo, check power and pairing, then select Reconnect Now on the Remote Connection screen.
+@text For Rivo, check power and pairing, then search again and select the discovered remote on the Remote Connection screen.
 @text For VisionLink, check the pairing code, matching server environment, Wi-Fi changes, and the sending state of the other device.
 @text If the issue repeats, record the reproduction time together with the diagnostics shown on screen.

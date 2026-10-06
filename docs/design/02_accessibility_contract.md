@@ -59,6 +59,8 @@
 - 카메라 확대와 사진 분석·문서 스캔 결과의 사진 확대는 두 손가락 제스처로만 된다. 화면 위 대체 버튼이 없다.
 - 문서 편집기(엑셀·워드·한글)의 문서 본문 렌더링 글자·손잡이 크기는 문서 내용이므로 12pt/48pt 하한을 적용하지 않는다.
 
+- iPad의 Rivo 리모컨 연결은 사용자 지정으로 매번 기기를 선택하는 수동 연결이다. 앱 재시작·Bluetooth 재활성화·연결 끊김 때 자동 연결하지 않는다(`RivoRemoteManager.swift` · `RivoRemoteManager`).
+
 ## Source Anchors
 
 - Android Accessibility: `sp`, 12sp 하한, 4.5:1 텍스트 대비, 3:1 비텍스트 대비, 48dp 터치 타깃.
