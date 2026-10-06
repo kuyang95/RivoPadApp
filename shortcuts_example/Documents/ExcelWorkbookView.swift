@@ -6583,13 +6583,14 @@ extension ExcelWorkbookViewModel {
         let old = captureEditingState(original)
         let document = ExcelEditingDocument(base: editingBaseData ?? sourceData, workbook: original, registry: registry)
         let sheetIndex = selectedSheetIndex
+        let selection = selectedAddress.map { ExcelCellRange(start: $0, end: selectionEnd ?? $0) }
         isSaving = true
         errorDescription = nil
         defer { isSaving = false }
         do {
             let task = Task.detached(priority: .userInitiated) {
                 try ExcelWorkbookOperationExecution.applying(
-                    plan, to: document, sheetIndex: sheetIndex, snapshot: snapshot,
+                    plan, to: document, sheetIndex: sheetIndex, snapshot: snapshot, selection: selection,
                     checkpoint: { try Task.checkCancellation() })
             }
             let transaction = try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
@@ -6600,8 +6601,11 @@ extension ExcelWorkbookViewModel {
             editingBaseData = transaction.document.base
             registry = transaction.document.registry
             workbook = finalBook
-            if transaction.sheetIndex != sheetIndex {
-                selectedSheetIndex = transaction.sheetIndex
+            selectedSheetIndex = transaction.sheetIndex
+            if let range = transaction.selection {
+                selectedAddress = range.start
+                selectionEnd = range.cellCount > 1 ? range.end : nil
+            } else if transaction.sheetIndex != sheetIndex {
                 selectedAddress = selectedSheet.flatMap { initialAddress(in: $0) }
                 selectionEnd = nil
             }
