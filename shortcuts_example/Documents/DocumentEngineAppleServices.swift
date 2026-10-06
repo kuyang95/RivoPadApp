@@ -14,8 +14,8 @@ nonisolated enum DocumentEngineAppleServices {
             localize: { key in
                 let language = AppLanguage.current()
                 let localized = AppLocalization.string(key, language: language)
-                guard localized == key, let code = language.localizationCode else { return localized }
-                return DocumentEngineStrings.localized(key, language: code)
+                guard localized == key else { return localized }
+                return DocumentEngineStrings.localized(key, language: language.effectiveLanguageCode)
             },
             locale: { AppLanguage.current().locale })
     }
