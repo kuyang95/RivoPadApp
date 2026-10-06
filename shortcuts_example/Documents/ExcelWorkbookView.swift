@@ -6571,8 +6571,8 @@ private struct ExcelWorkbookExportDocument: FileDocument {
     }
 }
 
-// Chat batches use an isolated, memory-only editor. Nothing reaches the live
-// workbook or file until every operation and the final XLSX export succeeds.
+// Chat batches run in the engine on a copy of the document. Nothing reaches
+// the live workbook or file until every operation and the export succeed.
 extension ExcelWorkbookViewModel {
     func applyAIWorkbookPlan(_ plan: ExcelAIValidatedPlan) async throws -> ExcelAIWorkbookApplyResult {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
@@ -6581,61 +6581,36 @@ extension ExcelWorkbookViewModel {
               snapshot.sheetPartPath == plan.sheetPartPath, snapshot.revision == plan.sourceRevision,
               !isLargeWorkbook, !plan.workbookOperations.isEmpty else { throw ExcelAIApplyError.staleProposal }
         let old = captureEditingState(original)
-        let draft = ExcelWorkbookViewModel(fileURL: fileURL, writeContents: { _, _, _ in throw ExcelWorkbookDocumentError.cannotSave })
-        draft.sourceData = sourceData
-        var draftBook = original
-        draft.restoreEditingState(old, workbook: &draftBook)
-        draft.workbook = draftBook
+        let document = ExcelEditingDocument(base: editingBaseData ?? sourceData, workbook: original, registry: registry)
+        let sheetIndex = selectedSheetIndex
         isSaving = true
         errorDescription = nil
         defer { isSaving = false }
         do {
-            var messages: [String] = []
-            var references: ExcelAIReferences?
-            if !plan.edits.isEmpty || !plan.appendedRows.isEmpty || !plan.createdTables.isEmpty || !plan.actions.isEmpty {
-                var legacy = plan
-                legacy.workbookOperations = []
-                try draft.applyAIPlan(legacy)
-                messages.append(AppLocalization.format("%lld개 항목을 바꿨습니다.", legacy.changeCount))
-                references = ExcelAIReferences.resolve(command: .init(intent: .edit, assistantMessage: "", edits: [], appendedRows: []), snapshot: snapshot, appliedPlan: legacy)
+            let task = Task.detached(priority: .userInitiated) {
+                try ExcelWorkbookOperationExecution.applying(
+                    plan, to: document, sheetIndex: sheetIndex, snapshot: snapshot,
+                    checkpoint: { try Task.checkCancellation() })
             }
-            for operation in plan.workbookOperations {
-                try Task.checkCancellation()
-                let result = try await draft.executeAIWorkbookOperation(operation)
-                messages.append(result.message)
-                if let previous = references, operation.sheetID == previous.sheetPartPath || (operation.sheetID == "$current" && draft.selectedSheet?.partPath == previous.sheetPartPath),
-                   operation.type == .insertTracks || operation.type == .deleteTracks {
-                    let shift = ExcelStructureChange(axis: ExcelEditAxis(rawValue: operation.axis!)!, index: operation.index!, count: operation.count!, deleting: operation.type == .deleteTracks)
-                    references = .init(sheetPartPath: previous.sheetPartPath, sheetName: previous.sheetName, addresses: previous.addresses.compactMap(shift.address))
-                }
-                if let actual = result.references {
-                    let preceding = references?.sheetPartPath == actual.sheetPartPath ? references!.addresses : []
-                    references = .init(sheetPartPath: actual.sheetPartPath, sheetName: actual.sheetName, addresses: Array(Set(preceding + actual.addresses)).sorted())
-                }
-                if let previous = references, let currentSheet = draft.selectedSheet, previous.sheetPartPath == currentSheet.partPath {
-                    let addresses = Array(Set(previous.addresses.map { currentSheet.canonicalAddress(for: $0) })).sorted()
-                    references = addresses.isEmpty ? nil : .init(sheetPartPath: currentSheet.partPath, sheetName: currentSheet.name, addresses: addresses)
-                } else { references = nil }
-            }
-            try Task.checkCancellation()
-            // Export validates drawing relationships and all other deferred XML.
-            let data = try await draft.exportData()
-            var finalBook = try await Task.detached(priority: .userInitiated) {
-                var loaded = try ExcelWorkbookDocument.load(from: data)
-                guard !loaded.sheets.contains(where: { $0.didTruncate || $0.isWindowed }) else { throw ExcelAIApplyError.rowLimitExceeded }
-                _ = Self.refreshDerivedFormulaValues(in: &loaded, edits: [:])
-                return loaded
-            }.value
+            let transaction = try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
             try Task.checkCancellation()
             guard makeAISnapshot()?.revision == plan.sourceRevision else { throw ExcelAIApplyError.staleProposal }
-            guard !draft.undoStack.isEmpty else { return .init(message: AppLocalization.string("변경할 내용이 없습니다."), references: nil) }
-            draft.installEditingBase(data, workbook: finalBook)
-            draft.workbook = finalBook
-            let next = draft.captureEditingState(finalBook)
-            restoreEditingState(next, workbook: &finalBook)
+            guard transaction.changed else { return .init(message: AppLocalization.string("변경할 내용이 없습니다."), references: nil) }
+            let finalBook = transaction.document.workbook
+            editingBaseData = transaction.document.base
+            registry = transaction.document.registry
             workbook = finalBook
+            if transaction.sheetIndex != sheetIndex {
+                selectedSheetIndex = transaction.sheetIndex
+                selectedAddress = selectedSheet.flatMap { initialAddress(in: $0) }
+                selectionEnd = nil
+            }
+            selectedDrawingID = transaction.drawingID
+            rangeClipboard = nil
+            aiReferences = nil
             navigationRevealAddress = selectedDrawingID == nil ? selectedAddress : nil
             findText = ""
+            let next = captureEditingState(finalBook)
             undoStack.append(MutationGroup(sheetIndex: selectedSheetIndex, cells: [], oldDocumentState: old, newDocumentState: next))
             redoStack.removeAll()
             if let sheet = selectedSheet {
@@ -6643,132 +6618,10 @@ extension ExcelWorkbookViewModel {
             }
             updateHistoryState()
             status = AppLocalization.string("채팅 요청을 적용했습니다. 실행 취소 한 번으로 되돌릴 수 있습니다.")
-            return .init(message: messages.joined(separator: "\n"), references: references)
+            return .init(message: transaction.messages.joined(separator: "\n"), references: transaction.references)
         } catch {
             status = error.localizedDescription
             throw error
         }
-    }
-
-    private func executeAIWorkbookOperation(_ op: ExcelAIWorkbookOperation) async throws -> ExcelAIWorkbookApplyResult {
-        func require(_ success: Bool) throws {
-            if !success { throw ExcelEditingError(status.isEmpty ? "요청한 작업을 적용하지 못했습니다." : status) }
-        }
-        guard let book = workbook else { throw ExcelAIApplyError.invalidTarget }
-        let path = op.sheetID == "$current" ? selectedSheet?.partPath : op.sheetID
-        guard let index = book.sheets.firstIndex(where: { $0.partPath == path }) else { throw ExcelAIApplyError.invalidTarget }
-        if index != selectedSheetIndex { selectSheet(index) }
-        guard let sheet = selectedSheet else { throw ExcelAIApplyError.invalidTarget }
-        guard op.isSheetOperation || !sheet.protection.isEnabled else { throw ExcelAICommandValidationError.protectedWorksheet }
-        status = ""
-        let before = undoStack.count
-        var highlighted: ExcelCellRange?
-        var detail = op.range ?? ""
-        var advanced: ExcelAdvancedEdit?
-        let range = op.cellRange
-        switch op.type {
-        case .freezePanes:
-            advanced = .freezePanes(.init(rows: op.rows!, columns: op.columns!))
-            detail = AppLocalization.format("행 %lld개 · 열 %lld개", op.rows!, op.columns!)
-        case .mergeCells: advanced = .merge(range!, center: op.center ?? false, discardOtherValues: false); highlighted = range
-        case .unmergeCells: advanced = .unmerge(range!); highlighted = range?.includingMergedCells(in: sheet)
-        case .insertTracks, .deleteTracks:
-            advanced = .structure(.init(axis: ExcelEditAxis(rawValue: op.axis!)!, index: op.index!, count: op.count!, deleting: op.type == .deleteTracks))
-            detail = "\(ExcelEditAxis(rawValue: op.axis!)!.title) \(op.index!)–\(op.index! + op.count! - 1)"
-        case .resizeTracks:
-            advanced = .resize(ExcelEditAxis(rawValue: op.axis!)!, op.index!...op.index! + op.count! - 1, op.size!)
-            detail = "\(ExcelEditAxis(rawValue: op.axis!)!.title) \(op.index!)–\(op.index! + op.count! - 1) · \(op.size!)"
-        case .formatCells: advanced = .format(range!, op.format!.basic); highlighted = range
-        case .sortRange: advanced = .sort(range!, column: op.column!, ascending: op.ascending!, header: op.header!); highlighted = range
-        case .filterRange: advanced = .filter(range!, column: op.column!, comparison: ExcelFilterComparison(rawValue: op.comparison!)!, query: op.value!); highlighted = range
-        case .clearFilter: advanced = .clearFilter
-        case .copyRange, .cutRange:
-            let source = range!
-            let values = (source.start.row...source.end.row).map { row in
-                (source.start.column...source.end.column).map { column in
-                    let cell = sheet.cells[.init(row: row, column: column)]
-                    return ExcelClipboardValue(text: cell?.editText ?? "", styleIndex: cell?.styleIndex, input: cell.map { input(preserving: $0) } ?? .blank)
-                }
-            }
-            let clipboard = ExcelRangeClipboard(range: source, sheetIndex: selectedSheetIndex, values: values, isCut: op.type == .cutRange, changeCount: 0)
-            let destinationPath = op.destinationSheetID == "$current" ? sheet.partPath : (op.destinationSheetID ?? sheet.partPath)
-            guard let targetSheet = book.sheets.firstIndex(where: { $0.partPath == destinationPath }), !book.sheets[targetSheet].protection.isEnabled else { throw ExcelAICommandValidationError.protectedWorksheet }
-            if targetSheet != selectedSheetIndex { selectSheet(targetSheet) }
-            let destination = ExcelCellAddress(op.destination!)!
-            selectCell(destination)
-            pasteSelection(using: clipboard)
-            try require(undoStack.count > before)
-            highlighted = .init(start: destination, end: .init(row: destination.row + values.count - 1, column: destination.column + values[0].count - 1))
-            detail = "\(sheet.name)!\(source.reference) → \(selectedSheet!.name)!\(highlighted!.reference)"
-        case .fillRange, .clearRange:
-            selectRange(from: range!.start, to: range!.end)
-            guard let effectiveRange = selectedRange, effectiveRange.cellCount <= 20_000 else { throw ExcelAICommandValidationError.tooManyChanges }
-            if op.type == .fillRange { fillSelection(across: op.across!) } else { clearSelection() }
-            // Already empty single cells and single-cell fills are valid no-ops.
-            if undoStack.count == before && !status.isEmpty { throw ExcelEditingError(status) }
-            highlighted = selectedRange
-        case .setCellValue:
-            let address = sheet.canonicalAddress(for: range!.start)
-            try require(applyRangeUpdates([selectedSheetIndex: [address: .init(text: op.value!, styleIndex: sheet.cells[address]?.styleIndex)]]))
-            highlighted = .init(start: address, end: address)
-        case .replaceText:
-            let updates = ExcelRangeOperations.replacing(op.value!, with: op.replacement!, at: range!.addresses, in: sheet)
-            if !updates.isEmpty { try require(applyRangeUpdates([selectedSheetIndex: updates])) }
-            let refs = ExcelAIReferences(sheetPartPath: sheet.partPath, sheetName: sheet.name, addresses: updates.keys.sorted())
-            return .init(message: AppLocalization.format("%@ · %@: %lld셀을 바꿨습니다.", sheet.name, range!.reference, updates.count), references: updates.isEmpty ? nil : refs)
-        case .addSheet, .duplicateSheet:
-            let base = op.type == .addSheet ? AppLocalization.string("시트") : sheet.name
-            let name = try ExcelSheetNames.validated(op.name ?? ExcelSheetNames.suggested(base: base, existing: book.sheets.map(\.name)), existing: book.sheets.map(\.name))
-            try require(await performSheetEdit(op.type == .addSheet ? .add(name: name) : .duplicate(path: sheet.partPath, name: name)))
-            selectedDrawingID = nil
-            detail = op.type == .duplicateSheet ? "\(sheet.name) → \(name)" : name
-        case .renameSheet:
-            try require(await performSheetEdit(.rename(path: sheet.partPath, name: op.name!)))
-            detail = "\(sheet.name) → \(selectedSheet!.name)"
-        case .deleteSheet:
-            try require(await performSheetEdit(.delete(path: sheet.partPath)))
-            selectedDrawingID = nil; detail = sheet.name
-        case .moveSheet:
-            guard let position = op.position, (1...book.sheets.count).contains(position) else { throw ExcelAIApplyError.invalidTarget }
-            var paths = book.sheets.map(\.partPath)
-            paths.remove(at: index); paths.insert(sheet.partPath, at: position - 1)
-            try require(await performSheetEdit(.reorder(paths: paths)))
-            detail = "\(sheet.name) → \(position)"
-        case .moveDrawing, .resizeDrawing, .deleteDrawing, .setImageDescription, .setChart:
-            let image = sheet.drawingObjects.images.first { $0.id == op.drawingID }
-            let chart = sheet.drawingObjects.charts.first { $0.id == op.drawingID }
-            guard let anchor = image?.anchor ?? chart?.anchor, let id = op.drawingID else { throw ExcelAIApplyError.invalidTarget }
-            let selection = ExcelDrawingSelection(id: id, sheetPath: sheet.partPath)
-            detail = image?.name ?? chart!.title
-            switch op.type {
-            case .moveDrawing, .resizeDrawing:
-                let next = try ExcelAIDrawingGeometry.applying(op, anchor: anchor, sheet: sheet)
-                try require(updateDrawingPlacement(selection, expected: anchor, anchor: next))
-                let rect = ExcelAIDrawingGeometry.grid(sheet: sheet).rect(for: next)!
-                detail += " · \(next.start.reference) · \(Int(rect.width)) × \(Int(rect.height))"
-                selectedDrawingID = id
-            case .deleteDrawing:
-                if image != nil { removeSheetImage(id: id) } else { removeSheetChart(id: id) }
-                try require(undoStack.count > before); selectedDrawingID = nil
-            case .setImageDescription:
-                guard let image else { throw ExcelAIApplyError.invalidTarget }
-                try require(updateSheetImageDescription(selection, name: op.name ?? image.name, alternativeText: op.value ?? image.alternativeText ?? ""))
-                selectedDrawingID = id; detail = op.name ?? image.name
-            case .setChart:
-                try require(updateSheetChart(id: id, title: op.name!, kind: ExcelChartKind(rawValue: op.chartKind!)!, sourceReference: op.range!))
-                selectedDrawingID = id; detail = "\(op.name!) · \(op.range!)"
-            default: break
-            }
-        case .addChart:
-            try require(addSheetChart(title: op.name!, kind: ExcelChartKind(rawValue: op.chartKind!)!, sourceReference: op.range!))
-            selectedDrawingID = selectedSheetCharts.last?.id
-            detail = "\(op.name!) · \(op.range!)"
-        }
-        if let advanced { try require(await performAdvancedEdit(advanced)) }
-        let targetSheet = selectedSheet!
-        let references = highlighted.map { ExcelAIReferences(sheetPartPath: targetSheet.partPath, sheetName: targetSheet.name, addresses: Array(Set($0.addresses.map { targetSheet.canonicalAddress(for: $0) })).sorted()) }
-        let label = AppLocalization.string(op.type.label)
-        let outcome = undoStack.count == before ? AppLocalization.string("변경할 내용이 없습니다.") : AppLocalization.string("적용했습니다.")
-        return .init(message: "\(op.isSheetOperation ? "" : targetSheet.name + " · ")\(label)\(detail.isEmpty ? "" : " · " + detail): \(outcome)", references: references)
     }
 }
