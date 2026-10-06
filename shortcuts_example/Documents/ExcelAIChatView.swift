@@ -93,8 +93,9 @@ final class ExcelAIChatViewModel: ObservableObject {
         applying: (ExcelAIValidatedPlan) async throws -> ExcelAIWorkbookApplyResult
     ) async throws {
         activeReferences = nil
-        guard let plan = try ExcelAICommandValidator.validate(command, snapshot: snapshot, userRequest: userRequest),
-              !plan.workbookOperations.isEmpty else { throw ExcelAICommandValidationError.invalidResponse }
+        guard case .workbookOperations(let plan) = try ExcelAIAssistant.resolve(
+            command, snapshot: snapshot, userRequest: userRequest
+        ) else { throw ExcelAICommandValidationError.invalidResponse }
         let result = try await applying(plan)
         messages.append(Message(role: .assistant, text: result.message, references: result.references))
         activeReferences = result.references
@@ -107,83 +108,21 @@ final class ExcelAIChatViewModel: ObservableObject {
         applying apply: (ExcelAIValidatedPlan) throws -> String
     ) throws {
         activeReferences = nil
-        let validated = try ExcelAICommandValidator.validate(
-            command,
-            snapshot: snapshot,
-            userRequest: userRequest
-        )
-        guard let validated else {
-            if command.intent == .answer, var query = command.query, query.operation != .none,
-               let result = try ExcelAIReadQueryExecutor.execute(query, snapshot: snapshot) {
-                if let rowsBySheet = result.scopeRowsBySheet {
-                    query.workbookResultScope = .init(revision: snapshot.revision, rowsBySheet: rowsBySheet)
-                } else {
-                    query.resultScope = .init(revision: snapshot.revision, rows: result.scopeRows ?? result.rows)
-                }
-                messages.append(Message(role: .assistant, text: result.answer, references: result.references, query: query))
-                activeReferences = result.references
-                return
+        switch try ExcelAIAssistant.resolve(command, snapshot: snapshot, userRequest: userRequest) {
+        case .answer(let answer):
+            messages.append(Message(role: .assistant, text: answer.text, references: answer.references, query: answer.query))
+            activeReferences = answer.references
+        case .edit(let validated), .workbookOperations(let validated):
+            do {
+                // The status bar carries the generic "applied N" result; the
+                // chat keeps only the AI's description of what it did.
+                _ = try apply(validated)
+                let references = ExcelAIAssistant.appliedReferences(command, plan: validated, snapshot: snapshot)
+                messages.append(Message(role: .assistant, text: command.assistantMessage, references: references))
+                activeReferences = references
+            } catch {
+                appendNotice(error.localizedDescription)
             }
-            let text = try ExcelAIReferences.answerText(command: command, snapshot: snapshot, userRequest: userRequest)
-            let references = ExcelAIReferences.resolve(command: command, snapshot: snapshot, userRequest: userRequest)
-            let query = command.query.flatMap { $0.operation == .none ? nil : $0 }
-            let countQuery = ExcelAIReferences.countGroup(
-                command: command,
-                snapshot: snapshot,
-                userRequest: userRequest
-            ).map { group in
-                var query = ExcelAIReadQuery(
-                    operation: .count,
-                    regionID: group.regionID,
-                    match: .all,
-                    filters: [.init(
-                        column: group.column,
-                        comparison: .equals,
-                        valueType: .text,
-                        value: group.value
-                    )],
-                    selectColumns: []
-                )
-                if let result = try? ExcelAIReadQueryExecutor.execute(
-                    query,
-                    snapshot: snapshot
-                ) {
-                    query.resultScope = .init(
-                        revision: snapshot.revision,
-                        rows: result.scopeRows ?? result.rows
-                    )
-                }
-                return query
-            }
-            messages.append(
-                Message(
-                    role: .assistant,
-                    text: text,
-                    references: references,
-                    query: query ?? countQuery
-                )
-            )
-            activeReferences = references
-            return
-        }
-
-        do {
-            // The status bar carries the generic "applied N" result; the
-            // chat keeps only the AI's description of what it did.
-            _ = try apply(validated)
-            let references = ExcelAIReferences.resolve(
-                command: command, snapshot: snapshot, appliedPlan: validated
-            )
-            messages.append(
-                Message(
-                    role: .assistant,
-                    text: command.assistantMessage,
-                    references: references
-                )
-            )
-            activeReferences = references
-        } catch {
-            appendNotice(error.localizedDescription)
         }
     }
 

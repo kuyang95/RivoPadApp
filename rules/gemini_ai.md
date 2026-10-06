@@ -13,7 +13,7 @@ iPad 앱은 **로컬 우선**: 텍스트 채팅·문서 Q&A·번역·음성 명�
 | 이미지 설명/질문 | `LLM/GeminiVisionService.swift` · `GeminiVisionService.stream` | `0.2` | `2_048` (`maximumOutputTokens`) | 스트리밍, 이미지는 첫 사용자 턴에만 첨부. 시스템 프롬프트는 호출자(`ChatViewModel`)가 넘김 |
 | Google Search 답변 | `LLM/WebSearchService.swift` · `GeminiGoogleSearchService.generate` | `0.2` | `512` | `tools: [.googleSearch()]`. 질의 검증 `WebSearchQueryValidator` 400자/50단어 |
 | OCR 교정 | `OCRCorrectionService.swift` · `GeminiOCRCorrectionService.generate` | `0.1` | `16_384` | 입력 ≤ `16_000` 자, 이미지 함께 첨부 |
-| Excel AI | `Documents/ExcelAICommandService.swift` | `0` | 일반 계획 `8_192` / 읽기 계획 단독 `2_048` | JSON 스키마 응답 강제 |
+| Excel AI | `Documents/ExcelAICommandService.swift` (호출·토큰·오류). 프롬프트·스키마·모델 설정은 엔진 `ExcelAIAssistant` | `0` | 일반 계획 `8_192` / 읽기 계획 단독 `2_048` | JSON 스키마 응답 강제 |
 | Word/HWP 양식 AI | `Documents/WordAICommandService.swift` | `0.1` | `maximumOutputTokens` 상수 | JSON 스키마 응답 (`intent: answer|clarify|edit`) |
 
 토큰 회계: 각 서비스가 `model.countTokens(contents).totalTokens` 로 입력을 세고 `CloudAITokenBudgetStore.reserve` → `commit(actualTokens: usageMetadata.totalTokenCount)` / `cancel` ([server_endpoints.md](server_endpoints.md)). 일일 한도 `1_000_000`.
@@ -24,7 +24,7 @@ Excel 클라우드 요청은 `ExcelAISourceData`와 `ExcelAIModelWorksheet`로 �
 
 원문 셀은 요청당 1,500개·내용 80,000자 한도이며 여러 시트를 요청하면 시트별로 한도를 나눈다. 행은 일부 셀만 자르지 않고 온전히 포함하거나 제외한다. 대용량 파일에서 이미 찾은 원문 행은 우선 포함하되 전송 순서는 원래 행 순서다. 누락·윈도 읽기는 시트별 `contextWasTruncated`, 실행 가능 행 목록의 축약은 `dataRowsWereTruncated`로 표시한다. 대용량 파일의 검색과 전체 시트 로컬 계산은 유지한다.
 
-`ExcelAICommandService.plan`은 기존 명시적 개수·편집·조건 검색 규칙을 먼저 시도한다. 그 외 클라우드 요청은 하나의 일반 계획 호출로 답변·검색/집계·수정을 결정한다. 원문에 명시된 단일 값 질문은 `query.operation=none`과 `referencedCells`로 답할 수 있다. 조건 검색·집계는 `ExcelAIReadQueryExecutor`가 기기의 전체 데이터로 계산한다. 항목 라벨을 짧은 질문 문법과 맞춰 답하는 별도 요약 조회 규칙은 사용하지 않는다. 직전 결과 후속 질문의 실제 행 범위 검증은 유지한다.
+엔진 `ExcelAIAssistant.prepare`가 기존 명시적 개수·편집·조건 검색 규칙을 먼저 시도한다. 그 외 요청은 `ExcelAICommandService.plan`이 하나의 일반 계획 호출로 보내고, 응답은 `ExcelAIAssistant.plan(fromResponse:for:)`가 해석하며 답변·검색/집계·수정 판정은 `ExcelAIAssistant.resolve`가 한다. 안드로이드도 같은 엔진 함수를 쓴다. 원문에 명시된 단일 값 질문은 `query.operation=none`과 `referencedCells`로 답할 수 있다. 조건 검색·집계는 `ExcelAIReadQueryExecutor`가 기기의 전체 데이터로 계산한다. 항목 라벨을 짧은 질문 문법과 맞춰 답하는 별도 요약 조회 규칙은 사용하지 않는다. 직전 결과 후속 질문의 실제 행 범위 검증은 유지한다.
 
 읽기 응답 스키마의 `metricColumn`·`sort`·`limit`은 사용하지 않을 때 null 또는 생략한다. 계산 열은 1 이상, 제한 개수는 1~100이다. 없는 옵션을 0으로 채우지 않는다. `ExcelAIReadQueryError.invalidQuery`는 검색 계획 검증 오류이며 서버 연결 실패와 구별한다.
 
