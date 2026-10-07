@@ -4,6 +4,24 @@ import XCTest
 @testable import shortcuts_example
 
 final class HWPFormFieldTests: XCTestCase {
+    private var previousLanguage: String?
+
+    // The expected labels and messages are the engine's Korean source text.
+    override func setUp() {
+        super.setUp()
+        previousLanguage = UserDefaults.standard.string(forKey: AppLanguage.preferenceKey)
+        UserDefaults.standard.set(AppLanguage.korean.rawValue, forKey: AppLanguage.preferenceKey)
+    }
+
+    override func tearDown() {
+        if let previousLanguage {
+            UserDefaults.standard.set(previousLanguage, forKey: AppLanguage.preferenceKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: AppLanguage.preferenceKey)
+        }
+        super.tearDown()
+    }
+
     private func fixture() throws -> Data {
         let bundle = Bundle(for: Self.self)
         let url = bundle.url(forResource: "hangul_design_application", withExtension: "hwp")

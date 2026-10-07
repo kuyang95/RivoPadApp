@@ -14,7 +14,7 @@ iPad 앱은 **로컬 우선**: 텍스트 채팅·문서 Q&A·번역·음성 명�
 | Google Search 답변 | `LLM/WebSearchService.swift` · `GeminiGoogleSearchService.generate` | `0.2` | `512` | `tools: [.googleSearch()]`. 질의 검증 `WebSearchQueryValidator` 400자/50단어 |
 | OCR 교정 | `OCRCorrectionService.swift` · `GeminiOCRCorrectionService.generate` | `0.1` | `16_384` | 입력 ≤ `16_000` 자, 이미지 함께 첨부 |
 | Excel AI | `Documents/ExcelAICommandService.swift` (호출·토큰·오류). 프롬프트·스키마·모델 설정은 엔진 `ExcelAIAssistant` | `0` | 일반 계획 `8_192` / 읽기 계획 단독 `2_048` | JSON 스키마 응답 강제 |
-| Word/HWP 양식 AI | `Documents/WordAICommandService.swift` | `0.1` | `maximumOutputTokens` 상수 | JSON 스키마 응답 (`intent: answer|clarify|edit`) |
+| Word/HWP 양식 AI | `Documents/WordAICommandService.swift` (호출·토큰·오류). 프롬프트·스키마·요청 JSON·응답 해석·구역 선택 검증은 엔진 `WordAIAssistant` | `0.1` | `maximumOutputTokens` 상수 | JSON 스키마 응답 (`intent: answer|clarify|edit`) |
 
 토큰 회계: 각 서비스가 `model.countTokens(contents).totalTokens` 로 입력을 세고 `CloudAITokenBudgetStore.reserve` → `commit(actualTokens: usageMetadata.totalTokenCount)` / `cancel` ([server_endpoints.md](server_endpoints.md)). 일일 한도 `1_000_000`.
 
@@ -29,6 +29,8 @@ Excel 클라우드 요청은 `ExcelAISourceData`와 `ExcelAIModelWorksheet`로 �
 읽기 응답 스키마의 `metricColumn`·`sort`·`limit`은 사용하지 않을 때 null 또는 생략한다. 계산 열은 1 이상, 제한 개수는 1~100이다. 없는 옵션을 0으로 채우지 않는다. `ExcelAIReadQueryError.invalidQuery`는 검색 계획 검증 오류이며 서버 연결 실패와 구별한다.
 
 Word/HWP/HWPX는 600블록·80,000자 안이면 카탈로그 검색 후보 생성과 라우팅 호출 없이 문단·표 셀 원문을 보낸다. 선택 문단이 있어도 전송 순서는 원문 순서다. 더 큰 문서는 구역 선택 후 해당 원문 블록을 보내고 생략 여부를 표시한다. `HWPAISource`는 HWP 바이너리/HWPX XML 파서가 읽은 텍스트·빈 셀·표 좌표·행/열 병합 크기·중첩 표 부모·구역 경로를 보존한다. 숫자 좌표는 0기반이다. AI 경로는 `HWPFormFields`의 의미 추정과 `HWPFormAISnapshot`의 라벨/값 재배열·사전 명확화에 의존하지 않는다. 수동 양식 UI 기능은 별도로 유지한다.
+
+HWP/HWPX의 모델 입력은 엔진 `HWPAISource.snapshot`이 만들고, 검증된 수정안은 `HWPAISource.replacements`가 문서 버전을 확인한 뒤 바꿀 문단으로 돌려준다. 안드로이드도 같은 엔진 함수와 프롬프트를 쓴다. 요청 JSON의 `responseLanguage`(앱 언어, 엔진 번역이 없는 언어는 English)로 `assistantMessage`를 쓰게 하고, 바꿀 문단 텍스트는 번역하지 않는다.
 
 지원 편집 종류는 `WordAIDocumentSnapshot.supportedOperations`에 명시한다. HWP/HWPX는 `replaceText`, DOCX는 `replaceText`와 `setStyle`이다. 대상 존재·편집 가능 여부·문서 버전·수정량 검증은 유지한다.
 

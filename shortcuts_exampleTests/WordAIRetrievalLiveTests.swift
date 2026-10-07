@@ -21,6 +21,24 @@ import XCTest
 /// and reviewed without changing the retrieval algorithm during an evaluation.
 @MainActor
 final class WordAIRetrievalLiveTests: XCTestCase {
+    private var previousLanguage: String?
+
+    // The expected answers are Korean phrases, so replies are asked in Korean.
+    override func setUp() {
+        super.setUp()
+        previousLanguage = UserDefaults.standard.string(forKey: AppLanguage.preferenceKey)
+        UserDefaults.standard.set(AppLanguage.korean.rawValue, forKey: AppLanguage.preferenceKey)
+    }
+
+    override func tearDown() {
+        if let previousLanguage {
+            UserDefaults.standard.set(previousLanguage, forKey: AppLanguage.preferenceKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: AppLanguage.preferenceKey)
+        }
+        super.tearDown()
+    }
+
     fileprivate struct EvaluationCase {
         enum ExpectedIntent: String {
             case answer
@@ -161,6 +179,9 @@ final class WordAIRetrievalLiveTests: XCTestCase {
         var outcomePassed = false
 
         do {
+            // Like the app, documents within the direct limits skip routing.
+            let snapshot: WordAIDocumentSnapshot
+            if catalog.requiresRouting {
             let beforeRoute = await CloudAITokenBudgetStore.shared.snapshot()
             let route = try await WordAICommandService.route(
                 userRequest: item.request,
@@ -196,7 +217,7 @@ final class WordAIRetrievalLiveTests: XCTestCase {
                 )
             }
 
-            guard let snapshot = WordAISnapshotBuilder.makeRetrieved(
+            guard let retrieved = WordAISnapshotBuilder.makeRetrieved(
                 documentName: item.documentName,
                 blocks: item.blocks,
                 selectedBlockID: nil,
@@ -204,6 +225,11 @@ final class WordAIRetrievalLiveTests: XCTestCase {
                 retrievalPlan: route
             ) else {
                 throw WordAICommandServiceError.invalidResponse
+            }
+            snapshot = retrieved
+            } else {
+                snapshot = WordAISnapshotBuilder.make(
+                    documentName: item.documentName, blocks: item.blocks, selectedBlockID: nil)
             }
             snapshotBlocks = snapshot.blocks.count
             snapshotCharacters = snapshot.blocks.reduce(0) {

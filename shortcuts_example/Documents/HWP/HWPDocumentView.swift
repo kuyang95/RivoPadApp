@@ -923,57 +923,18 @@ final class HWPDocumentViewModel: ObservableObject {
     ) -> WordAIDocumentSnapshot? {
         commitEditorChange()
         guard isEditableDocument else { return nil }
-        let wordBlocks = wordBlocks
-        guard catalog.queryTerms == WordAIQueryTokenizer.terms(in: userRequest),
-              catalog.revision == WordAISnapshotBuilder.revision(blocks: wordBlocks)
-        else { return nil }
-        var snapshot: WordAIDocumentSnapshot
-        if !catalog.requiresRouting {
-            snapshot = WordAISnapshotBuilder.make(
-                documentName: documentName,
-                blocks: wordBlocks,
-                selectedBlockID: selectedBlockID
-            )
-        } else {
-            guard let retrievalPlan, retrievalPlan.intent == .retrieve,
-                  let retrieved = WordAISnapshotBuilder.makeRetrieved(
-                    documentName: documentName, blocks: wordBlocks,
-                    selectedBlockID: selectedBlockID, catalog: catalog, retrievalPlan: retrievalPlan)
-            else { return nil }
-            snapshot = retrieved
-        }
-        snapshot.supportedOperations = ["replaceText"]
-        return snapshot
+        return HWPAISource.snapshot(
+            documentName: documentName, blocks: blocks, selectedBlockID: selectedBlockID,
+            userRequest: userRequest, catalog: catalog, retrievalPlan: retrievalPlan)
     }
 
     @discardableResult
     func applyAIPlan(_ plan: WordAIValidatedPlan) throws -> String {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
-        guard WordAISnapshotBuilder.revision(blocks: wordBlocks)
-            == plan.sourceRevision else {
-            throw WordAIApplyError.staleProposal
+        let mutations = try HWPAISource.replacements(for: plan, in: blocks).map {
+            Mutation(index: $0.index, oldBlock: blocks[$0.index], newBlock: $0.block)
         }
-        var updated = blocks
-        var mutations: [Mutation] = []
-        for operation in plan.operations {
-            guard operation.kind == .replaceText,
-                  let newText = operation.newText,
-                  let index = updated.firstIndex(where: {
-                      $0.id == operation.blockID
-                  }),
-                  updated[index].isEditable else {
-                throw WordAIApplyError.invalidTarget
-            }
-            let oldBlock = updated[index]
-            let newBlock = HWPTextRunEditing.replacingText(in: oldBlock, with: newText)
-            guard newBlock != oldBlock else { continue }
-            updated[index] = newBlock
-            mutations.append(
-                Mutation(index: index, oldBlock: oldBlock, newBlock: newBlock)
-            )
-        }
-        guard !mutations.isEmpty else { throw WordAIApplyError.noChanges }
         apply(
             MutationGroup(mutations: mutations),
             forward: true,

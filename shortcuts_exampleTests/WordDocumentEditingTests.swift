@@ -343,11 +343,7 @@ final class WordDocumentEditingTests: XCTestCase {
         }
         """
 
-        let decoded = try WordAICommandService.decodeRetrievalResponse(response)
-        let validated = try WordAICommandService.validateRetrievalPlan(
-            decoded,
-            catalog: catalog
-        )
+        let validated = try WordAIAssistant.retrievalPlan(fromResponse: response, catalog: catalog)
         XCTAssertEqual(validated.blockIDs, [candidate.blockID])
 
         let invalid = WordAIRetrievalPlan(
@@ -357,7 +353,7 @@ final class WordDocumentEditingTests: XCTestCase {
             blockIDs: ["invented-block-id"]
         )
         XCTAssertThrowsError(
-            try WordAICommandService.validateRetrievalPlan(
+            try WordAIAssistant.validated(
                 invalid,
                 catalog: catalog
             )
@@ -384,7 +380,7 @@ final class WordDocumentEditingTests: XCTestCase {
             blockIDs: []
         )
         XCTAssertNoThrow(
-            try WordAICommandService.validateRetrievalPlan(
+            try WordAIAssistant.validated(
                 validClarify,
                 catalog: catalog
             )
@@ -397,7 +393,7 @@ final class WordDocumentEditingTests: XCTestCase {
             blockIDs: [candidate.blockID]
         )
         XCTAssertThrowsError(
-            try WordAICommandService.validateRetrievalPlan(
+            try WordAIAssistant.validated(
                 invalidClarify,
                 catalog: catalog
             )
