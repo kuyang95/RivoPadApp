@@ -4,6 +4,24 @@ import XCTest
 @testable import shortcuts_example
 
 final class ExcelAIAggregationTests: XCTestCase {
+    private var previousLanguage: String?
+
+    // Expected answers are the engine's Korean source text.
+    override func setUp() {
+        super.setUp()
+        previousLanguage = UserDefaults.standard.string(forKey: AppLanguage.preferenceKey)
+        UserDefaults.standard.set(AppLanguage.korean.rawValue, forKey: AppLanguage.preferenceKey)
+    }
+
+    override func tearDown() {
+        if let previousLanguage {
+            UserDefaults.standard.set(previousLanguage, forKey: AppLanguage.preferenceKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: AppLanguage.preferenceKey)
+        }
+        super.tearDown()
+    }
+
     private func workbook() throws -> ExcelWorkbook {
         let blank = try ExcelWorkbookDocument.blankWorkbookData(), book = try ExcelWorkbookDocument.load(from: blank)
         var cells: [ExcelCellAddress: ExcelCellEdit] = [:]
