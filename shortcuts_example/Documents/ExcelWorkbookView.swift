@@ -886,30 +886,13 @@ final class ExcelWorkbookViewModel: ObservableObject {
             change = try ExcelSheetPartEditing.settingDropdown(
                 values: rawValues, allowsBlank: allowsBlank, at: addresses, sheetIndex: selectedSheetIndex, in: workbook)
         } catch {
-            switch error {
-            case .tooFewDropdownValues:
-                status = AppLocalization.string("드롭다운 값은 서로 다른 항목을 2개 이상 입력하세요.")
-            case .invalidDropdownCharacters:
-                status = AppLocalization.string("드롭다운 항목에는 쉼표와 큰따옴표를 사용할 수 없습니다.")
-            case .dropdownTooLong:
-                status = AppLocalization.string("드롭다운 항목 전체가 너무 깁니다. 항목 수나 글자 수를 줄여 주세요.")
-            default:
-                break
-            }
+            status = error.localizedDescription
             return false
         }
         apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
         updateValidationWarning(in: workbook.sheets[selectedSheetIndex])
-        status = toCurrentColumn
-            ? AppLocalization.format(
-                "현재 열의 %lld개 데이터 셀에 드롭다운을 설정했습니다.",
-                addresses.count
-            )
-            : AppLocalization.format(
-                "%@ 셀에 드롭다운을 설정했습니다.",
-                canonical.reference
-            )
+        status = ExcelSheetPartMessage.dropdownSet(at: canonical, count: addresses.count, toCurrentColumn: toCurrentColumn)
         return true
     }
 
@@ -927,20 +910,13 @@ final class ExcelWorkbookViewModel: ObservableObject {
             selection: canonical, selectedRange: selectedRange, toCurrentColumn: toCurrentColumn, in: sheet)
         guard let change = ExcelSheetPartEditing.removingDropdown(
             at: addresses, sheetIndex: selectedSheetIndex, in: workbook) else {
-            status = AppLocalization.string(
-                "선택한 범위에 제거할 드롭다운이 없습니다."
-            )
+            status = ExcelSheetPartMessage.noDropdown
             return
         }
         apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
         updateValidationWarning(in: workbook.sheets[selectedSheetIndex])
-        status = toCurrentColumn
-            ? AppLocalization.string("현재 열의 드롭다운을 제거했습니다.")
-            : AppLocalization.format(
-                "%@ 셀의 드롭다운을 제거했습니다.",
-                canonical.reference
-            )
+        status = ExcelSheetPartMessage.dropdownRemoved(at: canonical, toCurrentColumn: toCurrentColumn)
     }
 
     func chooseDropdownValue(_ value: String) {
@@ -965,9 +941,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
         do {
             comparisonValue = try ExcelSheetPartEditing.validatedComparisonValue(rawComparisonValue, for: kind)
         } catch {
-            status = error == .missingComparisonValue
-                ? AppLocalization.string("비교할 값을 입력하세요.")
-                : AppLocalization.string("보다 큼·작음 규칙에는 숫자를 입력하세요.")
+            status = error.localizedDescription
             return false
         }
         guard var workbook,
@@ -979,22 +953,18 @@ final class ExcelWorkbookViewModel: ObservableObject {
         let canonical = sheet.canonicalAddress(for: selectedAddress)
         let addresses = ExcelSheetPartEditing.targetAddresses(
             selection: canonical, selectedRange: selectedRange, toCurrentColumn: toCurrentColumn, in: sheet)
-        guard let change = try? ExcelSheetPartEditing.settingConditionalFormatting(
-            kind: kind, comparisonValue: comparisonValue, highlight: highlight, at: addresses,
-            sheetIndex: selectedSheetIndex, workbook: workbook, registry: registry) else {
+        let change: ExcelDocumentChange
+        do {
+            change = try ExcelSheetPartEditing.settingConditionalFormatting(
+                kind: kind, comparisonValue: comparisonValue, highlight: highlight, at: addresses,
+                sheetIndex: selectedSheetIndex, workbook: workbook, registry: registry)
+        } catch {
+            status = error.localizedDescription
             return false
         }
         apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
-        status = toCurrentColumn
-            ? AppLocalization.format(
-                "현재 열의 %lld개 데이터 셀에 조건부 서식을 설정했습니다.",
-                addresses.count
-            )
-            : AppLocalization.format(
-                "%@ 셀에 조건부 서식을 설정했습니다.",
-                canonical.reference
-            )
+        status = ExcelSheetPartMessage.conditionalFormattingSet(at: canonical, count: addresses.count, toCurrentColumn: toCurrentColumn)
         return true
     }
 
@@ -1012,19 +982,12 @@ final class ExcelWorkbookViewModel: ObservableObject {
             selection: canonical, selectedRange: selectedRange, toCurrentColumn: toCurrentColumn, in: sheet)
         guard let change = ExcelSheetPartEditing.removingConditionalFormatting(
             at: addresses, sheetIndex: selectedSheetIndex, in: workbook) else {
-            status = AppLocalization.string(
-                "선택한 범위에 제거할 기본 조건부 서식이 없습니다."
-            )
+            status = ExcelSheetPartMessage.noConditionalFormatting
             return
         }
         apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
-        status = toCurrentColumn
-            ? AppLocalization.string("현재 열의 기본 조건부 서식을 제거했습니다.")
-            : AppLocalization.format(
-                "%@ 셀의 기본 조건부 서식을 제거했습니다.",
-                canonical.reference
-            )
+        status = ExcelSheetPartMessage.conditionalFormattingRemoved(at: canonical, toCurrentColumn: toCurrentColumn)
     }
 
     @discardableResult
@@ -1047,23 +1010,18 @@ final class ExcelWorkbookViewModel: ObservableObject {
                 hyperlinkTarget: rawTarget, hyperlinkTooltip: rawTooltip, noteText: rawNoteText,
                 noteAuthor: rawAuthor, at: selectedAddress, sheetIndex: selectedSheetIndex, in: workbook
             ) else {
-                status = AppLocalization.string("바뀐 링크나 메모가 없습니다.")
+                status = ExcelSheetPartMessage.annotationsUnchanged
                 return false
             }
             change = edited
         } catch {
-            status = AppLocalization.string(
-                "웹 주소는 http:// 또는 https://로 시작해야 합니다. 이메일·전화 링크와 #시트!셀 내부 링크도 사용할 수 있습니다."
-            )
+            status = error.localizedDescription
             return false
         }
         let address = workbook.sheets[selectedSheetIndex].canonicalAddress(for: selectedAddress)
         apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
-        status = AppLocalization.format(
-            "%@ 셀의 링크·메모를 수정했습니다.",
-            address.reference
-        )
+        status = ExcelSheetPartMessage.annotationsChanged(at: address)
         return true
     }
 

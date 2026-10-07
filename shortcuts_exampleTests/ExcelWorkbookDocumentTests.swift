@@ -6,6 +6,24 @@ import ZIPFoundation
 @testable import shortcuts_example
 
 final class ExcelWorkbookDocumentTests: XCTestCase {
+    private var previousLanguage: String?
+
+    // Expected labels and messages are the engine's Korean source text.
+    override func setUp() {
+        super.setUp()
+        previousLanguage = UserDefaults.standard.string(forKey: AppLanguage.preferenceKey)
+        UserDefaults.standard.set(AppLanguage.korean.rawValue, forKey: AppLanguage.preferenceKey)
+    }
+
+    override func tearDown() {
+        if let previousLanguage {
+            UserDefaults.standard.set(previousLanguage, forKey: AppLanguage.preferenceKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: AppLanguage.preferenceKey)
+        }
+        super.tearDown()
+    }
+
     func testBlankWorkbookCanBeCreatedEditedAndReloaded() throws {
         let source = try ExcelWorkbookDocument.blankWorkbookData()
         let workbook = try ExcelWorkbookDocument.load(from: source)
