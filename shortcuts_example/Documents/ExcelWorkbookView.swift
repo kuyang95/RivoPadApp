@@ -1784,7 +1784,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
 
     var findResults: [ExcelCellAddress] {
         guard let sheet = selectedSheet, !findText.isEmpty else { return [] }
-        return sheet.cells.values.filter { $0.editText.range(of: findText, options: [.caseInsensitive, .diacriticInsensitive]) != nil }.map(\.address).sorted()
+        return ExcelRangeOperations.finding(findText, in: sheet)
     }
 
     func findNext() {
