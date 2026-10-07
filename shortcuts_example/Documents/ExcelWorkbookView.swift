@@ -1567,32 +1567,11 @@ final class ExcelWorkbookViewModel: ObservableObject {
         guard let sheet = selectedSheet else {
             return []
         }
-        return columns.map { column in
-            let address = sheet.canonicalAddress(
-                for: ExcelCellAddress(
-                    row: row,
-                    column: column.column
-                )
-            )
-            let cell = sheet.cell(at: address)
-            let validation = sheet.dataValidations.first {
-                $0.contains(address) && $0.inlineListValues != nil
-            }
-            let presentedValue: String
-            if cell?.formula?.isEmpty == false {
-                presentedValue = cell?.editText ?? ""
-            } else {
-                presentedValue = cell?.displayValue ?? ""
-            }
-            return RowField(
-                id: column.column,
-                column: column.column,
-                title: column.title,
-                value: presentedValue,
-                originalValue: presentedValue,
-                dropdownValues: validation?.inlineListValues ?? [],
-                dropdownAllowsBlank: validation?.allowsBlank ?? true
-            )
+        return ExcelAccessibleRows.fields(row: row, columns: columns, sheet: sheet).map { field in
+            RowField(
+                id: field.column, column: field.column, title: field.title, value: field.value,
+                originalValue: field.value, dropdownValues: field.dropdownValues,
+                dropdownAllowsBlank: field.dropdownAllowsBlank)
         }
     }
 
@@ -1600,44 +1579,8 @@ final class ExcelWorkbookViewModel: ObservableObject {
         guard let sheet = selectedSheet else {
             return []
         }
-        if let region = ExcelAccessibilityAnalyzer.region(
-            containing: selectedAddress,
-            in: sheet
-        ) {
-            return region.columns.map { column in
-                RowField(
-                    id: column.column,
-                    column: column.column,
-                    title: column.title,
-                    value: ""
-                )
-            }
-        }
-        let columns: ClosedRange<Int>
-        let headerRow: Int
-        if let selectedAddress,
-           let table = sheet.table(containing: selectedAddress) {
-            columns = table.range.start.column ... table.range.end.column
-            headerRow = table.range.start.row
-        } else {
-            columns = 1 ... max(min(sheet.maximumColumn, 30), 1)
-            headerRow = firstPopulatedRow(in: sheet)
-        }
-        return columns.map { column in
-            let address = ExcelCellAddress(
-                row: headerRow,
-                column: column
-            )
-            let header = sheet.cell(at: address)?.displayValue
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            return RowField(
-                id: column,
-                column: column,
-                title: header?.isEmpty == false
-                    ? header!
-                    : ExcelCellAddress.columnName(column),
-                value: ""
-            )
+        return ExcelAccessibleRows.appendingFields(near: selectedAddress, sheet: sheet).map {
+            RowField(id: $0.column, column: $0.column, title: $0.title, value: "")
         }
     }
 
@@ -4436,80 +4379,14 @@ private struct ExcelAccessibleRowsView: View {
         dataIndex: Int,
         region: ExcelAccessibleRegion
     ) -> String {
-        var components = [
-            AppLocalization.format(
-                "%lld번째 데이터 행, 원본 %lld행",
-                dataIndex + 1,
-                row
-            )
-        ]
-        let populated = region.columns.compactMap {
-            column -> String? in
-            let value = displayValue(
-                row: row,
-                column: column.column
-            )
-            guard !value.isEmpty else {
-                return nil
-            }
-            let address = ExcelCellAddress(
-                row: row,
-                column: column.column
-            )
-            var metadata = ""
-            if sheet.annotations.hyperlink(at: address) != nil {
-                metadata += AppLocalization.string(", 하이퍼링크 있음")
-            }
-            if let note = sheet.annotations.note(at: address) {
-                metadata += AppLocalization.format(
-                    ", %@의 메모 %@",
-                    note.author,
-                    note.text
-                )
-            }
-            if let formula = sheet.cell(at: address)?.formula,
-               !formula.isEmpty {
-                return AppLocalization.format(
-                    "%@, %@, 수식 %@%@",
-                    column.title,
-                    value,
-                    formula,
-                    metadata
-                )
-            }
-            return AppLocalization.format(
-                "%@, %@%@",
-                column.title,
-                value,
-                metadata
-            )
-        }
-        components.append(contentsOf: populated)
-        let emptyCount = region.columns.count - populated.count
-        if emptyCount > 0 {
-            components.append(
-                AppLocalization.format(
-                    "빈 항목 %lld개",
-                    emptyCount
-                )
-            )
-        }
-        return components.joined(separator: ". ")
+        ExcelAccessibleRows.label(row: row, dataIndex: dataIndex, region: region, sheet: sheet)
     }
 
     private func displayValue(
         row: Int,
         column: Int
     ) -> String {
-        let address = sheet.canonicalAddress(
-            for: ExcelCellAddress(
-                row: row,
-                column: column
-            )
-        )
-        return sheet.cell(at: address)?.displayValue
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            ?? ""
+        ExcelAccessibleRows.displayValue(row: row, column: column, sheet: sheet)
     }
 
     private func formulaRows(
@@ -4541,9 +4418,7 @@ private struct ExcelAccessibleRowsView: View {
     private func displayedRows(
         in region: ExcelAccessibleRegion
     ) -> [Int] {
-        let rows = region.rowNumbers.filter { !sheet.hiddenRows.contains($0) }
-        guard let visibleRows else { return rows }
-        return rows.filter(visibleRows.contains)
+        ExcelAccessibleRows.displayedRows(in: region, sheet: sheet, visibleRows: visibleRows)
     }
 }
 
