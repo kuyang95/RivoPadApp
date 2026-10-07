@@ -95,11 +95,11 @@ struct ExcelDrawingInspector: View {
     }
     private func applyPlacement() {
         guard let current = anchor, let a = ExcelCellAddress(start), let b = ExcelCellAddress(end) else {
-            message = AppLocalization.string("왼쪽 위 셀과 그보다 오른쪽 아래에 있는 경계 셀을 입력해 주세요."); return
+            message = ExcelDrawingMessage.invalidPlacement; return
         }
         if a == normalizedAnchor?.start, b == normalizedAnchor?.end { message = AppLocalization.string("변경할 내용이 없습니다."); return }
         guard a.row < b.row, a.column < b.column else {
-            message = AppLocalization.string("왼쪽 위 셀과 그보다 오른쪽 아래에 있는 경계 셀을 입력해 주세요."); return
+            message = ExcelDrawingMessage.invalidPlacement; return
         }
         report(viewModel.updateDrawingPlacement(selection, expected: current, anchor: .init(start: a, end: b)))
     }

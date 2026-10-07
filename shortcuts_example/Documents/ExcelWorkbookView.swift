@@ -1366,7 +1366,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
         case .changed(let change, _):
             apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &book)
             workbook = book
-            status = AppLocalization.string("개체의 위치와 크기를 바꿨습니다. 실행 취소로 되돌릴 수 있습니다.")
+            status = ExcelDrawingMessage.placed
             return true
         }
     }
