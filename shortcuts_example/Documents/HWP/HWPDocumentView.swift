@@ -2810,21 +2810,12 @@ struct HWPDocumentView: View {
                     .frame(width: 22)
                     .foregroundStyle(VisionCraftUI.primary)
                 VStack(alignment: .leading, spacing: 4) {
-                    if let region = block.region.accessibilityDescription {
-                        Text(region)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(VisionCraftUI.secondaryText)
-                    } else if let table = block.tableLocation {
-                        Text(table.accessibilityDescription)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(VisionCraftUI.secondaryText)
-                    } else if let styleName = block.presentation.styleName,
-                              !styleName.isEmpty {
-                        Text(styleName)
+                    if let label = HWPAccessibleDocument.label(for: block) {
+                        Text(label)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(VisionCraftUI.secondaryText)
                     }
-                    Text(accessibleText(for: block))
+                    Text(HWPAccessibleDocument.displayText(for: block))
                         .foregroundStyle(
                             block.text.isEmpty
                                 ? VisionCraftUI.secondaryText
@@ -2878,28 +2869,6 @@ struct HWPDocumentView: View {
                 ? "두 번 탭하면 이 문단을 선택합니다."
                 : "복합 개체가 포함된 읽기 전용 문단입니다."
         )
-    }
-
-    private func accessibleText(for block: HWPDocumentBlock) -> String {
-        if !block.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return block.text
-        }
-        let labels = block.canvasObjects.compactMap { object -> String? in
-            if let description = object.description,
-               !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                return description
-            }
-            switch object.content {
-            case .image: return AppLocalization.string("그림")
-            case .chart: return AppLocalization.string("차트")
-            case .equation: return AppLocalization.string("수식")
-            case .shape, .group: return AppLocalization.string("도형")
-            case .unsupported(let label): return label
-            }
-        }
-        return labels.isEmpty
-            ? AppLocalization.string("문서 개체")
-            : labels.joined(separator: " · ")
     }
 
     @ViewBuilder
