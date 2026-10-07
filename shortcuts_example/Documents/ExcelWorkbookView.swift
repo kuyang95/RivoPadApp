@@ -510,16 +510,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
 
     var defaultChartSourceReference: String {
         guard let sheet = selectedSheet else { return "A1:B2" }
-        let regions = ExcelAccessibilityAnalyzer.regions(in: sheet)
-        if let selectedAddress,
-           let region = regions.first(where: {
-               $0.contains(selectedAddress)
-           }) {
-            return region.range.reference
-        }
-        return regions.first?.range.reference
-            ?? "A1:\(ExcelCellAddress.columnName(max(sheet.maximumColumn, 2)))"
-                + String(max(sheet.maximumRow, 2))
+        return ExcelPivotEditing.defaultSourceReference(in: sheet, selected: selectedAddress)
     }
 
     var selectedSheetPivotTableCount: Int {
@@ -532,12 +523,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
 
     var defaultPivotDestinationReference: String {
         guard let sheet = selectedSheet else { return "G1" }
-        let source = ExcelCellRange(defaultChartSourceReference)
-        let column = min(
-            max((source?.end.column ?? sheet.maximumColumn) + 2, 1),
-            ExcelWorkbookDocument.maximumExcelColumns
-        )
-        return ExcelCellAddress(row: 1, column: column).reference
+        return ExcelPivotEditing.defaultDestinationReference(in: sheet, source: defaultChartSourceReference)
     }
 
     var canApplyNumberFormatToCurrentColumn: Bool {
@@ -1335,26 +1321,13 @@ final class ExcelWorkbookViewModel: ObservableObject {
                 rowFieldIndex: rowFieldIndex, dataFieldIndex: dataFieldIndex, aggregation: aggregation,
                 refreshOnLoad: refreshOnLoad, sheetIndex: selectedSheetIndex, workbook: workbook, registry: registry)
         } catch {
-            switch error {
-            case .invalidRanges:
-                status = AppLocalization.string("피벗 원본 범위와 결과 시작 셀을 확인해 주세요.")
-            case .invalidFields:
-                status = AppLocalization.string("행 필드와 값 필드는 서로 다른 열로 선택해 주세요.")
-            case .exceedsSheetLimits:
-                status = AppLocalization.string("피벗 결과가 Excel의 최대 행·열 범위를 넘습니다.")
-            case .destinationOccupied:
-                status = AppLocalization.string(
-                    "피벗 결과 범위가 원본 데이터나 기존 셀과 겹칩니다. 다른 시작 셀을 선택해 주세요."
-                )
-            case .invalidName:
-                break
-            }
+            status = error.localizedDescription
             return false
         }
         apply(MutationGroup(change: edit.change), forward: true, registeringUndo: true, workbook: &workbook)
         edit.finish(workbook: &workbook)
         self.workbook = workbook
-        status = AppLocalization.format("%@을(를) 추가했습니다.", edit.name)
+        status = edit.message
         return true
     }
 
@@ -1386,25 +1359,18 @@ final class ExcelWorkbookViewModel: ObservableObject {
                 rowFieldIndex: rowFieldIndex, dataFieldIndex: dataFieldIndex, aggregation: aggregation,
                 refreshOnLoad: refreshOnLoad, sheetIndex: selectedSheetIndex, workbook: workbook, registry: registry
             ) else {
-                status = AppLocalization.string("바뀐 피벗 설정이 없습니다.")
+                status = ExcelPivotEdit.unchangedMessage
                 return false
             }
             edit = updated
         } catch {
-            switch error {
-            case .invalidName:
-                status = AppLocalization.string("피벗 이름은 비어 있지 않고 다른 피벗과 달라야 합니다.")
-            case .invalidRanges:
-                status = AppLocalization.string("피벗 원본 범위와 결과 시작 셀을 확인해 주세요.")
-            case .invalidFields, .exceedsSheetLimits, .destinationOccupied:
-                status = AppLocalization.string("필드 설정 또는 결과 범위를 확인해 주세요.")
-            }
+            status = error.localizedDescription
             return false
         }
         apply(MutationGroup(change: edit.change), forward: true, registeringUndo: true, workbook: &workbook)
         edit.finish(workbook: &workbook)
         self.workbook = workbook
-        status = AppLocalization.format("%@을(를) 수정했습니다.", edit.name)
+        status = edit.message
         return true
     }
 
@@ -1422,7 +1388,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
         }
         apply(MutationGroup(change: edit.change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
-        status = AppLocalization.format("%@을(를) 삭제했습니다.", edit.name)
+        status = edit.message
     }
 
 
