@@ -1033,9 +1033,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
               var workbook,
               workbook.sheets.indices.contains(selectedSheetIndex),
               let prepared = preparedImage(data) else {
-            status = AppLocalization.string(
-                "이미지를 추가하지 못했습니다. PNG 또는 JPEG 사진을 선택해 주세요."
-            )
+            status = ExcelDrawingMessage.imageNotAdded
             return false
         }
         let start = selectedAddress ?? ExcelCellAddress(row: 1, column: 1)
@@ -1045,10 +1043,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
         }
         apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
-        status = AppLocalization.format(
-            "%@ 셀을 시작 위치로 이미지를 추가했습니다.",
-            start.reference
-        )
+        status = ExcelDrawingMessage.imageAdded(at: start)
         return true
     }
 
@@ -1069,20 +1064,18 @@ final class ExcelWorkbookViewModel: ObservableObject {
             preferredContentType: ExcelDrawingEditing.preferredReplacementContentType(
                 id: id, sheetIndex: selectedSheetIndex, in: workbook)
         ) else {
-            status = AppLocalization.string(
-                "이미지를 교체하지 못했습니다. PNG 또는 JPEG 사진을 선택해 주세요."
-            )
+            status = ExcelDrawingMessage.imageNotReplaced
             return false
         }
         let result = ExcelDrawingEditing.replacingImage(id: id, with: prepared, sheetIndex: selectedSheetIndex, in: workbook)
         if case .unchanged = result {
-            status = AppLocalization.string("같은 이미지입니다.")
+            status = ExcelDrawingMessage.sameImage
             return false
         }
         guard case .changed(let change, let name) = result else { return false }
         apply(MutationGroup(change: change), forward: true, registeringUndo: true, workbook: &workbook)
         self.workbook = workbook
-        status = AppLocalization.format("%@을(를) 교체했습니다.", name)
+        status = ExcelDrawingMessage.imageReplaced(name)
         return true
     }
 
@@ -1403,7 +1396,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
         preferredContentType: String? = nil
     ) -> ExcelPreparedImage? {
         guard !data.isEmpty,
-              data.count <= 20 * 1_024 * 1_024,
+              data.count <= ExcelPreparedImage.maximumBytes,
               let image = UIImage(data: data) else {
             return nil
         }
@@ -1419,15 +1412,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
             }
             return ExcelPreparedImage(data: encoded, contentType: "image/png", extensionName: "png")
         }
-        if data.starts(with: [0xFF, 0xD8, 0xFF]) {
-            return ExcelPreparedImage(data: data, contentType: "image/jpeg", extensionName: "jpg")
-        }
-        if data.starts(with: [
-            0x89, 0x50, 0x4E, 0x47,
-            0x0D, 0x0A, 0x1A, 0x0A,
-        ]) {
-            return ExcelPreparedImage(data: data, contentType: "image/png", extensionName: "png")
-        }
+        if let detected = ExcelPreparedImage.detecting(data) { return detected }
         guard let encoded = image.pngData() else {
             return nil
         }
