@@ -759,15 +759,9 @@ final class ExcelWorkbookViewModel: ObservableObject {
             let rows = Array(matchingRows).sorted()
             largeSearchRows = rows
             largeSearchResultIndex = rows.isEmpty ? nil : 0
+            status = ExcelLargeWindow.foundMessage(rows)
             if let first = rows.first {
-                status = AppLocalization.format(
-                    "%lld개 행에서 찾았습니다. 첫 결과는 %lld행입니다.",
-                    rows.count,
-                    first
-                )
                 await jumpToLargeRow(first)
-            } else {
-                status = AppLocalization.string("검색 결과가 없습니다.")
             }
         } catch {
             errorDescription = error.localizedDescription
@@ -2621,12 +2615,9 @@ final class ExcelWorkbookViewModel: ObservableObject {
     private func allLargeRows(
         for summary: ExcelWorksheetPreflight
     ) -> [Int] {
-        Array(
-            Set(summary.populatedRows).union(
-                largeAddedRows[summary.partPath] ?? []
-            )
-        ).sorted()
+        ExcelLargeWindow.rows(summary, added: largeAddedRows[summary.partPath] ?? [])
     }
+
 
     private func loadLargeWindow(
         summary: ExcelWorksheetPreflight,
@@ -2663,11 +2654,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
         )
 
         isLoadingLargeWindow = true
-        status = AppLocalization.format(
-            "%lld행부터 %lld행 구간을 불러오는 중…",
-            visibleRows.first ?? 0,
-            visibleRows.last ?? 0
-        )
+        status = ExcelLargeWindow.loadingMessage(visibleRows)
         let data = sourceData
         let cachedSheet = largeWorkbookCache?.sheet(
             partPath: summary.partPath
@@ -2714,12 +2701,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
                 )
                 syncEditorText(using: loaded)
             }
-            status = AppLocalization.format(
-                "%lld행부터 %lld행까지 표시합니다. 전체 데이터 행은 %lld개입니다.",
-                visibleRows.first ?? 0,
-                visibleRows.last ?? 0,
-                allRows.count
-            )
+            status = ExcelLargeWindow.shownMessage(visibleRows, total: allRows.count)
             requestAccessibilityFocus()
         } catch {
             errorDescription = error.localizedDescription
@@ -2735,33 +2717,10 @@ final class ExcelWorkbookViewModel: ObservableObject {
         to sheet: inout ExcelWorksheet,
         includedRows: Set<Int>
     ) {
-        guard let sheetEdits = edits[sheet.partPath] else {
-            return
-        }
-        for (address, edit) in sheetEdits
-            where includedRows.contains(address.row) {
-            if edit.preservesExistingContent,
-               var existing = sheet.cells[address] {
-                existing.styleIndex = edit.styleIndex
-                existing.displayValue = ExcelValueFormatter.displayValue(
-                    existing.rawValue,
-                    type: existing.cellType,
-                    style: workbook?.style(at: edit.styleIndex) ?? .plain,
-                    uses1904DateSystem:
-                        workbook?.uses1904DateSystem ?? false
-                )
-                sheet.cells[address] = existing
-            } else {
-                sheet.cells[address] = cell(
-                    address: address,
-                    input: edit.input,
-                    styleIndex: edit.styleIndex
-                )
-            }
-            sheet.maximumRow = max(sheet.maximumRow, address.row)
-            sheet.maximumColumn = max(sheet.maximumColumn, address.column)
-        }
+        guard let sheetEdits = edits[sheet.partPath], let workbook else { return }
+        ExcelLargeWindow.reapplying(sheetEdits, to: &sheet, includedRows: includedRows, workbook: workbook)
     }
+
 
     private func lowerBound(
         of value: Int,
@@ -2783,17 +2742,9 @@ final class ExcelWorkbookViewModel: ObservableObject {
     private func searchableText(
         for input: ExcelCellInput
     ) -> String {
-        switch input {
-        case .blank:
-            return ""
-        case .text(let value), .number(let value), .error(let value):
-            return value
-        case .boolean(let value):
-            return value ? "TRUE 참" : "FALSE 거짓"
-        case .formula(let value):
-            return value
-        }
+        ExcelLargeWindow.searchableText(for: input)
     }
+
 
     private func syncEditorText(using sheet: ExcelWorksheet) {
         guard let selectedAddress else {
