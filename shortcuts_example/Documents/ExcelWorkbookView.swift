@@ -2127,90 +2127,15 @@ final class ExcelWorkbookViewModel: ObservableObject {
         let partPath = summary.partPath
         let cachedSheet = largeWorkbookCache?.sheet(partPath: partPath)
         let data = sourceData
-        let terms = ExcelLargeAIQueryTokenizer.terms(in: request)
-        let perTermResultLimit = 501
-
-        let searchResult = try await Task.detached(
-            priority: .userInitiated
-        ) { () -> ([Int: Int], Bool) in
-            var scores = [Int: Int]()
-            var reachedResultLimit = false
-            for term in terms {
-                let rows: [Int]
-                if let cachedSheet {
-                    rows = try cachedSheet.searchRows(
-                        query: term,
-                        maximumResults: perTermResultLimit
-                    )
-                } else {
-                    rows = try ExcelWorkbookDocument.searchRows(
-                        in: data,
-                        sheetPartPath: partPath,
-                        query: term,
-                        maximumResults: perTermResultLimit
-                    )
-                }
-                if rows.count == perTermResultLimit {
-                    reachedResultLimit = true
-                }
-                for row in rows {
-                    scores[row, default: 0] += 1
-                }
-            }
-            return (scores, reachedResultLimit)
+        let sheetEdits = edits[partPath] ?? [:]
+        let windowRows = selectedLargeWindowRows
+        let selectedRow = selectedAddress?.row
+        let search = try await Task.detached(priority: .userInitiated) {
+            try ExcelLargeWindow.aiSearch(
+                request, summary: summary, cache: cachedSheet, source: data, edits: sheetEdits,
+                windowRows: windowRows, selectedRow: selectedRow)
         }.value
-
-        var rowScores = searchResult.0
-        for (address, edit) in edits[partPath] ?? [:] {
-            let text = searchableText(for: edit.input)
-            let score = terms.reduce(into: 0) { result, term in
-                if text.localizedCaseInsensitiveContains(term) {
-                    result += 1
-                }
-            }
-            if score > 0 {
-                rowScores[address.row] = max(
-                    rowScores[address.row] ?? 0,
-                    score
-                )
-            }
-        }
-
-        let relevantColumnCount = max(
-            1,
-            min(summary.maximumColumn, 100)
-        )
-        let maximumRetrievedRows = max(
-            5,
-            min(
-                100,
-                1_000 / relevantColumnCount
-            )
-        )
-        let rankedRows = rowScores.keys.sorted { lhs, rhs in
-            let leftScore = rowScores[lhs] ?? 0
-            let rightScore = rowScores[rhs] ?? 0
-            return leftScore == rightScore
-                ? lhs < rhs
-                : leftScore > rightScore
-        }
-        let retrievedRows = Array(
-            rankedRows.prefix(maximumRetrievedRows)
-        )
-        let fallbackRows = retrievedRows.isEmpty
-            ? selectedLargeWindowRows
-            : []
-        var includedRows = Set(
-            summary.populatedRows.prefix(
-                ExcelWorkbookDocument.largeContextRowCount
-            )
-        )
-        includedRows.formUnion(summary.tableHeaderRows)
-        includedRows.formUnion(retrievedRows)
-        includedRows.formUnion(fallbackRows)
-        if let selectedAddress {
-            includedRows.insert(selectedAddress.row)
-        }
+        let includedRows = search.includedRows
 
         var loaded = try await Task.detached(
             priority: .userInitiated
@@ -2244,11 +2169,10 @@ final class ExcelWorkbookViewModel: ObservableObject {
             selectedAddress: selectedAddress,
             supportsEdits: false,
             searchedWholeSheet: true,
-            searchTerms: terms,
-            searchResultRowCount: rowScores.count,
-            searchResultsWereTruncated: searchResult.1
-                || rankedRows.count > retrievedRows.count,
-            retrievedRows: retrievedRows
+            searchTerms: search.terms,
+            searchResultRowCount: search.resultRowCount,
+            searchResultsWereTruncated: search.wasTruncated,
+            retrievedRows: search.retrievedRows
         )
     }
 
