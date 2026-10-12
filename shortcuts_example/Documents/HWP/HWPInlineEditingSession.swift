@@ -455,7 +455,9 @@ nonisolated struct HWPInlineEditingContext: Sendable {
             guard block.sectionPath == source.sectionPath,
                   block.paragraphIndex == source.paragraphIndex,
                   let first = block.lineLayouts.first,
-                  first.textOrigin.map({ $0.paragraphLength == source.text.utf16.count })
+                  // While live pagination catches up, the drawn block can still
+                  // carry the previous text's lines; only bound the first line.
+                  first.textOrigin.map({ $0.offset <= source.text.utf16.count })
                     ?? (first.startCharacter <= HWPInlineParagraphGeometry.rawLength(source.text)) else { return nil }
         }
         return source
