@@ -241,9 +241,8 @@ struct HomeView: View {
     private var homeCategories: [VisionCraftHomeCategory] {
         [
             VisionCraftHomeCategory(id: "ai", title: "AI 대화", tone: .ai, artName: "HomeTileAIChat", items: chatActions),
-            // Android MainScreen: 카메라 타일은 카메라를 바로 연다. 문서 스캔·실시간 문자 읽기·
-            // 이미지 분석·사진 분석은 카메라의 모드 버튼에서 들어간다.
-            VisionCraftHomeCategory(id: "camera", title: "카메라", tone: .camera, artName: "HomeTileCamera", items: Array(cameraActions.prefix(1))),
+            // 카메라 기능은 홈에서 각각 선택해 들어간다.
+            VisionCraftHomeCategory(id: "camera", title: "카메라", tone: .camera, artName: "HomeTileCamera", items: cameraActions),
             VisionCraftHomeCategory(id: "reading", title: "텍스트 · 문서", tone: .reading, artName: "HomeTileReading", items: readingActions),
             VisionCraftHomeCategory(id: "link", title: "비전링크", tone: .link, artName: "HomeTilePhoneLink", items: connectionActions),
         ]
@@ -423,6 +422,15 @@ struct HomeView: View {
                     "사진 속 내용을 AI가 설명해줍니다.",
                 action: {
                     isImageAnalysisDialogPresented = true
+                }
+            ),
+            VisionCraftActionItem(
+                id: "ask-ai",
+                icon: "bubble.left.and.bubble.right",
+                title: "AI 질문하기",
+                description: "지금 보이는 장면을 찍어 AI에게 음성으로 질문합니다.",
+                action: {
+                    appRouter.route = .cameraAskAI
                 }
             ),
             VisionCraftActionItem(

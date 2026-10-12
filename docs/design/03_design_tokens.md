@@ -43,7 +43,7 @@
 ### 강조색 쓰임
 
 - **주황**: 뭔가를 실행하는 동작. 촬영, `작업`, 분석, 보낸 말풍선, 마이크. `VisionCraftAndroidButtonStyle(emphasized: true)`.
-- **남색 잉크**(글자색을 면으로): 확인·이동 같은 차분한 주 동작. 새 대화 버튼, 카메라 모드 버튼, 다이얼로그 닫기. `VisionCraftAndroidButtonStyle(filled: true)`. 앱 `AccentColor`도 이 색이라 시스템 컨트롤의 tint가 파랑이 아니다.
+- **남색 잉크**(글자색을 면으로): 확인·이동 같은 차분한 주 동작. 새 대화 버튼, 다이얼로그 닫기. `VisionCraftAndroidButtonStyle(filled: true)`. 앱 `AccentColor`도 이 색이라 시스템 컨트롤의 tint가 파랑이 아니다.
 - **파랑**은 UI 면에 쓰지 않는다. 구분 표시에만 쓴다: 카메라 섹션 밑줄(`SectionTone.camera` `#356AA8`/`#9EC5FF`), 비전링크 연결 원·선(`VisionCraftUI.linkBlue`), 카드 다이얼로그 아이콘 색 중 하나.
 - 한 화면에 강한 강조는 하나. 오류·삭제 같은 시스템 상태는 예외(`VisionCraftUI.error`).
 - 라이트 주황 `#C0521B`는 흰 글자 4.7:1, 면(`#FAFAFA`) 위 글자로 4.5:1이 되도록 정한 값이다. 더 밝게 바꾸지 않는다.
@@ -61,7 +61,7 @@ AI 보라 `#7655B4`/`#C6B1F5` · 카메라 파랑 `#356AA8`/`#9EC5FF` · 읽기 
 - 안내 카드: 면 `#FFF9EF`/`#211D18`, 보조글자 `#6F604F`/`#D4C4AF`, 화살표 칩 `#FFE1C9`/`#483326`, 화살표 `#885024`/`#F3C9A4` (`VisionCraftHomeUI.guide*`).
 - 홈 사용법 아이콘: 진한 황금색 `#A67C00`/`#D4A72C` (`VisionCraftHomeUI.guideIcon`). 홈 5번째 방문부터 설정 오른쪽에 표시한다.
 - 타일 그림 뒤 squircle: `#E6E8EA`/`#DBE2EC` (`VisionCraftHomeUI.tileArtBackground`).
-- 카메라 미리보기 위 버튼: 테마를 따르지 않는 고정색(`VisionCraftCameraUI`). 면 `#171717`, 눌림 `#3A3A3A`, 테두리·글자 흰색, 보조글자 `#D6DCE6`, 켬 `#FFA05C` + 글자 `#2B1200`, 모드 버튼 `#283546` + 테두리 `#F0F4FA`, 촬영 눌림 `#D0D0D0`.
+- 카메라 미리보기 위 버튼: 테마를 따르지 않는 고정색(`VisionCraftCameraUI`). 면 `#171717`, 눌림 `#3A3A3A`, 테두리·글자 흰색, 보조글자 `#D6DCE6`, 켬 `#FFA05C` + 글자 `#2B1200`, 촬영 눌림 `#D0D0D0`.
 - 스위치: 켬 트랙 `#34C759`, 끔 트랙 `#B8BDC7` (`VisionCraftHomeUI.switchOn/Off`).
 - 비전링크 HUD·연결 원·노드 색은 `VisionLink/VisionLinkView.swift` 위쪽에 한 번만 정의한다.
 
@@ -73,7 +73,7 @@ AI 보라 `#7655B4`/`#C6B1F5` · 카메라 파랑 `#356AA8`/`#9EC5FF` · 읽기 
 | --- | --- |
 | 24 / Bold | 화면 제목(`VisionCraftScreenTitleRow`), 업데이트 버전 |
 | 22 / SemiBold | 섹션 제목(`VisionCraftHomeSectionHeader`), 다이얼로그 제목 |
-| 18 / SemiBold | 목록 카드 제목, 카메라 모드 버튼 |
+| 18 / SemiBold | 목록 카드 제목 |
 | 18 / Regular | 다이얼로그 줄, 설정 항목 이름, 본문 |
 | 16 / Regular | 목록 카드 설명, 안내 글, 업데이트 항목 |
 | 16 / SemiBold | 버튼 글자, 값 버튼 |
@@ -102,7 +102,6 @@ AI 보라 `#7655B4`/`#C6B1F5` · 카메라 파랑 `#356AA8`/`#9EC5FF` · 읽기 
 | 12 | 값 고르기 다이얼로그 안 줄, 색 견본 |
 | 14 | 버튼(`VisionCraftAndroidButtonStyle`), 안내 띠, 채팅 칩, 값 버튼 |
 | 16 | 패널(`visionCraftSurfaceCard`), 목록 아이콘 칸(Large), 제목 줄 아이콘 버튼, 카메라 조작 버튼 |
-| 20 | 카메라 모드 버튼 |
 | 22 | 목록 카드, 2x2 타일, 말풍선, 업데이트 카드 |
 | 24 | 값 고르기 다이얼로그(`VisionCraftSelectionDialog`), 채팅 입력 영역 위쪽 |
 | 28 | 카드 다이얼로그(`VisionCraftDialogCard`), 채팅 입력칸 |

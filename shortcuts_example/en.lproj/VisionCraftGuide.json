@@ -21,7 +21,7 @@
     "icon": "doc.text.viewfinder",
     "action": "scan",
     "steps": [
-      "For a paper document, open Document scan from Home and capture the whole page in the camera view. With the Categories home layout, open Camera and choose Document scan from Mode at the top left.",
+      "For a paper document, open Document scan from Home and capture the whole page in the camera view. With the Categories home layout, tap the Camera tile and choose Document scan in the dialog.",
       "When text recognition finishes, choose Actions → Open in text viewer.",
       "Adjust text size, line spacing, and colors in Text viewer to read comfortably. You can also listen to the text."
     ],
@@ -35,7 +35,7 @@
     "icon": "camera",
     "action": "camera",
     "steps": [
-      "Open Camera from Home and point it at the object you want to see.",
+      "Open Camera from Home and point it at the object you want to see. With the Categories home layout, tap the Camera tile and choose Camera in the dialog.",
       "Pinch out or use the zoom controls to magnify. If the image is blurry, adjust the distance and hold the iPad steady.",
       "Turn on the torch in dim light and choose a color filter that makes the text easier to see."
     ],
@@ -49,7 +49,7 @@
     "icon": "doc.viewfinder",
     "action": "scan",
     "steps": [
-      "Open Document Scan from Home and fit the whole document in the camera view.",
+      "Open Document Scan from Home and fit the whole document in the camera view. With the Categories home layout, tap the Camera tile and choose Document scan in the dialog.",
       "Hold the iPad steady and it captures on its own. If shake keeps blocking it, it announces and shoots anyway after 8 seconds, and turns the torch on in dim light. Check the edges and orientation in the result.",
       "Recognize a page to read or copy its text. To keep several pages, add pages, review them, and save a PDF."
     ],
@@ -63,7 +63,7 @@
     "icon": "text.viewfinder",
     "action": "liveText",
     "steps": [
-      "Open Live Text Reading from Home.",
+      "Open Live Text Reading from Home. With the Categories home layout, tap the Camera tile and choose Live text reader in the dialog.",
       "Point the camera so that the text is visible and hold the iPad steady for a moment.",
       "Listen to the automatically recognized text. Move the camera slowly to read something else."
     ],
@@ -77,7 +77,7 @@
     "icon": "sparkles",
     "action": "image",
     "steps": [
-      "Open Image analysis from Home and take a picture of the scene.",
+      "Open Image analysis from Home and take a picture of the scene. With the Categories home layout, tap the Camera tile and choose Image analysis in the dialog.",
       "When analysis finishes, read the description or listen to it.",
       "Ask a follow-up question about the same picture. To use a saved photo, attach it to a new chat."
     ],

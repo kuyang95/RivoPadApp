@@ -3,7 +3,7 @@ import SwiftUI
 import PhotosUI
 
 /// 카메라 화면(Android `RVCameraXActivity`)의 SwiftUI 껍데기. 카메라 자체는 `MagnifierViewController`(UIKit)가 그리고,
-/// 왼쪽 위 모드 알약과 뒤로가기는 툴바 한 줄에 둔다(Android `CameraModeButton` 자리).
+/// 왼쪽 위에는 뒤로 가기만 둔다.
 struct MagnifierView: View {
     let mode: MagnifierCameraMode
 
@@ -12,29 +12,24 @@ struct MagnifierView: View {
         RivoScreenRemoteControlCenter
     @EnvironmentObject private var quickMenu: RivoRemoteControlCenter
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var bridge: MagnifierCameraBridge
 
     init(mode: MagnifierCameraMode = .magnifier) {
         self.mode = mode
-        _bridge = StateObject(wrappedValue: MagnifierCameraBridge(mode: mode))
     }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             MagnifierCameraHost(
                 mode: mode,
-                bridge: bridge,
                 remoteControl: remoteControl,
                 quickMenu: quickMenu,
                 appRouter: appRouter,
                 dismiss: { dismiss() }
             )
             .ignoresSafeArea()
-            VisionCraftCameraHeader(
-                modeName: MagnifierViewController.modeName(for: bridge.mode),
-                onBack: { dismiss() },
-                onMode: { bridge.controller?.presentModeDialog() }
-            )
+            VisionCraftBackButton(style: .overlay) { dismiss() }
+                .padding(.leading, 16)
+                .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .toolbar(.hidden, for: .navigationBar)
@@ -43,20 +38,8 @@ struct MagnifierView: View {
 
 }
 
-/// 툴바(SwiftUI)와 카메라 컨트롤러(UIKit) 사이의 다리. 제자리 모드 전환을 알약에 반영한다.
-@MainActor
-final class MagnifierCameraBridge: ObservableObject {
-    @Published var mode: MagnifierCameraMode
-    weak var controller: MagnifierViewController?
-
-    init(mode: MagnifierCameraMode) {
-        self.mode = mode
-    }
-}
-
 private struct MagnifierCameraHost: UIViewControllerRepresentable {
     let mode: MagnifierCameraMode
-    let bridge: MagnifierCameraBridge
     let remoteControl: RivoScreenRemoteControlCenter
     let quickMenu: RivoRemoteControlCenter
     let appRouter: AppRouter
@@ -66,14 +49,10 @@ private struct MagnifierCameraHost: UIViewControllerRepresentable {
         context: Context
     ) -> MagnifierViewController {
         let controller = MagnifierViewController(mode: mode)
-        bridge.controller = controller
         let appRouter = appRouter
         let dismiss = dismiss
         controller.onClose = {
             dismiss()
-        }
-        controller.onModeChanged = { [weak bridge] newMode in
-            bridge?.mode = newMode
         }
         controller.onCameraStateChanged = { [weak quickMenu] isTorchOn, isFrontCamera in
             quickMenu?.noteMagnifierState(
@@ -81,22 +60,7 @@ private struct MagnifierCameraHost: UIViewControllerRepresentable {
                 isFrontCamera: isFrontCamera
             )
         }
-        controller.onOpenCaptureMode = { newMode in
-            switch newMode {
-            case .magnifier: appRouter.route = .magnifier
-            case .imageDescription: appRouter.route = .imageDescriptionCamera
-            case .askAI: appRouter.route = .cameraAskAI
-            case .liveTextReader: break
-            }
-        }
-        // 문서 스캔·실시간 문자 읽기는 자체 카메라 세션을 쓰므로 이 화면을 대신한다(Android `closeCameraActivity`).
-        controller.onOpenDocumentScan = {
-            appRouter.route = .documentScanning
-        }
-        controller.onOpenLiveTextReader = {
-            appRouter.route = .liveTextReader
-        }
-        // 사진 분석은 카메라 위에 얹어 연다. 뒤로 가면 카메라로 돌아온다.
+        // 기본 촬영 결과는 사진 검토 화면으로 이어진다.
         controller.onOpenPhotoReview = {
             appRouter.route = .photoReview
         }
@@ -136,104 +100,9 @@ private struct MagnifierCameraHost: UIViewControllerRepresentable {
     }
 }
 
-/// Android `CameraModeNavigator.showDialog`: 모드 다이얼로그. 머리 아이콘은 카메라 톤,
-/// 각 줄은 아이콘 타일 + 제목 + 설명, 지금 모드에는 "현재" 배지를 달고 다시 누르면 닫기만 한다.
-struct CameraMoreOptionsDialog: View {
-    /// nil means the document scanner is the current camera mode.
-    let currentMode: MagnifierCameraMode?
-    let onBasic: () -> Void
-    let onDocumentScan: () -> Void
-    let onLiveTextReader: () -> Void
-    let onImageAnalysis: () -> Void
-    let onAskAI: () -> Void
-    let onPhotoReview: () -> Void
-    let onDismiss: () -> Void
-
-    var body: some View {
-        VisionCraftDialogCard(
-            title: "모드",
-            cancelTitle: "닫기",
-            tone: .camera,
-            onDismiss: onDismiss
-        ) {
-            VStack(spacing: VisionCraftUI.actionRowSpacing) {
-                modeRow(
-                    index: 0,
-                    title: "기본",
-                    subtitle: "확대, 토치, 색상 필터로 가까운 대상을 봅니다.",
-                    systemImage: "camera",
-                    isCurrent: currentMode == .magnifier,
-                    action: onBasic
-                )
-                modeRow(
-                    index: 1,
-                    title: "문서 스캔",
-                    subtitle: "문서 한 장을 촬영해 텍스트로 이어갑니다.",
-                    systemImage: "doc.viewfinder",
-                    isCurrent: currentMode == nil,
-                    action: onDocumentScan
-                )
-                modeRow(
-                    index: 2,
-                    title: "실시간 문자 읽기",
-                    subtitle: "카메라 앞 글자를 자동으로 읽습니다.",
-                    systemImage: "textformat",
-                    isCurrent: currentMode == .liveTextReader,
-                    action: onLiveTextReader
-                )
-                modeRow(
-                    index: 3,
-                    title: "이미지 분석",
-                    subtitle: "사진 속 내용을 AI가 설명해줍니다.",
-                    systemImage: "sparkles",
-                    isCurrent: currentMode == .imageDescription,
-                    action: onImageAnalysis
-                )
-                modeRow(
-                    index: 4,
-                    title: "AI 질문하기",
-                    subtitle: "지금 보이는 장면을 찍어 AI에게 음성으로 질문합니다.",
-                    systemImage: "bubble.left.and.bubble.right",
-                    isCurrent: currentMode == .askAI,
-                    action: onAskAI
-                )
-                modeRow(
-                    index: 5,
-                    title: "사진 분석",
-                    subtitle: "저장된 사진을 골라 글자 인식, 번역, 설명, AI 대화를 합니다.",
-                    systemImage: "photo.on.rectangle",
-                    isCurrent: false,
-                    action: onPhotoReview
-                )
-            }
-        }
-        .accessibilityAction(.escape, onDismiss)
-    }
-
-    private func modeRow(
-        index: Int,
-        title: String,
-        subtitle: String,
-        systemImage: String,
-        isCurrent: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        VisionCraftDialogOptionRow(
-            title: title,
-            subtitle: subtitle,
-            systemImage: systemImage,
-            isPrimary: isCurrent,
-            badge: isCurrent ? "현재" : nil,
-            showsIconTile: true,
-            accent: VisionCraftHomeUI.logoAccent(index),
-            action: isCurrent ? onDismiss : action
-        )
-    }
-}
-
 /// Android `PhotoReviewActivity`: 사진 한 장을 크게 보여주고 '작업' 버튼으로 후속 작업을 고르는 화면.
 ///
-/// - 홈 '읽기와 문서 > 사진 분석' / 카메라 모드 다이얼로그: 사진 없이 열려 먼저 사진을 고르게 한다.
+/// - 홈 '카메라와 연결 > 사진 분석': 사진 없이 열려 먼저 사진을 고르게 한다.
 /// - 카메라 기본 모드: 촬영해 저장한 사진(`PhotoReviewHandoff`)을 받아 "촬영한 사진"으로 연다.
 /// - 홈 '이미지 분석 > 사진에서'(`startsWithImageDescription`): 사진을 고르면 바로 설명한다(Android `ImageAnalysisActivity`).
 ///

@@ -80,8 +80,6 @@ struct DocumentScanRootView: View {
     @State private var isShowingRecognizedText = false
     @State private var scanDialog: ScanReviewDialog?
     @State private var reviewStatusMessage: String?
-    @State private var showsCameraModes = false
-    @State private var isLeavingForCameraMode = false
     @State private var descriptionText: String?
     @State private var isDescribingImage = false
     @State private var descriptionTask: Task<Void, Never>?
@@ -111,7 +109,7 @@ struct DocumentScanRootView: View {
                     cameraRemoteEvent,
                 command: scannerCommand,
                 isActive:
-                    phase == .camera && !isLeavingForCameraMode,
+                    phase == .camera,
                 automaticCaptureEnabled:
                     settings
                     .documentScanAutomaticCaptureEnabled,
@@ -143,12 +141,10 @@ struct DocumentScanRootView: View {
             }
 
             if phase == .camera {
-                VisionCraftCameraHeader(
-                    modeName: "문서 스캔",
-                    onBack: { dismiss() },
-                    onMode: { showsCameraModes = true }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                VisionCraftBackButton(style: .overlay) { dismiss() }
+                    .padding(.leading, 16)
+                    .padding(.top, 8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
 
             if isPreparingDocument {
@@ -157,18 +153,7 @@ struct DocumentScanRootView: View {
 
             scanDialogOverlay
 
-            if showsCameraModes {
-                CameraMoreOptionsDialog(
-                    currentMode: nil,
-                    onBasic: { openCameraMode(.magnifier) },
-                    onDocumentScan: { showsCameraModes = false },
-                    onLiveTextReader: { openCameraMode(.liveTextReader) },
-                    onImageAnalysis: { openCameraMode(.imageDescriptionCamera) },
-                    onAskAI: { openCameraMode(.cameraAskAI) },
-                    onPhotoReview: { openCameraMode(.photoReview) },
-                    onDismiss: { showsCameraModes = false }
-                )
-            }
+
         }
         .tint(VisionCraftUI.primary)
         .background(Color.black)
@@ -258,25 +243,6 @@ struct DocumentScanRootView: View {
             recognitionTask?.cancel()
             descriptionTask?.cancel()
             TTSManager.shared.stop()
-        }
-        .onAppear {
-            isLeavingForCameraMode = false
-        }
-    }
-
-    /// Android `CameraModeNavigator`: 기본·이미지 분석·AI 질문하기·실시간 문자 읽기는 자체 카메라를 쓰므로
-    /// 이 화면을 닫고 바꾼다. 사진 분석은 카메라가 필요 없으니 이 화면 위에 얹어 연다.
-    private func openCameraMode(_ route: AppRoute) {
-        showsCameraModes = false
-        if case .photoReview = route {
-            appRouter.route = route
-            return
-        }
-        isLeavingForCameraMode = true
-        session.discard()
-        dismiss()
-        DispatchQueue.main.async {
-            appRouter.route = route
         }
     }
 

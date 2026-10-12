@@ -9,7 +9,7 @@ Android 기준: `c6a03f0` (Android `docs/design/` 점검 기준 코드 `0878501`
 3. `02_accessibility_contract.md`: 절대 깨면 안 되는 접근성 기준.
 4. `03_design_tokens.md`: 색, 타이포그래피, 간격, 형태 토큰.
 5. `04_component_specs.md`: 앱에 실제로 쓰이는 공용 컴포넌트 목록과 이름(`VisionCraft*`). 새 화면을 만들기 전에 여기서 쓸 스타일을 고른다.
-6. `05_screen_specs.md`: 홈(목록형/카테고리형), 전체 설정, 채팅, 데이지, 카메라와 모드, 사진 분석, 문서 스캔, 비전링크, 위젯별 화면 구성과 Android와 다른 곳.
+6. `05_screen_specs.md`: 홈(목록형/카테고리형), 전체 설정, 채팅, 데이지, 카메라 개별 기능, 사진 분석, 문서 스캔, 비전링크, 위젯별 화면 구성과 Android와 다른 곳.
 7. `06_ai_redesign_prompt.md`: 다음 AI 작업자에게 그대로 줄 수 있는 작업 프롬프트.
 8. `07_mobbin_reference_picks.md`: Mobbin 레퍼런스 선정.
 

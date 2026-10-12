@@ -925,20 +925,13 @@ final class MagnifierViewController:
     }
 
     var onClose: (() -> Void)?
-    /// 문서 스캔·실시간 문자 읽기: 자체 카메라 세션을 쓰므로 이 화면을 대신한다(Android `closeCameraActivity`).
-    var onOpenDocumentScan: (() -> Void)?
-    var onOpenLiveTextReader: (() -> Void)?
-    /// 사진 분석: 카메라 위에 얹어 연다. 기본 모드 촬영 결과도 `PhotoReviewHandoff` 로 넘겨 같은 화면을 연다.
+    /// 기본 촬영 결과를 `PhotoReviewHandoff`로 넘겨 사진 검토 화면을 연다.
     var onOpenPhotoReview: (() -> Void)?
     /// AI 질문하기 촬영: 찍은 사진을 첨부해 음성 질문 화면으로 넘긴다.
     var onAskAI: ((UIImage) -> Void)?
-    /// 기본·이미지 분석·AI 질문하기 사이를 제자리에서 바꿀 때 툴바의 모드 알약에 알린다.
-    var onModeChanged: ((MagnifierCameraMode) -> Void)?
-    /// 실시간 읽기는 촬영 컨트롤이 없으므로 촬영 모드는 별도 화면으로 연다.
-    var onOpenCaptureMode: ((MagnifierCameraMode) -> Void)?
     var onCameraStateChanged: ((_ isTorchOn: Bool, _ isFrontCamera: Bool) -> Void)?
 
-    private(set) var mode: MagnifierCameraMode
+    let mode: MagnifierCameraMode
     private let session = AVCaptureSession()
     private let videoOutput = AVCaptureVideoDataOutput()
     private let sessionQueue = DispatchQueue(
@@ -1006,8 +999,7 @@ final class MagnifierViewController:
     private static let logTextMaximumCharacters = 2_000
     private var lastRemoteEventID: UInt64 = 0
     private var isCameraScreenVisible = false
-    private var isOpeningCameraTool = false
-    private weak var moreOptionsController: UIViewController?
+    private var isOpeningCaptureResult = false
 
     private let metalDevice = MTLCreateSystemDefaultDevice()
     private lazy var commandQueue = metalDevice?.makeCommandQueue()
@@ -1090,7 +1082,7 @@ final class MagnifierViewController:
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         isCameraScreenVisible = true
-        isOpeningCameraTool = false
+        isOpeningCaptureResult = false
         view.isUserInteractionEnabled = true
         updateTorchUI()
         requestCameraAndStart()
@@ -1503,7 +1495,7 @@ final class MagnifierViewController:
                 authorized = false
             }
 
-            guard isCameraScreenVisible, !isOpeningCameraTool else {
+            guard isCameraScreenVisible, !isOpeningCaptureResult else {
                 return
             }
             guard authorized else {
@@ -1513,7 +1505,7 @@ final class MagnifierViewController:
                     statusLabel.text = message
                     tts.speakFeedback(message)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        guard self.isCameraScreenVisible else { return }
+                        guard self.isCameraScreenVisible, !self.isOpeningCaptureResult else { return }
                         self.onClose?()
                     }
                 } else {
@@ -1761,13 +1753,7 @@ final class MagnifierViewController:
         }
         lastRemoteEventID = eventID
 
-        guard !isOpeningCameraTool else { return }
-        if moreOptionsController != nil {
-            if case .close = action {
-                dismissMoreOptions()
-            }
-            return
-        }
+        guard !isOpeningCaptureResult else { return }
 
         if mode == .liveTextReader {
             switch action {
@@ -2213,83 +2199,12 @@ final class MagnifierViewController:
         horizontalGridLine.backgroundColor = color
     }
 
-    // MARK: - 모드: 기본 / 문서 스캔 / 실시간 문자 읽기 / 이미지 분석 / AI 질문하기 / 사진 분석
-
-    /// 왼쪽 위 모드 알약(SwiftUI 툴바)이 부른다.
-    func presentModeDialog() {
-        moreTapped()
-    }
-
-    @objc private func moreTapped() {
-        guard !isOpeningCameraTool,
-              presentedViewController == nil else { return }
-
-        let dialog = CameraMoreOptionsDialog(
-            currentMode: mode,
-            onBasic: { [weak self] in
-                self?.dismissMoreOptions { [weak self] in
-                    self?.switchMode(to: .magnifier)
-                }
-            },
-            onDocumentScan: { [weak self] in
-                self?.dismissMoreOptions { [weak self] in
-                    guard let self else { return }
-                    self.openCameraTool(self.onOpenDocumentScan)
-                }
-            },
-            onLiveTextReader: { [weak self] in
-                self?.dismissMoreOptions { [weak self] in
-                    guard let self else { return }
-                    self.openCameraTool(self.onOpenLiveTextReader)
-                }
-            },
-            onImageAnalysis: { [weak self] in
-                self?.dismissMoreOptions { [weak self] in
-                    self?.switchMode(to: .imageDescription)
-                }
-            },
-            onAskAI: { [weak self] in
-                self?.dismissMoreOptions { [weak self] in
-                    self?.switchMode(to: .askAI)
-                }
-            },
-            onPhotoReview: { [weak self] in
-                self?.dismissMoreOptions { [weak self] in
-                    // 사진 분석은 카메라가 필요 없으니 이 화면 위에 연다. 뒤로 가면 카메라로 돌아온다.
-                    guard let self, self.isCameraScreenVisible else { return }
-                    self.onOpenPhotoReview?()
-                }
-            },
-            onDismiss: { [weak self] in
-                self?.dismissMoreOptions()
-            }
-        )
-        let controller = UIHostingController(rootView: dialog)
-        controller.view.backgroundColor = .clear
-        controller.view.accessibilityViewIsModal = true
-        controller.modalPresentationStyle = .overFullScreen
-        controller.modalTransitionStyle = .crossDissolve
-        moreOptionsController = controller
-        present(controller, animated: true)
-    }
-
-    private func dismissMoreOptions(completion: (() -> Void)? = nil) {
-        guard let controller = moreOptionsController,
-              !controller.isBeingDismissed else { return }
-        controller.dismiss(animated: true) { [weak self] in
-            self?.moreOptionsController = nil
-            completion?()
-        }
-    }
-
-    /// 문서 스캔·실시간 문자 읽기는 자체 카메라 세션을 쓰므로 이 세션을 내리고 화면을 바꾼다.
-    private func openCameraTool(_ action: (() -> Void)?) {
-        guard let action, isCameraScreenVisible,
-              !isOpeningCameraTool else { return }
-        isOpeningCameraTool = true
+    /// AI 질문 촬영 결과로 넘어가기 전에 카메라 세션을 멈추고 중복 촬영을 막는다.
+    private func openCaptureResult(_ action: @escaping () -> Void) {
+        guard isCameraScreenVisible, !isOpeningCaptureResult else { return }
+        isOpeningCaptureResult = true
         view.isUserInteractionEnabled = false
         setTorch(false)
-        // 다음 화면이 자체 카메라를 시작하기 전에 현재 세션을 해제한다.
         sessionQueue.async { [weak self] in
             self?.session.stopRunning()
             DispatchQueue.main.async { [weak self] in
@@ -2299,28 +2214,11 @@ final class MagnifierViewController:
         }
     }
 
-    /// Android `selectCameraMode`: 모드를 고르는 순간에는 촬영하지 않는다. 세션·줌·토치·격자·색상은 그대로 두고
-    /// 촬영 버튼의 동작만 바꾼 뒤, 바뀐 모드를 화면 중앙 큰 글씨와 음성으로 알린다. 이미 그 모드면 아무것도 하지 않는다.
-    private func switchMode(to newMode: MagnifierCameraMode) {
-        guard newMode != mode, newMode != .liveTextReader else { return }
-        if mode == .liveTextReader {
-            guard let onOpenCaptureMode else { return }
-            openCameraTool { onOpenCaptureMode(newMode) }
-            return
-        }
-        mode = newMode
-        applyModeToShutter()
-        onModeChanged?(newMode)
-        showOverlay(
-            Self.modeName(for: newMode).replacingOccurrences(of: " ", with: "\n"),
-            duration: 0.9
-        )
-        tts.speakFeedback(Self.modeHint(for: newMode))
-    }
+    // MARK: - 진입한 기능의 제목·촬영 동작
 
     static func modeName(for mode: MagnifierCameraMode) -> String {
         switch mode {
-        case .magnifier: return AppLocalization.string("기본")
+        case .magnifier: return AppLocalization.string("카메라")
         case .imageDescription: return AppLocalization.string("이미지 분석")
         case .askAI: return AppLocalization.string("AI 질문하기")
         case .liveTextReader: return AppLocalization.string("실시간 문자 읽기")
@@ -2386,7 +2284,7 @@ final class MagnifierViewController:
     /// Android `captureAndAnalyzeImage`: 카메라에 머문 채 한 장 찍어 이미지 설명을 받는다.
     /// 결과는 클립보드에 복사하고, 음성으로 읽고, 화면 아래 띠로 보여준다. 사진은 저장하지 않는다.
     private func captureAndAnalyzeImage() {
-        guard !isOpeningCameraTool else { return }
+        guard !isOpeningCaptureResult else { return }
         if isAnalyzingImage {
             tts.speakFeedback(AppLocalization.string("이미 이미지를 분석하고 있습니다."))
             return
@@ -2405,7 +2303,7 @@ final class MagnifierViewController:
             defer { self.isAnalyzingImage = false }
             do {
                 let caption = try await CameraImageDescriber.describe(image)
-                guard self.isCameraScreenVisible else { return }
+                guard self.isCameraScreenVisible, !self.isOpeningCaptureResult else { return }
                 guard !caption.isEmpty else {
                     self.handleAnalysisError(AppLocalization.string("사진을 해석하지 못했어요."))
                     return
@@ -2415,7 +2313,7 @@ final class MagnifierViewController:
                 self.tts.speakFeedback(caption)
                 self.showCameraBand(caption, duration: 12)
             } catch {
-                guard self.isCameraScreenVisible else { return }
+                guard self.isCameraScreenVisible, !self.isOpeningCaptureResult else { return }
                 self.handleAnalysisError(CameraImageDescriber.userMessage(for: error))
             }
         }
@@ -2429,7 +2327,7 @@ final class MagnifierViewController:
 
     /// Android `captureAndAskAi`: 한 장 찍어 음성 질문 화면으로 넘긴다. 사진은 갤러리에 저장하지 않는다.
     private func captureForAskAI() {
-        guard !isOpeningCameraTool, let onAskAI else { return }
+        guard !isOpeningCaptureResult, let onAskAI else { return }
         if isAnalyzingImage {
             tts.speakFeedback(AppLocalization.string("이미 이미지를 분석하고 있습니다."))
             return
@@ -2437,7 +2335,7 @@ final class MagnifierViewController:
         guard let image = frameForAnalysis() else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         SoundEffectManager.shared.play(.cameraShot2)
-        openCameraTool { onAskAI(image) }
+        openCaptureResult { onAskAI(image) }
     }
 
     private func saveCurrentFrameToPhotos() {
@@ -2463,7 +2361,7 @@ final class MagnifierViewController:
                 let capture = try MagnifierPhotoCapture(image: image)
                 try await self.photoSaveService.saveToPhotoLibrary(capture)
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                guard self.isCameraScreenVisible, !self.isOpeningCameraTool else { return }
+                guard self.isCameraScreenVisible, !self.isOpeningCaptureResult else { return }
                 PhotoReviewHandoff.pendingCapturedImage = image
                 self.onOpenPhotoReview?()
             } catch {
