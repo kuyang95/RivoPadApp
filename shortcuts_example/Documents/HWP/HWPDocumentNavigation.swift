@@ -154,8 +154,7 @@ final class HWPDocumentNavigation: ObservableObject {
             for block in page.bodyBlocks {
                 let id = HWPInlineParagraphGeometry.sourceID(block.id)
                 guard let source = sources[id] else { continue }
-                let start = block.id == source.id ? 0 : HWPInlineParagraphGeometry.textOffset(in: source.text,
-                    raw: block.lineLayouts.first?.startCharacter ?? 0)
+                let start = block.id == source.id ? 0 : (block.lineLayouts.first?.textOffset(in: source.text) ?? 0)
                 surfaces[id, default: []].append(Surface(page: pageIndex, block: block, start: start))
             }
         }
@@ -194,7 +193,7 @@ struct HWPDocumentSearchContext {
     var pageIndex: Int = -1
     func range(in block: HWPDocumentBlock, line: HWPDocumentLineLayout) -> NSRange? {
         guard matches(block), let result else { return nil }
-        let start = HWPInlineParagraphGeometry.textOffset(in: result.match.sourceText, raw: line.startCharacter)
+        let start = line.textOffset(in: result.match.sourceText)
         let selected = NSIntersectionRange(result.match.range, NSRange(location: start, length: line.text.utf16.count))
         guard selected.length > 0 else { return nil }
         return NSRange(location: selected.location - start, length: selected.length)

@@ -455,7 +455,8 @@ nonisolated struct HWPInlineEditingContext: Sendable {
             guard block.sectionPath == source.sectionPath,
                   block.paragraphIndex == source.paragraphIndex,
                   let first = block.lineLayouts.first,
-                  first.startCharacter <= HWPInlineParagraphGeometry.rawLength(source.text) else { return nil }
+                  first.textOrigin.map({ $0.paragraphLength == source.text.utf16.count })
+                    ?? (first.startCharacter <= HWPInlineParagraphGeometry.rawLength(source.text)) else { return nil }
         }
         return source
     }
@@ -519,7 +520,7 @@ struct HWPInlineParagraphTarget: View {
                                 onSelect: editing.onSelect, onChange: editing.onChange,
                                 onCommit: editing.onCommit, onCommitBlock: editing.onCommitBlock,
                                 onStructure: editing.onStructure, listContext: editing.orderedBlocks,
-                                caretOffset: source.id == block.id ? nil : HWPInlineParagraphGeometry.textOffset(in: source.text, raw: block.lineLayouts.first?.startCharacter ?? 0),
+                                caretOffset: source.id == block.id ? nil : (block.lineLayouts.first?.textOffset(in: source.text) ?? 0),
                                 targetID: block.id, usesFragmentTap: source.id != block.id)
                         }
                         .accessibilityElement()
@@ -533,7 +534,7 @@ struct HWPInlineParagraphTarget: View {
                                 onSelect: editing.onSelect, onChange: editing.onChange,
                                 onCommit: editing.onCommit, onCommitBlock: editing.onCommitBlock,
                                 onStructure: editing.onStructure, listContext: editing.orderedBlocks,
-                                caretOffset: source.id == block.id ? nil : HWPInlineParagraphGeometry.textOffset(in: source.text, raw: block.lineLayouts.first?.startCharacter ?? 0),
+                                caretOffset: source.id == block.id ? nil : (block.lineLayouts.first?.textOffset(in: source.text) ?? 0),
                                 targetID: block.id, usesFragmentTap: source.id != block.id)
                         }
                 }
