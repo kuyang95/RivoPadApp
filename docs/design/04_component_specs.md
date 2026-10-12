@@ -60,6 +60,7 @@
 
 - 구현: `VisionCraftHomeUI.swift` `VisionCraftHomeGuideEntry`. Android와 같음(면 `guideSurface`, 40pt 원형 화살표 칩 `guideArrow`, 화살표 `guideAccent`).
 - 스크린리더: 자식 글자를 한 덩어리로, 힌트 "열기".
+- 홈 1~4번째 방문에 표시한다. 5번째부터 설정 오른쪽의 사용법 아이콘으로 바뀐다.
 
 ## VcTile — 2x2 큰 타일
 
@@ -111,6 +112,7 @@
 
 - 구현: `VisionCraftUI.swift` `VisionCraftIconButton(systemImage:label:tint:statusDot:action:)`
 - 생김새: 52pt 정사각 터치 영역, 모서리 16, 면·테두리 없음, 아이콘 26.
+- 홈 사용법 변형: `questionmark.circle`, `guideIcon` 황금색, 접근성 이름 "사용 설명서 열기". 설정 오른쪽에서 같은 사용법 화면을 연다.
 - 변형 `VcStatusIconButton`: `VisionCraftStatusBanner.swift` `VisionCraftHomeRemoteStatusIcon(eyebrow:title:subtitle:systemImage:accent:action:)` — 같은 크기에 `accent` 색 아이콘과 오른쪽 위 8pt 점. 연결 `success`, 연결 중 `warning`, 끊김 보조글자색. 읽기 "리모컨 연결. <상태>. <설명>".
 
 ---

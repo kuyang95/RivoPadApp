@@ -20,6 +20,7 @@ enum VisionCraftHomeUI {
     static let guideAccent = color(0x885024, 0xF3C9A4)
     static let guideSecondaryText = color(0x6F604F, 0xD4C4AF)
     static let guideArrow = color(0xFFE1C9, 0x483326)
+    static let guideIcon = color(0xA67C00, 0xD4A72C)
     /// Android `VcHomeTileArt`: 회색(Neutral)을 면에 14% 섞은 값, 다크는 회색 다크색을 흰색 쪽으로 50%.
     static let tileArtBackground = color(0xE6E8EA, 0xDBE2EC)
     /// 잉크 버튼 글자 = 배경색(라이트 흰색, 다크 검정). Android `VcHomeSoftButton(ink = true)`.

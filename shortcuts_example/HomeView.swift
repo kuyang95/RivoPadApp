@@ -4,14 +4,18 @@ import UniformTypeIdentifiers
 import PhotosUI
 
 /// 홈. Android `compose/MainScreen.kt`와 같은 구성: 제목 줄(앱 이름·리모컨 상태·전체 설정),
-/// 사용법 안내 카드, 그 아래 목록형(섹션 + 카드 + 설정 + 업데이트 기록) 또는 카테고리형(2x2 타일).
+/// 사용법 안내(5번째 방문부터 설정 오른쪽 아이콘), 그 아래 목록형 또는 카테고리형(2x2 타일).
 /// 항목 목록은 여기에서 한 번만 정의하고 두 구성이 같이 쓴다.
 struct HomeView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var appRouter: AppRouter
     @EnvironmentObject private var rivoRemoteManager: RivoRemoteManager
     @ObservedObject private var settings = AppSettingsStore.shared
     @ObservedObject private var appFonts = AppFontCatalogStore.shared
     @AppStorage(HomeLayoutMode.storageKey) private var homeLayoutModeRaw = HomeLayoutMode.list.rawValue
+    @AppStorage(HomeGuideVisitStore.storageKey) private var homeGuideVisitCount = 0
+    @State private var isHomeVisible = false
+    @State private var hasRecordedCurrentHomeVisit = false
 
     @State private var documentAppearance =
         LocalDocumentAppearanceStore().load()
@@ -156,12 +160,25 @@ struct HomeView: View {
             Text(fileImportError ?? "")
         }
         .onAppear {
+            isHomeVisible = true
+            recordHomeVisitIfNeeded()
             refreshChatHistoryAvailability()
             // 설치 후 이전 화면 상태가 남아 있어도 사용자가 고른 홈 구성을 다시 적용한다.
             if let stored = UserDefaults.standard.string(forKey: HomeLayoutMode.storageKey),
                HomeLayoutMode(rawValue: stored) != nil,
                homeLayoutModeRaw != stored {
                 homeLayoutModeRaw = stored
+            }
+        }
+        .onDisappear {
+            isHomeVisible = false
+            hasRecordedCurrentHomeVisit = false
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background {
+                hasRecordedCurrentHomeVisit = false
+            } else if phase == .active {
+                recordHomeVisitIfNeeded()
             }
         }
         .onChange(of: documentAppearance) { _, value in
@@ -209,6 +226,16 @@ struct HomeView: View {
         HomeLayoutMode(rawValue: homeLayoutModeRaw) ?? .list
     }
 
+    private var showsCompactHomeGuide: Bool {
+        homeGuideVisitCount >= HomeGuideVisitStore.iconVisitThreshold
+    }
+
+    private func recordHomeVisitIfNeeded() {
+        guard isHomeVisible, scenePhase != .background, !hasRecordedCurrentHomeVisit else { return }
+        hasRecordedCurrentHomeVisit = true
+        homeGuideVisitCount = HomeGuideVisitStore.recordVisit()
+    }
+
     // MARK: - 카테고리형
 
     private var homeCategories: [VisionCraftHomeCategory] {
@@ -229,9 +256,11 @@ struct HomeView: View {
         let categories = homeCategories
         return VStack(alignment: .leading, spacing: 0) {
             homeTitleRow
-            sectionSpacer(height: 16)
-            VisionCraftHomeGuideEntry {
-                appRouter.route = .help
+            if !showsCompactHomeGuide {
+                sectionSpacer(height: 16)
+                VisionCraftHomeGuideEntry {
+                    appRouter.route = .help
+                }
             }
             sectionSpacer(height: 20)
             GeometryReader { gridArea in
@@ -272,9 +301,11 @@ struct HomeView: View {
     private var listHomeContent: some View {
         homeTitleRow
 
-        sectionSpacer(height: 16)
-        VisionCraftHomeGuideEntry {
-            appRouter.route = .help
+        if !showsCompactHomeGuide {
+            sectionSpacer(height: 16)
+            VisionCraftHomeGuideEntry {
+                appRouter.route = .help
+            }
         }
 
         sectionSpacer(height: 28)
@@ -507,6 +538,16 @@ struct HomeView: View {
                 appRouter.route = .allSettings
             }
             .accessibilityIdentifier("home.all-settings")
+            if showsCompactHomeGuide {
+                VisionCraftIconButton(
+                    systemImage: "questionmark.circle",
+                    label: "사용 설명서 열기",
+                    tint: VisionCraftHomeUI.guideIcon
+                ) {
+                    appRouter.route = .help
+                }
+                .accessibilityIdentifier("home.user-guide")
+            }
         }
     }
 

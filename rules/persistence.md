@@ -1,6 +1,6 @@
 # 영속 데이터 (UserDefaults / App Group / 파일 / Keychain / Assets)
 
-점검일 2026-10-06 · 기준 코드 `c0b9f54a`
+점검일 2026-10-12 · 기준 코드 `8249fa41`
 
 Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 데이터는 전부 **JSON 파일** 또는 **UserDefaults(Codable 인코딩)**.
 
@@ -21,6 +21,7 @@ Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 �
 | `settings.rivoQuickMenuExpanded.v1` / `settings.rivoQuickMenuColorIndex.v1` | Bool / Int | Rivo 빠른 메뉴 UI |
 | `settings.fontChoice.v1` | 글꼴 key, 기본 `system` | `Settings/AppFontCatalog.swift` · `AppFontCatalogStore.preferenceKey` |
 | `visioncraft.home.layout` | `HomeLayoutMode` raw (`list`/`grid`). 홈이 나타날 때 저장값을 다시 적용한다 | `HomeView.swift` · `HomeLayoutMode.storageKey` (Android `HomeLayoutController` 대응) |
+| `visioncraft.home.guideVisitCount.v1` | Int, 기본 0, 0~5 범위로 저장. 5번째 홈 방문부터 사용법 카드를 설정 오른쪽 아이콘으로 바꾼다 | `HomeGuideVisitStore.swift` · `HomeGuideVisitStore.recordVisit`, `HomeView.swift` · `HomeView.recordHomeVisitIfNeeded`. 홈 최초 표시·화면 복귀·백그라운드 복귀를 세며, 같은 표시 중 화면 갱신·회전·다이얼로그는 세지 않는다 |
 | `display.app.interfaceInverted` / `display.app.orientation` | Bool / `AppDisplayOrientation` raw | `shortcuts_exampleApp.swift` `@AppStorage` |
 | `camera.display.colorIndex.v1` / `camera.display.colorInverted.v1` / `camera.display.threshold.v1` | Int / Bool / 값 | `CameraTools/MagnifierDisplayPreferenceStore.swift` — 돋보기 Android 호환 색상 조합 복원 |
 | `webSearch.enabled.v1` / `webSearch.automaticChat.v1` / `webSearch.removedBraveCredential.v1` | Bool (앞의 두 설정은 기본 true, 저장된 false는 유지) | `LLM/WebSearchConfigurationStore.swift` |

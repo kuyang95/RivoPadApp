@@ -59,6 +59,7 @@ AI 보라 `#7655B4`/`#C6B1F5` · 카메라 파랑 `#356AA8`/`#9EC5FF` · 읽기 
 ### 화면 전용 색
 
 - 안내 카드: 면 `#FFF9EF`/`#211D18`, 보조글자 `#6F604F`/`#D4C4AF`, 화살표 칩 `#FFE1C9`/`#483326`, 화살표 `#885024`/`#F3C9A4` (`VisionCraftHomeUI.guide*`).
+- 홈 사용법 아이콘: 진한 황금색 `#A67C00`/`#D4A72C` (`VisionCraftHomeUI.guideIcon`). 홈 5번째 방문부터 설정 오른쪽에 표시한다.
 - 타일 그림 뒤 squircle: `#E6E8EA`/`#DBE2EC` (`VisionCraftHomeUI.tileArtBackground`).
 - 카메라 미리보기 위 버튼: 테마를 따르지 않는 고정색(`VisionCraftCameraUI`). 면 `#171717`, 눌림 `#3A3A3A`, 테두리·글자 흰색, 보조글자 `#D6DCE6`, 켬 `#FFA05C` + 글자 `#2B1200`, 모드 버튼 `#283546` + 테두리 `#F0F4FA`, 촬영 눌림 `#D0D0D0`.
 - 스위치: 켬 트랙 `#34C759`, 끔 트랙 `#B8BDC7` (`VisionCraftHomeUI.switchOn/Off`).
