@@ -1172,7 +1172,7 @@ final class MagnifierViewController:
     }
 
     /// Android `a_live_text_reader.xml`: 아래 반투명 패널(#80000000)에 제목 "바로 읽기"(22 Bold 흰색)와 상태(16).
-    /// 닫기는 라우트의 뒤로가기 버튼이 담당한다. 모드 알약은 SwiftUI 툴바(왼쪽 위)에 있다.
+    /// 닫기는 왼쪽 위 SwiftUI 툴바의 뒤로가기 버튼이 담당한다.
     private func setupLiveTextReaderUI() {
         liveTextPanel.translatesAutoresizingMaskIntoConstraints = false
         liveTextPanel.backgroundColor = UIColor.black.withAlphaComponent(0.5)
@@ -1347,7 +1347,6 @@ final class MagnifierViewController:
         updateGridColor()
 
         // VoiceOver 읽기 순서(Android traversalIndex): 촬영 → 설정 → 전환 → 라이트 → 격자.
-        // 모드 알약은 툴바에 있어 그보다 먼저 읽힌다.
         view.accessibilityElements = [
             captureButton,
             settingsTile,

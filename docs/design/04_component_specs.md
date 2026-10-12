@@ -162,12 +162,12 @@
 
 ## VcCardDialog — 기능 고르기
 
-- 제목 밑줄 아래에서 본문까지 20pt(`VisionCraftUI.cardDialogHeaderBottomSpacing`). Android `VcHomeCategoryDialog`의 14dp + 6dp와 같다. 카메라 모드·사진 작업·문서 스캔 저장/작업·Excel/HWP 더보기·셀 도구처럼 내부 목록을 따로 감싼 경우도 `VisionCraftUI.actionRowSpacing`(16pt)을 사용한다.
+- 제목 밑줄 아래에서 본문까지 20pt(`VisionCraftUI.cardDialogHeaderBottomSpacing`). Android `VcHomeCategoryDialog`의 14dp + 6dp와 같다. 홈 카메라 기능 선택·사진 작업·문서 스캔 저장/작업·Excel/HWP 더보기·셀 도구처럼 내부 목록을 따로 감싼 경우도 `VisionCraftUI.actionRowSpacing`(16pt)을 사용한다.
 
 - 구현: `VisionCraftDialogs.swift` `VisionCraftDialogCard(title:message:cancelTitle:maxWidth:tone:onDismiss:content:)`, 카테고리용 `VisionCraftHomeCategoryDialog(category:onDismiss:)`
 - 생김새: 모서리 28, 배경색 면 + 1.5pt 테두리, 최대 너비 560, 안쪽 24. 머리는 VcSectionHeader(밑줄 `tone`, 아래 20), 몸통은 VcActionRow 목록(간격 16, 아이콘은 `logoAccent(index)`), 오른쪽 아래 공용 VcDialogClose(위 24). 내용 높이로 화면 중앙에 놓고, 화면보다 길 때만 스크롤한다. 열릴 때 제목을 `screenChanged`로 읽는다. 스크림 탭·escape로 닫힘.
 - 언제: 고르는 대상이 아이콘과 설명이 있는 기능일 때. 값 하나를 고르는 거라면 VcOptionDialog.
-- 쓰는 곳: 카테고리 타일, 이미지 분석(촬영하기/사진에서), 열기(클립보드/이미지/문서), 카메라 모드, 사진·문서 스캔 작업, 채팅 첨부, 엑셀·한글 문서 작업.
+- 쓰는 곳: 카테고리 타일, 이미지 분석(촬영하기/사진에서), 열기(클립보드/이미지/문서), 홈 카메라 기능 선택, 사진·문서 스캔 작업, 채팅 첨부, 엑셀·한글 문서 작업.
 
 ---
 
