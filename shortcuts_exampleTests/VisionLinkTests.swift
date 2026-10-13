@@ -727,3 +727,27 @@ final class VisionLinkSignalingTests: XCTestCase {
         )
     }
 }
+
+final class VisionLinkMediaRecoveryPolicyTests: XCTestCase {
+    func testVideoMustReturnBeforeAnotherLightweightRecovery() {
+        var policy = VisionLinkMediaRecoveryPolicy()
+        XCTAssertEqual(policy.timedOut(canRequestRestart: true), .restartICE)
+        XCTAssertEqual(policy.timedOut(canRequestRestart: true), .reconnect)
+        policy.reset()
+        XCTAssertEqual(policy.timedOut(canRequestRestart: true), .restartICE)
+    }
+    func testBrokenControlChannelRequiresFullRecoveryImmediately() {
+        var policy = VisionLinkMediaRecoveryPolicy()
+        XCTAssertEqual(policy.timedOut(canRequestRestart: false), .reconnect)
+    }
+    func testRestartWaitIsBoundedAndCancelledByAFrame() {
+        var watchdog = VisionLinkMediaWatchdog()
+        watchdog.waitForFirstFrame(at: 5, timeout: 12)
+        XCTAssertNil(watchdog.consumeTimeout(at: 16.999))
+        XCTAssertEqual(watchdog.consumeTimeout(at: 17), .firstFrame)
+        watchdog.waitForFirstFrame(at: 20, timeout: 12)
+        _ = watchdog.receiveFrame(at: 25)
+        XCTAssertNil(watchdog.consumeTimeout(at: 29.999))
+        XCTAssertEqual(watchdog.consumeTimeout(at: 30), .stalledFrame)
+    }
+}

@@ -137,6 +137,7 @@ nonisolated enum VisionLinkDataEvent:
     Sendable
 {
     case cameraShareChanged(Bool)
+    case cameraZoomChanged(VisionLinkCameraZoom)
     case clipboardReceived(String)
     case transferStarted(VisionLinkTransferProgress)
     case transferProgress(VisionLinkTransferProgress)
@@ -386,6 +387,9 @@ actor VisionLinkDataReceiver {
             return cancelTransfer(message)
         case "clipboard-text":
             return receiveClipboard(message)
+        case "camera-zoom-state":
+            guard let zoom = VisionLinkCameraZoom(message: message) else { return [] }
+            return [.event(.cameraZoomChanged(zoom))]
         case "camera-share-state":
             guard let active =
                     message["active"] as? Bool else {

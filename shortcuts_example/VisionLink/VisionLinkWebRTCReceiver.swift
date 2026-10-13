@@ -16,6 +16,11 @@ nonisolated enum VisionLinkMediaConnectionState:
 protocol VisionLinkWebRTCReceiverDelegate: AnyObject {
     func webRTCReceiver(
         _ receiver: VisionLinkWebRTCReceiver,
+        didMeasureVideoQuality quality: VisionLinkVideoQuality?
+    )
+
+    func webRTCReceiver(
+        _ receiver: VisionLinkWebRTCReceiver,
         didCreateAnswer sdp: String
     )
 
@@ -67,6 +72,7 @@ protocol VisionLinkWebRTCReceiverDelegate: AnyObject {
         _ receiver: VisionLinkWebRTCReceiver,
         didFail message: String
     )
+    func webRTCReceiver(_ receiver: VisionLinkWebRTCReceiver, compatibilityFailed message: String)
 }
 
 @MainActor
@@ -80,8 +86,18 @@ final class VisionLinkWebRTCReceiver: NSObject {
     private let factory: RTCPeerConnectionFactory
     private var peerConnection: RTCPeerConnection?
     private var negotiationTask: Task<Void, Never>?
+    private var videoStatisticsTask: Task<Void, Never>?
+    private var videoStatisticsGeneration = 0
+    private var videoQualityMeter = VisionLinkVideoQualityMeter()
+
     private var pendingRemoteCandidates: [RTCIceCandidate] = []
     private weak var remoteVideoTrack: RTCVideoTrack?
+    private var compatibility: VisionLinkCompatibility?
+    private(set) var compatibilityFailed = false
+    private var compatibilityReady = false
+    private var acceptedHelloID: String?
+    private var compatibilityDeadline: Task<Void, Never>?
+    private var pendingCompatibleVideoTrack: RTCVideoTrack?
     private var dataChannel: RTCDataChannel?
     private var dataChannelBridge:
         VisionLinkDataChannelBridge?
@@ -178,6 +194,7 @@ final class VisionLinkWebRTCReceiver: NSObject {
         iceServers: [VisionLinkIceServer],
         relayPolicy: String
     ) {
+        guard !compatibilityFailed else { return }
         do {
             if peerConnection == nil {
                 try prepare(
@@ -222,6 +239,7 @@ final class VisionLinkWebRTCReceiver: NSObject {
             } catch is CancellationError {
                 return
             } catch {
+                guard !Task.isCancelled, self.peerConnection === peerConnection else { return }
                 self.fail(
                     AppLocalization.format(
                         "VisionLink 연결 협상 실패: %@",
@@ -247,6 +265,7 @@ final class VisionLinkWebRTCReceiver: NSObject {
         )
         guard let peerConnection,
               peerConnection.remoteDescription != nil else {
+            if pendingRemoteCandidates.count >= 256 { pendingRemoteCandidates.removeFirst() }
             pendingRemoteCandidates.append(
                 webRTCCandidate
             )
@@ -259,6 +278,7 @@ final class VisionLinkWebRTCReceiver: NSObject {
     }
 
     func close() {
+        setVideoStatisticsActive(false)
         negotiationTask?.cancel()
         negotiationTask = nil
         closeDataChannel()
@@ -273,6 +293,58 @@ final class VisionLinkWebRTCReceiver: NSObject {
         peerConnection?.delegate = nil
         peerConnection?.close()
         peerConnection = nil
+    }
+
+    func setVideoStatisticsActive(_ active: Bool) {
+        if active && videoStatisticsTask != nil { return }
+        videoStatisticsTask?.cancel()
+        videoStatisticsTask = nil
+        videoStatisticsGeneration &+= 1
+        videoQualityMeter = VisionLinkVideoQualityMeter()
+        delegate?.webRTCReceiver(self, didMeasureVideoQuality: nil)
+        guard active, let peerConnection else { return }
+        let generation = videoStatisticsGeneration
+        videoStatisticsTask = Task { [weak self, weak peerConnection] in
+            while !Task.isCancelled {
+                guard let self, let peerConnection else { return }
+                let report = await withCheckedContinuation { continuation in
+                    peerConnection.statistics { report in
+                        continuation.resume(returning: report)
+                    }
+                }
+                guard !Task.isCancelled,
+                      self.peerConnection === peerConnection,
+                      self.videoStatisticsGeneration == generation else { return }
+                self.reportVideoQuality(report)
+                do {
+                    try await Task.sleep(for: .seconds(2))
+                } catch { return }
+            }
+        }
+    }
+
+    private func reportVideoQuality(_ report: RTCStatisticsReport) {
+        guard let stats = report.statistics.values.first(where: {
+            $0.type == "inbound-rtp" &&
+                (($0.values["kind"] as? String) == "video" ||
+                 ($0.values["mediaType"] as? String) == "video")
+        }) else {
+            delegate?.webRTCReceiver(self, didMeasureVideoQuality: nil)
+            return
+        }
+        func number(_ key: String) -> Double? {
+            let value = (stats.values[key] as? NSNumber)?.doubleValue
+                ?? (stats.values[key] as? String).flatMap(Double.init)
+            return value.flatMap { $0.isFinite ? $0 : nil }
+        }
+        let quality = videoQualityMeter.sample(
+            id: stats.id, timestampUs: stats.timestamp_us,
+            width: Int(number("frameWidth") ?? 0),
+            height: Int(number("frameHeight") ?? 0),
+            bytesReceived: number("bytesReceived"),
+            framesDecoded: number("framesDecoded"), fps: number("framesPerSecond")
+        )
+        delegate?.webRTCReceiver(self, didMeasureVideoQuality: quality)
     }
 
     @discardableResult
@@ -438,6 +510,7 @@ final class VisionLinkWebRTCReceiver: NSObject {
             do {
                 try await peerConnection.add(candidate)
             } catch {
+                guard self.peerConnection === peerConnection else { return }
                 fail(
                     AppLocalization.format(
                         "VisionLink ICE 후보 적용 실패: %@",
@@ -451,8 +524,12 @@ final class VisionLinkWebRTCReceiver: NSObject {
     private func attachVideoTrack(
         _ track: RTCMediaStreamTrack?
     ) {
-        guard let track = track as? RTCVideoTrack,
-              remoteVideoTrack !== track else {
+        guard let track = track as? RTCVideoTrack else { return }
+        guard compatibility?.cameraAvailable == true, !compatibilityFailed else {
+            pendingCompatibleVideoTrack = track
+            return
+        }
+        guard remoteVideoTrack !== track else {
             return
         }
         remoteVideoTrack?.remove(
@@ -460,6 +537,7 @@ final class VisionLinkWebRTCReceiver: NSObject {
         )
         remoteVideoTrack = track
         track.add(liveReadingFrameSampler)
+        setVideoStatisticsActive(true)
         delegate?.webRTCReceiver(
             self,
             didReceive: track
@@ -469,7 +547,9 @@ final class VisionLinkWebRTCReceiver: NSObject {
     private func attachDataChannel(
         _ channel: RTCDataChannel
     ) {
+        let pendingTrack = pendingCompatibleVideoTrack
         closeDataChannel()
+        pendingCompatibleVideoTrack = pendingTrack
 
         let destinationDirectory =
             FileManager.default.urls(
@@ -529,17 +609,17 @@ final class VisionLinkWebRTCReceiver: NSObject {
                 }
                 switch input {
                 case .opened:
-                    self.delegate?.webRTCReceiver(
-                        self,
-                        dataChannelReady: true
-                    )
+                    self.startCompatibilityDeadline(channel)
                 case .closed:
+                    self.compatibilityDeadline?.cancel()
+                    self.compatibility = nil
                     await receiver.close()
                     self.delegate?.webRTCReceiver(
                         self,
                         dataChannelReady: false
                     )
                 case .control, .binary:
+                    guard self.acceptCompatibleInput(input) else { continue }
                     let actions = await receiver
                         .receive(input)
                     guard !Task.isCancelled else {
@@ -553,6 +633,13 @@ final class VisionLinkWebRTCReceiver: NSObject {
     }
 
     private func closeDataChannel() {
+        compatibilityDeadline?.cancel()
+        compatibilityDeadline = nil
+        compatibility = nil
+        compatibilityFailed = false
+        acceptedHelloID = nil
+        compatibilityReady = false
+        pendingCompatibleVideoTrack = nil
         let receiver = dataReceiver
         dataChannel?.delegate = nil
         dataChannel?.close()
@@ -590,7 +677,82 @@ final class VisionLinkWebRTCReceiver: NSObject {
     }
 
     @discardableResult
+    func requestMediaRecovery() -> Bool {
+        guard let data = try? JSONSerialization.data(withJSONObject: ["type": "media-recovery-request"]) else { return false }
+        return sendControl(data)
+    }
+
+    @discardableResult
+    func requestCameraZoom(sessionID: String, value: Double) -> Bool {
+        guard value.isFinite,
+              let data = try? JSONSerialization.data(withJSONObject: [
+                "type": "camera-zoom-request", "sessionId": sessionID, "value": value
+              ]) else { return false }
+        return sendControl(data)
+    }
+
+    private func startCompatibilityDeadline(_ channel: RTCDataChannel) {
+        guard compatibilityDeadline == nil, compatibility == nil, !compatibilityFailed else { return }
+        compatibilityDeadline = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(6)) } catch { return }
+            guard let self, self.dataChannel === channel, channel.readyState == .open, !self.compatibilityReady else { return }
+            self.rejectCompatibility()
+        }
+    }
+
+    private func rejectCompatibility() {
+        guard !compatibilityFailed else { return }
+        compatibilityFailed = true
+        setVideoStatisticsActive(false)
+        remoteVideoTrack?.remove(liveReadingFrameSampler)
+        remoteVideoTrack = nil
+        compatibility = nil
+        compatibilityDeadline?.cancel()
+        pendingCompatibleVideoTrack = nil
+        delegate?.webRTCReceiver(self, compatibilityFailed: AppLocalization.string(VisionLinkCompatibility.updateMessage))
+    }
+
+    private func acceptCompatibleInput(_ input: VisionLinkDataInput) -> Bool {
+        guard !compatibilityFailed else { return false }
+        switch input {
+        case .binary:
+            return compatibility?.common.contains("file.v1") == true
+        case .control(let data):
+            guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  let type = json["type"] as? String else { return false }
+            if type == "visionlink-hello" {
+                guard let requestID = json["requestId"] as? String, !requestID.isEmpty, requestID.count <= 80,
+                      let agreed = VisionLinkCompatibility(message: json),
+                      acceptedHelloID == nil || (acceptedHelloID == requestID && compatibility == agreed) else {
+                    rejectCompatibility(); return false
+                }
+                let first = !compatibilityReady
+                compatibility = agreed
+                acceptedHelloID = requestID
+                if sendControl(VisionLinkCompatibility.hello(requestID: requestID)), first {
+                    compatibilityReady = true
+                    compatibilityDeadline?.cancel()
+                    delegate?.webRTCReceiver(self, dataChannelReady: true)
+                    if let track = pendingCompatibleVideoTrack {
+                        pendingCompatibleVideoTrack = nil
+                        attachVideoTrack(track)
+                    }
+                }
+                return false
+            }
+            guard compatibility?.permits(type) == true else { return false }
+            if type == "file-start", json["feature"] != nil || json["purpose"] as? String == "visioncraft-chat-attachment" {
+                return compatibility?.common.contains("remote-actions.v1") == true
+            }
+            return true
+        default: return false
+        }
+    }
+
     private func sendControl(_ data: Data) -> Bool {
+        guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let type = json["type"] as? String,
+              type == "visionlink-hello" || (!compatibilityFailed && compatibility?.permits(type) == true) else { return false }
         guard let dataChannel,
               dataChannel.readyState == .open else {
             return false
@@ -625,7 +787,8 @@ extension VisionLinkWebRTCReceiver:
     ) {
         let track = stream.videoTracks.first
         Task { @MainActor [weak self] in
-            self?.attachVideoTrack(track)
+            guard let self, self.peerConnection === peerConnection else { return }
+            self.attachVideoTrack(track)
         }
     }
 
@@ -661,7 +824,7 @@ extension VisionLinkWebRTCReceiver:
             return
         }
         Task { @MainActor [weak self] in
-            guard let self else {
+            guard let self, self.peerConnection === peerConnection else {
                 return
             }
             self.delegate?.webRTCReceiver(
@@ -679,7 +842,7 @@ extension VisionLinkWebRTCReceiver:
             return
         }
         Task { @MainActor [weak self] in
-            guard let self else {
+            guard let self, self.peerConnection === peerConnection else {
                 return
             }
             self.delegate?
@@ -698,7 +861,7 @@ extension VisionLinkWebRTCReceiver:
             sdpMLineIndex: Int(candidate.sdpMLineIndex)
         )
         Task { @MainActor [weak self] in
-            guard let self else {
+            guard let self, self.peerConnection === peerConnection else {
                 return
             }
             self.delegate?.webRTCReceiver(
@@ -718,7 +881,8 @@ extension VisionLinkWebRTCReceiver:
         didOpen dataChannel: RTCDataChannel
     ) {
         Task { @MainActor [weak self] in
-            self?.attachDataChannel(dataChannel)
+            guard let self, self.peerConnection === peerConnection else { return }
+            self.attachDataChannel(dataChannel)
         }
     }
 
@@ -729,7 +893,8 @@ extension VisionLinkWebRTCReceiver:
     ) {
         let track = rtpReceiver.track
         Task { @MainActor [weak self] in
-            self?.attachVideoTrack(track)
+            guard let self, self.peerConnection === peerConnection else { return }
+            self.attachVideoTrack(track)
         }
     }
 }

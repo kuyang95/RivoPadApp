@@ -150,6 +150,40 @@ final class VisionLinkManager: ObservableObject {
     @Published private(set) var hasStoredPair = false
     @Published private(set) var remoteVideoTrack:
         RTCVideoTrack?
+    @Published private(set) var cameraZoom: VisionLinkCameraZoom?
+    private var pendingCameraZoom: Double?
+    private var cameraZoomSendTask: Task<Void, Never>?
+    var cameraZoomTarget: Double { pendingCameraZoom ?? cameraZoom?.value ?? 1 }
+
+    func requestCameraZoom(_ value: Double) {
+        guard isCameraShareActive, isDataChannelReady,
+              let zoom = cameraZoom, let value = zoom.clamped(value) else { return }
+        pendingCameraZoom = value
+        guard cameraZoomSendTask == nil else { return }
+        let sessionID = zoom.sessionID
+        cameraZoomSendTask = Task { [weak self] in
+            // Pinch updates share one pending request every 33 ms.
+            try? await Task.sleep(for: .milliseconds(33))
+            guard !Task.isCancelled, let self else { return }
+            self.cameraZoomSendTask = nil
+            guard self.isCameraShareActive, self.isDataChannelReady,
+                  self.cameraZoom?.sessionID == sessionID,
+                  let value = self.pendingCameraZoom else { return }
+            self.pendingCameraZoom = nil
+            self.webRTCReceiver.requestCameraZoom(sessionID: sessionID, value: value)
+        }
+    }
+
+    private func resetCameraZoom() {
+        cameraZoomSendTask?.cancel()
+        cameraZoomSendTask = nil
+        pendingCameraZoom = nil
+        cameraZoom = nil
+    }
+
+    @Published private(set) var videoQuality: VisionLinkVideoQuality?
+    @Published private(set) var isVideoQualityBlocked = false
+    private var videoDisplayGate = VisionLinkVideoDisplayGate()
     @Published private(set) var isDataChannelReady =
         false
     @Published private(set) var isCameraShareActive =
@@ -189,6 +223,9 @@ final class VisionLinkManager: ObservableObject {
 
     private var connectionTask: Task<Void, Never>?
     private var receiveTask: Task<Void, Never>?
+    private var heartbeatTask: Task<Void, Never>?
+    private var mediaRecoveryPolicy = VisionLinkMediaRecoveryPolicy()
+    private var mediaRestartRequested: Bool { mediaRecoveryPolicy.hasRequestedRestart }
     private var countdownTask: Task<Void, Never>?
     private var mediaWatchdogTask:
         Task<Void, Never>?
@@ -287,6 +324,8 @@ final class VisionLinkManager: ObservableObject {
 
     deinit {
         connectionTask?.cancel()
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
         receiveTask?.cancel()
         countdownTask?.cancel()
         mediaWatchdogTask?.cancel()
@@ -619,6 +658,7 @@ final class VisionLinkManager: ObservableObject {
             )
         )
         socket.resume()
+        startSocketHeartbeat(socket, generation: generation)
 
         receiveTask = Task { [weak self, socket] in
             guard let self else {
@@ -628,6 +668,35 @@ final class VisionLinkManager: ObservableObject {
                 from: socket,
                 generation: generation
             )
+        }
+    }
+
+    private func startSocketHeartbeat(_ socket: URLSessionWebSocketTask, generation: Int) {
+        heartbeatTask = Task { [weak self, weak socket] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(25)) } catch { return }
+                guard let self, let socket, self.socketGeneration == generation else { return }
+                guard self.isApplicationActive else { continue }
+                let deadline = Task { @MainActor [weak self] in
+                    do { try await Task.sleep(for: .seconds(12)) } catch { return }
+                    guard let self, self.socketGeneration == generation, self.isApplicationActive else { return }
+                    self.needsConnectionRecovery = true
+                    socket.cancel(with: .goingAway, reason: nil)
+                    self.webSocket = nil
+                    self.scheduleConnectionRecovery(after: 0, reason: "signaling-heartbeat-timeout")
+                }
+                socket.sendPing { error in
+                    deadline.cancel()
+                    if error != nil {
+                        Task { @MainActor [weak self] in
+                            guard let self, self.socketGeneration == generation else { return }
+                            self.needsConnectionRecovery = true
+                            self.webSocket = nil
+                            self.scheduleConnectionRecovery(after: 0, reason: "signaling-heartbeat-failed")
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -806,7 +875,8 @@ final class VisionLinkManager: ObservableObject {
             mediaWatchdog.receiveFrame(
                 at: Self.systemUptime
             )
-        scheduleMediaWatchdog()
+        mediaRecoveryPolicy.reset()
+        if mediaWatchdogTask == nil { scheduleMediaWatchdog() }
         if isFirstFrame
             || connectedActivity == .videoPreparing {
             let isLiveReadingActive =
@@ -921,6 +991,14 @@ final class VisionLinkManager: ObservableObject {
         }
         state = .failed(message)
         appendEvent(message)
+        let canRestart = timeout != .offer && !mediaRestartRequested && webRTCReceiver.requestMediaRecovery()
+        if mediaRecoveryPolicy.timedOut(canRequestRestart: canRestart) == .restartICE {
+            mediaWatchdog.waitForFirstFrame(at: Self.systemUptime, timeout: 12)
+            scheduleMediaWatchdog()
+        } else {
+            needsConnectionRecovery = true
+            scheduleConnectionRecovery(after: 0, reason: "media-\(timeout)")
+        }
     }
 
     private func restartMediaWatchdogForVisibleState() {
@@ -1116,6 +1194,8 @@ final class VisionLinkManager: ObservableObject {
 
     private func cancelSocket(reason: String) {
         socketGeneration &+= 1
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
         receiveTask?.cancel()
         receiveTask = nil
         resetMedia()
@@ -1127,12 +1207,16 @@ final class VisionLinkManager: ObservableObject {
     }
 
     private func resetMedia() {
+        mediaRecoveryPolicy.reset()
         stopMediaWatchdog()
         invalidateRemoteFeatureWork(
             reason: "media-reset"
         )
         webRTCReceiver.close()
         remoteVideoTrack = nil
+        videoQuality = nil
+        resetCameraZoom()
+        resetVideoDisplayGate()
         isDataChannelReady = false
         isCameraShareActive = false
         incomingTransfer = nil
@@ -2001,16 +2085,20 @@ extension VisionLinkManager:
         _ receiver: VisionLinkWebRTCReceiver,
         didChange mediaState: VisionLinkMediaConnectionState
     ) {
+        guard !receiver.compatibilityFailed else { return }
         switch mediaState {
         case .connecting:
-            stopMediaWatchdog()
+            if !mediaRestartRequested { stopMediaWatchdog() }
             updateConnectedActivity {
                 $0.videoPreparing()
             }
             state = .mediaConnecting
         case .connected:
-            needsConnectionRecovery = false
-            cancelConnectionRecovery()
+            if isCameraShareActive { receiver.setVideoStatisticsActive(true) }
+            if webSocket != nil {
+                needsConnectionRecovery = false
+                cancelConnectionRecovery()
+            }
             if state != .videoReceiving {
                 state = isCameraShareActive
                     ? .mediaConnected
@@ -2026,6 +2114,7 @@ extension VisionLinkManager:
                 )
             )
         case .disconnected:
+            receiver.setVideoStatisticsActive(false)
             needsConnectionRecovery = true
             stopMediaWatchdog()
             clearConnectedActivity()
@@ -2040,6 +2129,7 @@ extension VisionLinkManager:
                 reason: "webrtc-disconnected"
             )
         case .failed:
+            receiver.setVideoStatisticsActive(false)
             needsConnectionRecovery = true
             stopMediaWatchdog()
             remoteVideoTrack = nil
@@ -2066,6 +2156,7 @@ extension VisionLinkManager:
         didReceive videoTrack: RTCVideoTrack
     ) {
         remoteVideoTrack = videoTrack
+        resetVideoDisplayGate()
         isCameraShareActive = true
         updateConnectedActivity {
             $0.videoPreparing()
@@ -2076,6 +2167,23 @@ extension VisionLinkManager:
                 "원격 비디오 트랙 수신"
             )
         )
+    }
+
+    private func resetVideoDisplayGate() {
+        videoDisplayGate.reset()
+        isVideoQualityBlocked = false
+    }
+
+    func webRTCReceiver(
+        _ receiver: VisionLinkWebRTCReceiver,
+        didMeasureVideoQuality quality: VisionLinkVideoQuality?
+    ) {
+        videoQuality = isCameraShareActive ? quality : nil
+        if isCameraShareActive, isApplicationActive {
+            isVideoQualityBlocked = videoDisplayGate.observe(quality, at: Self.systemUptime)
+        } else if !isCameraShareActive {
+            resetVideoDisplayGate()
+        }
     }
 
     func webRTCReceiverDidReceiveVideoFrame(
@@ -2110,6 +2218,9 @@ extension VisionLinkManager:
                 reason: "data-channel-closed"
             )
             isCameraShareActive = false
+            resetCameraZoom()
+            resetVideoDisplayGate()
+            receiver.setVideoStatisticsActive(false)
             stopMediaWatchdog()
             incomingTransfer = nil
             clearConnectedActivity()
@@ -2129,8 +2240,17 @@ extension VisionLinkManager:
         didReceive dataEvent: VisionLinkDataEvent
     ) {
         switch dataEvent {
+        case .cameraZoomChanged(let zoom):
+            guard isCameraShareActive, isDataChannelReady else { return }
+            if let current = cameraZoom, current.sessionID == zoom.sessionID,
+               zoom.revision <= current.revision { return }
+            if cameraZoom?.sessionID != zoom.sessionID { resetCameraZoom() }
+            cameraZoom = zoom
         case .cameraShareChanged(let active):
+            if !active { resetCameraZoom() }
+            if active != isCameraShareActive { resetVideoDisplayGate() }
             isCameraShareActive = active
+            receiver.setVideoStatisticsActive(active)
             if active {
                 updateConnectedActivity {
                     $0.videoPreparing()
@@ -2240,6 +2360,20 @@ extension VisionLinkManager:
             dataTransferMessage = message
             appendEvent(message)
         }
+    }
+
+    func webRTCReceiver(_ receiver: VisionLinkWebRTCReceiver, compatibilityFailed message: String) {
+        needsConnectionRecovery = false
+        cancelConnectionRecovery()
+        stopMediaWatchdog()
+        isDataChannelReady = false
+        isCameraShareActive = false
+        remoteVideoTrack = nil
+        clearConnectedActivity()
+        resetCameraZoom()
+        resetVideoDisplayGate()
+        state = .failed(message)
+        appendEvent(message)
     }
 
     func webRTCReceiver(

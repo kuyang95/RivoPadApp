@@ -2690,3 +2690,17 @@
 "글과 문서를 편하게 읽고 편집하세요." = "Read and edit text and documents.";
 
 "스마트폰과 연결해 함께 사용하세요." = "Connect your smartphone to VisionCraft.";
+
+// VisionLink quality and shared camera zoom
+"자동 화질" = "Auto quality";
+"자동 화질 · 영상 측정 중" = "Auto quality · Measuring video";
+"자동 화질 · 영상 일시 멈춤" = "Auto quality · Video paused";
+"영상 품질이 충분하지 않아 표시를 잠시 멈췄습니다.\n연결 상태가 좋아지면 자동으로 다시 표시합니다." = "Video quality is insufficient, so the picture is temporarily hidden.\nIt will return automatically when the connection improves.";
+"카메라 축소" = "Zoom out camera";
+"카메라 확대" = "Zoom in camera";
+"카메라 확대 배율" = "Camera zoom";
+"%.1f배" = "%.1f×";
+"1배 복원" = "Reset 1×";
+"1배로 복원" = "Reset camera to 1×";
+"이 카메라는 확대를 지원하지 않습니다." = "This camera does not support zoom.";
+"확대를 적용하지 못했습니다. 다시 시도해 주세요." = "Could not apply zoom. Please try again.";

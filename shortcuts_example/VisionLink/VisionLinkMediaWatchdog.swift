@@ -118,3 +118,15 @@ nonisolated struct VisionLinkMediaWatchdog:
         }
     }
 }
+
+/// A live frame clears the recovery attempt; an ICE event alone cannot prove video returned.
+nonisolated struct VisionLinkMediaRecoveryPolicy: Equatable, Sendable {
+    enum Action: Equatable, Sendable { case restartICE, reconnect }
+    private(set) var hasRequestedRestart = false
+    mutating func timedOut(canRequestRestart: Bool) -> Action {
+        guard canRequestRestart, !hasRequestedRestart else { return .reconnect }
+        hasRequestedRestart = true
+        return .restartICE
+    }
+    mutating func reset() { hasRequestedRestart = false }
+}

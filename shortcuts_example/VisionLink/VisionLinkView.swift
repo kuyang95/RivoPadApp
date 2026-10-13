@@ -59,6 +59,7 @@ struct VisionLinkView: View {
         AppRouter
     @EnvironmentObject private var manager:
         VisionLinkManager
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion)
     private var reduceMotion
     @Environment(\.colorScheme)
@@ -78,9 +79,28 @@ struct VisionLinkView: View {
         Task<Void, Never>?
     @State private var lastReceived:
         VisionLinkLastReceived?
+    @State private var pinchZoomStart: Double?
     @State private var isOrbPulsing = false
     @State private var isLinkDotTravelling = false
     @State private var isNodeBreathing = false
+
+    private func cameraZoomValue(_ zoom: VisionLinkCameraZoom) -> some View {
+        Text(cameraQualityAndZoomText)
+            .visionCraftAndroidText(16, relativeTo: .body)
+            .monospacedDigit()
+            .accessibilityLabel(AppLocalization.string("카메라 확대 배율"))
+            .accessibilityValue(cameraQualityAndZoomText)
+            .accessibilityIdentifier("visionlink.cameraZoomValue")
+            .accessibilityAdjustableAction { direction in
+                guard zoom.supported else { return }
+                switch direction {
+                case .increment: manager.requestCameraZoom(manager.cameraZoomTarget * 1.1)
+                case .decrement: manager.requestCameraZoom(manager.cameraZoomTarget / 1.1)
+                @unknown default: break
+                }
+            }
+
+    }
 
     var body: some View {
         ZStack {
@@ -94,6 +114,26 @@ struct VisionLinkView: View {
                 }
                 .ignoresSafeArea()
                 .background(Color.black)
+                .accessibilityHidden(manager.isVideoQualityBlocked)
+                .gesture(MagnificationGesture()
+                    .onChanged { scale in
+                        if pinchZoomStart == nil { pinchZoomStart = manager.cameraZoomTarget }
+                        manager.requestCameraZoom((pinchZoomStart ?? 1) * Double(scale))
+                    }
+                    .onEnded { _ in pinchZoomStart = nil })
+                if manager.isVideoQualityBlocked {
+                    Color.black.ignoresSafeArea().allowsHitTesting(false)
+                    Text(AppLocalization.string("영상 품질이 충분하지 않아 표시를 잠시 멈췄습니다.\n연결 상태가 좋아지면 자동으로 다시 표시합니다."))
+                        .visionCraftAndroidText(20, relativeTo: .body)
+                        .foregroundStyle(Color.white)
+                        .multilineTextAlignment(.center)
+                        .padding(32)
+                        .accessibilityIdentifier("visionlink.videoQualityBlocked")
+                        .allowsHitTesting(false)
+                        .onAppear {
+                            UIAccessibility.post(notification: .announcement, argument: AppLocalization.string("영상 품질이 충분하지 않아 표시를 잠시 멈췄습니다.\n연결 상태가 좋아지면 자동으로 다시 표시합니다."))
+                        }
+                }
             } else if isConnected {
                 connectedStage
             } else {
@@ -101,39 +141,65 @@ struct VisionLinkView: View {
             }
 
             VStack(spacing: 0) {
-                HStack(alignment: .top) {
+                HStack(alignment: .center, spacing: 8) {
+                    VisionCraftBackButton(tint: VisionLinkStyle.hudText) { dismiss() }
+                        .background(VisionLinkStyle.hudChipFill, in: Circle())
                     if let chipTitle = statusChipTitle {
                         statusChip(chipTitle)
                     }
                     Spacer()
-                    Button {
-                        isSettingsPresented = true
-                    } label: {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 22))
-                            .foregroundStyle(
-                                VisionLinkStyle.hudText
-                            )
-                            .frame(width: 48, height: 48)
-                            .background(
-                                VisionLinkStyle.hudChipFill,
-                                in: Circle()
-                            )
-                            .overlay {
-                                Circle().strokeBorder(
-                                    VisionLinkStyle.hudOutline,
-                                    lineWidth: 1
+                    if !manager.isCameraShareActive {
+                        Button {
+                            isSettingsPresented = true
+                        } label: {
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 22))
+                                .foregroundStyle(
+                                    VisionLinkStyle.hudText
                                 )
-                            }
-                            .contentShape(Circle())
+                                .frame(width: 48, height: 48)
+                                .background(
+                                    VisionLinkStyle.hudChipFill,
+                                    in: Circle()
+                                )
+                                .overlay {
+                                    Circle().strokeBorder(
+                                        VisionLinkStyle.hudOutline,
+                                        lineWidth: 1
+                                    )
+                                }
+                                .contentShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            "VisionLink 설정"
+                        )
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(
-                        "VisionLink 설정"
-                    )
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
+
+                if manager.isCameraShareActive, isConnected, !cameraQualityAndZoomText.isEmpty {
+                    Group {
+                        if let zoom = manager.cameraZoom {
+                            cameraZoomValue(zoom)
+                        } else {
+                            Text(cameraQualityAndZoomText)
+                        }
+                    }
+                        .visionCraftAndroidText(16, relativeTo: .body)
+                        .foregroundStyle(VisionLinkStyle.hudText)
+                        .padding(12)
+                        .background(VisionLinkStyle.hudCardFill,
+                            in: RoundedRectangle(cornerRadius: 16))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16)
+                                .strokeBorder(VisionLinkStyle.hudOutline, lineWidth: 1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
+                }
 
                 Spacer()
 
@@ -152,11 +218,9 @@ struct VisionLinkView: View {
             reduceMotion ? nil : .easeOut(duration: 0.2),
             value: hudCard
         )
-        // Android `a_vision_link_receiver.xml`: 제목 줄 없는 전체 화면. 뒤로 가기만 남긴다.
-        .visionCraftNavigationScreen()
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .navigationBar)
+        .visionCraftHandlesBackNavigation()
+        .onChange(of: manager.cameraZoom?.sessionID) { _, _ in pinchZoomStart = nil }
         .task {
             manager.activate()
         }
@@ -712,6 +776,17 @@ struct VisionLinkView: View {
     // MARK: - HUD 칩·카드
 
     /// Android `VcLinkChip`: 영상·바로 읽기 중에만 "연결됨 · …".
+    private var cameraQualityAndZoomText: String {
+        var parts: [String] = []
+        if let quality = manager.videoQuality, quality.width > 0, quality.height > 0 {
+            parts.append("\(min(quality.width, quality.height))p")
+        }
+        if let zoom = manager.cameraZoom {
+            parts.append(String(format: "%.1fx", zoom.value))
+        }
+        return parts.joined(separator: " · ")
+    }
+
     private func statusChip(_ title: String) -> some View {
         HStack(spacing: 9) {
             Circle()
@@ -751,8 +826,7 @@ struct VisionLinkView: View {
                 manager.connectedActivity == .liveReading
                 ? AppLocalization.string("바로 읽기 처리 중")
                 : AppLocalization.string("카메라 화면 공유 중")
-            return AppLocalization.string("연결됨")
-                + " · " + activity
+            return activity
         }
         if manager.connectedActivity == .liveReading {
             return AppLocalization.string("연결됨")

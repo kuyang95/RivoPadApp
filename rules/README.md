@@ -23,7 +23,8 @@
 | [dependencies.md](dependencies.md) | CocoaPods + SwiftPM 패키지 버전, 시스템 프레임워크, 번들 ONNX 모델/글꼴, 손패치 Pod, 시뮬레이터 제약 |
 | [persistence.md](persistence.md) | UserDefaults 키(standard/App Group), 파일 저장 경로(Application Support/Caches/App Group), Keychain, 에셋 |
 | [scanner_pipeline.md](scanner_pipeline.md) | 자체 문서 스캐너: LCNet 모서리 검출, 자동 셔터 게이트, PaperEdgeRefiner, 원근/색상 보정, UVDoc 평탄화, ML Kit OCR + Gemini 교정 |
-| [visionlink.md](visionlink.md) | VisionLink 수신기: 페어링 REST/WebSocket, WebRTC 영상·데이터 채널, 원격 기능(이미지 분석·AI 채팅·실시간 읽기), Keychain 자격 증명. **안드로이드 rules 에는 대응 문서 없음** |
+| [visionlink.md](visionlink.md) | VisionLink 수신기: 페어링 REST/WebSocket, WebRTC 영상·데이터 채널, 원격 기능(이미지 분석·AI 채팅·실시간 읽기), Keychain 자격 증명 |
+| [visionlink_compatibility.md](visionlink_compatibility.md) | VisionLink 규격 1, 기능 ID·앱 버전·공통 지원 협상, 기능 추가 절차 |
 
 ## 점검 기록
 
@@ -39,7 +40,8 @@
 | dependencies.md | 2026-10-01 | `babc3875` |
 | persistence.md | 2026-10-12 | `8249fa41` |
 | scanner_pipeline.md | 2026-10-13 | `b1be61d0` + 작업 트리 (스캐너 안내 음성) |
-| visionlink.md | 2026-09-29 | `babc3875` |
+| visionlink.md | 2026-10-13 | `cf9d0863` + 작업 트리 |
+| visionlink_compatibility.md | 2026-10-13 | `cf9d0863` + 작업 트리 |
 
 문서를 코드와 대조해 확인할 때마다 **무조건**:
 

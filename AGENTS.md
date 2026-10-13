@@ -59,3 +59,10 @@
 ## 빌드·테스트
 - 시뮬레이터는 쓸 수 없다(ML Kit Pod가 arm64 시뮬레이터를 제외). 컴파일 확인은 `xcodebuild -workspace shortcuts_example.xcworkspace -scheme shortcuts_example -destination 'generic/platform=iOS' -configuration Debug CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build`, 실행·테스트는 연결된 iPad에서 한다(`rules/dependencies.md` 참조).
 - 새 Swift 파일은 `shortcuts_example/` 아래에 두면 프로젝트에 자동 포함된다(파일 시스템 동기화 그룹).
+
+## VisionLink 기능 호환 관리
+
+- VisionLink 기능·메시지·영상 상한을 변경하기 전에 `rules/visionlink_compatibility.md`와 `rules/visionlink.md`를 읽는다.
+- 모든 기능에 버전이 있는 기능 ID, 요구 protocol, 세 앱별 최초 지원 버전·빌드, 미지원 시 동작과 호환 테스트를 명시한다. 미출시 버전은 출시됐다고 기록하지 않는다.
+- 송신앱·리보탭·리보패드가 협상한 공통 기능만 사용한다. 앱 버전 숫자가 같다는 이유로 기능 지원을 가정하지 않는다. 기능 목록·호환 문서·테스트를 세 앱에 함께 반영한다.
+- 공통 호환 규격 문서는 양쪽 `rules/visionlink_compatibility.md`와 송신앱 `docs/visionlink_compatibility.md`에 유지하고 함께 갱신한다.
