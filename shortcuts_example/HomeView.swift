@@ -952,6 +952,11 @@ struct HomeSettingsPanel: View {
         VisionCraftSettingsGroup(title: "화면 및 글꼴") {
             VisionCraftSettingsGrid {
                 VisionCraftSettingValueTile(
+                    label: "앱 테마",
+                    value: AppLocalization.string(settings.appTheme.title),
+                    action: { selectionDialog = .appTheme }
+                )
+                VisionCraftSettingValueTile(
                     label: "앱 글꼴",
                     value:
                         appFonts.selectedLabel(
@@ -1119,6 +1124,8 @@ struct HomeSettingsDialogs: View {
         for dialog: HomeSelectionDialog
     ) -> String {
         switch dialog {
+        case .appTheme:
+            return settings.appTheme.rawValue
         case .speechRate:
             return settings.speechRate.rawValue
         case .language:
@@ -1141,6 +1148,10 @@ struct HomeSettingsDialogs: View {
         for dialog: HomeSelectionDialog
     ) {
         switch dialog {
+        case .appTheme:
+            if let value = AppThemeMode(rawValue: option.id) {
+                settings.appTheme = value
+            }
         case .speechRate:
             if let value = AppSpeechRate(rawValue: option.id) {
                 settings.speechRate = value
@@ -1362,6 +1373,7 @@ private struct VisionCraftTextSourceDialog: View {
 // MARK: - 값 고르기 목록
 
 enum HomeSelectionDialog: String, Identifiable {
+    case appTheme
     case speechRate
     case language
     case documentFontLevel
@@ -1380,6 +1392,8 @@ enum HomeSelectionDialog: String, Identifiable {
 
     var title: String {
         switch self {
+        case .appTheme:
+            return "앱 테마"
         case .speechRate:
             return "음성 속도"
         case .language:
@@ -1399,6 +1413,10 @@ enum HomeSelectionDialog: String, Identifiable {
 
     var options: [VisionCraftSelectionOption] {
         switch self {
+        case .appTheme:
+            return AppThemeMode.allCases.map {
+                VisionCraftSelectionOption(id: $0.rawValue, title: AppLocalization.string($0.title))
+            }
         case .speechRate:
             return AppSpeechRate.allCases.map {
                 VisionCraftSelectionOption(

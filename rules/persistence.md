@@ -8,6 +8,7 @@ Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 �
 
 | 키 | 타입/기본 | 출처 |
 |---|---|---|
+| `settings.appTheme.v1` | `AppThemeMode` raw (`system`/`light`/`dark`), 기본 `system`. 잘못된 값은 시스템으로 복구하며 설정 초기화 시 `system`으로 저장 | `Settings/AppThemeMode.swift` · `AppThemeMode.preferenceKey`, `AppSettingsStore.appTheme` |
 | `settings.soundEffects.v1` | Bool | `Settings/AppSettingsStore.swift` · `AppSettingsStore.Key` |
 | `settings.voiceFeedback.v1` | Bool | 〃 |
 | `settings.speechRate.v1` | `AppSpeechRate` raw (`slow/normal/fast/veryFast`) | 〃 |

@@ -30,6 +30,33 @@ final class AppSettingsStoreTests:
         super.tearDown()
     }
 
+    func testAppThemePersistsAndReturnsToSystem() {
+        let store = AppSettingsStore(defaults: defaults)
+        XCTAssertEqual(store.appTheme, .system)
+        XCTAssertNil(store.appTheme.colorScheme)
+
+        for mode in [AppThemeMode.light, .dark, .system] {
+            store.appTheme = mode
+            let restored = AppSettingsStore(defaults: defaults)
+            XCTAssertEqual(restored.appTheme, mode)
+        }
+    }
+
+    func testInvalidAppThemeFallsBackToSystem() {
+        defaults.set("unsupported", forKey: AppThemeMode.preferenceKey)
+        let store = AppSettingsStore(defaults: defaults)
+        XCTAssertEqual(store.appTheme, .system)
+        XCTAssertNil(store.appTheme.colorScheme)
+    }
+
+    func testResetClearsSavedAppTheme() {
+        let store = AppSettingsStore(defaults: defaults)
+        store.appTheme = .dark
+        store.resetToDefaults()
+        XCTAssertEqual(store.appTheme, .system)
+        XCTAssertEqual(AppSettingsStore(defaults: defaults).appTheme, .system)
+    }
+
     func testDefaultsMatchVisionCraftPort()
     {
         let store = AppSettingsStore(

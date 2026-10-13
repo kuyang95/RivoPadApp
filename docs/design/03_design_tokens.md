@@ -15,6 +15,12 @@
 | 면 | `.visionCraftHomeSurface(...)`, `.visionCraftSurfaceCard(...)` |
 | 글자 | `.visionCraftAndroidText(size, weight:, relativeTo:)` |
 
+## 앱 테마
+
+- 설정의 화면 및 글꼴 → 앱 테마에서 시스템 설정에 따름·라이트·다크를 고른다. 기본은 시스템 설정에 따름이며, 선택은 저장되고 즉시 적용된다. 시스템 설정에 따름은 기기의 테마 변경을 계속 반영한다.
+- `AppSettingsStore.appTheme`과 `AppThemeMode`, 앱 루트의 `preferredColorScheme`가 앱 전체에 적용한다. 기기 자체의 테마는 바꾸지 않는다.
+- 카메라 미리보기의 고정 색, 텍스트 뷰어의 사용자 색 조합, 도서 읽기의 본문 테마와 위젯 전용 색은 각 화면 규칙을 유지한다.
+
 ## 색
 
 ### 기본 팔레트 (VisionCraftUI / VisionCraftHomeUI)

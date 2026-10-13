@@ -2704,3 +2704,6 @@
 "1배로 복원" = "Reset camera to 1×";
 "이 카메라는 확대를 지원하지 않습니다." = "This camera does not support zoom.";
 "확대를 적용하지 못했습니다. 다시 시도해 주세요." = "Could not apply zoom. Please try again.";
+
+"앱 테마" = "App Theme";
+"다크" = "Dark";

@@ -177,7 +177,7 @@
 - 생김새: 모서리 24, 최대 너비 440. 제목 22 SemiBold(화면이 열릴 때 `screenChanged`로 읽고 요소로는 숨김). 줄은 꽉 찬 너비, 모서리 12, 안쪽 16, 18pt. 현재 값인 줄만 강조색 15% 바탕 + 강조색 글자 + SemiBold. `markSelected`면 오른쪽 ●. 닫기 = 공용 VcDialogClose. 제목 아래 16, 목록과 닫기 버튼 사이 24, 다이얼로그 바깥면까지 좌우·아래 24 여백(Android Material3 1.2.1 `AlertDialog`의 `TitlePadding`·`TextPadding` 기준).
 - 줄을 누르면 호출한 쪽이 적용하고 닫는다(글꼴은 받는 동안 열어 둠). 내용 높이로 화면 중앙에 놓고, 화면보다 긴 목록만 스크롤한다.
 - 줄 변형: `supportingText`(아래 작은 글), `fontName`(글꼴 미리보기), `swatch`(바탕·글자 색 견본, 읽기는 `accessibilityLabel`).
-- 쓰는 곳: 홈·전체 설정(`HomeSettingsDialogs`): 음성 속도·언어·단계·홈 구성·앱 글꼴·색 조합.
+- 쓰는 곳: 홈·전체 설정(`HomeSettingsDialogs`): 음성 속도·언어·단계·앱 테마·홈 구성·앱 글꼴·색 조합.
 
 ## VcCardDialog — 기능 고르기
 

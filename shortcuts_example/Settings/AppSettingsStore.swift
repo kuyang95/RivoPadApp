@@ -276,6 +276,10 @@ final class AppSettingsStore:
 
     static let shared = AppSettingsStore()
 
+    @Published var appTheme: AppThemeMode {
+        didSet { defaults.set(appTheme.rawValue, forKey: AppThemeMode.preferenceKey) }
+    }
+
     @Published var soundEffectsEnabled: Bool {
         didSet {
             save(
@@ -445,6 +449,8 @@ final class AppSettingsStore:
             )
         }
         self.defaults = defaults
+        appTheme = defaults.string(forKey: AppThemeMode.preferenceKey)
+            .flatMap(AppThemeMode.init(rawValue:)) ?? .system
         soundEffectsEnabled =
             Self.bool(
                 forKey: Key.soundEffects,
@@ -536,6 +542,7 @@ final class AppSettingsStore:
     }
 
     func resetToDefaults() {
+        appTheme = .system
         soundEffectsEnabled = true
         voiceFeedbackEnabled = true
         speechRate = .fast

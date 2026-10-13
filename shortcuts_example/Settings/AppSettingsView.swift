@@ -272,6 +272,11 @@ struct AppSettingsView: View {
 
     private var appearanceSection: some View {
         Section {
+            Picker("앱 테마", selection: $settings.appTheme) {
+                ForEach(AppThemeMode.allCases) { mode in
+                    Text(AppLocalization.string(mode.title)).tag(mode)
+                }
+            }
             Button {
                 showsFontSelection = true
             } label: {

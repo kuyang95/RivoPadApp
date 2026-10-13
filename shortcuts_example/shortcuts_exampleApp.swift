@@ -664,6 +664,7 @@ struct shortcuts_exampleApp: App {
                
             }
             .environmentObject(appSettings)
+            .preferredColorScheme(appSettings.appTheme.colorScheme)
             .environmentObject(appRouter)
             .environmentObject(rivoRemoteManager)
             .environmentObject(rivoRemoteControlCenter)
