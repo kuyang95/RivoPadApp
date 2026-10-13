@@ -85,7 +85,7 @@ struct VisionCraftHomeCategory: Identifiable {
     let items: [VisionCraftActionItem]
 }
 
-/// Android `VcHomeTilePage`: 머리 높이를 뺀 첫 화면에 홈의 네 칸을 중앙 배치한다.
+/// Android `VcHomeTilePage`: 세로는 첫 화면 중앙, 가로(4열)는 머리 바로 아래에 배치한다.
 /// 높이가 부족하면 전폭 타일을 유지해 스크롤하고, 추가 기능 행은 아래에 이어 붙인다.
 struct VisionCraftHomeTilePageLayout: Layout {
     let columns: Int
@@ -121,7 +121,10 @@ struct VisionCraftHomeTilePageLayout: Layout {
         let referenceRows = max(1, (referenceItemCount + columns - 1) / columns)
         let rows = (itemCount + columns - 1) / columns
         let referenceHeight = tileHeight * CGFloat(referenceRows) + gap * CGFloat(referenceRows - 1)
-        let firstGridHeight = max(referenceHeight, firstPageHeight - headerHeight)
+        // 가로 모드의 홈·하위 기능 화면은 위쪽에 붙이고 남는 높이는 아래에 둔다.
+        let firstGridHeight = columns == 4
+            ? referenceHeight
+            : max(referenceHeight, firstPageHeight - headerHeight)
         let extraHeight = CGFloat(max(0, rows - referenceRows)) * (tileHeight + gap)
         let gridHeight = tileHeight * CGFloat(rows) + gap * CGFloat(max(0, rows - 1))
         return (width, headerHeight, gridHeight, (firstGridHeight - referenceHeight) / 2,
