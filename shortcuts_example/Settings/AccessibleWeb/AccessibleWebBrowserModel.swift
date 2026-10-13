@@ -164,7 +164,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
         if AccessibleWebAddress.isWebURL(url) || url.absoluteString == "about:blank" || localChildFrame {
             decisionHandler(.allow)
         } else {
-            if navigationAction.targetFrame?.isMainFrame != false {
+            if webView === self.webView, navigationAction.targetFrame?.isMainFrame != false {
                 errorMessage = "외부 앱 전용 링크는 여기서 열 수 없습니다. 필요한 경우 Safari에서 이어서 이용해 주세요."
             }
             decisionHandler(.cancel)
@@ -175,7 +175,9 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
                  decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
         if navigationResponse.canShowMIMEType { decisionHandler(.allow) }
         else {
-            errorMessage = "이 파일 형식은 브라우저에서 표시할 수 없습니다. Safari에서 열어 주세요."
+            if webView === self.webView, navigationResponse.isForMainFrame {
+                errorMessage = "이 파일 형식은 브라우저에서 표시할 수 없습니다. Safari에서 열어 주세요."
+            }
             decisionHandler(.cancel)
         }
     }
