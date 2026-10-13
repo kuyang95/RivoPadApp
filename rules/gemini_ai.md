@@ -1,6 +1,6 @@
 # AI 백엔드 — 로컬 MLX + Gemini (Firebase AI Logic)
 
-점검일 2026-10-02 · 기준 코드 `babc3875`
+점검일: 2026-10-13 · 기준 코드: `c25bf291` (이번 기능 변경 범위)
 
 iPad 앱은 **로컬 우선**: 텍스트 채팅·문서 Q&A·번역·음성 명령·VisionLink 원격 채팅은 기기 안 MLX 모델. 클라우드(Gemini)는 이미지 설명, Google Search grounding, OCR 교정, Excel/Word AI 에만 쓴다. Apple `FoundationModels` 는 import 조차 없다.
 

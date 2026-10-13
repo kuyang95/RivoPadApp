@@ -1,6 +1,6 @@
 # Design Tokens
 
-점검일: 2026-09-29 · 기준 코드: `babc3875`+작업 트리 · Android 기준: `c6a03f0`
+점검일: 2026-10-13 · 기준 코드: `c25bf291` (이번 기능 변경 범위)
 
 앱 전체가 홈의 soft UI 한 벌을 쓴다. 색·모양·면을 새로 정하지 말고 아래 토큰을 쓴다. 값은 Android `docs/design/03_design_tokens.md`와 같다. 컴포넌트별 규격은 `04_component_specs.md`.
 

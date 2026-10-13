@@ -1,6 +1,6 @@
 # 영속 데이터 (UserDefaults / App Group / 파일 / Keychain / Assets)
 
-점검일 2026-10-13 · 기준 코드 `f7c42775` + 작업 트리 (앱 테마 저장·기능 타일 에셋·Debug 웹 세션)
+점검일: 2026-10-13 · 기준 코드: `c25bf291` (이번 기능 변경 범위)
 
 Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 데이터는 전부 **JSON 파일** 또는 **UserDefaults(Codable 인코딩)**.
 

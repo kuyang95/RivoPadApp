@@ -1,6 +1,6 @@
 # 의존성 / 라이브러리 버전
 
-점검일 2026-10-13 · 기준 코드 `f7c42775` + 작업 트리 (WebKit 사용처)
+점검일: 2026-10-13 · 기준 코드: `c25bf291` (이번 기능 변경 범위)
 
 `Podfile.lock`, `shortcuts_example.xcworkspace/xcshareddata/swiftpm/Package.resolved`, Xcode 프로젝트의 로컬 패키지 참조, GitHub `kuyang95/VisionCraftDocumentEngine`의 `Package.swift` 출처.
 

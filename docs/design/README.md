@@ -25,10 +25,10 @@ UI 코드(색·모양·간격·배치·컴포넌트·화면 구성·위젯)를 �
 | --- | --- | --- |
 | `00_product_design_brief.md` | 2026-09-29 | `babc3875`+작업 트리 |
 | `01_reference_matrix.md` | 2026-09-29 | `babc3875`+작업 트리 |
-| `02_accessibility_contract.md` | 2026-09-29 | `babc3875`+작업 트리 |
-| `03_design_tokens.md` | 2026-09-29 | `babc3875`+작업 트리 |
-| `04_component_specs.md` | 2026-10-13 | `583cafbd` + 작업 트리 (카테고리 가로 모드 위쪽 정렬) |
-| `05_screen_specs.md` | 2026-10-13 | `583cafbd` + 작업 트리 (카테고리 가로 모드 위쪽 정렬) |
+| `02_accessibility_contract.md` | 2026-10-13 | `c25bf291` (이번 기능 변경 범위) |
+| `03_design_tokens.md` | 2026-10-13 | `c25bf291` (이번 기능 변경 범위) |
+| `04_component_specs.md` | 2026-10-13 | `c25bf291` (이번 기능 변경 범위) |
+| `05_screen_specs.md` | 2026-10-13 | `c25bf291` (이번 기능 변경 범위) |
 | `06_ai_redesign_prompt.md` | 2026-09-29 | `babc3875`+작업 트리 |
 | `07_mobbin_reference_picks.md` | 2026-09-29 | — |
 

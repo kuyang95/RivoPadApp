@@ -1,6 +1,6 @@
 # 앱 메타데이터 / 빌드 정보
 
-점검일 2026-10-13 · 기준 코드 `f7c42775` + 작업 트리 (기기 빌드·서명)
+점검일: 2026-10-13 · 기준 코드: `c25bf291` (이번 기능 변경 범위)
 
 `shortcuts_example.xcodeproj/project.pbxproj`, `shortcuts-example-Info.plist`, `*.entitlements` 출처. 코드 안 봐도 한눈에 알 수 있는 정보만.
 
