@@ -38,7 +38,7 @@
 | ble_protocol.md | 2026-10-06 | `c0b9f54a` |
 | dependencies.md | 2026-10-01 | `babc3875` |
 | persistence.md | 2026-10-12 | `8249fa41` |
-| scanner_pipeline.md | 2026-09-29 | `babc3875` |
+| scanner_pipeline.md | 2026-10-13 | `b1be61d0` + 작업 트리 (스캐너 안내 음성) |
 | visionlink.md | 2026-09-29 | `babc3875` |
 
 문서를 코드와 대조해 확인할 때마다 **무조건**:

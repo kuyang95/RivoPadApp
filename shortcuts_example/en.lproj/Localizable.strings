@@ -400,7 +400,7 @@
 "저장된 API 키를 삭제하고 웹 검색을 껐습니다." = "The saved API key was deleted and web search was turned off.";
 "선택적 웹 검색을 켜면 검색어와 개인 API 키는 Brave로 보내고, 최종 AI 답변은 이 iPad에서 만듭니다." = "When optional web search is on, queries and your personal API key are sent to Brave, while the final AI answer is generated on this iPad.";
 
-"AI 대화" = "AI Conversations";
+"AI 대화" = "AI Chat";
 "대화 기록을 불러오는 중" = "Loading chat history";
 "저장된 대화가 없습니다" = "No Saved Conversations";
 "오른쪽 위의 새 대화 버튼으로 시작하세요." = "Use the New Chat button at the top right to begin.";
@@ -1167,7 +1167,7 @@
 "명령 모드. 2 클립보드 번역, 3 실시간 텍스트 읽기, 4 카메라 돋보기, 9 이미지 설명. 카메라를 연 뒤 5 전환, 6 토치, 7 촬영, 별표 0 샵 확대를 사용합니다." = "Command mode. 2 Clipboard Translation, 3 Live Text Reading, 4 Camera Magnifier, 9 Image Description. After opening the camera, use 5 to switch cameras, 6 for the torch, 7 to capture, and Star, 0, and Sharp for zoom.";
 "명령 모드에서 지원하지 않는 %@ 버튼" = "%@ is not supported in command mode";
 "모드 버튼 두 번: 현재 화면의 키 안내" = "Double-press a mode button: Key guide for the current screen";
-"문서 스캔" = "Document Scan";
+"문서 스캔" = "Scan Document";
 "문서 스캔: 4 닫기 · 7 수동 촬영" = "Document Scan: 4 Close · 7 Manual Capture";
 "문서 조작 안내. TXT 또는 PDF 로컬 문서에서 L3 문서 탐색 모드를 사용할 수 있습니다." = "Document controls guide. L3 document navigation mode is available in local TXT or PDF documents.";
 "발견한 리모컨" = "Discovered Remotes";
@@ -2648,3 +2648,45 @@
 "파일을 불러오는 중입니다.." = "Loading file...";
 "파일이 없습니다" = "File not found";
 "일치하는 문서가 없습니다" = "No matching documents";
+
+"확대 보기" = "Magnifier";
+
+"장면 설명" = "Describe Scene";
+
+"저장된 사진" = "Saved Photos";
+
+"텍스트/문서" = "Text/Docs";
+
+"도서 읽기" = "Book Reader";
+
+"스마트폰 연결" = "Connect Your Phone";
+
+"문서, 클립보드 내용, 사진을 첨부할 수 있습니다." = "Add documents, clipboard content, or photos as needed.";
+
+"이전 대화를 다시 엽니다." = "Reopen past chats.";
+
+"확대, 조명, 색상 필터를 사용합니다." = "Use zoom, lighting, and color filters.";
+
+"문서 한 장을 텍스트로 변환합니다." = "Convert a document page to text.";
+
+"비춘 글자를 자동으로 읽어줍니다." = "Hear text read aloud automatically.";
+
+"촬영 후 AI에게 음성으로 묻습니다." = "Take a photo and ask AI about it by voice.";
+
+"촬영한 장면을 AI가 설명합니다." = "Get an AI description of the captured scene.";
+
+"글자 인식, 번역, AI 설명과 대화를 이용합니다." = "Extract text, translate, get descriptions, or chat with AI.";
+
+"글을 크게 보고 편집합니다." = "View and edit text in large print.";
+
+"EPUB·DAISY 도서를 읽습니다." = "Read EPUB and DAISY books.";
+
+"스마트폰의 카메라, 사진, 문서를 VisionCraft에서 활용하세요." = "Use your phone’s camera, photos, and documents in VisionCraft.";
+
+"궁금한 내용을 AI에게 물어보세요." = "Ask questions and chat with AI.";
+
+"확대해서 보고, 글자와 이미지를 인식하세요." = "Zoom in, read text, and understand images.";
+
+"글과 문서를 편하게 읽고 편집하세요." = "Read and edit text and documents.";
+
+"스마트폰과 연결해 함께 사용하세요." = "Connect your smartphone to VisionCraft.";

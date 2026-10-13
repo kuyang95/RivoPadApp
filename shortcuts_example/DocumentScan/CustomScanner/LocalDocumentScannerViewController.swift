@@ -2206,6 +2206,8 @@ final class LocalDocumentScannerViewController: UIViewController {
         }
         lastAnnouncedText = text
         lastAnnouncementTime = now
+        // 상태 안내와 별도 방향 안내 음성이 동시에 나오지 않게 한다.
+        stopFramingGuidance()
         if AppSettingsStore.shared.voiceFeedbackEnabled {
             TTSManager.shared.speakFeedback(text)
         } else if UIAccessibility.isVoiceOverRunning {
@@ -2216,6 +2218,11 @@ final class LocalDocumentScannerViewController: UIViewController {
     private func updateFramingGuidance(_ guidance: DocumentFramingGuidance) {
         guard isViewActive, !sessionInterrupted,
               AppSettingsStore.shared.voiceFeedbackEnabled else {
+            stopFramingGuidance()
+            return
+        }
+        // 재촬영 시작 안내가 끝난 뒤 현재 프레임의 방향을 안내한다.
+        guard !TTSManager.shared.isSpeaking else {
             stopFramingGuidance()
             return
         }

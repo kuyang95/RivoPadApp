@@ -23,6 +23,7 @@ enum VisionCraftHomeUI {
     static let guideIcon = color(0xA67C00, 0xD4A72C)
     /// Android `VcHomeTileArt`: 회색(Neutral)을 면에 14% 섞은 값, 다크는 회색 다크색을 흰색 쪽으로 50%.
     static let tileArtBackground = color(0xE6E8EA, 0xDBE2EC)
+    static let tileArtIcon = Color(red: 0x28 / 255.0, green: 0x35 / 255.0, blue: 0x46 / 255.0)
     /// 잉크 버튼 글자 = 배경색(라이트 흰색, 다크 검정). Android `VcHomeSoftButton(ink = true)`.
     static let onPrimary = VisionCraftUI.background
     static let switchOn = color(0x34C759, 0x34C759)
@@ -78,8 +79,54 @@ struct VisionCraftHomeCategory: Identifiable {
     let id: String
     let title: String
     let tone: VisionCraftHomeUI.SectionTone
-    let artName: String
+    let artName: String?
+    var systemImage: String? = nil
+    var description: String? = nil
     let items: [VisionCraftActionItem]
+}
+
+/// Android `VcHomeTilePage`: 머리 높이를 뺀 첫 화면에 홈의 네 칸을 중앙 배치한다.
+/// 높이가 부족하면 전폭 타일을 유지해 스크롤하고, 추가 기능 행은 아래에 이어 붙인다.
+struct VisionCraftHomeTilePageLayout: Layout {
+    let columns: Int
+    let referenceItemCount: Int
+    let itemCount: Int
+    let firstPageHeight: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let metrics = metrics(width: proposal.width ?? 0, subviews: subviews)
+        return CGSize(width: metrics.width, height: metrics.pageHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let metrics = metrics(width: bounds.width, subviews: subviews)
+        subviews[0].place(
+            at: bounds.origin, anchor: .topLeading,
+            proposal: ProposedViewSize(width: bounds.width, height: metrics.headerHeight)
+        )
+        subviews[1].place(
+            at: CGPoint(x: bounds.minX, y: bounds.minY + metrics.headerHeight + metrics.topSpace),
+            anchor: .topLeading,
+            proposal: ProposedViewSize(width: bounds.width, height: metrics.gridHeight)
+        )
+    }
+
+    private func metrics(width: CGFloat, subviews: Subviews) -> (
+        width: CGFloat, headerHeight: CGFloat, gridHeight: CGFloat, topSpace: CGFloat, pageHeight: CGFloat
+    ) {
+        let headerHeight = subviews[0].sizeThatFits(ProposedViewSize(width: width, height: nil)).height
+        let gap: CGFloat = 16
+        let tileWidth = max(0, (width - gap * CGFloat(columns - 1)) / CGFloat(columns))
+        let tileHeight = tileWidth * 5 / 4
+        let referenceRows = max(1, (referenceItemCount + columns - 1) / columns)
+        let rows = (itemCount + columns - 1) / columns
+        let referenceHeight = tileHeight * CGFloat(referenceRows) + gap * CGFloat(referenceRows - 1)
+        let firstGridHeight = max(referenceHeight, firstPageHeight - headerHeight)
+        let extraHeight = CGFloat(max(0, rows - referenceRows)) * (tileHeight + gap)
+        let gridHeight = tileHeight * CGFloat(rows) + gap * CGFloat(max(0, rows - 1))
+        return (width, headerHeight, gridHeight, (firstGridHeight - referenceHeight) / 2,
+                headerHeight + firstGridHeight + extraHeight)
+    }
 }
 
 /// Android `VcTile`(`VcHomeCategoryGrid`): 세로 2열, 가로 4열, 16pt 간격, 4:5 비율.
@@ -87,6 +134,8 @@ struct VisionCraftHomeCategory: Identifiable {
 struct VisionCraftHomeCategoryGrid: View {
     let categories: [VisionCraftHomeCategory]
     let columns: Int
+    var minimumTitleSize: CGFloat = 0
+    var identifierPrefix = "home.category"
     let onOpen: (VisionCraftHomeCategory) -> Void
 
     var body: some View {
@@ -106,10 +155,16 @@ struct VisionCraftHomeCategoryGrid: View {
                                     RoundedRectangle(cornerRadius: side * 0.225, style: .continuous)
                                         .fill(VisionCraftHomeUI.tileArtBackground)
                                         .frame(width: side, height: side)
-                                    Image(category.artName)
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(width: side * 0.7, height: side * 0.7)
+                                    if let artName = category.artName {
+                                        Image(artName)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: side * 0.7, height: side * 0.7)
+                                    } else if let systemImage = category.systemImage {
+                                        Image(systemName: systemImage)
+                                            .font(.system(size: side * 0.5, weight: .medium))
+                                            .foregroundStyle(VisionCraftHomeUI.tileArtIcon)
+                                    }
                                 }
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                             }
@@ -117,7 +172,8 @@ struct VisionCraftHomeCategoryGrid: View {
 
                             VisionCraftHomeTileTitle(
                                 title: category.title,
-                                tileWidth: geometry.size.width
+                                tileWidth: geometry.size.width,
+                                minimumTextSize: minimumTitleSize
                             )
                         }
                         .padding(.top, 18)
@@ -130,7 +186,8 @@ struct VisionCraftHomeCategoryGrid: View {
                 }
                 .buttonStyle(VisionCraftHomePressStyle())
                 .accessibilityLabel(accessibilityLabel(for: category))
-                .accessibilityIdentifier("home.category.\(category.id)")
+                .accessibilityHint(category.description.map { AppLocalization.string($0) } ?? "")
+                .accessibilityIdentifier("\(identifierPrefix).\(category.id)")
             }
         }
     }
@@ -156,12 +213,16 @@ struct VisionCraftHomeTileTitle: View {
     let title: String
     let tileWidth: CGFloat
     var widthFraction: CGFloat = 0.17
+    var minimumTextSize: CGFloat = 0
 
     var body: some View {
         let text = AppLocalization.string(title)
         let available = max(1, tileWidth - 36)
         let target = UIFontMetrics.default.scaledValue(for: available * widthFraction)
-        let size = fittedSize(text: text, target: target, available: available)
+        let size = max(
+            UIFontMetrics.default.scaledValue(for: minimumTextSize),
+            fittedSize(text: text, target: target, available: available)
+        )
         let _ = dynamicTypeSize
         Text(text)
             .font(.system(size: size, weight: .bold))
@@ -180,35 +241,6 @@ struct VisionCraftHomeTileTitle: View {
             .size(withAttributes: [.font: font]).width
         guard wordWidth > available, wordWidth > 0 else { return target }
         return target * (available / wordWidth) * 0.97
-    }
-}
-
-/// Android `VcCardDialog`(`VcHomeCategoryDialog`): 카테고리 타일을 눌렀을 때 항목을 보여 주는 카드 다이얼로그.
-struct VisionCraftHomeCategoryDialog: View {
-    let category: VisionCraftHomeCategory
-    let onDismiss: () -> Void
-
-    var body: some View {
-        VisionCraftDialogCard(
-            title: category.title,
-            cancelTitle: "닫기",
-            tone: category.tone,
-            onDismiss: onDismiss
-        ) {
-            ForEach(Array(category.items.enumerated()), id: \.element.id) { index, item in
-                VisionCraftDialogOptionRow(
-                    title: item.title,
-                    subtitle: item.description,
-                    systemImage: item.icon,
-                    badge: item.badge,
-                    accent: VisionCraftHomeUI.logoAccent(index)
-                ) {
-                    onDismiss()
-                    item.action()
-                }
-                .accessibilityIdentifier("home.action.\(item.id)")
-            }
-        }
     }
 }
 

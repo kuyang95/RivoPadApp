@@ -83,6 +83,8 @@ struct DocumentScanRootView: View {
     @State private var descriptionText: String?
     @State private var isDescribingImage = false
     @State private var descriptionTask: Task<Void, Never>?
+    @ScaledMetric(relativeTo: .title) private var reviewIconSize: CGFloat = 24
+    @ScaledMetric(relativeTo: .title) private var reviewIconCircleSize: CGFloat = 36
 
     init() {
         let session =
@@ -156,19 +158,18 @@ struct DocumentScanRootView: View {
 
         }
         .tint(VisionCraftUI.primary)
-        .background(Color.black)
-        .visionCraftCameraScreen()
+        .background(phase == .camera ? Color.black : VisionCraftUI.background)
         .visionCraftHandlesBackNavigation()
-        .toolbar(phase == .camera ? .hidden : .visible, for: .navigationBar)
+        .toolbar(phase == .pageReview ? .visible : .hidden, for: .navigationBar)
         .toolbar {
             if #available(iOS 26.0, *) {
                 ToolbarItem(placement: .topBarLeading) {
-                    if phase != .camera { scanBackButton }
+                    if phase == .pageReview { scanBackButton }
                 }
                 .sharedBackgroundVisibility(.hidden)
             } else {
                 ToolbarItem(placement: .topBarLeading) {
-                    if phase != .camera { scanBackButton }
+                    if phase == .pageReview { scanBackButton }
                 }
             }
         }
@@ -265,23 +266,40 @@ struct DocumentScanRootView: View {
         if let pendingImage {
             VStack(spacing: 0) {
                 HStack(spacing: 12) {
+                    scanBackButton
                     Text(AppLocalization.string("스캔된 문서"))
                         .visionCraftAndroidText(24, weight: .bold, relativeTo: .title)
                         .foregroundStyle(VisionCraftUI.primaryText)
                         .accessibilityAddTraits(.isHeader)
-                    Spacer()
-
-                    // Android `btnViewText`: 48dp 아이콘 버튼, 이름은 "텍스트만 보기"/"이미지 보기".
-                    VisionCraftIconButton(
-                        systemImage: isShowingRecognizedText ? "photo" : "doc.text",
-                        label: isShowingRecognizedText ? "이미지 보기" : "텍스트만 보기",
-                        tint: VisionCraftUI.primaryText
-                    ) {
-                        toggleRecognizedTextView()
+                    Button(action: toggleRecognizedTextView) {
+                        Group {
+                            if isShowingRecognizedText {
+                                Image(systemName: "photo")
+                            } else {
+                                Text(verbatim: "T")
+                            }
+                        }
+                            .font(.system(size: reviewIconSize, weight: .regular))
+                            .foregroundStyle(VisionCraftUI.primaryText)
+                            .frame(width: reviewIconCircleSize, height: reviewIconCircleSize)
+                            .overlay {
+                                Circle().strokeBorder(VisionCraftUI.primaryText, lineWidth: 1.5)
+                            }
+                            .frame(
+                                minWidth: VisionCraftUI.minTouchTarget,
+                                minHeight: VisionCraftUI.minTouchTarget
+                            )
+                            .contentShape(Circle())
                     }
+                    .buttonStyle(.plain)
+                    .fixedSize()
+                    .accessibilityLabel(AppLocalization.string(
+                        isShowingRecognizedText ? "이미지 보기" : "텍스트만 보기"
+                    ))
+                    Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 24)
+                .padding(.top, 8)
                 .padding(.bottom, 8)
 
                 ZStack {

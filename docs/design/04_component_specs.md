@@ -54,7 +54,7 @@
 - 생김새: VcSoftSurface + 모서리 22, 최소 높이 88, 안쪽 20/18, 요소 간격 16. 왼쪽 VcIconTile Large(다이얼로그·카테고리) 또는 회색 28pt 아이콘(홈 목록형), 가운데 제목(18 SemiBold)과 설명(16 보조글자), 오른쪽 VcChevron.
 - 상태: 눌림. `badge`(`VisionCraftActionItem.badge` / `VisionCraftDialogOptionRow.badge`)가 있으면 테두리가 강조색이 되고 화살표 자리에 VcBadge. `isPrimary`도 테두리 강조색. `isEnabled == false`면 아이콘 칸·글자를 흐리게.
 - 스크린리더: "제목. 설명"(뱃지가 있으면 "제목, 뱃지. 설명") 한 덩어리, 역할 버튼.
-- 쓰는 곳: 홈 목록형(`HomeView.swift`), 카테고리 다이얼로그, 이미지 분석·열기·작업 다이얼로그, 데이지 여는 화면.
+- 쓰는 곳: 홈 목록형(`HomeView.swift`), 목록형 기능 선택창, 이미지 분석·열기·작업 다이얼로그, 데이지 여는 화면.
 
 ## VcNoticeCard — 안내 카드 (크림색)
 
@@ -62,14 +62,33 @@
 - 스크린리더: 자식 글자를 한 덩어리로, 힌트 "열기".
 - 홈 1~4번째 방문에 표시한다. 5번째부터 설정 오른쪽의 사용법 아이콘으로 바뀐다.
 
-## VcTile — 2x2 큰 타일
+## VcTile — 홈과 기능 화면의 큰 타일
 
 - 구현: `VisionCraftHomeUI.swift` `VisionCraftHomeCategoryGrid(categories:columns:onOpen:)`, 제목 `VisionCraftHomeTileTitle`, 모델 `VisionCraftHomeCategory`
-- 생김새: VcSoftSurface `raised` + 모서리 22. 세로 화면 2열, 가로 화면(폭 > 높이) 4열(`HomeView.categoryHomeContent`가 `columns`를 정함). 간격 16, 높이 = 너비 × 5/4(`aspectRatio(4/5)`). 한 화면에 맞도록 너비를 화면 높이로도 제한한다. 위쪽 그림, 아래 제목.
+- 생김새: VcSoftSurface `raised` + 모서리 22. 세로 화면 2열, 가로 화면(폭 > 높이) 4열(`HomeView.categoryHomeContent`가 `columns`를 정함). 간격 16, 높이 = 너비 × 5/4(`aspectRatio(4/5)`). 좌우 여백을 뺀 전폭을 열 수로 나눈다. 높이가 부족하면 타일 크기를 유지하고 머리와 함께 스크롤한다. 위쪽 그림, 아래 제목.
 - 제목: 타일 안쪽 너비(타일 폭 − 36)의 17%를 글자 크기로 하고 `UIFontMetrics`로 글자 크기 설정을 반영. 가장 긴 낱말이 한 줄에 들어갈 때까지만 줄인다(×0.97).
 - 그림: 남는 칸 안에서 가장 큰 정사각 squircle(모서리 = 한 변의 22.5%, 좌우 24 여백)을 `tileArtBackground`로 깔고 가운데 70% 크기로 `Assets.xcassets/HomeTile*` 아이콘(Android `home_tile_art_*.webp` 768px 한 벌, 라이트·다크 공용)을 올린다.
-- 상태: 눌림. 항목이 하나뿐인 타일은 다이얼로그 없이 바로 실행.
-- 스크린리더: 항목이 하나면 "제목. 기능 설명", 여럿이면 "제목. 항목 이름들", 역할 버튼.
+- 상태: 눌림. 항목이 하나뿐인 타일은 바로 실행.
+- 스크린리더: 항목이 하나면 "제목. 기능 설명", 여럿이면 "제목. 항목 이름들", 역할 버튼. 홈 카테고리의 짧은 설명은 접근성 힌트로 제공한다.
+
+- 기능 화면: `HomeView.categoryHomeContent`가 홈 내용을 전체 화면으로 바꾼다. 세로 2열·가로 4열, 홈의 첫 네 칸을 기준으로 타일 너비와 시작 위치를 고정한다. 추가 행은 같은 크기로 아래에 이어지고 스크롤한다. 기능 그림은 `HomeAction*` PNG를 같은 squircle 위에 표시하고(그림이 없으면 남색 심벌), 제목은 최소 16pt(Dynamic Type 반영), 설명은 스크린리더가 읽는다. 상단 뒤로 가기·escape는 홈으로 돌아온다.
+- 첫 화면 배치: `VisionCraftHomeTilePageLayout`은 Android `VcHomeTilePage`처럼 머리(제목·안내·20pt 간격)를 측정한 뒤 남은 높이에 홈의 네 칸을 중앙 배치한다. 홈보다 항목이 적어도 네 칸을 기준으로 하고, 추가 행은 아래에 이어 붙인다. 아래 그림자 여백은 12pt다.
+
+기능 타일 그림은 사용자가 제공한 `VC menu 261008/menu icons`에서 선택한 투명 PNG 원본이다. 홈의 네 카테고리, 목록형, 카메라 내부 조작 버튼에는 적용하지 않는다. 타일 배치·터치 영역·그림 영역은 동일하며, 라이트·다크 공용이다.
+
+| 기능 | 번들 그림 | 제공 원본 |
+|---|---|---|
+| 새 대화 | `HomeActionNewChat` | `2/New Chat 3.png` |
+| 대화 기록 | `HomeActionChatHistory` | `2/Chat History 3.png` |
+| 확대 보기 | `HomeActionCamera` | `2/Camera.png` |
+| 문서 스캔 | `HomeActionScanDoc` | `2/Scan Doc.png` |
+| 실시간 읽기 | `HomeActionLiveReading` | `2/Live Reading.png` |
+| 장면 설명 | `HomeActionDescribeImage` | `2/Describe Scene.png` |
+| AI 질문 | `HomeActionAskAI` | `2/Ask AI.png` |
+| 저장된 사진 | `HomeActionSavedPhotos` | `2/Saved Photos.png` |
+| 텍스트 | `HomeActionText` | `Text.png` |
+| 문서 작업 | `HomeActionDocument` | `2/Doc 2.png` |
+| 도서 읽기 | `HomeActionBookReader` | `2/Book Reader 2.png` |
 
 ## VcPanel — 묶음 패널
 
@@ -162,12 +181,12 @@
 
 ## VcCardDialog — 기능 고르기
 
-- 제목 밑줄 아래에서 본문까지 20pt(`VisionCraftUI.cardDialogHeaderBottomSpacing`). Android `VcHomeCategoryDialog`의 14dp + 6dp와 같다. 홈 카메라 기능 선택·사진 작업·문서 스캔 저장/작업·Excel/HWP 더보기·셀 도구처럼 내부 목록을 따로 감싼 경우도 `VisionCraftUI.actionRowSpacing`(16pt)을 사용한다.
+- 제목 밑줄 아래에서 본문까지 20pt(`VisionCraftUI.cardDialogHeaderBottomSpacing`). Android `VcHomeCategoryDialog`의 14dp + 6dp와 같다. 사진 작업·문서 스캔 저장/작업·Excel/HWP 더보기·셀 도구처럼 내부 목록을 따로 감싼 경우도 `VisionCraftUI.actionRowSpacing`(16pt)을 사용한다.
 
-- 구현: `VisionCraftDialogs.swift` `VisionCraftDialogCard(title:message:cancelTitle:maxWidth:tone:onDismiss:content:)`, 카테고리용 `VisionCraftHomeCategoryDialog(category:onDismiss:)`
+- 구현: `VisionCraftDialogs.swift` `VisionCraftDialogCard(title:message:cancelTitle:maxWidth:tone:onDismiss:content:)`
 - 생김새: 모서리 28, 배경색 면 + 1.5pt 테두리, 최대 너비 560, 안쪽 24. 머리는 VcSectionHeader(밑줄 `tone`, 아래 20), 몸통은 VcActionRow 목록(간격 16, 아이콘은 `logoAccent(index)`), 오른쪽 아래 공용 VcDialogClose(위 24). 내용 높이로 화면 중앙에 놓고, 화면보다 길 때만 스크롤한다. 열릴 때 제목을 `screenChanged`로 읽는다. 스크림 탭·escape로 닫힘.
 - 언제: 고르는 대상이 아이콘과 설명이 있는 기능일 때. 값 하나를 고르는 거라면 VcOptionDialog.
-- 쓰는 곳: 카테고리 타일, 이미지 분석(촬영하기/사진에서), 열기(클립보드/이미지/문서), 홈 카메라 기능 선택, 사진·문서 스캔 작업, 채팅 첨부, 엑셀·한글 문서 작업.
+- 쓰는 곳: 장면 설명(촬영하기/사진에서), 열기(클립보드/이미지/문서), 사진·문서 스캔 작업, 채팅 첨부, 엑셀·한글 문서 작업.
 
 ---
 
@@ -177,10 +196,11 @@
 
 - 구현: `VisionCraftUI.swift` `VisionCraftScreenTitleRow(title:onBack:actions:)` — 24 Bold + heading. `onBack`이 있으면 왼쪽에 48pt `VisionCraftBackButton`, `actions`에 오른쪽 `VisionCraftIconButton`.
 - 쓰는 곳: 홈 제목 줄(`HomeView.homeTitleRow`, 앱 이름 + 상태 아이콘 + 설정), 전체 설정(`HomeAllSettingsView`), 대화 목록, 채팅, 텍스트뷰어 메뉴. 이 화면들은 시스템 내비게이션 바를 숨긴다.
+- 홈과 카테고리 제목은 `HomeView.homeHeaderTitle`로 24 Bold·최소 32pt 글자 칸을 공유하며 같은 Dynamic Type 기준을 사용한다. 카테고리 머리는 홈 머리 높이를 예약해 첫 타일 위치를 유지한다.
 
 ## VcScreen — 화면 여백
 
-- 구현: `VisionCraftUI.swift` `View.visionCraftScreenPadding(bottom:)` — 좌우 24, 위 12, 아래 24. 홈은 위 44/아래 32를 직접 쓴다.
+- 구현: `VisionCraftUI.swift` `View.visionCraftScreenPadding(bottom:)` — 좌우 24, 위 12, 아래 24. 홈은 화면 가장자리 기준 위 44/아래 최소 32이며, 안전 영역을 뺀 나머지만 추가 여백으로 적용한다.
 
 ## 뒤로 가기
 

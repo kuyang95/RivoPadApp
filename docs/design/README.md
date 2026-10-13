@@ -1,6 +1,6 @@
 # VisionCraft iPadOS Design Reference Pack
 
-Android 기준: `c6a03f0` (Android `docs/design/` 점검 기준 코드 `0878501`)
+Android 기준: `c6a03f0` (Android `docs/design/` 점검 기준 코드 `0878501`). 홈 머리·첫 화면 배치는 `a63b984` + 작업 트리의 `MainScreen.kt`·`VcSoftHome.kt`·`ComposeTheme.kt`와 대조했다. 장면 설명 하위 타일은 `1aa905e` + 작업 트리의 `MainScreen.kt`와 대조했다.
 
 이 폴더는 VisionCraft iPadOS UI를 AI가 이어서 고치기 쉽게 만든 디자인 기준 문서 모음이다. Android VisionCraft의 `docs/design/`과 같은 구성이고, 두 앱은 같은 제품이므로 규격도 같다. iPadOS에서 구조적으로 못 만드는 것과 사용자가 유지하기로 한 iPad 전용 기능만 예외로 적는다. 새 화면을 만들거나 기존 화면을 손볼 때는 이 순서로 읽는다.
 
@@ -28,7 +28,7 @@ UI 코드(색·모양·간격·배치·컴포넌트·화면 구성·위젯)를 �
 | `02_accessibility_contract.md` | 2026-09-29 | `babc3875`+작업 트리 |
 | `03_design_tokens.md` | 2026-09-29 | `babc3875`+작업 트리 |
 | `04_component_specs.md` | 2026-09-29 | `babc3875`+작업 트리 |
-| `05_screen_specs.md` | 2026-09-29 | `babc3875`+작업 트리 |
+| `05_screen_specs.md` | 2026-10-13 | `b1be61d0` + 작업 트리 (홈 장면 설명·스캔 결과 복귀) |
 | `06_ai_redesign_prompt.md` | 2026-09-29 | `babc3875`+작업 트리 |
 | `07_mobbin_reference_picks.md` | 2026-09-29 | — |
 

@@ -1,6 +1,6 @@
 # 문서 스캔 파이프라인 (자체 스캐너, Android 패리티)
 
-점검일 2026-09-29 · 기준 코드 `babc3875`
+점검일 2026-10-13 · 기준 코드 `b1be61d0` + 작업 트리 (스캐너 안내 음성)
 
 VisionKit `VNDocumentCameraViewController` 를 쓰지 않고 Android VisionCraft 와 **같은 모델·같은 수치** 로 동작하는 자체 스캐너. 코드는 `shortcuts_example/DocumentScan/CustomScanner/`. 목표는 Android 문서 [scanner_pipeline.md](../../../AndroidProject/VisionCraft/rules/scanner_pipeline.md) 의 Step 0-5 결과를 iPad 에서 재현하는 것 (`Tools/ScannerParity/` 로 결과 비교).
 
@@ -41,6 +41,11 @@ AVCaptureSession(.photo, builtInWideAngleCamera, continuousAutoFocus)      Local
 - 모션 샘플이 필요 개수만큼 모이지 않은 채 타임아웃이 지나면 `ScannerMotionMonitor.shouldFallOpen(sampleCount:requiredSampleCount:elapsed:timeout:)` 이 true 를 돌려 정지 게이트를 통과시킨다 (센서 불량 기기에서 촬영이 영영 막히지 않도록).
 - 자동 촬영이 켜져 있고 검출기가 동작하면 수동 촬영 버튼을 숨긴다(Android 2026-09-17 결정). iPadOS에서 자동 촬영을 끄거나 검출기가 실패하면 대체 수동 촬영 버튼을 보인다(`needsManualShutter`). Rivo 리모컨 7번은 `DocumentScanEvent.manualCaptureRequested`.
 - 상태·이벤트·효과 enum 은 `DocumentScanState` / `DocumentScanEvent` / `DocumentScanEffect` (`DocumentScannerStateMachine.handle`). 다중 페이지는 `awaitingPageRemoval(capturedPageCount:)` → `pageRemoved`.
+
+### 안내 음성 순서
+
+- `LocalDocumentScannerViewController.setStatus`는 상태 안내를 발화하기 전에 별도 방향 안내 음성을 중지한다. `updateFramingGuidance`는 공용 TTS가 말하는 동안 방향 안내를 보류하고, 발화가 끝난 뒤 현재 프레임 기준으로 안내한다. 재촬영 시작·자동 조명·강제 촬영 안내와 방향 안내가 동시에 재생되지 않는다.
+- `DocumentScanRootView.returnToCamera`는 결과 TTS를 중지하고 OCR/이미지 설명 작업을 취소한 뒤 카메라를 재개한다.
 
 ## 모서리 검출 — LCNet100 DocAligner
 
