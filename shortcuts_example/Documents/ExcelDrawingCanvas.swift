@@ -108,18 +108,19 @@ private struct ExcelDrawingChartPreview: View {
                         }
                     }
                 }
+                .modifier(CategoryDomain(kind: chart.kind, keys: Self.categoryKeys(data)))
                 .chartXAxis {
                     if chart.kind == .bar || chart.kind == .scatter { AxisMarks() }
                     else { AxisMarks(values: .automatic(desiredCount: 5)) { value in
                         AxisGridLine(); AxisTick()
-                        AxisValueLabel { if let index = value.as(Int.self), let point = data.series.first?.points.first(where: { $0.id == index }) { Text(point.category).lineLimit(1) } }
+                        AxisValueLabel { if let index = Self.pointIndex(value), let point = data.series.lazy.compactMap({ $0.points.first { $0.id == index } }).first { Text(point.category).lineLimit(1) } }
                     } }
                 }
                 .chartYAxis {
                     if chart.kind != .bar { AxisMarks() }
                     else { AxisMarks(values: .automatic(desiredCount: 5)) { value in
                         AxisGridLine(); AxisTick()
-                        AxisValueLabel { if let index = value.as(Int.self), let point = data.series.first?.points.first(where: { $0.id == index }) { Text(point.category).lineLimit(1) } }
+                        AxisValueLabel { if let index = Self.pointIndex(value), let point = data.series.lazy.compactMap({ $0.points.first { $0.id == index } }).first { Text(point.category).lineLimit(1) } }
                     } }
                 }
             }
@@ -128,13 +129,33 @@ private struct ExcelDrawingChartPreview: View {
         .background(.background)
         .overlay(Rectangle().stroke(.quaternary))
     }
+    /// Bars sit on a category axis (an Int `x` would make it numeric: hairline bars, the last one on the
+    /// domain edge). The key is the point's index, so repeated category names stay separate bars.
+    private static func categoryKey(_ point: ExcelDrawingChartData.Point) -> String { String(point.id) }
+    /// Every series' points in source order, so a value missing from the first series does not reorder them.
+    private static func categoryKeys(_ data: ExcelDrawingChartData) -> [String] {
+        Set(data.series.flatMap { $0.points.map(\.id) }).sorted().map(String.init)
+    }
+    private struct CategoryDomain: ViewModifier {
+        let kind: ExcelChartKind
+        let keys: [String]
+        func body(content: Content) -> some View {
+            switch kind {
+            case .column: content.chartXScale(domain: keys)
+            case .bar: content.chartYScale(domain: keys)
+            default: content
+            }
+        }
+    }
+    private static func pointIndex(_ value: AxisValue) -> Int? { value.as(Int.self) ?? value.as(String.self).flatMap(Int.init) }
+
     @ChartContentBuilder
     private func marks(_ point: ExcelDrawingChartData.Point, series: ExcelDrawingChartData.Series) -> some ChartContent {
         switch chart.kind {
         case .column:
-            BarMark(x: .value("항목", point.id), y: .value("값", point.value)).foregroundStyle(by: .value("계열", series.name)).position(by: .value("계열", series.name))
+            BarMark(x: .value("항목", Self.categoryKey(point)), y: .value("값", point.value)).foregroundStyle(by: .value("계열", series.name)).position(by: .value("계열", series.name))
         case .bar:
-            BarMark(x: .value("값", point.value), y: .value("항목", point.id)).foregroundStyle(by: .value("계열", series.name)).position(by: .value("계열", series.name))
+            BarMark(x: .value("값", point.value), y: .value("항목", Self.categoryKey(point))).foregroundStyle(by: .value("계열", series.name)).position(by: .value("계열", series.name))
         case .area:
             AreaMark(x: .value("항목", point.id), y: .value("값", point.value), stacking: .unstacked).foregroundStyle(by: .value("계열", series.name))
         case .scatter:
