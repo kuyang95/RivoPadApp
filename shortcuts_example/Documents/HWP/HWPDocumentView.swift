@@ -370,6 +370,30 @@ final class HWPDocumentViewModel: ObservableObject {
         }
     }
 
+    /// Writes the picture's 그림 설명 (empty removes it); the layout does not change.
+    @discardableResult
+    func describeImage(_ text: String, target: HWPImageEditing.Target) async throws -> String {
+        guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
+        commitEditorChange()
+        guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
+        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        isSaving = true; errorDescription = nil; status = AppLocalization.string("그림을 수정하는 중…")
+        defer { isSaving = false }
+        do {
+            let result = try await HWPImageEditing.describing(text, target: target, source: source, drafts: before)
+            apply(MutationGroup(before: before, after: result.document.blocks,
+                oldSelection: selected, newSelection: result.focusedID,
+                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                forward: true, registeringUndo: true)
+            syncEditor()
+            status = AppLocalization.string("그림 설명을 적용했습니다. 저장하면 파일에 반영됩니다.")
+            return result.focusedID
+        } catch {
+            status = AppLocalization.string("그림을 수정하지 못했습니다.")
+            throw error
+        }
+    }
+
     @discardableResult
     func insertShape(_ request: HWPShapeEditing.Request) async throws -> String {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
@@ -1223,6 +1247,7 @@ struct HWPDocumentView: View {
     @State private var showsFontManager = false
     @State private var editingTableRow: HWPAccessibleRow?
     @State private var editingImage: HWPImageEditing.Target?
+    @State private var describingImage: HWPImageDescriptionDraft?
     @State private var selectedImage: HWPImageEditing.Target?
     @State private var editingShape: HWPShapeEditing.Target?
     @State private var selectedShape: HWPShapeEditing.Target?
@@ -1315,6 +1340,10 @@ struct HWPDocumentView: View {
             HWPImageSizeSheet(target: target,
                 onApply: { editImage($0, target: target) },
                 onDelete: { editImage(.delete, target: target) })
+        }
+        .sheet(item: $describingImage) { draft in
+            HWPImageDescriptionSheet(draft: draft,
+                onApply: { describeImage($0, target: draft.target) })
         }
         .sheet(item: $editingShape) { target in
             HWPShapeEditingSheet(target: target,
@@ -1604,6 +1633,14 @@ struct HWPDocumentView: View {
             }
             .frame(minHeight: 48)
             .accessibilityIdentifier("hwp-ribbon-image-properties")
+            Button("그림 설명", systemImage: "text.below.photo") {
+                guard let target = refreshedImageTarget(image),
+                      let owner = viewModel.blocks.first(where: { $0.id == target.ownerID }) else { return }
+                describingImage = HWPImageDescriptionDraft(target: target,
+                    description: HWPImageEditing.description(owner: owner, objectID: target.objectID) ?? "")
+            }
+            .frame(minHeight: 48)
+            .accessibilityIdentifier("hwp-ribbon-image-description")
             Button("삭제", systemImage: "trash", role: .destructive) { editImage(.delete, target: image) }
                 .frame(minHeight: 48)
         }
@@ -1855,7 +1892,7 @@ struct HWPDocumentView: View {
             HWPShapeKeyboardNudgeReceiver(
                 isActive: (selectedImage != nil
                     || (selectedShape != nil && selectedShape?.groupChildIndex == nil))
-                    && editingImage == nil && editingShape == nil
+                    && editingImage == nil && describingImage == nil && editingShape == nil
                     && !isSelectingShapeGroup,
                 onNudge: nudgeSelectedObject
             )
@@ -1911,6 +1948,18 @@ struct HWPDocumentView: View {
                 if let page = documentNavigation.pages.firstIndex(where: {
                     $0.bodyBlocks.contains { HWPInlineParagraphGeometry.sourceID($0.id) == focused }
                 }) { documentNavigation.goToPage(page) }
+            } catch { exportError = error.localizedDescription }
+        }
+    }
+
+    private func describeImage(_ text: String, target: HWPImageEditing.Target) {
+        originalEditor.finish()
+        Task { @MainActor in
+            do {
+                try await viewModel.describeImage(text, target: target)
+                describingImage = nil
+                selectedImage = refreshedImageTarget(target)
+                documentNavigation.update(blocks: viewModel.blocks, layouts: viewModel.pageLayouts)
             } catch { exportError = error.localizedDescription }
         }
     }

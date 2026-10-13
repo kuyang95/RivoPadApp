@@ -549,3 +549,63 @@ struct HWPImageSizeSheet: View {
         value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
     }
 }
+
+/// A picture's 그림 설명 being edited: the picture and the description it has now.
+struct HWPImageDescriptionDraft: Identifiable {
+    let target: HWPImageEditing.Target
+    let description: String
+    var id: String { target.objectID }
+}
+
+/// 그림 설명 (Android `DescriptionDialog`): the picture's alternative text, which screen readers
+/// read instead of the picture. Up to 1,000 characters; empty removes it.
+struct HWPImageDescriptionSheet: View {
+    let draft: HWPImageDescriptionDraft
+    let onApply: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+
+    private var count: Int { text.utf16.count }
+    private var accepted: Bool { HWPImageEditing.acceptsDescription(normalized) }
+    private var normalized: String {
+        text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextEditor(text: $text)
+                        .frame(minHeight: 120)
+                        .accessibilityLabel("그림 설명")
+                        .accessibilityIdentifier("hwp-image-description-text")
+                } footer: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(count) / 1,000")
+                            .monospacedDigit()
+                            .foregroundStyle(accepted ? VisionCraftUI.secondaryText : VisionCraftUI.error)
+                            .accessibilityLabel(Text("글자 수 \(count) / 1,000"))
+                        Text("화면 읽기 프로그램이 그림 대신 읽는 글입니다. 비워 두면 설명을 지웁니다.")
+                            .foregroundStyle(VisionCraftUI.secondaryText)
+                    }
+                    .font(.footnote)
+                }
+            }
+            .navigationTitle("그림 설명")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("적용") {
+                        guard accepted else { return }
+                        dismiss()
+                        onApply(normalized)
+                    }
+                    .disabled(!accepted || normalized == draft.description)
+                }
+            }
+            .onAppear { text = draft.description }
+        }
+    }
+}

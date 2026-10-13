@@ -245,6 +245,48 @@ final class HWPImageEditingTests: XCTestCase {
         XCTAssertTrue(reopenedImage.supportsTransparency)
     }
 
+    func testViewModelImageDescriptionUndoSaveAndRemove() async throws {
+        let package = try HWPXDocumentPackage.load(from: LegacyHWPXConverter.convert(text: "그림"))
+        let source = HWPTableStructureDocument.hwpx(package)
+        let selection = try XCTUnwrap(HWPImageEditing.selection(blocks: package.blocks,
+            selectedID: package.blocks[0].id, range: NSRange(location: 1, length: 0), layouts: package.pageLayouts))
+        let image = try HWPImageEditing.normalize(Self.png)
+        let size = image.displaySize(maxWidth: selection.width)
+        let inserted = try await HWPImageEditing.inserting(.init(selection: selection, image: image,
+            widthPoints: size.width, heightPoints: size.height), source: source, drafts: package.blocks)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".hwpx")
+        try inserted.document.data.write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let model = HWPDocumentViewModel(fileURL: url)
+        await model.load()
+        func target() throws -> (HWPDocumentBlock, HWPImageEditing.Target) {
+            let owner = try XCTUnwrap(model.blocks.first { !$0.canvasObjects.isEmpty })
+            return (owner, try XCTUnwrap(HWPImageEditing.target(owner: owner, object: try XCTUnwrap(owner.canvasObjects.first))))
+        }
+        let before = model.blocks
+        let text = "막대 그래프.\n2024년 매출이 가장 높다."
+        _ = try await model.describeImage(text, target: try target().1)
+        var (owner, picked) = try target()
+        XCTAssertEqual(HWPImageEditing.description(owner: owner, objectID: picked.objectID), text)
+        XCTAssertTrue(model.hasUnsavedChanges)
+        model.undo(); XCTAssertEqual(model.blocks, before)
+        model.redo()
+        await model.save()
+        XCTAssertNil(model.errorDescription)
+        let reopened = try HWPTableStructureDocument.load(Data(contentsOf: url))
+        let reopenedOwner = try XCTUnwrap(reopened.blocks.first { !$0.canvasObjects.isEmpty })
+        XCTAssertEqual(HWPImageEditing.description(owner: reopenedOwner,
+            objectID: try XCTUnwrap(reopenedOwner.canvasObjects.first).id), text)
+
+        (owner, picked) = try target()
+        _ = try await model.describeImage("", target: picked)
+        (owner, picked) = try target()
+        XCTAssertNil(HWPImageEditing.description(owner: owner, objectID: picked.objectID))
+        XCTAssertFalse(HWPImageEditing.acceptsDescription(String(repeating: "가", count: 1_001)))
+        XCTAssertTrue(HWPImageEditing.acceptsDescription(String(repeating: "가", count: 1_000)))
+    }
+
     func testHWPImageInsertResizeDeleteRoundTrip() async throws {
         let source = try HWPTableStructureDocument.load(fixture("hangul_design_application", "hwp"))
         let candidate = try XCTUnwrap(source.blocks.compactMap { block -> HWPImageEditing.Selection? in

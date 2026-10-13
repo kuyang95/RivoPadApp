@@ -2004,8 +2004,8 @@ private struct HWPChartCanvasView: View {
                 .resizable()
                 .scaledToFit()
         } else if let metafile = chart.previewMetafile,
-                  HWPWMFRenderer.hasSupportedDrawingRecords(metafile) {
-            HWPWMFCanvasView(metafile: metafile)
+                  HWPOriginalCanvasSceneBuilder.metafileHasDrawingRecords(metafile) {
+            HWPMetafileCanvasView(metafile: metafile)
         } else if chart.hasRenderableData {
             VStack(spacing: 2) {
                 if let title = chart.title {
@@ -2370,452 +2370,101 @@ private func textAlignment(_ alignment: HWPParagraphAlignment) -> TextAlignment 
     }
 }
 
-/// Lightweight WMF playback for the record subset emitted by legacy Hancom
-/// chart/OLE previews. Unknown records are skipped using their declared size,
-/// as required by the WMF record model, so newer producers degrade safely.
-private struct HWPWMFCanvasView: View {
+/// Paints a chart's WMF preview from the engine's playback (`HWPMetafilePlayback`, shared with
+/// Android): filled and stroked paths, then text lines, over white.
+struct HWPMetafileCanvasView: View {
     let metafile: HWPDocumentMetafile
 
     var body: some View {
         Canvas { context, size in
-            HWPWMFRenderer.render(
-                metafile: metafile,
-                context: &context,
-                size: size
-            )
+            for item in HWPMetafilePlayback.items(metafile, width: size.width, height: size.height) {
+                switch item.type {
+                case "path":
+                    guard let commands = item.path else { continue }
+                    let path = hwpMetafilePath(commands)
+                    if let fill = item.fill {
+                        context.fill(path, with: .color(hwpColor(fill)))
+                    }
+                    if let stroke = item.stroke, let width = item.strokeWidth {
+                        context.stroke(path, with: .color(hwpColor(stroke)), style: StrokeStyle(lineWidth: width))
+                    }
+                case "text":
+                    guard let text = item.text ?? item.bytes.map({ hwpMetafileText(hex: $0, charset: item.charset) }),
+                          !text.isEmpty, let size = item.size, size > 0 else { continue }
+                    var font = Font.system(size: size, weight: item.bold == true ? .bold : .regular)
+                    if item.italic == true { font = font.italic() }
+                    context.draw(
+                        Text(text).font(font).foregroundStyle(hwpColor(item.color ?? 0)),
+                        at: CGPoint(x: item.x ?? 0, y: item.y ?? 0),
+                        anchor: .topLeading
+                    )
+                default:
+                    continue
+                }
+            }
         }
         .background(.white)
     }
 }
 
-private enum HWPWMFRenderer {
-    /// Bitmap-only or EMF-wrapped previews cannot be played by this renderer.
-    /// Let the chart use its OOXML data (or a placeholder) instead of a blank WMF.
-    static func hasSupportedDrawingRecords(_ metafile: HWPDocumentMetafile) -> Bool {
-        let data = metafile.data
-        guard data.count >= 18,
-              let headerWords = uint16(data, 2), headerWords >= 9 else { return false }
-        var cursor = Int(headerWords) * 2
-        var recordCount = 0
-        var hasDrawing = false
-        while cursor + 6 <= data.count && recordCount < 100_000 {
-            recordCount += 1
-            guard let sizeWords = uint32(data, cursor),
-                  sizeWords >= 3, sizeWords <= 1_048_576,
-                  let function = uint16(data, cursor + 4) else { return false }
-            let end = cursor + Int(sizeWords) * 2
-            guard end <= data.count else { return false }
-            switch function {
-            case 0x0000: return hasDrawing
-            case 0x0213, 0x041B, 0x0324, 0x0A32: hasDrawing = true
-            default: break
-            }
-            cursor = end
-        }
-        return false
-    }
-
-    private struct Pen {
-        let style: UInt16
-        let width: Double
-        let colorRGB: UInt32
-    }
-
-    private struct Brush {
-        let style: UInt16
-        let colorRGB: UInt32
-    }
-
-    private struct FontObject {
-        let height: Double
-        let weight: Int
-        let italic: Bool
-        let charset: UInt8
-    }
-
-    private enum GraphicObject {
-        case pen(Pen)
-        case brush(Brush)
-        case font(FontObject)
-    }
-
-    private struct PlaybackState {
-        var windowOrigin = CGPoint.zero
-        var windowExtent = CGSize.zero
-        var currentPoint = CGPoint.zero
-        var selectedPen: Int?
-        var selectedBrush: Int?
-        var selectedFont: Int?
-        var textColorRGB: UInt32 = 0x000000
-        var backgroundColorRGB: UInt32 = 0xFFFFFF
-        var backgroundMode: UInt16 = 1
-    }
-
-    static func render(
-        metafile: HWPDocumentMetafile,
-        context: inout GraphicsContext,
-        size: CGSize
-    ) {
-        let data = metafile.data
-        guard data.count >= 18,
-              let headerWords = uint16(data, 2),
-              headerWords >= 9 else { return }
-        var cursor = Int(headerWords) * 2
-        guard cursor <= data.count else { return }
-        let declaredObjectCount = Int(uint16(data, 10) ?? 0)
-        var objects = [GraphicObject?](
-            repeating: nil,
-            count: min(max(declaredObjectCount, 16), 4_096)
-        )
-        var state = PlaybackState(
-            windowExtent: CGSize(
-                width: max(Double(metafile.widthLogical), 1),
-                height: max(Double(metafile.heightLogical), 1)
-            )
-        )
-        var savedStates: [PlaybackState] = []
-        var recordCount = 0
-
-        func transformed(_ logical: CGPoint) -> CGPoint {
-            let extentX = abs(state.windowExtent.width) > 0.0001
-                ? state.windowExtent.width : Double(metafile.widthLogical)
-            let extentY = abs(state.windowExtent.height) > 0.0001
-                ? state.windowExtent.height : Double(metafile.heightLogical)
-            return CGPoint(
-                x: (logical.x - state.windowOrigin.x) / extentX * size.width,
-                y: (logical.y - state.windowOrigin.y) / extentY * size.height
-            )
-        }
-
-        func object(at handle: Int?) -> GraphicObject? {
-            guard let handle,
-                  handle >= 0,
-                  handle < objects.count else { return nil }
-            return objects[handle]
-        }
-
-        func selectedPen() -> Pen {
-            if let handle = state.selectedPen, handle >= 0x8000 {
-                switch handle - 0x8000 {
-                case 6: return Pen(style: 0, width: 1, colorRGB: 0xFFFFFF)
-                case 8: return Pen(style: 5, width: 0, colorRGB: 0)
-                default: return Pen(style: 0, width: 1, colorRGB: 0)
-                }
-            }
-            if case .pen(let pen) = object(at: state.selectedPen) { return pen }
-            return Pen(style: 0, width: 1, colorRGB: 0)
-        }
-
-        func selectedBrush() -> Brush {
-            if let handle = state.selectedBrush, handle >= 0x8000 {
-                switch handle - 0x8000 {
-                case 0: return Brush(style: 0, colorRGB: 0xFFFFFF)
-                case 4: return Brush(style: 0, colorRGB: 0x000000)
-                case 5: return Brush(style: 1, colorRGB: 0)
-                default: return Brush(style: 1, colorRGB: 0)
-                }
-            }
-            if case .brush(let brush) = object(at: state.selectedBrush) { return brush }
-            return Brush(style: 1, colorRGB: 0)
-        }
-
-        func selectedFont() -> FontObject {
-            if case .font(let font) = object(at: state.selectedFont) { return font }
-            return FontObject(height: 12, weight: 400, italic: false, charset: 0)
-        }
-
-        func install(_ object: GraphicObject) {
-            for index in objects.indices {
-                if case nil = objects[index] {
-                    objects[index] = object
-                    return
-                }
-            }
-        }
-
-        func fillAndStroke(_ path: Path) {
-            let brush = selectedBrush()
-            if brush.style != 1 {
-                context.fill(path, with: .color(hwpColor(brush.colorRGB)))
-            }
-            let pen = selectedPen()
-            if pen.style & 0x000F != 5 {
-                let scale = size.width / max(abs(state.windowExtent.width), 1)
-                context.stroke(
-                    path,
-                    with: .color(hwpColor(pen.colorRGB)),
-                    style: StrokeStyle(
-                        lineWidth: max(0.5, CGFloat(abs(pen.width) * scale))
-                    )
-                )
-            }
-        }
-
-        while cursor + 6 <= data.count && recordCount < 100_000 {
-            recordCount += 1
-            guard let sizeWords = uint32(data, cursor),
-                  sizeWords >= 3,
-                  sizeWords <= 1_048_576 else { break }
-            let recordBytes = Int(sizeWords) * 2
-            let end = cursor + recordBytes
-            guard end <= data.count,
-                  let function = uint16(data, cursor + 4) else { break }
-            let parameters = cursor + 6
-
-            switch function {
-            case 0x0000: // META_EOF
-                return
-            case 0x001E: // META_SAVEDC
-                savedStates.append(state)
-            case 0x0127: // META_RESTOREDC
-                if let restored = savedStates.popLast() { state = restored }
-            case 0x0102: // META_SETBKMODE
-                state.backgroundMode = uint16(data, parameters) ?? 1
-            case 0x0201: // META_SETBKCOLOR
-                state.backgroundColorRGB = colorRGB(
-                    fromColorRef: uint32(data, parameters) ?? 0x00FF_FFFF
-                )
-            case 0x0209: // META_SETTEXTCOLOR
-                state.textColorRGB = colorRGB(
-                    fromColorRef: uint32(data, parameters) ?? 0
-                )
-            case 0x020B: // META_SETWINDOWORG
-                if let y = int16(data, parameters),
-                   let x = int16(data, parameters + 2) {
-                    state.windowOrigin = CGPoint(x: Double(x), y: Double(y))
-                }
-            case 0x020C: // META_SETWINDOWEXT
-                if let y = int16(data, parameters),
-                   let x = int16(data, parameters + 2), x != 0, y != 0 {
-                    state.windowExtent = CGSize(width: Double(x), height: Double(y))
-                }
-            case 0x0214: // META_MOVETO
-                if let y = int16(data, parameters),
-                   let x = int16(data, parameters + 2) {
-                    state.currentPoint = CGPoint(x: Double(x), y: Double(y))
-                }
-            case 0x0213: // META_LINETO
-                if let y = int16(data, parameters),
-                   let x = int16(data, parameters + 2) {
-                    let destination = CGPoint(x: Double(x), y: Double(y))
-                    var path = Path()
-                    path.move(to: transformed(state.currentPoint))
-                    path.addLine(to: transformed(destination))
-                    let pen = selectedPen()
-                    if pen.style & 0x000F != 5 {
-                        let scale = size.width / max(abs(state.windowExtent.width), 1)
-                        context.stroke(
-                            path,
-                            with: .color(hwpColor(pen.colorRGB)),
-                            style: StrokeStyle(
-                                lineWidth: max(0.5, CGFloat(abs(pen.width) * scale))
-                            )
-                        )
-                    }
-                    state.currentPoint = destination
-                }
-            case 0x041B: // META_RECTANGLE
-                if let bottom = int16(data, parameters),
-                   let right = int16(data, parameters + 2),
-                   let top = int16(data, parameters + 4),
-                   let left = int16(data, parameters + 6) {
-                    let p1 = transformed(CGPoint(x: Double(left), y: Double(top)))
-                    let p2 = transformed(CGPoint(x: Double(right), y: Double(bottom)))
-                    fillAndStroke(Path(CGRect(
-                        x: min(p1.x, p2.x),
-                        y: min(p1.y, p2.y),
-                        width: abs(p2.x - p1.x),
-                        height: abs(p2.y - p1.y)
-                    )))
-                }
-            case 0x0324: // META_POLYGON
-                if let countValue = uint16(data, parameters) {
-                    let count = min(Int(countValue), 16_384)
-                    guard parameters + 2 + count * 4 <= end else { break }
-                    var path = Path()
-                    for index in 0..<count {
-                        let offset = parameters + 2 + index * 4
-                        guard let x = int16(data, offset),
-                              let y = int16(data, offset + 2) else { continue }
-                        let point = transformed(CGPoint(x: Double(x), y: Double(y)))
-                        if index == 0 { path.move(to: point) }
-                        else { path.addLine(to: point) }
-                    }
-                    path.closeSubpath()
-                    fillAndStroke(path)
-                }
-            case 0x02FA: // META_CREATEPENINDIRECT
-                if let style = uint16(data, parameters),
-                   let width = int16(data, parameters + 2),
-                   let color = uint32(data, parameters + 6) {
-                    install(.pen(Pen(
-                        style: style,
-                        width: max(abs(Double(width)), 1),
-                        colorRGB: colorRGB(fromColorRef: color)
-                    )))
-                }
-            case 0x02FC: // META_CREATEBRUSHINDIRECT
-                if let style = uint16(data, parameters),
-                   let color = uint32(data, parameters + 2) {
-                    install(.brush(Brush(
-                        style: style,
-                        colorRGB: colorRGB(fromColorRef: color)
-                    )))
-                }
-            case 0x02FB: // META_CREATEFONTINDIRECT
-                if let height = int16(data, parameters),
-                   let weight = int16(data, parameters + 8),
-                   parameters + 14 <= end {
-                    install(.font(FontObject(
-                        height: abs(Double(height)),
-                        weight: Int(weight),
-                        italic: data[parameters + 10] != 0,
-                        charset: data[parameters + 13]
-                    )))
-                }
-            case 0x012D: // META_SELECTOBJECT
-                if let handleValue = uint16(data, parameters) {
-                    let handle = Int(handleValue)
-                    if handle >= 0x8000 {
-                        let stock = handle - 0x8000
-                        if stock <= 5 { state.selectedBrush = handle }
-                        else if stock <= 8 { state.selectedPen = handle }
-                        else { state.selectedFont = handle }
-                    } else if handle < objects.count {
-                        switch objects[handle] {
-                        case .pen?: state.selectedPen = handle
-                        case .brush?: state.selectedBrush = handle
-                        case .font?: state.selectedFont = handle
-                        case nil: break
-                        }
-                    }
-                }
-            case 0x01F0: // META_DELETEOBJECT
-                if let handle = uint16(data, parameters), Int(handle) < objects.count {
-                    objects[Int(handle)] = nil
-                }
-            case 0x0A32: // META_EXTTEXTOUT
-                drawText(
-                    data: data,
-                    parameters: parameters,
-                    end: end,
-                    state: state,
-                    font: selectedFont(),
-                    transformed: transformed,
-                    context: &context,
-                    size: size
-                )
-            default:
-                break
-            }
-            cursor = end
+private func hwpMetafilePath(_ commands: [HWPCanvasPathCommand]) -> Path {
+    // The engine writes a Rectangle record as an axis-aligned closed outline. Draw it as a
+    // rectangle so its corners antialias the way the rectangle path always has.
+    if commands.map(\.op) == ["M", "L", "L", "L", "Z"], commands.prefix(4).allSatisfy({ $0.values.count >= 2 }) {
+        let p = commands.prefix(4).map { CGPoint(x: $0.values[0], y: $0.values[1]) }
+        if p[0].y == p[1].y, p[1].x == p[2].x, p[2].y == p[3].y, p[3].x == p[0].x {
+            return Path(CGRect(x: p[0].x, y: p[0].y, width: p[2].x - p[0].x, height: p[2].y - p[0].y))
         }
     }
-
-    private static func drawText(
-        data: Data,
-        parameters: Int,
-        end: Int,
-        state: PlaybackState,
-        font: FontObject,
-        transformed: (CGPoint) -> CGPoint,
-        context: inout GraphicsContext,
-        size: CGSize
-    ) {
-        guard let y = int16(data, parameters),
-              let x = int16(data, parameters + 2),
-              let lengthValue = uint16(data, parameters + 4),
-              let options = uint16(data, parameters + 6) else { return }
-        let length = min(Int(lengthValue), 16_384)
-        var stringOffset = parameters + 8
-        if options & 0x0006 != 0 {
-            guard stringOffset + 8 <= end else { return }
-            if options & 0x0002 != 0,
-               let left = int16(data, stringOffset),
-               let top = int16(data, stringOffset + 2),
-               let right = int16(data, stringOffset + 4),
-               let bottom = int16(data, stringOffset + 6) {
-                let p1 = transformed(CGPoint(x: Double(left), y: Double(top)))
-                let p2 = transformed(CGPoint(x: Double(right), y: Double(bottom)))
-                context.fill(
-                    Path(CGRect(
-                        x: min(p1.x, p2.x),
-                        y: min(p1.y, p2.y),
-                        width: abs(p2.x - p1.x),
-                        height: abs(p2.y - p1.y)
-                    )),
-                    with: .color(hwpColor(state.backgroundColorRGB))
-                )
-            }
-            stringOffset += 8
+    var path = Path()
+    for command in commands {
+        let values = command.values
+        func point() -> CGPoint {
+            CGPoint(x: values.indices.contains(0) ? values[0] : 0, y: values.indices.contains(1) ? values[1] : 0)
         }
-        guard length >= 0, stringOffset + length <= end else { return }
-        let bytes = Data(data[stringOffset..<(stringOffset + length)])
-        let text = String(data: bytes, encoding: textEncoding(charset: font.charset))
-            ?? String(data: bytes, encoding: .windowsCP1252)
-            ?? String(data: bytes, encoding: .isoLatin1)
-            ?? ""
-        guard !text.isEmpty else { return }
-        let origin = transformed(CGPoint(x: Double(x), y: Double(y)))
-        let extentHeight = max(abs(state.windowExtent.height), 1)
-        let fontSize = min(
-            max(CGFloat(max(font.height, 8) / extentHeight) * size.height, 4),
-            max(size.height * 0.25, 4)
-        )
-        var swiftUIFont = Font.system(
-            size: fontSize,
-            weight: font.weight >= 600 ? .bold : .regular
-        )
-        if font.italic { swiftUIFont = swiftUIFont.italic() }
-        context.draw(
-            Text(text)
-                .font(swiftUIFont)
-                .foregroundStyle(hwpColor(state.textColorRGB)),
-            at: origin,
-            anchor: .topLeading
-        )
-    }
-
-    private static func textEncoding(charset: UInt8) -> String.Encoding {
-        let cfValue: UInt32
-        switch charset {
-        case 128: return .shiftJIS
-        case 129: cfValue = 0x0422 // Windows CP949 / Unified Hangul Code
-        case 134: cfValue = 0x0631 // GBK
-        case 136: cfValue = 0x0A03 // Big5
-        case 204: cfValue = 0x0502 // Windows Cyrillic
-        default: return .windowsCP1252
+        switch command.op {
+        case "M": path.move(to: point())
+        case "L": path.addLine(to: point())
+        case "Z": path.closeSubpath()
+        default: break
         }
-        return String.Encoding(
-            rawValue: CFStringConvertEncodingToNSStringEncoding(
-                CFStringEncoding(cfValue)
-            )
-        )
     }
+    return path
+}
 
-    private static func colorRGB(fromColorRef value: UInt32) -> UInt32 {
-        let red = value & 0xFF
-        let green = (value >> 8) & 0xFF
-        let blue = (value >> 16) & 0xFF
-        return red << 16 | green << 8 | blue
+/// A metafile string the engine left as hex bytes in a Windows charset: that charset's code
+/// page (Shift_JIS, CP949, GBK, Big5, Windows-1251), else Windows-1252, else ISO 8859-1.
+func hwpMetafileText(hex: String, charset: Int?) -> String {
+    var bytes: [UInt8] = []
+    bytes.reserveCapacity(hex.utf8.count / 2)
+    var index = hex.startIndex
+    while let next = hex.index(index, offsetBy: 2, limitedBy: hex.endIndex) {
+        guard let byte = UInt8(hex[index..<next], radix: 16) else { break }
+        bytes.append(byte)
+        index = next
     }
+    let data = Data(bytes)
+    for encoding in charset.map(hwpMetafileEncodings) ?? [] {
+        if let text = String(data: data, encoding: encoding) { return text }
+    }
+    return String(data: data, encoding: .windowsCP1252)
+        ?? String(data: data, encoding: .isoLatin1)
+        ?? ""
+}
 
-    private static func uint16(_ data: Data, _ offset: Int) -> UInt16? {
-        guard offset >= 0, offset + 2 <= data.count else { return nil }
-        return UInt16(data[offset]) | UInt16(data[offset + 1]) << 8
+/// The code pages for a Windows font charset, the first that decodes wins (GBK: Foundation's
+/// GBK_95 does not decode on iOS, so GB 18030 and CP936 follow, as Android's GBK does).
+private func hwpMetafileEncodings(_ charset: Int) -> [String.Encoding] {
+    let values: [UInt32]
+    switch charset {
+    case 128: return [.shiftJIS]
+    case 129: values = [0x0422] // Windows CP949 / Unified Hangul Code
+    case 134: values = [0x0631, 0x0632, 0x0421] // GBK, GB 18030, CP936
+    case 136: values = [0x0A03] // Big5
+    case 204: values = [0x0502] // Windows Cyrillic
+    default: return []
     }
-
-    private static func int16(_ data: Data, _ offset: Int) -> Int16? {
-        uint16(data, offset).map { Int16(bitPattern: $0) }
-    }
-
-    private static func uint32(_ data: Data, _ offset: Int) -> UInt32? {
-        guard offset >= 0, offset + 4 <= data.count else { return nil }
-        return UInt32(data[offset])
-            | UInt32(data[offset + 1]) << 8
-            | UInt32(data[offset + 2]) << 16
-            | UInt32(data[offset + 3]) << 24
-    }
+    return values.map { String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding($0))) }
 }
 
 private func frameAlignment(_ alignment: HWPParagraphAlignment) -> Alignment {
