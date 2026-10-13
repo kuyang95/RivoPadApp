@@ -886,6 +886,18 @@ struct HomeSettingsPanel: View {
             appearanceSettings
             quickMenuSettings
             documentViewerSettings
+            #if DEBUG
+            VisionCraftSettingsGroup(title: "개발") {
+                NavigationLink {
+                    DebugDevelopmentView()
+                } label: {
+                    Label("개발 화면", systemImage: "hammer")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(VisionCraftAndroidButtonStyle())
+                .accessibilityHint("Debug 전용 개발 도구를 엽니다.")
+            }
+            #endif
         }
     }
 

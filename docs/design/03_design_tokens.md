@@ -64,6 +64,7 @@ AI 보라 `#7655B4`/`#C6B1F5` · 카메라 파랑 `#356AA8`/`#9EC5FF` · 읽기 
 
 ### 화면 전용 색
 
+- Debug 접근성 웹의 콘텐츠 팔레트(`Settings/AccessibleWeb/AccessibleWebAppearance.swift`)는 앱 UI 테마와 독립적이다. 어둡게: 배경 `#000000`, 면 `#171717`, 글자 `#F0F4FA`, 경계 `#BBC6D7`, 링크·포커스 `#FFD166`. 밝게: 배경 `#FFFFFF`, 면 `#F0F2F5`, 글자 `#283546`, 경계 `#536176`, 링크·포커스 `#704000`. 고대비: 배경·면 `#000000`, 글자·경계 `#FFFF00`, 링크·포커스 `#FFFFFF`. 사진 등 시각 콘텐츠는 원본 색을 유지한다. 브라우저 바깥의 제목·주소·도구 줄은 공용 앱 토큰을 사용한다.
 - 안내 카드: 면 `#FFF9EF`/`#211D18`, 보조글자 `#6F604F`/`#D4C4AF`, 화살표 칩 `#FFE1C9`/`#483326`, 화살표 `#885024`/`#F3C9A4` (`VisionCraftHomeUI.guide*`).
 - 홈 사용법 아이콘: 진한 황금색 `#A67C00`/`#D4A72C` (`VisionCraftHomeUI.guideIcon`). 홈 5번째 방문부터 설정 오른쪽에 표시한다.
 - 타일 그림 뒤 squircle: `#E6E8EA`/`#DBE2EC` (`VisionCraftHomeUI.tileArtBackground`).

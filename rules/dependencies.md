@@ -61,7 +61,7 @@ HWP 글자 측정·이미지 변환·지역화 계약은 `Support/DocumentEngine
 | `MLKit` (Pod) | `OCRService` — 한국어 텍스트 인식 |
 | `Vision` | `DocumentScan/SentenceBox.swift`, `OCRResultView.swift` 에서만 import (좌표 유틸). OCR 인식 경로는 ML Kit |
 | `PDFKit` | PDF 뷰어/텍스트 추출, HWP PDF 렌더 |
-| `WebKit` | `WebKitRenderedContentLoader` (웹 본문 추출) |
+| `WebKit` | `WebKitRenderedContentLoader` (웹 본문 추출), Debug 전용 `AccessibleWebBrowserModel`·`AccessibleWebBrowserView` (분리된 스크립트 월드·비영속 저장소의 접근성 웹, 추가 라이브러리 없음) |
 | `AppIntents` / `WidgetKit` | App Shortcuts, 위젯 |
 | `Security` | Keychain (`VisionLinkCredentialStore`) |
 | `CryptoKit` | 모델·글꼴 SHA-256 검증 |

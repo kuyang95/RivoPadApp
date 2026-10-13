@@ -76,6 +76,10 @@ Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 �
 
 사용자 문서(HWP/HWPX/XLSX/XLS/DOCX/PDF/TXT/EPUB)는 Files 앱에서 직접 열거나(`LocalFileOpening`, `LocalDocumentImportService`) `AuthorizedDocumentLibrary` 가 북마크한 폴더에서 나열 (지원 확장자 `supportedExtensions`, 최대 5,000개 / 깊이 64). 테스트 산출물도 `Documents/` 에 쓴다.
 
+## Debug 접근성 웹 세션
+
+`Settings/AccessibleWeb/AccessibleWebBrowserModel.swift`는 `WKWebsiteDataStore.nonPersistent()`를 사용한다. 웹 쿠키·로그인·localStorage는 열린 브라우저와 그 팝업 사이에서만 공유하고 디스크에 영속 저장하지 않는다. 화면을 닫고 다시 열면 새 저장소가 생긴다. 주소·방문 내역·색상 통일 여부·팔레트는 화면 메모리에만 두며 UserDefaults 키를 만들지 않는다. 기존 문서용 WebView나 앱의 네이티브 데이터 브리지를 사용하지 않는다.
+
 ## Keychain
 
 | 서비스 / 계정 | 내용 | 출처 |

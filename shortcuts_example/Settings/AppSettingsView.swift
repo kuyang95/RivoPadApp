@@ -42,6 +42,16 @@ struct AppSettingsView: View {
             connectionSection
             supportSection
             systemSection
+            #if DEBUG
+            Section("개발") {
+                NavigationLink {
+                    DebugDevelopmentView()
+                } label: {
+                    Label("개발 화면", systemImage: "hammer")
+                }
+                .accessibilityHint("Debug 전용 개발 도구를 엽니다.")
+            }
+            #endif
             resetSection
         }
         .environment(\.defaultMinListRowHeight, VisionCraftUI.minTouchTarget)
