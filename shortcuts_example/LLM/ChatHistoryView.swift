@@ -38,7 +38,7 @@ struct ChatHistoryView: View {
 
             VStack(spacing: 0) {
                 VisionCraftScreenTitleRow(
-                    title: "대화기록",
+                    title: "대화 기록",
                     onBack: { dismiss() }
                 )
                 .padding(.bottom, 16)

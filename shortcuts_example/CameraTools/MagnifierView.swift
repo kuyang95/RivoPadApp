@@ -129,7 +129,7 @@ struct PhotoReviewView: View {
     @State private var work: Task<Void, Never>?
 
     private var title: String {
-        AppLocalization.string(fromCamera ? "촬영한 사진" : "사진 분석")
+        AppLocalization.string(fromCamera ? "촬영한 사진" : "저장된 사진")
     }
 
     var body: some View {

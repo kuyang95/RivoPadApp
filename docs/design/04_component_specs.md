@@ -54,7 +54,7 @@
 - 생김새: VcSoftSurface + 모서리 22, 최소 높이 88, 안쪽 20/18, 요소 간격 16. 왼쪽 VcIconTile Large(다이얼로그·카테고리) 또는 회색 28pt 아이콘(홈 목록형), 가운데 제목(18 SemiBold)과 설명(16 보조글자), 오른쪽 VcChevron.
 - 상태: 눌림. `badge`(`VisionCraftActionItem.badge` / `VisionCraftDialogOptionRow.badge`)가 있으면 테두리가 강조색이 되고 화살표 자리에 VcBadge. `isPrimary`도 테두리 강조색. `isEnabled == false`면 아이콘 칸·글자를 흐리게.
 - 스크린리더: "제목. 설명"(뱃지가 있으면 "제목, 뱃지. 설명") 한 덩어리, 역할 버튼.
-- 쓰는 곳: 홈 목록형(`HomeView.swift`), 목록형 기능 선택창, 이미지 분석·열기·작업 다이얼로그, 데이지 여는 화면.
+- 쓰는 곳: 홈 목록형(`HomeView.swift`), 목록형 기능 선택창, 장면 설명·열기·작업 다이얼로그, 데이지 여는 화면.
 
 ## VcNoticeCard — 안내 카드 (크림색)
 
@@ -110,7 +110,7 @@
 ## VcButtonAccent — 실행 버튼 (주황)
 
 - 구현: `VisionCraftAndroidButtonStyle(emphasized: true)` — 면·테두리 강조색, 글자 배경색(`onPrimary`), 최소 64.
-- 쓰는 곳: 사진 분석·문서 스캔 `작업`, 채팅 다이얼로그 확인.
+- 쓰는 곳: 저장된 사진·문서 스캔 `작업`, 채팅 다이얼로그 확인.
 
 ## VcButtonInk — 이동·확정 버튼 (남색)
 
@@ -241,11 +241,11 @@
 
 - 구현: `CameraTools/MagnifierViewController.swift` 촬영 버튼
 - 생김새: 흰 원 → 3 여백 → `#171717` 링 → 4 여백 → 채움. 100(iPad 124, 낮은 화면 80). 안에 "촬영"/"분석\n촬영"/"질문\n촬영".
-- 상태: 눌림 `#D0D0D0`, 이미지 분석·AI 질문 모드에서는 강조색 채움.
+- 상태: 눌림 `#D0D0D0`, 장면 설명·AI 질문 모드에서는 강조색 채움.
 
 ## VcCamStatusOverlay — 안내 띠
 
-- 구현: 사진 분석(`CameraTools/MagnifierView.swift` `PhotoReviewView`), 문서 스캔 결과(`DocumentScan/DocumentScanRootView.swift`), 카메라 이미지 분석 결과
+- 구현: 저장된 사진(`CameraTools/MagnifierView.swift` `PhotoReviewView`), 문서 스캔 결과(`DocumentScan/DocumentScanRootView.swift`), 카메라 장면 설명 결과
 - 생김새: `VisionCraftUI.overlay`(글자색 88%) 면, 모서리 14, 글자는 배경색 17~18 굵게. 바뀔 때마다 읽는다(`UIAccessibility.post(.announcement)`).
 - 카메라 미리보기 위 문서 스캔 상태 알약은 별개: 거의 투명한 어두운 면 + 옅은 파란 테두리, 모서리 22, 화면 아래.
 
@@ -277,6 +277,6 @@
 
 # 11. AI 문서 진입 패널과 안 쓰는 레거시
 
-`VisionCraftPrimaryActionPanel`은 Android `FileSelectScreen`이 쓰는 `VcPrimaryActionPanel`에 대응한다. iPadOS의 `AIDocumentSelectionView`에서도 문서 안내와 새 대화·대화기록 버튼을 묶는 머리 패널로 쓴다. 제목과 설명 사이에는 추가 간격을 두지 않는다.
+`VisionCraftPrimaryActionPanel`은 Android `FileSelectScreen`이 쓰는 `VcPrimaryActionPanel`에 대응한다. iPadOS의 `AIDocumentSelectionView`에서도 문서 안내와 새 대화·대화 기록 버튼을 묶는 머리 패널로 쓴다. 제목과 설명 사이에는 추가 간격을 두지 않는다.
 
 `VisionCraftUI.swift`의 `VisionCraftSectionHeader`, `VisionCraftActionList`와 `VisionCraftStatusBanner.swift`의 `VisionCraftStatusBanner`는 옛 스타일이다. 새 화면에서 쓰지 않는다.

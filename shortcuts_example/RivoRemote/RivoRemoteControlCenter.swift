@@ -410,7 +410,7 @@ final class RivoRemoteControlCenter: ObservableObject {
             ),
             RivoQuickMenuItem(
                 id: "widgets.reader",
-                title: AppLocalization.string("데이지/EPUB 플레이어"),
+                title: AppLocalization.string("도서 읽기"),
                 systemImage: "book",
                 command: .navigate(.reader)
             ),

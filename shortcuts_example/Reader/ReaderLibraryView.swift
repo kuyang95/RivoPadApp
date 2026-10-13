@@ -100,7 +100,7 @@ struct ReaderLibraryView: View {
         }
         .visionCraftListScreen()
         .navigationTitle(
-            "데이지/EPUB 플레이어"
+            "도서 읽기"
         )
         .fileImporter(
             isPresented: $isImporterPresented,

@@ -359,7 +359,7 @@ struct TextEditorViewerView: View {
             GeometryReader { geometry in
                 ScrollView {
                 VStack(spacing: 14) {
-                    Text(AppLocalization.string("어떤 텍스트를 열까요?"))
+                    Text(AppLocalization.string("텍스트 가져오기"))
                         .visionCraftAndroidText(28, weight: .bold, relativeTo: .title)
                         .foregroundStyle(VisionCraftUI.primaryText)
                         .multilineTextAlignment(.center)
@@ -376,7 +376,7 @@ struct TextEditorViewerView: View {
                         }
                     }
                     openSourceButton(
-                        title: "이미지에서 텍스트 읽어오기",
+                        title: "이미지",
                         hint: "사진 앨범에서 고른 이미지의 글자를 읽어옵니다."
                     ) {
                         isPhotoPickerPresented = true
@@ -420,7 +420,7 @@ struct TextEditorViewerView: View {
     private var dialogOverlays: some View {
         if isSourceDialogPresented {
             VisionCraftDialogCard(
-                title: "열기",
+                title: "텍스트 가져오기",
                 onDismiss: {
                     isSourceDialogPresented = false
                 }
@@ -433,7 +433,7 @@ struct TextEditorViewerView: View {
                     replaceContentFromClipboard()
                 }
                 VisionCraftDialogOptionRow(
-                    title: "이미지에서 텍스트 읽어오기",
+                    title: "이미지",
                     systemImage: "photo"
                 ) {
                     isSourceDialogPresented = false

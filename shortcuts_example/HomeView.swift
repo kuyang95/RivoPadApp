@@ -1338,7 +1338,7 @@ private struct VisionCraftTextSourceDialog: View {
 
     var body: some View {
         VisionCraftDialogCard(
-            title: "열기",
+            title: "텍스트 가져오기",
             tone: .reading,
             onDismiss: onDismiss
         ) {
@@ -1353,7 +1353,7 @@ private struct VisionCraftTextSourceDialog: View {
                 )
             }
             VisionCraftDialogOptionRow(
-                title: "이미지에서 텍스트 읽어오기",
+                title: "이미지",
                 subtitle: "사진 앨범에서 고른 이미지의 글자를 읽어옵니다.",
                 systemImage: "photo",
                 accent: VisionCraftHomeUI.logoAccent(1),

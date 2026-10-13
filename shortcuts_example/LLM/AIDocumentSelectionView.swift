@@ -39,7 +39,7 @@ struct AIDocumentSelectionView: View {
                     title: "AI 문서 질의",
                     description: "기기 안의 PDF, 엑셀, 한글, TXT 문서를 골라 AI에게 질문할 수 있습니다.",
                     primaryTitle: "새 대화",
-                    secondaryTitle: "대화기록",
+                    secondaryTitle: "대화 기록",
                     onPrimary: { appRouter.route = .localChat(conversationID: nil) },
                     onSecondary: { appRouter.route = .chatHistory }
                 )

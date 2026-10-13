@@ -1790,7 +1790,7 @@ final class MagnifierViewController:
                         "7 이미지 설명"
                     )
             case .askAI:
-                seventhKeyAction = AppLocalization.string("7 AI 질문하기")
+                seventhKeyAction = AppLocalization.string("7 AI 질문")
             }
             announceRemoteStatus(
                 showGuide
@@ -2217,10 +2217,10 @@ final class MagnifierViewController:
 
     static func modeName(for mode: MagnifierCameraMode) -> String {
         switch mode {
-        case .magnifier: return AppLocalization.string("카메라")
-        case .imageDescription: return AppLocalization.string("이미지 분석")
-        case .askAI: return AppLocalization.string("AI 질문하기")
-        case .liveTextReader: return AppLocalization.string("실시간 문자 읽기")
+        case .magnifier: return AppLocalization.string("확대 보기")
+        case .imageDescription: return AppLocalization.string("장면 설명")
+        case .askAI: return AppLocalization.string("AI 질문")
+        case .liveTextReader: return AppLocalization.string("실시간 읽기")
         }
     }
 

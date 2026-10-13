@@ -7,8 +7,8 @@
     "icon": "hand.wave",
     "action": "home",
     "steps": [
-      "Choose Camera to magnify small objects, Document Scan to read a paper document, or Live Text Reading to hear text in front of you.",
-      "Open your files in Document Workspace. Use the DAISY/EPUB Player for EPUB and DAISY books.",
+      "Choose Magnifier to magnify small objects, Scan Document to read a paper document, or Live Reading to hear text in front of you.",
+      "Open your files in Document Workspace. Use the Book Reader for EPUB and DAISY books.",
       "Return to Home and try a feature. The By Feature tab in this guide also shows how to use each tool."
     ],
     "tip": "You can use every Home feature by touch without a remote. The app explains any required permission when you first use a feature."
@@ -16,12 +16,12 @@
   {
     "id": "printed_text",
     "group": "feature",
-    "feature": "Document scan · Text recognition",
+    "feature": "Scan Document · Text recognition",
     "situation": "I want to enlarge text on paper or objects",
     "icon": "doc.text.viewfinder",
     "action": "scan",
     "steps": [
-      "For a paper document, open Document scan from Home and capture the whole page in the camera view. With the Categories home layout, tap the Camera tile and choose Document scan in the dialog.",
+      "For a paper document, open Scan Document from Home and capture the whole page in the camera view. With the Categories home layout, tap the Camera tile and choose Scan Document on the feature selection screen.",
       "When text recognition finishes, choose Actions → Open in text viewer.",
       "Adjust text size, line spacing, and colors in Text viewer to read comfortably. You can also listen to the text."
     ],
@@ -30,12 +30,12 @@
   {
     "id": "camera",
     "group": "feature",
-    "feature": "Camera",
+    "feature": "Magnifier",
     "situation": "I want to magnify nearby text and objects",
     "icon": "camera",
     "action": "camera",
     "steps": [
-      "Open Camera from Home and point it at the object you want to see. With the Categories home layout, tap the Camera tile and choose Camera in the dialog.",
+      "Open Magnifier from Home and point the camera at the subject. With the Categories home layout, tap the Camera tile and choose Magnifier on the feature selection screen.",
       "Pinch out or use the zoom controls to magnify. If the image is blurry, adjust the distance and hold the iPad steady.",
       "Turn on the torch in dim light and choose a color filter that makes the text easier to see."
     ],
@@ -44,12 +44,12 @@
   {
     "id": "scan",
     "group": "feature",
-    "feature": "Document Scan",
+    "feature": "Scan Document",
     "situation": "I want to read and save a paper document",
     "icon": "doc.viewfinder",
     "action": "scan",
     "steps": [
-      "Open Document Scan from Home and fit the whole document in the camera view. With the Categories home layout, tap the Camera tile and choose Document scan in the dialog.",
+      "Open Scan Document from Home and fit the whole document in the camera view. With the Categories home layout, tap the Camera tile and choose Scan Document on the feature selection screen.",
       "Hold the iPad steady and it captures on its own. If shake keeps blocking it, it announces and shoots anyway after 8 seconds, and turns the torch on in dim light. Check the edges and orientation in the result.",
       "Recognize a page to read or copy its text. To keep several pages, add pages, review them, and save a PDF."
     ],
@@ -58,30 +58,30 @@
   {
     "id": "live",
     "group": "feature",
-    "feature": "Live Text Reading",
+    "feature": "Live Reading",
     "situation": "I want to hear the text in front of me",
     "icon": "text.viewfinder",
     "action": "liveText",
     "steps": [
-      "Open Live Text Reading from Home. With the Categories home layout, tap the Camera tile and choose Live text reader in the dialog.",
+      "Open Live Reading from Home. With the Categories home layout, tap the Camera tile and choose Live Reading on the feature selection screen.",
       "Point the camera so that the text is visible and hold the iPad steady for a moment.",
       "Listen to the automatically recognized text. Move the camera slowly to read something else."
     ],
-    "tip": "The reader avoids repeating the same sentence continuously. Use Document Scan to review and save a whole page."
+    "tip": "The reader avoids repeating the same sentence continuously. Use Scan Document to review and save a whole page."
   },
   {
     "id": "image",
     "group": "feature",
-    "feature": "Image analysis",
+    "feature": "Describe Scene",
     "situation": "I want to know what is in a picture",
     "icon": "sparkles",
     "action": "image",
     "steps": [
-      "Open Image analysis from Home and take a picture of the scene. With the Categories home layout, tap the Camera tile and choose Image analysis in the dialog.",
+      "Open Describe Scene from Home and take a picture of the scene. With the Categories home layout, tap the Camera tile and choose Describe Scene on the feature selection screen.",
       "When analysis finishes, read the description or listen to it.",
       "Ask a follow-up question about the same picture. To use a saved photo, attach it to a new chat."
     ],
-    "tip": "Image analysis sends the picture and question to Gemini and requires an internet connection. Descriptions can contain mistakes, so check important details."
+    "tip": "Describe Scene sends the picture and question to Gemini and requires an internet connection. Descriptions can contain mistakes, so check important details."
   },
   {
     "id": "chat",
@@ -156,12 +156,12 @@
   {
     "id": "books",
     "group": "feature",
-    "feature": "DAISY/EPUB Player",
+    "feature": "Book Reader",
     "situation": "I want to listen to an ebook",
     "icon": "book.closed",
     "action": "books",
     "steps": [
-      "Open the DAISY/EPUB Player from Home.",
+      "Open the Book Reader from Home.",
       "Choose Select Book File and select an EPUB or DAISY ZIP file.",
       "Open the book and start playback. Choose a location in the table of contents and adjust viewing and reading settings."
     ],
@@ -260,7 +260,7 @@
     "action": "home",
     "steps": [
       "Touch and hold an empty area of the iPad Home Screen, then choose Add Widget from the edit menu.",
-      "Add a VisionCraft Quick Launch widget. Edit the widget to choose Camera, Document Scan, Voice Command, or another feature.",
+      "Add a VisionCraft Quick Launch widget. Edit the widget to choose Camera, Scan Document, Voice Command, or another feature.",
       "Tap the widget to launch it. You can also find VisionCraft actions in Shortcuts and build your own sequence."
     ],
     "tip": "Add multiple widgets to make a shortcut for each feature. VisionCraft Quick Launch is also available when adding a control in Control Center."
@@ -372,7 +372,7 @@
     "action": "documents",
     "steps": [
       "Make sure the file has finished downloading. A USB storage device must remain connected for documents on it.",
-      "Reselect documents in Document Workspace, and EPUB or DAISY books in the DAISY/EPUB Player.",
+      "Reselect documents in Document Workspace, and EPUB or DAISY books in the Book Reader.",
       "Try another file. If only one file fails, obtain a fresh copy from its provider."
     ],
     "tip": "Password-protected, DRM-protected, or damaged files may not open. Changing a filename extension does not convert the file format."

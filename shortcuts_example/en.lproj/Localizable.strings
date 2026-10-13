@@ -2649,53 +2649,44 @@
 "파일이 없습니다" = "File not found";
 "일치하는 문서가 없습니다" = "No matching documents";
 
-"확대 보기" = "Magnifier";
-
-"장면 설명" = "Describe Scene";
-
-"저장된 사진" = "Saved Photos";
-
-"텍스트/문서" = "Text/Docs";
-
-"도서 읽기" = "Book Reader";
-
-"스마트폰 연결" = "Connect Your Phone";
-
-"문서, 클립보드 내용, 사진을 첨부할 수 있습니다." = "Add documents, clipboard content, or photos as needed.";
-
-"이전 대화를 다시 엽니다." = "Reopen past chats.";
-
-"확대, 조명, 색상 필터를 사용합니다." = "Use zoom, lighting, and color filters.";
-
-"문서 한 장을 텍스트로 변환합니다." = "Convert a document page to text.";
-
-"비춘 글자를 자동으로 읽어줍니다." = "Hear text read aloud automatically.";
-
-"촬영 후 AI에게 음성으로 묻습니다." = "Take a photo and ask AI about it by voice.";
-
-"촬영한 장면을 AI가 설명합니다." = "Get an AI description of the captured scene.";
-
-"글자 인식, 번역, AI 설명과 대화를 이용합니다." = "Extract text, translate, get descriptions, or chat with AI.";
-
-"글을 크게 보고 편집합니다." = "View and edit text in large print.";
-
-"EPUB·DAISY 도서를 읽습니다." = "Read EPUB and DAISY books.";
-
-"스마트폰의 카메라, 사진, 문서를 VisionCraft에서 활용하세요." = "Use your phone’s camera, photos, and documents in VisionCraft.";
-
-"궁금한 내용을 AI에게 물어보세요." = "Ask questions and chat with AI.";
-
-"확대해서 보고, 글자와 이미지를 인식하세요." = "Zoom in, read text, and understand images.";
-
-"글과 문서를 편하게 읽고 편집하세요." = "Read and edit text and documents.";
-
-"스마트폰과 연결해 함께 사용하세요." = "Connect your smartphone to VisionCraft.";
-
-// VisionLink quality and shared camera zoom
 "자동 화질" = "Auto quality";
+
 "자동 화질 · 영상 측정 중" = "Auto quality · Measuring video";
+
 "자동 화질 · 영상 일시 멈춤" = "Auto quality · Video paused";
+
 "영상 품질이 충분하지 않아 표시를 잠시 멈췄습니다.\n연결 상태가 좋아지면 자동으로 다시 표시합니다." = "Video quality is insufficient, so the picture is temporarily hidden.\nIt will return automatically when the connection improves.";
+"확대 보기" = "Magnifier";
+"장면 설명" = "Describe Scene";
+"저장된 사진" = "Saved Photos";
+"텍스트/문서" = "Text/Docs";
+"도서 읽기" = "Book Reader";
+"스마트폰 연결" = "Connect Your Phone";
+"문서, 클립보드 내용, 사진을 첨부할 수 있습니다." = "Add documents, clipboard content, or photos as needed.";
+"이전 대화를 다시 엽니다." = "Reopen past chats.";
+"확대, 조명, 색상 필터를 사용합니다." = "Use zoom, lighting, and color filters.";
+"문서 한 장을 텍스트로 변환합니다." = "Convert a document page to text.";
+"비춘 글자를 자동으로 읽어줍니다." = "Hear text read aloud automatically.";
+"촬영 후 AI에게 음성으로 묻습니다." = "Take a photo and ask AI about it by voice.";
+"촬영한 장면을 AI가 설명합니다." = "Get an AI description of the captured scene.";
+"글자 인식, 번역, AI 설명과 대화를 이용합니다." = "Extract text, translate, get descriptions, or chat with AI.";
+"글을 크게 보고 편집합니다." = "View and edit text in large print.";
+"EPUB·DAISY 도서를 읽습니다." = "Read EPUB and DAISY books.";
+"스마트폰의 카메라, 사진, 문서를 VisionCraft에서 활용하세요." = "Use your phone’s camera, photos, and documents in VisionCraft.";
+"궁금한 내용을 AI에게 물어보세요." = "Ask questions and chat with AI.";
+"확대해서 보고, 글자와 이미지를 인식하세요." = "Zoom in, read text, and understand images.";
+"글과 문서를 편하게 읽고 편집하세요." = "Read and edit text and documents.";
+"스마트폰과 연결해 함께 사용하세요." = "Connect your smartphone to VisionCraft.";
+"텍스트 가져오기" = "Import Text";
+"확대 보기 열기" = "Open Magnifier";
+"대화 기록 열기" = "Open Chat History";
+"실시간 읽기 열기" = "Open Live Reading";
+"장면 설명 열기" = "Open Describe Scene";
+"도서 읽기 열기" = "Open Book Reader";
+"스마트폰 연결 열기" = "Open Connect Your Phone";
+"7 AI 질문" = "7 Ask AI";
+
+// VisionLink shared camera zoom
 "카메라 축소" = "Zoom out camera";
 "카메라 확대" = "Zoom in camera";
 "카메라 확대 배율" = "Camera zoom";
