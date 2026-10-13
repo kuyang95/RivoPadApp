@@ -1,6 +1,6 @@
 # 영속 데이터 (UserDefaults / App Group / 파일 / Keychain / Assets)
 
-점검일 2026-10-12 · 기준 코드 `8249fa41`
+점검일 2026-10-13 · 기준 코드 `f7c42775` + 작업 트리 (앱 테마 저장·기능 타일 에셋·Debug 웹 세션)
 
 Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 데이터는 전부 **JSON 파일** 또는 **UserDefaults(Codable 인코딩)**.
 
@@ -96,5 +96,5 @@ Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 �
 | `Help/RivoPadManual.txt`, `Help/RivoPadChangelog.txt` (+ 언어별) | `@title/@version/@date/@chapter/@section/@text` 마크업 — `Help/HelpDocument.swift` · `HelpContentLibrary` 가 언어 lproj 우선, 없으면 루트 파일 |
 | `*.mp3`, `*.wav` 16개 | `SoundEffectManager` ([gemini_ai.md](gemini_ai.md) 효과음 표) |
 | `*.ttf`/`*.otf` 15개 | `UIAppFonts` |
-| `Assets.xcassets` | `AppIcon`, `AccentColor`, `LaunchBackground`, `LaunchLogo`, 홈 타일 4종 (`HomeTileAIChat/Camera/PhoneLink/Reading`), `TextOpenSourceIllustration` |
+| `Assets.xcassets` | `AppIcon`, `AccentColor`, `LaunchBackground`, `LaunchLogo`, 홈 타일 4종 (`HomeTileAIChat/Camera/PhoneLink/Reading`), 카테고리 기능 타일 11종 (`HomeAction*`, 사용자 제공 투명 PNG), `TextOpenSourceIllustration` |
 | `AppShortcuts.xcstrings` | App Shortcut 문구 |

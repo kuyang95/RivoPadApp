@@ -280,3 +280,7 @@
 `VisionCraftPrimaryActionPanel`은 Android `FileSelectScreen`이 쓰는 `VcPrimaryActionPanel`에 대응한다. iPadOS의 `AIDocumentSelectionView`에서도 문서 안내와 새 대화·대화 기록 버튼을 묶는 머리 패널로 쓴다. 제목과 설명 사이에는 추가 간격을 두지 않는다.
 
 `VisionCraftUI.swift`의 `VisionCraftSectionHeader`, `VisionCraftActionList`와 `VisionCraftStatusBanner.swift`의 `VisionCraftStatusBanner`는 옛 스타일이다. 새 화면에서 쓰지 않는다.
+
+### VisionLink 공유 확대 조작
+
+`VisionLinkView` / `VisionLinkReceiverActivity`와 송신 미리보기는 `1080p · 1.5x`처럼 화질과 배율을 하나의 작은 HUD에 표시한다. 화질은 실제 영상의 짧은 변이고 측정 전에는 배율만 표시한다. 자동 화질·가로×세로·fps·전송률은 표시하지 않는다. 확대·축소·1배 복원 버튼 없이 핀치로 조작하며, 배율은 16pt/sp 이상이고 VoiceOver/TalkBack 조절 동작을 제공한다. 공유 중 설정 버튼은 숨기고 공유 중지 시 복구한다. 수신 상태 칩은 연결됨 접두어 없이 현재 활동만 표시한다. iPad는 별도 내비게이션 헤더 없이 뒤로가기·활동 칩을 한 줄에 두고, 아래에 화질·배율 HUD를 둔다. 큰 글씨에서는 줄바꿈한다.

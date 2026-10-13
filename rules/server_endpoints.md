@@ -1,6 +1,6 @@
 # 외부 서버 / 클라우드 서비스
 
-점검일 2026-09-29 · 기준 코드 `babc3875`
+점검일 2026-10-02 · 기준 코드 `babc3875`
 
 VisionCraft iPad 앱이 사용하는 모든 외부 URL과 클라우드 서비스 목록.
 
@@ -67,7 +67,7 @@ VisionCraft iPad 앱이 사용하는 모든 외부 URL과 클라우드 서비스
 
 | 항목 | 값 |
 |---|---|
-| `dailyLimit` | `1_000_000` 토큰/일 (모든 Gemini 호출 합산) |
+| `dailyLimit` | 기기 내 앱 설치당 `1_000_000` 토큰/일 (모든 Gemini 호출의 입력·출력 합산). 서버나 계정 전체의 사용량 제한은 아님 |
 | 저장 | App Group `group.net.rivo.visioncraft` UserDefaults 키 `cloudAI.tokenBudget.today.v1` (`dayIdentifier` `yyyy-MM-dd`, 날짜 바뀌면 리셋) |
 | 흐름 | `reserve(inputTokens: countTokens 결과, maximumOutputTokens:)` → 성공 시 `commit(_, actualTokens: usageMetadata.totalTokenCount)` (없으면 예약량 차감) / 실패·취소 시 `cancel` |
 | 초과 오류 | `CloudAITokenBudgetError.dailyLimitExceeded` — "오늘의 클라우드 AI 100만 토큰을 모두 사용했습니다. 내일 다시 이용해 주세요." |

@@ -1,6 +1,6 @@
 # AI 백엔드 — 로컬 MLX + Gemini (Firebase AI Logic)
 
-점검일 2026-09-29 · 기준 코드 `babc3875`
+점검일 2026-10-02 · 기준 코드 `babc3875`
 
 iPad 앱은 **로컬 우선**: 텍스트 채팅·문서 Q&A·번역·음성 명령·VisionLink 원격 채팅은 기기 안 MLX 모델. 클라우드(Gemini)는 이미지 설명, Google Search grounding, OCR 교정, Excel/Word AI 에만 쓴다. Apple `FoundationModels` 는 import 조차 없다.
 
@@ -14,11 +14,13 @@ iPad 앱은 **로컬 우선**: 텍스트 채팅·문서 Q&A·번역·음성 명�
 | Google Search 답변 | `LLM/WebSearchService.swift` · `GeminiGoogleSearchService.generate` | `0.2` | `512` | `tools: [.googleSearch()]`. 질의 검증 `WebSearchQueryValidator` 400자/50단어 |
 | OCR 교정 | `OCRCorrectionService.swift` · `GeminiOCRCorrectionService.generate` | `0.1` | `16_384` | 입력 ≤ `16_000` 자, 이미지 함께 첨부 |
 | Excel AI | `Documents/ExcelAICommandService.swift` (호출·토큰·오류). 프롬프트·스키마·모델 설정은 엔진 `ExcelAIAssistant` | `0` | 일반 계획 `8_192` / 읽기 계획 단독 `2_048` | JSON 스키마 응답 강제 |
-| Word/HWP 양식 AI | `Documents/WordAICommandService.swift` (호출·토큰·오류). 프롬프트·스키마·요청 JSON·응답 해석·구역 선택 검증은 엔진 `WordAIAssistant` | `0.1` | `maximumOutputTokens` 상수 | JSON 스키마 응답 (`intent: answer|clarify|edit`) |
+| Word/HWP 양식 AI | `Documents/WordAICommandService.swift` (호출·토큰·오류). 프롬프트·스키마·요청 JSON·응답 해석·구역 선택 검증은 엔진 `WordAIAssistant` | `0.1` | 일반 계획 `4_096` / 대용량 문서 구역 선택 `1_024` | JSON 스키마 응답 (`intent: answer|clarify|edit`) |
 
 토큰 회계: 각 서비스가 `model.countTokens(contents).totalTokens` 로 입력을 세고 `CloudAITokenBudgetStore.reserve` → `commit(actualTokens: usageMetadata.totalTokenCount)` / `cancel` ([server_endpoints.md](server_endpoints.md)). 일일 한도 `1_000_000`.
 
 ### 문서 AI의 원문 전달
+
+문서 클라우드 요청마다 원문 문맥과 최근 대화 최대 8개 턴을 다시 전달한다 (엔진 `WordAIAssistant.planRequestJSON`, `ExcelAIAssistant.prepare`). 따라서 같은 문서에 이어서 질문해도 입력 토큰이 다시 발생하며, 문서 길이·셀 메타데이터·대화 길이·응답 길이에 따라 1회 사용량이 달라진다. 일일 100만 토큰은 요청 횟수나 문서 페이지 수 한도가 아니다.
 
 Excel 클라우드 요청은 `ExcelAISourceData`와 `ExcelAIModelWorksheet`로 구성한다. 셀 주소·표시값·표시값과 다른 원래 저장값·셀 형식·수식을 행/열 순서로 보내며 시트별 병합 범위를 보존한다. 앱이 추정한 일반 범위의 열 제목, 독립적인 열 예시값, 범주별 집계(`valueGroups`), 항목/값 요약(`summaryEntries`)은 모델 입력에서 제외한다. 정식 Excel 표의 열 이름은 파일에 있는 메타데이터이므로 유지한다. `regions`는 앱이 실행할 수 있는 범위·열·행의 식별 정보다.
 

@@ -32,13 +32,13 @@
 
 | 문서 | 점검일 | 기준 코드 |
 |---|---|---|
-| app_metadata.md | 2026-09-29 | `babc3875` |
-| server_endpoints.md | 2026-09-29 | `babc3875` |
+| app_metadata.md | 2026-10-13 | `f7c42775` + 작업 트리 (기기 빌드·서명) |
+| server_endpoints.md | 2026-10-02 | `babc3875` |
 | firebase_services.md | 2026-09-29 | `babc3875` |
-| gemini_ai.md | 2026-09-29 | `babc3875` |
+| gemini_ai.md | 2026-10-02 | `babc3875` |
 | ble_protocol.md | 2026-10-06 | `c0b9f54a` |
-| dependencies.md | 2026-10-01 | `babc3875` |
-| persistence.md | 2026-10-12 | `8249fa41` |
+| dependencies.md | 2026-10-13 | `f7c42775` + 작업 트리 (WebKit 사용처) |
+| persistence.md | 2026-10-13 | `f7c42775` + 작업 트리 (앱 테마 저장·기능 타일 에셋·Debug 웹 세션) |
 | scanner_pipeline.md | 2026-10-13 | `b1be61d0` + 작업 트리 (스캐너 안내 음성) |
 | visionlink.md | 2026-10-13 | `cf9d0863` + 작업 트리 |
 | visionlink_compatibility.md | 2026-10-13 | `cf9d0863` + 작업 트리 |
