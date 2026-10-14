@@ -255,9 +255,9 @@ struct HomeView: View {
         [
             VisionCraftHomeCategory(id: "ai", title: "AI 대화", tone: .ai, artName: "HomeTileAIChat", description: "궁금한 내용을 AI에게 물어보세요.", items: chatActions),
             // 카메라 기능은 홈에서 각각 선택해 들어간다.
-            VisionCraftHomeCategory(id: "camera", title: "카메라", tone: .camera, artName: "HomeTileCamera", description: "확대해서 보고, 글자와 이미지를 인식하세요.", items: cameraActions),
-            VisionCraftHomeCategory(id: "reading", title: "텍스트/문서", tone: .reading, artName: "HomeTileReading", description: "글과 문서를 편하게 읽고 편집하세요.", items: readingActions),
-            VisionCraftHomeCategory(id: "link", title: "비전링크", tone: .link, artName: "HomeTilePhoneLink", description: "스마트폰과 연결해 함께 사용하세요.", items: connectionActions),
+            VisionCraftHomeCategory(id: "camera", title: "카메라/이미지", tone: .camera, artName: "HomeTileCamera", description: "확대해서 보고, 글자와 이미지를 인식하세요.", items: categoryCameraActions),
+            VisionCraftHomeCategory(id: "reading", title: "텍스트/문서", tone: .reading, artName: "HomeTileReading", description: "글과 문서를 읽고 편집하세요.", items: readingActions.map(categoryMenuItem)),
+            VisionCraftHomeCategory(id: "link", title: "비전링크", tone: .link, artName: "HomeTilePhoneLink", description: "스마트폰과 VisionCraft를 함께 사용하세요.", items: connectionActions),
         ]
     }
 
@@ -266,8 +266,8 @@ struct HomeView: View {
         switch actionID {
         case "new-chat": "HomeActionNewChat"
         case "chat-history": "HomeActionChatHistory"
-        case "image-analysis-camera": "HomeActionCamera"
-        case "image-analysis-photo": "HomeActionSavedPhotos"
+        case "image-analysis-camera": "HomeActionDescribeImage"
+        case "image-analysis-photo": "HomeActionDescribePhoto"
         case "magnifier": "HomeActionCamera"
         case "scanner": "HomeActionScanDoc"
         case "live-text": "HomeActionLiveReading"
@@ -476,11 +476,7 @@ struct HomeView: View {
                 description:
                     "촬영한 장면을 AI가 설명합니다.",
                 action: {
-                    if homeLayoutMode == .grid {
-                        openCategory = imageAnalysisCategory
-                    } else {
-                        isImageAnalysisDialogPresented = true
-                    }
+                    isImageAnalysisDialogPresented = true
                 }
             ),
             VisionCraftActionItem(
@@ -504,28 +500,42 @@ struct HomeView: View {
         ]
     }
 
-    private var imageAnalysisCategory: VisionCraftHomeCategory {
-        VisionCraftHomeCategory(
-            id: "image-analysis-source", title: "장면 설명", tone: .camera, artName: nil,
-            items: [
+    private var categoryCameraActions: [VisionCraftActionItem] {
+        let actions = cameraActions
+        return (Array(actions.prefix(3)) + actions.filter { $0.id == "ask-ai" } + [
                 VisionCraftActionItem(
-                    id: "image-analysis-camera", icon: "camera", title: "촬영하기",
-                    description: "카메라로 찍은 장면을 설명합니다.",
+                    id: "image-analysis-camera", icon: "camera", title: "촬영 후 설명",
+                    description: "촬영한 장면을 AI가 설명합니다.",
                     action: { appRouter.route = .imageDescriptionCamera }
                 ),
                 VisionCraftActionItem(
-                    id: "image-analysis-photo", icon: "photo.on.rectangle", title: "사진에서",
-                    description: "저장된 사진을 골라 설명합니다.",
+                    id: "image-analysis-photo", icon: "photo.on.rectangle", title: "사진 설명",
+                    description: "AI 설명을 먼저 받고 다른 기능을 이용합니다.",
                     action: { appRouter.route = .imageAnalysisPhoto }
                 ),
-            ]
+            ] + actions.filter { $0.id == "photo-review" }).map(categoryMenuItem)
+    }
+
+    /// 목록형의 이름·동작을 유지하면서 카테고리형 문구만 제공 목록에 맞춘다.
+    private func categoryMenuItem(_ item: VisionCraftActionItem) -> VisionCraftActionItem {
+        let description: String
+        switch item.id {
+        case "magnifier": description = "확대, 조명, 색상 필터로 봅니다."
+        case "ask-ai": description = "촬영 후 음성으로 질문합니다."
+        case "photo-review": description = "글자 인식, 번역, 설명 또는 AI 대화를 이용합니다."
+        case "text-view": description = "텍스트를 크게 보고 편집합니다."
+        case "files": description = "읽고 편집합니다."
+        case "reader": description = "EPUB/DAISY 도서를 읽습니다."
+        default: description = item.description
+        }
+        return VisionCraftActionItem(
+            id: item.id, icon: item.icon, title: item.id == "files" ? "문서" : item.title,
+            description: description, accent: item.accent, badge: item.badge, action: item.action
         )
     }
 
     private func navigateBackFromCategory() {
-        openCategory = openCategory?.id == "image-analysis-source"
-            ? homeCategories.first { $0.id == "camera" }
-            : nil
+        openCategory = nil
     }
 
     private var readingActions: [VisionCraftActionItem] {
@@ -540,7 +550,7 @@ struct HomeView: View {
                     openTextView()
                 }
             ),
-            // iPadOS 전용: 문서 작업(엑셀·워드·한글 편집).
+            // 문서 작업(엑셀·한글은 공통, 워드 편집은 iPadOS 전용).
             VisionCraftActionItem(
                 id: "files",
                 icon: "folder",

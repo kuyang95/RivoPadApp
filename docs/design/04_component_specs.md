@@ -1,6 +1,6 @@
 # Component Catalog
 
-점검일: 2026-10-13 · 기준 코드: `c25bf291` (이번 기능 변경 범위)
+점검일: 2026-10-14 · 기준 코드: `759100bf`+작업 트리 (홈 카테고리 메뉴 범위)
 
 앱에 실제로 그려지고 있는 UI 스타일을 전수 조사해서 이름을 붙인 목록이다. 이름은 Android `04_component_specs.md`의 `Vc*` 이름을 기준으로 하고, 각 항목의 `구현`이 iPadOS 코드 위치다. Android와 규격이 같으면 값을 되풀이하지 않고 "Android와 같음"으로 적는다.
 
@@ -67,28 +67,33 @@
 - 구현: `VisionCraftHomeUI.swift` `VisionCraftHomeCategoryGrid(categories:columns:onOpen:)`, 제목 `VisionCraftHomeTileTitle`, 모델 `VisionCraftHomeCategory`
 - 생김새: VcSoftSurface `raised` + 모서리 22. 세로 화면 2열, 가로 화면(폭 > 높이) 4열(`HomeView.categoryHomeContent`가 `columns`를 정함). 간격 16, 높이 = 너비 × 5/4(`aspectRatio(4/5)`). 좌우 여백을 뺀 전폭을 열 수로 나눈다. 높이가 부족하면 타일 크기를 유지하고 머리와 함께 스크롤한다. 위쪽 그림, 아래 제목.
 - 제목: 타일 안쪽 너비(타일 폭 − 36)의 17%를 글자 크기로 하고 `UIFontMetrics`로 글자 크기 설정을 반영. 가장 긴 낱말이 한 줄에 들어갈 때까지만 줄인다(×0.97).
-- 그림: 남는 칸 안에서 가장 큰 정사각 squircle(모서리 = 한 변의 22.5%, 좌우 24 여백)을 `tileArtBackground`로 깔고 가운데 70% 크기로 `Assets.xcassets/HomeTile*` 아이콘(Android `home_tile_art_*.webp` 768px 한 벌, 라이트·다크 공용)을 올린다.
+- 그림: 남는 칸 안에서 가장 큰 정사각 squircle(모서리 = 한 변의 22.5%, 좌우 24 여백)을 `tileArtBackground`로 깔고 가운데 70% 크기로 `Assets.xcassets/HomeTile*` 아이콘(Android `home_tile_art_*.png` 한 벌, 라이트·다크 공용)을 올린다.
 - 상태: 눌림. 항목이 하나뿐인 타일은 바로 실행.
 - 스크린리더: 항목이 하나면 "제목. 기능 설명", 여럿이면 "제목. 항목 이름들", 역할 버튼. 홈 카테고리의 짧은 설명은 접근성 힌트로 제공한다.
 
 - 기능 화면: `HomeView.categoryHomeContent`가 홈 내용을 전체 화면으로 바꾼다. 세로 2열·가로 4열, 홈의 첫 네 칸을 기준으로 타일 너비와 시작 위치를 고정한다. 추가 행은 같은 크기로 아래에 이어지고 스크롤한다. 기능 그림은 `HomeAction*` PNG를 같은 squircle 위에 표시하고(그림이 없으면 남색 심벌), 제목은 최소 16pt(Dynamic Type 반영), 설명은 스크린리더가 읽는다. 상단 뒤로 가기·escape는 홈으로 돌아온다.
-- 첫 화면 배치: `VisionCraftHomeTilePageLayout`은 Android `VcHomeTilePage`처럼 머리(제목·안내·20pt 간격)를 측정한 뒤 세로 모드에서는 남은 높이에 홈의 네 칸을 중앙 배치한다. 가로 모드(4열)는 중앙 여백 없이 머리 바로 아래에 타일을 위쪽 정렬한다. 홈·카테고리 안의 기능·장면 설명 원본 선택에 같은 배치를 적용한다. 홈보다 항목이 적어도 네 칸을 기준으로 하고, 추가 행은 아래에 이어 붙인다. 아래 그림자 여백은 12pt다.
+- 첫 화면 배치: `VisionCraftHomeTilePageLayout`은 Android `VcHomeTilePage`처럼 머리(제목·안내·20pt 간격)를 측정한 뒤 세로 모드에서는 남은 높이에 홈의 네 칸을 중앙 배치한다. 가로 모드(4열)는 중앙 여백 없이 머리 바로 아래에 타일을 위쪽 정렬한다. 홈·카테고리 안의 기능에 같은 배치를 적용한다. 홈보다 항목이 적어도 네 칸을 기준으로 하고, 추가 행은 아래에 이어 붙인다. 아래 그림자 여백은 12pt다.
 
-기능 타일 그림은 사용자가 제공한 `VC menu 261008/menu icons`에서 선택한 투명 PNG 원본이다. 홈의 네 카테고리, 목록형, 카메라 내부 조작 버튼에는 적용하지 않는다. 타일 배치·터치 영역·그림 영역은 동일하며, 라이트·다크 공용이다.
+홈 카테고리와 기능 타일 그림은 사용자가 제공한 `menu icons 2` 최상위에서 용도가 일치하는 투명 PNG 원본을 사용한다. 목록형과 카메라 내부 조작 버튼은 기존 심벌을 사용한다. 타일 배치·터치 영역·그림 영역은 동일하며 라이트·다크 공용이다.
 
-| 기능 | 번들 그림 | 제공 원본 |
+| 메뉴 | 번들 그림 | 제공 원본 |
 |---|---|---|
-| 새 대화 | `HomeActionNewChat` | `2/New Chat 3.png` |
-| 대화 기록 | `HomeActionChatHistory` | `2/Chat History 3.png` |
-| 확대 보기 | `HomeActionCamera` | `2/Camera.png` |
-| 문서 스캔 | `HomeActionScanDoc` | `2/Scan Doc.png` |
-| 실시간 읽기 | `HomeActionLiveReading` | `2/Live Reading.png` |
-| 장면 설명 | `HomeActionDescribeImage` | `2/Describe Scene.png` |
-| AI 질문 | `HomeActionAskAI` | `2/Ask AI.png` |
-| 저장된 사진 | `HomeActionSavedPhotos` | `2/Saved Photos.png` |
+| AI 대화 | `HomeTileAIChat` | `AI Chat.png` |
+| 카메라/이미지 | `HomeTileCamera` | `Camera.png` |
+| 텍스트/문서 | `HomeTileReading` | `Text & Docs.png` |
+| 비전링크 | `HomeTilePhoneLink` | `VisionLink.png` |
+| 새 대화 | `HomeActionNewChat` | `New Chat.png` |
+| 대화 기록 | `HomeActionChatHistory` | `Chat History.png` |
+| 확대 보기 | `HomeActionCamera` | `Magnifier.png` |
+| 문서 스캔 | `HomeActionScanDoc` | `Scan Documents.png` |
+| 실시간 읽기 | `HomeActionLiveReading` | `Live Reading.png` |
+| AI 질문 | `HomeActionAskAI` | `Ask AI.png` |
+| 촬영 후 설명 | `HomeActionDescribeImage` | `Capture & Describe.png` |
+| 사진 설명 | `HomeActionDescribePhoto` | `Describe a Photo.png` |
+| 저장된 사진 | `HomeActionSavedPhotos` | `Saved Photos.png` |
 | 텍스트 | `HomeActionText` | `Text.png` |
-| 문서 작업 | `HomeActionDocument` | `2/Doc 2.png` |
-| 도서 읽기 | `HomeActionBookReader` | `2/Book Reader 2.png` |
+| 문서 | `HomeActionDocument` | `Documents.png` |
+| 도서 읽기 | `HomeActionBookReader` | `Book Reader.png` |
 
 ## VcPanel — 묶음 패널
 

@@ -447,7 +447,7 @@
 "정보 목록" = "Information";
 "다음 행동" = "Next Steps";
 "대화에 첨부" = "Attach to Conversation";
-"문서" = "Document";
+"문서" = "Documents";
 "클립보드" = "Clipboard";
 "사진" = "Photo";
 "PDF·TXT 문서, 클립보드 텍스트 또는 사진을 현재 대화의 문맥으로 사용합니다." = "Use a PDF or TXT document, clipboard text, or a photo as context for this conversation.";
@@ -1167,7 +1167,7 @@
 "명령 모드. 2 클립보드 번역, 3 실시간 텍스트 읽기, 4 카메라 돋보기, 9 이미지 설명. 카메라를 연 뒤 5 전환, 6 토치, 7 촬영, 별표 0 샵 확대를 사용합니다." = "Command mode. 2 Clipboard Translation, 3 Live Text Reading, 4 Camera Magnifier, 9 Image Description. After opening the camera, use 5 to switch cameras, 6 for the torch, 7 to capture, and Star, 0, and Sharp for zoom.";
 "명령 모드에서 지원하지 않는 %@ 버튼" = "%@ is not supported in command mode";
 "모드 버튼 두 번: 현재 화면의 키 안내" = "Double-press a mode button: Key guide for the current screen";
-"문서 스캔" = "Scan Document";
+"문서 스캔" = "Scan Doc";
 "문서 스캔: 4 닫기 · 7 수동 촬영" = "Document Scan: 4 Close · 7 Manual Capture";
 "문서 조작 안내. TXT 또는 PDF 로컬 문서에서 L3 문서 탐색 모드를 사용할 수 있습니다." = "Document controls guide. L3 document navigation mode is available in local TXT or PDF documents.";
 "발견한 리모컨" = "Discovered Remotes";
@@ -2662,19 +2662,19 @@
 "텍스트/문서" = "Text/Docs";
 "도서 읽기" = "Book Reader";
 "스마트폰 연결" = "Connect Your Phone";
-"문서, 클립보드 내용, 사진을 첨부할 수 있습니다." = "Add documents, clipboard content, or photos as needed.";
+"문서, 클립보드 내용, 사진을 첨부할 수 있습니다." = "Add documents, clipboard content, or photos.";
 "이전 대화를 다시 엽니다." = "Reopen past chats.";
 "확대, 조명, 색상 필터를 사용합니다." = "Use zoom, lighting, and color filters.";
-"문서 한 장을 텍스트로 변환합니다." = "Convert a document page to text.";
-"비춘 글자를 자동으로 읽어줍니다." = "Hear text read aloud automatically.";
+"문서 한 장을 텍스트로 변환합니다." = "Convert a page to text.";
+"비춘 글자를 자동으로 읽어줍니다." = "Read text aloud automatically.";
 "촬영 후 AI에게 음성으로 묻습니다." = "Take a photo and ask AI about it by voice.";
-"촬영한 장면을 AI가 설명합니다." = "Get an AI description of the captured scene.";
+"촬영한 장면을 AI가 설명합니다." = "Take a photo and get an AI description.";
 "글자 인식, 번역, AI 설명과 대화를 이용합니다." = "Extract text, translate, get descriptions, or chat with AI.";
 "글을 크게 보고 편집합니다." = "View and edit text in large print.";
 "EPUB·DAISY 도서를 읽습니다." = "Read EPUB and DAISY books.";
 "스마트폰의 카메라, 사진, 문서를 VisionCraft에서 활용하세요." = "Use your phone’s camera, photos, and documents in VisionCraft.";
 "궁금한 내용을 AI에게 물어보세요." = "Ask questions and chat with AI.";
-"확대해서 보고, 글자와 이미지를 인식하세요." = "Zoom in, read text, and understand images.";
+"확대해서 보고, 글자와 이미지를 인식하세요." = "Zoom, read text, and understand images.";
 "글과 문서를 편하게 읽고 편집하세요." = "Read and edit text and documents.";
 "스마트폰과 연결해 함께 사용하세요." = "Connect your smartphone to VisionCraft.";
 "텍스트 가져오기" = "Import Text";
@@ -2698,3 +2698,17 @@
 
 "앱 테마" = "App Theme";
 "다크" = "Dark";
+
+/* Category home menu */
+"확대, 조명, 색상 필터로 봅니다." = "Zoom with lighting and color filters.";
+"촬영 후 음성으로 질문합니다." = "Take a photo and ask by voice.";
+"촬영 후 설명" = "Capture & Describe";
+"사진 설명" = "Describe a Photo";
+"AI 설명을 먼저 받고 다른 기능을 이용합니다." = "Get an AI description first, then use other tools.";
+"글자 인식, 번역, 설명 또는 AI 대화를 이용합니다." = "Recognize text, translate, describe, or chat with AI.";
+"텍스트를 크게 보고 편집합니다." = "View and edit in large print.";
+"읽고 편집합니다." = "Read and edit.";
+"EPUB/DAISY 도서를 읽습니다." = "Read EPUB and DAISY books.";
+"카메라/이미지" = "Camera/Images";
+"글과 문서를 읽고 편집하세요." = "Read and edit text and docs.";
+"스마트폰과 VisionCraft를 함께 사용하세요." = "Use VisionCraft with your phone.";
