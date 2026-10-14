@@ -517,6 +517,12 @@ struct HomeView: View {
 
     /// 목록형의 이름·동작을 유지하면서 카테고리형 문구만 제공 목록에 맞춘다.
     private func categoryMenuItem(_ item: VisionCraftActionItem) -> VisionCraftActionItem {
+        let title: String
+        switch item.id {
+        case "files": title = "home.category.documents"
+        case "scanner": title = "home.category.scan"
+        default: title = item.title
+        }
         let description: String
         switch item.id {
         case "magnifier": description = "확대, 조명, 색상 필터로 봅니다."
@@ -528,7 +534,7 @@ struct HomeView: View {
         default: description = item.description
         }
         return VisionCraftActionItem(
-            id: item.id, icon: item.icon, title: item.id == "files" ? "문서" : item.title,
+            id: item.id, icon: item.icon, title: title,
             description: description, accent: item.accent, badge: item.badge, action: item.action
         )
     }

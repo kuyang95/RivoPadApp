@@ -447,7 +447,7 @@
 "정보 목록" = "Information";
 "다음 행동" = "Next Steps";
 "대화에 첨부" = "Attach to Conversation";
-"문서" = "Documents";
+"문서" = "Document";
 "클립보드" = "Clipboard";
 "사진" = "Photo";
 "PDF·TXT 문서, 클립보드 텍스트 또는 사진을 현재 대화의 문맥으로 사용합니다." = "Use a PDF or TXT document, clipboard text, or a photo as context for this conversation.";
@@ -1167,7 +1167,7 @@
 "명령 모드. 2 클립보드 번역, 3 실시간 텍스트 읽기, 4 카메라 돋보기, 9 이미지 설명. 카메라를 연 뒤 5 전환, 6 토치, 7 촬영, 별표 0 샵 확대를 사용합니다." = "Command mode. 2 Clipboard Translation, 3 Live Text Reading, 4 Camera Magnifier, 9 Image Description. After opening the camera, use 5 to switch cameras, 6 for the torch, 7 to capture, and Star, 0, and Sharp for zoom.";
 "명령 모드에서 지원하지 않는 %@ 버튼" = "%@ is not supported in command mode";
 "모드 버튼 두 번: 현재 화면의 키 안내" = "Double-press a mode button: Key guide for the current screen";
-"문서 스캔" = "Scan Doc";
+"문서 스캔" = "Scan Document";
 "문서 스캔: 4 닫기 · 7 수동 촬영" = "Document Scan: 4 Close · 7 Manual Capture";
 "문서 조작 안내. TXT 또는 PDF 로컬 문서에서 L3 문서 탐색 모드를 사용할 수 있습니다." = "Document controls guide. L3 document navigation mode is available in local TXT or PDF documents.";
 "발견한 리모컨" = "Discovered Remotes";
@@ -2700,6 +2700,8 @@
 "다크" = "Dark";
 
 /* Category home menu */
+"home.category.documents" = "Documents";
+"home.category.scan" = "Scan Doc";
 "확대, 조명, 색상 필터로 봅니다." = "Zoom with lighting and color filters.";
 "촬영 후 음성으로 질문합니다." = "Take a photo and ask by voice.";
 "촬영 후 설명" = "Capture & Describe";
