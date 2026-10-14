@@ -1,6 +1,6 @@
 # Component Catalog
 
-점검일: 2026-10-14 · 기준 코드: `759100bf`+작업 트리 (홈 카테고리 메뉴 범위)
+점검일: 2026-10-14 · 기준 코드: `91212211`+작업 트리 (홈 카테고리 메뉴·전체 진입·복귀 및 텍스트뷰 상단 범위)
 
 앱에 실제로 그려지고 있는 UI 스타일을 전수 조사해서 이름을 붙인 목록이다. 이름은 Android `04_component_specs.md`의 `Vc*` 이름을 기준으로 하고, 각 항목의 `구현`이 iPadOS 코드 위치다. Android와 규격이 같으면 값을 되풀이하지 않고 "Android와 같음"으로 적는다.
 
@@ -202,6 +202,12 @@
 - 구현: `VisionCraftUI.swift` `VisionCraftScreenTitleRow(title:onBack:actions:)` — 24 Bold + heading. `onBack`이 있으면 왼쪽에 48pt `VisionCraftBackButton`, `actions`에 오른쪽 `VisionCraftIconButton`.
 - 쓰는 곳: 홈 제목 줄(`HomeView.homeTitleRow`, 앱 이름 + 상태 아이콘 + 설정), 전체 설정(`HomeAllSettingsView`), 대화 목록, 채팅, 텍스트뷰어 메뉴. 이 화면들은 시스템 내비게이션 바를 숨긴다.
 - 홈과 카테고리 제목은 `HomeView.homeHeaderTitle`로 24 Bold·최소 32pt 글자 칸을 공유하며 같은 Dynamic Type 기준을 사용한다. 카테고리 머리는 홈 머리 높이를 예약해 첫 타일 위치를 유지한다.
+
+## 텍스트뷰 상단 버튼
+
+- 구현: `TextEditorViewerView.swift` `editorTopBar`·`editorTopButton`
+- 별도 헤더 없이 뒤로가기·메뉴를 간격 6으로 나란히 둔다. 보이는 원은 30, 터치 영역은 48이며 본문 색 조합의 전경색을 사용한다. 텍스트 가져오기에서는 앱 테마 글자색을 쓴다. 일시정지는 읽는 동안 같은 줄에 표시한다.
+- 카테고리에서 실행한 기능을 닫으면 진입한 카테고리의 기능 선택 화면을 유지한다. 카테고리 자체의 뒤로가기는 홈으로 돌아간다.
 
 ## VcScreen — 화면 여백
 

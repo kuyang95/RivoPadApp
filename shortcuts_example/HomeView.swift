@@ -333,7 +333,6 @@ struct HomeView: View {
                     identifierPrefix: openCategory == nil ? "home.category" : "home.action"
                 ) { category in
                     if openCategory != nil {
-                        openCategory = nil
                         category.items.first?.action()
                     } else if category.items.count == 1 {
                         category.items[0].action()

@@ -7,6 +7,7 @@ import UIKit
 /// 일반 PDF/문서 뷰어와 분리해, 가져온 텍스트를 큰 글자로 보고 바로 편집하는
 /// 흐름과 화면 구성을 유지한다.
 struct TextEditorViewerView: View {
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var appRouter: AppRouter
     @EnvironmentObject private var remoteControl:
@@ -80,14 +81,21 @@ struct TextEditorViewerView: View {
 
     var body: some View {
         ZStack {
-            editorBackground
+            (showsOpenSourcePage ? VisionCraftUI.background : editorBackground)
                 .ignoresSafeArea()
 
-            mainContent
+            ZStack {
+                mainContent
 
-            if showsOpenSourcePage {
-                openSourcePage
-                    .transition(.opacity)
+                if showsOpenSourcePage {
+                    openSourcePage
+                        .transition(.opacity)
+                }
+            }
+            .safeAreaInset(edge: .top, spacing: 8) {
+                editorTopBar
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
             }
 
             if isMenuPresented {
@@ -124,8 +132,21 @@ struct TextEditorViewerView: View {
             }
         }
         .animation(.easeOut(duration: 0.16), value: isMenuPresented)
-        // The route back button stays; the editor bar itself has no back.
-        .visionCraftNavigationScreen()
+        .toolbar(.hidden, for: .navigationBar)
+        .visionCraftHandlesBackNavigation()
+        .accessibilityAction(.escape) {
+            if isColorDialogPresented {
+                isColorDialogPresented = false
+            } else if isSaveDialogPresented {
+                isSaveDialogPresented = false
+            } else if isSourceDialogPresented {
+                isSourceDialogPresented = false
+            } else if isMenuPresented {
+                isMenuPresented = false
+            } else {
+                dismiss()
+            }
+        }
         .task {
             await loadInitialContentIfNeeded()
         }
@@ -226,10 +247,6 @@ struct TextEditorViewerView: View {
 
     private var editorScreen: some View {
         VStack(spacing: 8) {
-            editorTopBar
-                .padding(.horizontal, 14)
-                .padding(.top, 10)
-
             TextEditorCanvas(
                 text: $viewModel.text,
                 isEditing: isEditing,
@@ -262,10 +279,11 @@ struct TextEditorViewerView: View {
         }
     }
 
-    /// Android `EditorMenuBar`: menu button on the left (48pt circle),
-    /// pause while reading, nothing else. The route back button is above.
+    /// 뒤로가기와 메뉴는 같은 줄에서 30pt 원형 아이콘·48pt 터치 영역을 쓴다.
     private var editorTopBar: some View {
         HStack(spacing: 6) {
+            VisionCraftBackButton(tint: topBarForeground) { dismiss() }
+
             editorTopButton(
                 title: "에디터 메뉴 열기",
                 systemImage: "line.3.horizontal"
@@ -287,8 +305,11 @@ struct TextEditorViewerView: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// Android `TopBarIconButton`: 48pt, surface fill + outline; the menu
-    /// button is a circle with a 2pt border, the pause button a 12pt rect.
+    private var topBarForeground: Color {
+        showsOpenSourcePage ? VisionCraftUI.primaryText : editorForeground
+    }
+
+    /// 메뉴의 보이는 원 크기는 뒤로가기와 맞추고 터치 영역은 48pt를 유지한다.
     private func editorTopButton(
         title: String,
         systemImage: String,
@@ -302,8 +323,8 @@ struct TextEditorViewerView: View {
                     width: VisionCraftUI.minTouchTarget,
                     height: VisionCraftUI.minTouchTarget
                 )
-                .foregroundStyle(VisionCraftUI.primaryText)
-                .background(VisionCraftUI.surface)
+                .foregroundStyle(isCircular ? topBarForeground : VisionCraftUI.primaryText)
+                .background(isCircular ? Color.clear : VisionCraftUI.surface)
                 .clipShape(
                     isCircular
                         ? AnyShape(Circle())
@@ -317,7 +338,8 @@ struct TextEditorViewerView: View {
                 .overlay {
                     if isCircular {
                         Circle()
-                            .stroke(VisionCraftUI.outline, lineWidth: 2)
+                            .stroke(topBarForeground, lineWidth: 1.6)
+                            .frame(width: 30, height: 30)
                     } else {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .stroke(VisionCraftUI.outline, lineWidth: 1)
