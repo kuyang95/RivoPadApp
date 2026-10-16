@@ -85,7 +85,7 @@ final class LocalDocumentImportTests: XCTestCase {
                 level: 1,
                 availableWidth: 700
             ),
-            58,
+            18,
             accuracy: 0.001
         )
         XCTAssertEqual(
@@ -93,12 +93,12 @@ final class LocalDocumentImportTests: XCTestCase {
                 level: 5,
                 availableWidth: 600
             ),
-            100,
+            25,
             accuracy: 0.001
         )
         XCTAssertEqual(
             TextEditorLayoutPolicy.fontSize(
-                level: 10,
+                level: 20,
                 availableWidth: 600
             ),
             600,
@@ -288,7 +288,7 @@ final class LocalDocumentImportTests: XCTestCase {
         XCTAssertEqual(
             store.load(),
             LocalDocumentAppearance(
-                fontLevel: 10,
+                fontLevel: 20,
                 lineHeightLevel: 1,
                 colorIndex:
                     LocalDocumentColorTheme

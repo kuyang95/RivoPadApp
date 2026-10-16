@@ -1082,7 +1082,7 @@ private struct TextEditorMenuOverlay: View {
                             .padding(.top, 8)
 
                             LazyVGrid(columns: columns, spacing: 8) {
-                                ForEach(1 ... 10, id: \.self) { level in
+                                ForEach(1 ... 20, id: \.self) { level in
                                     Button {
                                         appearance.fontLevel = level
                                     } label: {
@@ -1444,6 +1444,7 @@ private struct TextEditorColorDialog: View {
 
 nonisolated enum TextEditorLayoutPolicy {
     private static let targetCharactersPerLine: [CGFloat] = [
+        40, 36, 32, 28, 24, 22, 20, 18, 16, 15,
         14, 12, 10, 8, 6, 5, 4, 3, 2, 1,
     ]
 
@@ -1451,9 +1452,9 @@ nonisolated enum TextEditorLayoutPolicy {
         level: Int,
         availableWidth: CGFloat
     ) -> CGFloat {
-        let safeLevel = min(max(level, 1), 10)
+        let safeLevel = min(max(level, 1), targetCharactersPerLine.count)
         return max(
-            58,
+            18,
             availableWidth / targetCharactersPerLine[safeLevel - 1]
         )
     }

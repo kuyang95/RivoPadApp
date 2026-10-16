@@ -1460,7 +1460,8 @@ enum HomeSelectionDialog: String, Identifiable {
             }
         case .documentFontLevel,
              .documentLineHeight:
-            return (1 ... 10).map {
+            let maximumLevel = self == .documentFontLevel ? 20 : 10
+            return (1 ... maximumLevel).map {
                 VisionCraftSelectionOption(
                     id: String($0),
                     title: "\($0)"

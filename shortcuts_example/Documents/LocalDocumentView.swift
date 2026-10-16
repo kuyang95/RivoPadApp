@@ -1362,7 +1362,7 @@ struct LocalDocumentView: View {
                         "글자 크기 \(appearance.fontLevel)",
                         value:
                             $appearance.fontLevel,
-                        in: 1 ... 10
+                        in: 1 ... 20
                     )
                     Stepper(
                         "줄 간격 \(appearance.lineHeightLevel)",
@@ -1586,6 +1586,8 @@ struct LocalDocumentView: View {
 
     private var documentFontSize: CGFloat {
         let sizes: [CGFloat] = [
+            16, 16.5, 17, 17.5, 18,
+            18.5, 19, 19.5, 20, 21,
             22, 26, 30, 36, 44,
             52, 60, 72, 84, 96,
         ]

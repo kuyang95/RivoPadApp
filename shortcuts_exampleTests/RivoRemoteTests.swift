@@ -1762,7 +1762,7 @@ final class RivoRemoteControlCenterTests: XCTestCase {
             )
         let maximum =
             LocalDocumentAppearance(
-                fontLevel: 10,
+                fontLevel: 20,
                 lineHeightLevel: 10,
                 colorIndex: 0,
                 showsLineSeparators: false
@@ -1775,6 +1775,12 @@ final class RivoRemoteControlCenterTests: XCTestCase {
                     from: minimum
                 )?.fontLevel,
             1
+        )
+        XCTAssertEqual(
+            RivoLocalDocumentRemoteAction
+                .increaseFont
+                .updatedAppearance(from: maximum)?.fontLevel,
+            20
         )
         XCTAssertEqual(
             RivoLocalDocumentRemoteAction

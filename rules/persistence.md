@@ -1,6 +1,6 @@
 # 영속 데이터 (UserDefaults / App Group / 파일 / Keychain / Assets)
 
-점검일: 2026-10-13 · 기준 코드: `c25bf291` (이번 기능 변경 범위)
+점검일: 2026-10-16 · 기준 코드: `63f88e9b`+작업 트리 (텍스트뷰 설정 범위)
 
 Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 데이터는 전부 **JSON 파일** 또는 **UserDefaults(Codable 인코딩)**.
 
@@ -31,7 +31,7 @@ Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 �
 | `RecentOriginalDocumentStore.records.v1` | JSON, 최대 100건 | `Documents/RecentOriginalDocumentStore.swift` |
 | `AuthorizedDocumentLibrary.bookmark.v1` / `AuthorizedDocumentLibrary.folderName.v1` | security-scoped bookmark Data / String | `Documents/AuthorizedDocumentLibrary.swift` — 사용자가 고른 문서 폴더 |
 | `rivo.remote.connectionDiagnostics` | JSON, 최근 80건 | `RivoRemote/RivoRemoteManager.swift` · `DefaultsKey`. 기기 UUID·타입·Bluetooth 활성화 이력은 저장하지 않고, 초기화 시 이전 버전의 `rivo.remote.peripheralIdentifier` / `rivo.remote.deviceType` / `rivo.remote.hasActivatedBluetooth` 값을 제거한다 |
-| `LocalDocumentAppearance.v1` | `LocalDocumentAppearance` JSON (fontLevel, lineHeightLevel, colorIndex, showsLineSeparators) — 문서 뷰어 글자/줄간격/색상 | `Documents/LocalDocumentReading.swift` |
+| `LocalDocumentAppearance.v1` | `LocalDocumentAppearance` JSON (fontLevel 1~20·기본 5, lineHeightLevel 1~10·기본 5, colorIndex, showsLineSeparators, usesSingleLineInLandscape) — 문서 뷰어 글자/줄간격/색상·가로 한 줄 보기 | `Documents/LocalDocumentReading.swift` |
 
 ## App Group `group.net.rivo.visioncraft`
 

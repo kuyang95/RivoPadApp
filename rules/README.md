@@ -38,7 +38,7 @@
 | `gemini_ai.md` | 2026-10-13 | `c25bf291` (이번 기능 변경 범위) |
 | ble_protocol.md | 2026-10-06 | `c0b9f54a` |
 | `dependencies.md` | 2026-10-13 | `c25bf291` (이번 기능 변경 범위) |
-| `persistence.md` | 2026-10-13 | `c25bf291` (이번 기능 변경 범위) |
+| `persistence.md` | 2026-10-16 | `63f88e9b`+작업 트리 (텍스트뷰 설정 범위) |
 | scanner_pipeline.md | 2026-10-13 | `b1be61d0` + 작업 트리 (스캐너 안내 음성) |
 | visionlink.md | 2026-10-13 | `cf9d0863` + 작업 트리 |
 | visionlink_compatibility.md | 2026-10-13 | `cf9d0863` + 작업 트리 |

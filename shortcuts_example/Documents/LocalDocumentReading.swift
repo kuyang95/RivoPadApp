@@ -98,7 +98,7 @@ nonisolated struct LocalDocumentAppearance:
     ) -> Self {
         LocalDocumentAppearance(
             fontLevel:
-                min(max(fontLevel, 1), 10),
+                min(max(fontLevel, 1), 20),
             lineHeightLevel:
                 min(
                     max(lineHeightLevel, 1),

@@ -319,7 +319,7 @@ struct AppSettingsView: View {
                 value:
                     $documentAppearance
                     .fontLevel,
-                in: 1 ... 10
+                in: 1 ... 20
             )
             Stepper(
                 "줄 간격 \(documentAppearance.lineHeightLevel)단계",
