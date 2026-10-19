@@ -58,10 +58,17 @@ struct AppSettingsView: View {
         .visionCraftListScreen()
         .navigationTitle("설정")
         .navigationBarTitleDisplayMode(.large)
+        .onAppear {
+            documentAppearance =
+                LocalDocumentAppearanceStore().load()
+        }
         .onChange(of: documentAppearance) {
-            _, value in
-            LocalDocumentAppearanceStore()
-                .save(value)
+            old, value in
+            let merged = LocalDocumentAppearanceStore()
+                .save(changesFrom: old, to: value)
+            if merged != value {
+                documentAppearance = merged
+            }
         }
         .confirmationDialog(
             "앱 설정을 초기값으로 되돌릴까요?",

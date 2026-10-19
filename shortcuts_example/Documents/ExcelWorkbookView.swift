@@ -750,6 +750,12 @@ final class ExcelWorkbookViewModel: ObservableObject {
                     query: trimmed
                 )
             }.value
+            // The sheet may have changed while the detached search ran;
+            // results for another sheet must not be applied here.
+            guard selectedSheet?.partPath == partPath else {
+                isSearchingLargeWorkbook = false
+                return
+            }
             var matchingRows = Set(sourceRows)
             for (address, edit) in edits[partPath] ?? [:]
                 where searchableText(for: edit.input)
@@ -1994,8 +2000,11 @@ final class ExcelWorkbookViewModel: ObservableObject {
                             "VisionCraft-Large-XLSX-\(UUID().uuidString)",
                             isDirectory: true
                         )
+                    // 히스토리를 유지하는 자동 저장은 편집 전 기준 데이터로 캐시를 만든다.
+                    // 창을 불러올 때 현재 편집을 다시 얹으므로, 실행 취소된 값이
+                    // 저장본에서 되살아나지 않는다. 저장 확정 시에는 저장본 그대로.
                     cache = try? ExcelWorkbookDocument.buildLargeCache(
-                        from: data,
+                        from: preservingHistory ? inputData : data,
                         preflight: preflight,
                         directoryURL: directoryURL
                     )
