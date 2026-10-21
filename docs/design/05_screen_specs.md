@@ -195,6 +195,15 @@
 
 파일: `Documents/HWP/HWPDocumentView.swift`(`HWPDocumentView`·`HWPDocumentViewModel`, 간편 보기 `documentList`·`blockView`·`editorPanel`), `Documents/HWP/HWPAccessibleEditingSheets.swift`(간편 보기 편집 시트), `Documents/HWP/HWPAccessibleTableView.swift`(`HWPAccessibleRowButton`·`HWPAccessibleRowEditor`), 리본 `Documents/HWP/HWPFormattingToolbar.swift` (Android `document/HwpActivity.kt`·`document/HwpViewModel.kt`).
 
+### 안내 띠·원본 보기 개체
+
+- 머리 막대 아래 안내 띠(`HWPDocumentNoticeBand`, Android `NoticeBand`): surfaceVariant 바탕에 안내(subheadline 굵게)·설명(caption)과 primary 캡슐 버튼(높이 34pt, 누르는 영역 48pt). 좁으면 버튼이 안내 아래로 내려간다. 원본·간편 보기 모두에 보인다.
+  - 편집할 수 없는 HWP(`HWPDocumentViewModel.isLegacyReadOnly`): "이 한글 문서는 이 앱에서 바로 편집할 수 없습니다." + "원본 HWP는 바꾸지 않습니다. 표와 서식 없이 글만 옮기며, 저장하면 새 HWPX 파일이 됩니다." + `편집용 HWPX 사본 만들기`. 더보기의 HWPX 변환과 같은 동작이다(`convertForEditing`).
+  - 읽을 내용이 없는 새 문서(`blankParagraphID`: 간편 보기 항목이 없고 편집 가능한 첫 본문 문단이 있을 때): "아직 내용이 없는 문서입니다." + `글 쓰기`. 누르면 편집 모드를 켜고 그 문단의 문단 편집 시트를 연다(`startWriting`).
+- 원본 보기의 개체(`HWPOriginalDocumentCanvas.swift`의 `HWPDocumentCanvasObjectView`·`HWPCanvasObjectAccessibility`): 누를 수 있는 개체(그림·도형·묶음·수식·글상자)는 VoiceOver에서 버튼이고, 고른 개체는 "선택됨"으로 읽는다. 두 번 탭은 손가락 탭과 같다(고르기, 고른 그림·도형은 설정 시트). 고른 그림·도형(편집 가능한 문서)에는 사용자 지정 동작 `위로 이동`·`아래로 이동`·`왼쪽으로 이동`·`오른쪽으로 이동`(20pt), `개체 크게`·`개체 작게`(오른쪽 아래 모서리 기준 20pt), `개체 설정`, `선택 해제`가 있다. 묶음 안 도형을 골랐을 때는 `선택 해제`만 있다.
+- 문단·개체가 없는 빈 종이를 누르면 고른 그림·도형 선택이 풀리고 문서 위 문단 편집이 끝난다(`HWPOriginalCanvasPageView`의 `pageBackground`, `HWPDocumentView.clearObjectSelection`). 그룹으로 묶으려고 고르는 중인 도형은 그대로 둔다.
+- 빈 문단도 원본 보기에서 VoiceOver로 "빈 문단"으로 읽고 두 번 탭으로 문서에서 편집한다(`HWPInlineParagraphTarget`).
+
 ### 간편 보기 편집
 
 - 문단 카드를 길게 누르거나 VoiceOver 사용자 지정 동작 `문단 편집`(편집 가능한 문서의 편집 가능한 문단만, `HWPAccessibleEditActionModifier`), 또는 편집 모드 아래 "선택한 문단 편집" 칸의 `문단 편집` 버튼으로 문단 편집 시트(`HWPAccessibleParagraphEditor`)를 연다. 열기 전에 아래 칸에 입력한 글을 먼저 확정한다.

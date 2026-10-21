@@ -101,6 +101,16 @@ final class HWPDocumentViewModel: ObservableObject {
         package != nil || legacyDocument?.blocks.contains(where: \.isEditable) == true
     }
 
+    /// A new, empty document's paragraph to start writing in: the first editable
+    /// body paragraph when nothing in the document is read yet (Android `blankParagraph`).
+    var blankParagraphID: String? {
+        guard !isLoading, isEditableDocument,
+              HWPAccessibleDocument.make(blocks: blocks).entries.isEmpty else { return nil }
+        return blocks.first {
+            $0.isEditable && $0.tableLocation == nil && $0.region.kind == .body
+        }?.id
+    }
+
     func load() async {
         guard !didLoad else { return }
         didLoad = true
@@ -1812,6 +1822,23 @@ struct HWPDocumentView: View {
 
     private var content: some View {
         VStack(spacing: 0) {
+            if viewModel.isLegacyReadOnly {
+                // A read-only HWP can still be edited as an HWPX copy of its text (also in 더보기).
+                HWPDocumentNoticeBand(
+                    text: "이 한글 문서는 이 앱에서 바로 편집할 수 없습니다.",
+                    detail: "원본 HWP는 바꾸지 않습니다. 표와 서식 없이 글만 옮기며, 저장하면 새 HWPX 파일이 됩니다.",
+                    action: "편집용 HWPX 사본 만들기",
+                    identifier: "hwp-notice-convert",
+                    onAction: convertForEditing)
+            } else if let blank = viewModel.blankParagraphID {
+                // A new document has nothing to read yet.
+                HWPDocumentNoticeBand(
+                    text: "아직 내용이 없는 문서입니다.",
+                    detail: nil,
+                    action: "글 쓰기",
+                    identifier: "hwp-notice-start-writing",
+                    onAction: { startWriting(in: blank) })
+            }
             if viewMode == .originalDocument {
                 ribbon
                 if documentNavigation.showsSearch, !ribbonCollapsed {
@@ -1968,7 +1995,8 @@ struct HWPDocumentView: View {
                 if selectedImage?.objectID == target.objectID { editingImage = target }
                 selectedImage = target
             },
-            onDirectManipulation: applyDirectImageManipulation
+            onDirectManipulation: applyDirectImageManipulation,
+            onDeselect: clearObjectSelection
         ))
         .environment(\.hwpShapeObjectEditing, HWPShapeObjectEditingContext(
             selectedID: selectedShape?.id,
@@ -2012,7 +2040,8 @@ struct HWPDocumentView: View {
                 if selectedShape?.id == target.id { editingShape = target }
                 selectedShape = target
             },
-            onDirectManipulation: applyDirectShapeManipulation
+            onDirectManipulation: applyDirectShapeManipulation,
+            onDeselect: clearObjectSelection
         ))
         .environment(\.hwpEquationObjectEditing, HWPEquationObjectEditingContext(
             selectedID: editingEquation?.objectID,
@@ -2200,6 +2229,14 @@ struct HWPDocumentView: View {
                 }) { documentNavigation.goToPage(page) }
             } catch { exportError = error.localizedDescription }
         }
+    }
+
+    /// VoiceOver `선택 해제` or a tap on blank paper: the picked picture or shape is let go
+    /// (shapes being chosen for a group stay chosen).
+    private func clearObjectSelection() {
+        guard selectedImage != nil || selectedShape != nil else { return }
+        selectedImage = nil
+        selectedShape = nil
     }
 
     private func nudgeSelectedObject(_ deltaX: Double, _ deltaY: Double) {
@@ -3366,6 +3403,22 @@ struct HWPDocumentView: View {
         .fixedSize(horizontal: true, vertical: false)
     }
 
+    /// 더보기 or the read-only band's `편집용 HWPX 사본 만들기`.
+    private func convertForEditing() {
+        Task {
+            await viewModel.convertLegacyForEditing()
+            isEditingAccessibleDocument = viewModel.isEditableDocument
+            if isEditingAccessibleDocument { viewMode = .accessibleDocument }
+        }
+    }
+
+    /// The empty document band's `글 쓰기`: editing on, the blank paragraph's editor open (Android `startWriting`).
+    private func startWriting(in id: String) {
+        originalEditor.finish()
+        isEditingAccessibleDocument = true
+        openParagraphEditor(id)
+    }
+
     private func setMoreActionsPresented(_ isPresented: Bool) {
         var transaction = Transaction()
         transaction.disablesAnimations = true
@@ -3385,11 +3438,7 @@ struct HWPDocumentView: View {
         case .fonts:
             showsFontManager = true
         case .convertToHWPX:
-            Task {
-                await viewModel.convertLegacyForEditing()
-                isEditingAccessibleDocument = viewModel.isEditableDocument
-                if isEditingAccessibleDocument { viewMode = .accessibleDocument }
-            }
+            convertForEditing()
         case .save:
             if viewModel.requiresSaveAs {
                 beginExport()

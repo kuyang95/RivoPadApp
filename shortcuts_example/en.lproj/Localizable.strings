@@ -2748,6 +2748,13 @@
 "앞 문단과 합쳤습니다." = "Merged with the previous paragraph.";
 "행·열 추가와 삭제, 병합·분할, 셀 서식, 행·열 크기를 바꿉니다." = "Adds or deletes rows and columns, merges or splits cells, and changes cell formatting and row and column size.";
 "나누기·합치기, 글자·문단 서식, 표·링크·각주·쪽 나누기를 편집합니다." = "Split or merge, format text and paragraphs, and insert tables, links, notes and page breaks.";
+"이 한글 문서는 이 앱에서 바로 편집할 수 없습니다." = "This Hangul document can't be edited here directly.";
+"원본 HWP는 바꾸지 않습니다. 표와 서식 없이 글만 옮기며, 저장하면 새 HWPX 파일이 됩니다." = "The original HWP stays as it is. Only the text moves over, without tables or formatting, and saving makes a new HWPX file.";
+"편집용 HWPX 사본 만들기" = "Make an editable HWPX copy";
+"아직 내용이 없는 문서입니다." = "This document has no content yet.";
+"글 쓰기" = "Start writing";
+"두 번 탭하면 개체를 선택합니다." = "Double-tap to select the object.";
+"두 번 탭하면 개체 설정을 엽니다. 동작에서 이동·크기·선택 해제를 고를 수 있습니다." = "Double-tap to open object settings. Use actions to move, resize or deselect it.";
 "표 배율 %lld%%" = "Table zoom %lld%%";
 "표 원래 크기" = "Table Actual Size";
 "원본 셀에서 보기" = "Show in Original Cells";

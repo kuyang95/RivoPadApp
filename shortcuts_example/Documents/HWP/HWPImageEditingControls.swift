@@ -10,6 +10,8 @@ nonisolated struct HWPImageObjectEditingContext: Sendable {
     var onDirectManipulation: @MainActor @Sendable (
         String, HWPDocumentCanvasObject, HWPImageEditing.DirectManipulation
     ) -> Void = { _, _, _ in }
+    /// Lets the picked object go (VoiceOver `선택 해제`, a tap on blank paper).
+    var onDeselect: @MainActor @Sendable () -> Void = {}
 }
 
 private struct HWPImageObjectEditingKey: EnvironmentKey {

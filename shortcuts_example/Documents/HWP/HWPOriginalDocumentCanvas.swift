@@ -68,6 +68,7 @@ struct HWPOriginalDocumentCanvas: View {
 
 struct HWPOriginalCanvasPageView: View {
     @Environment(\.hwpShapeObjectEditing) private var shapeEditing
+    @Environment(\.hwpImageObjectEditing) private var imageEditing
     let page: HWPOriginalCanvasPage
     var showsPaperShadow = true
     @Environment(\.hwpInlineEditing) private var inlineEditing
@@ -91,6 +92,15 @@ struct HWPOriginalCanvasPageView: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             pageBackground
+                // Blank paper (no paragraph or object above it) lets the picked object go
+                // and ends editing on the page (Android `tapPage`).
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if imageEditing.selectedID != nil { imageEditing.onDeselect() }
+                    if shapeEditing.selectedID != nil { shapeEditing.onDeselect() }
+                    if inlineEditing.session?.activation != nil { inlineEditing.session?.finish() }
+                }
+                .accessibilityHidden(true)
                 .zIndex(-30_000)
 
             if let pageStyle = layout.pageStyle,
@@ -1191,6 +1201,7 @@ private struct HWPDocumentCanvasObjectView: View {
     @Environment(\.hwpShapeObjectEditing) private var shapeEditing
     @Environment(\.hwpEquationObjectEditing) private var equationEditing
     @Environment(\.hwpTextBoxObjectEditing) private var textBoxEditing
+    @Environment(\.hwpInlineEditing) private var inlineEditing
     @State private var moveTranslation = CGSize.zero
     @State private var resizeAnchor: HWPShapeEditing.ResizeAnchor?
     @State private var resizeTranslation = CGSize.zero
@@ -1212,6 +1223,26 @@ private struct HWPDocumentCanvasObjectView: View {
     private var isDirectlySelected: Bool {
         (isShapeObject && shapeEditing.selectedID == object.id)
             || (isImageObject && imageEditing.selectedID == object.id)
+    }
+
+    /// What a tap on the object does something with (`selectObject`).
+    private var isSelectable: Bool {
+        if !textBlocks.isEmpty { return true }
+        switch object.content {
+        case .image, .shape, .group, .equation: return true
+        default: return false
+        }
+    }
+
+    private var isGroupChildSelected: Bool {
+        guard case .group = object.content else { return false }
+        return shapeEditing.selectedID?.hasPrefix(object.id + "#group-child-") == true
+    }
+
+    private var isAccessibilitySelected: Bool {
+        isDirectlySelected || isGroupChildSelected
+            || shapeEditing.groupedSelectionIDs.contains(object.id)
+            || equationEditing.selectedID == object.id || textBoxEditing.selectedID == object.id
     }
 
     private var preview: (offset: CGSize, size: CGSize, rotationDelta: Double) {
@@ -1274,6 +1305,17 @@ private struct HWPDocumentCanvasObjectView: View {
                 : AppLocalization.string("한글 문서 개체")
         )
         .accessibilityIdentifier("hwp-canvas-object-\(object.id)")
+        .modifier(HWPCanvasObjectAccessibility(
+            isSelectable: isSelectable,
+            isSelected: isAccessibilitySelected,
+            isPicked: isDirectlySelected && inlineEditing.session != nil,
+            canDeselect: isDirectlySelected || isGroupChildSelected,
+            onSelect: selectObject,
+            onMove: { dx, dy in applyDirectManipulation(.move(deltaX: dx, deltaY: dy)) },
+            onResize: { delta in
+                applyDirectManipulation(.resize(anchor: .bottomTrailing, deltaX: delta, deltaY: delta))
+            },
+            onDeselect: isImageObject ? imageEditing.onDeselect : shapeEditing.onDeselect))
         .contentShape(Rectangle())
         // A drag on a resize or rotation handle must not also move the object.
         // Keep the move recognizer on the object content, outside the overlay
@@ -1471,6 +1513,53 @@ private struct HWPDocumentCanvasObjectView: View {
         }
     }
 
+}
+
+/// VoiceOver for an object on the page, the non-gesture alternative to tapping and
+/// dragging it (Android `objectAccessibilityActions`): double-tap selects it as a tap
+/// does (again: its settings); a picked picture or shape moves 20 pt 위로·아래로·
+/// 왼쪽으로·오른쪽으로, grows or shrinks 20 pt from its bottom-right corner
+/// (개체 크게·작게), opens 개체 설정, or is let go (선택 해제).
+private struct HWPCanvasObjectAccessibility: ViewModifier {
+    static let nudgePoints = 20.0
+
+    let isSelectable: Bool
+    let isSelected: Bool
+    let isPicked: Bool
+    let canDeselect: Bool
+    let onSelect: () -> Void
+    let onMove: (Double, Double) -> Void
+    let onResize: (Double) -> Void
+    let onDeselect: () -> Void
+
+    func body(content: Content) -> some View {
+        if isSelectable {
+            content
+                .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+                .accessibilityHint(isPicked
+                    ? AppLocalization.string("두 번 탭하면 개체 설정을 엽니다. 동작에서 이동·크기·선택 해제를 고를 수 있습니다.")
+                    : AppLocalization.string("두 번 탭하면 개체를 선택합니다."))
+                .accessibilityAction { onSelect() }
+                // SwiftUI hands VoiceOver these in reverse: written last to first so the
+                // rotor reads 위로 이동 … 선택 해제 as on Android (HWPAndroidParityTests).
+                .accessibilityActions {
+                    if canDeselect {
+                        Button("선택 해제") { onDeselect() }
+                    }
+                    if isPicked {
+                        Button("개체 설정") { onSelect() }
+                        Button("개체 작게") { onResize(-Self.nudgePoints) }
+                        Button("개체 크게") { onResize(Self.nudgePoints) }
+                        Button("오른쪽으로 이동") { onMove(Self.nudgePoints, 0) }
+                        Button("왼쪽으로 이동") { onMove(-Self.nudgePoints, 0) }
+                        Button("아래로 이동") { onMove(0, Self.nudgePoints) }
+                        Button("위로 이동") { onMove(0, -Self.nudgePoints) }
+                    }
+                }
+        } else {
+            content.accessibilityAddTraits(isSelected ? .isSelected : [])
+        }
+    }
 }
 
 private struct HWPImageCanvasView: View {

@@ -11,6 +11,8 @@ nonisolated struct HWPShapeObjectEditingContext: Sendable {
     var onDirectManipulation: @MainActor @Sendable (
         String, HWPDocumentCanvasObject, HWPShapeEditing.DirectManipulation
     ) -> Void = { _, _, _ in }
+    /// Lets the picked shape go (VoiceOver `선택 해제`, a tap on blank paper).
+    var onDeselect: @MainActor @Sendable () -> Void = {}
 }
 
 struct HWPShapeKeyboardNudgeReceiver: UIViewRepresentable {
