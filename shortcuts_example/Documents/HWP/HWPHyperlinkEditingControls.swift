@@ -30,9 +30,14 @@ struct HWPHyperlinkButton: View {
     }
 }
 
-private struct HWPHyperlinkSheet: View {
+struct HWPHyperlinkSheet: View {
     let selection: HWPHyperlinkEditing.Selection
     let onApply: (HWPHyperlinkEditing.Action) -> Void
+
+    init(selection: HWPHyperlinkEditing.Selection, onApply: @escaping (HWPHyperlinkEditing.Action) -> Void) {
+        self.selection = selection
+        self.onApply = onApply
+    }
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL

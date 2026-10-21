@@ -262,6 +262,102 @@ final class HWPDocumentViewModel: ObservableObject {
         return HWPParagraphEditResult(blocks: blocks, focusedID: proposal.focusedID, caret: proposal.caret)
     }
 
+    // MARK: 간편 보기 문단·표 편집
+
+    /// Paragraph `id` with the text typed in the 간편 문단 편집 sheet, line breaks as the engine stores them.
+    func accessibleParagraphDraft(_ id: String, text: String) -> HWPDocumentBlock? {
+        guard isEditableDocument, let block = blocks.first(where: { $0.id == id }), block.isEditable else { return nil }
+        return HWPTextRunEditing.replacingText(in: block, with: HWPInlineTextInput.normalized(text))
+    }
+
+    /// The whole document with that typed text, as tools that rewrite the file (링크, 각주·미주, 표 넣기) start from it.
+    func accessibleParagraphDrafts(_ id: String, text: String) -> [HWPDocumentBlock]? {
+        guard let draft = accessibleParagraphDraft(id, text: text),
+              let original = blocks.first(where: { $0.id == id }) else { return nil }
+        return original == draft ? blocks : HWPBlockEditing.committing(draft, in: blocks, layouts: pageLayouts)
+    }
+
+    /// 문단 편집's 적용: the typed text as one undo step.
+    @discardableResult
+    func applyAccessibleParagraphText(_ id: String, text: String) -> Bool {
+        guard !isSaving, let draft = accessibleParagraphDraft(id, text: text) else { return false }
+        if blocks.first(where: { $0.id == id }) != draft {
+            commitInlineBlock(draft)
+            status = isLegacyDocument
+                ? AppLocalization.string("문단을 수정했습니다. 저장하면 원본 HWP 파일에 반영됩니다.")
+                : AppLocalization.string("문단을 수정했습니다. 저장하면 HWPX 파일에 반영됩니다.")
+        } else {
+            selectedBlockID = id
+            syncEditor()
+        }
+        return true
+    }
+
+    /// 글자 and 문단 from the 문단 편집 sheet: `commands` on the selection (the whole paragraph
+    /// without one), together with the typed text, as one undo step.
+    @discardableResult
+    func formatAccessibleParagraph(_ id: String, text: String, range: NSRange,
+                                   commands: [HWPFormattingCommand]) -> Bool {
+        guard !isSaving, let original = blocks.first(where: { $0.id == id }),
+              let draft = accessibleParagraphDraft(id, text: text) else { return false }
+        let target = range.length > 0 ? range : NSRange(location: 0, length: draft.text.utf16.count)
+        let updated = commands.reduce(draft) { HWPDocumentFormatting.apply($1, to: $0, range: target) }
+        guard updated != original else { return true }
+        commitInlineBlock(updated)
+        status = AppLocalization.string("서식을 바꿨습니다. 저장하면 파일에 반영됩니다.")
+        return true
+    }
+
+    /// Split, merge and page breaks from the 문단 편집 sheet, with the typed text, as one undo step.
+    func editAccessibleParagraph(_ id: String, text: String, operation: HWPParagraphEdit) -> HWPParagraphEditResult? {
+        guard !isSaving, let original = blocks.first(where: { $0.id == id }),
+              let draft = accessibleParagraphDraft(id, text: text),
+              pageLayouts.contains(where: { $0.sectionIndex == (HWPPageSetup.sectionIndex(draft.sectionPath) ?? 0) }),
+              let proposal = HWPParagraphEditing.apply(operation, draft: draft, to: blocks) else { return nil }
+        let typed = original == draft ? blocks : HWPBlockEditing.committing(draft, in: blocks, layouts: pageLayouts)
+        let updated = HWPParagraphEditing.reflow(proposal, before: typed, draft: draft, operation: operation, layouts: pageLayouts)
+        apply(MutationGroup(before: blocks, after: updated, oldSelection: selectedBlockID, newSelection: proposal.focusedID),
+            forward: true, registeringUndo: true)
+        syncEditor()
+        switch operation {
+        case .split: status = AppLocalization.string("문단을 나눴습니다. 새 문단을 이어서 편집합니다.")
+        case .mergeBackward: status = AppLocalization.string("앞 문단과 합쳤습니다.")
+        case .insertPageBreak, .removePageBreak:
+            status = AppLocalization.string("편집을 적용했습니다. 실행 취소로 되돌릴 수 있습니다.")
+        }
+        return HWPParagraphEditResult(blocks: blocks, focusedID: proposal.focusedID, caret: proposal.caret)
+    }
+
+    /// 표 편집's 셀 서식 on cell paragraph `id`; the whole cell follows, as one undo step.
+    @discardableResult
+    func formatAccessibleCell(_ id: String, format: HWPCellFormat) -> Bool {
+        guard !isSaving, isEditableDocument, let block = blocks.first(where: { $0.id == id }),
+              HWPCellFormatting.supports(block) else { return false }
+        let updated = HWPDocumentFormatting.apply(.cell(format), to: block, range: NSRange(location: 0, length: 0))
+        guard updated != block else { return true }
+        commitInlineBlock(updated)
+        status = AppLocalization.string("서식을 바꿨습니다. 저장하면 파일에 반영됩니다.")
+        return true
+    }
+
+    /// The table changes possible at cell paragraph `id`, in the ribbon's order (행·열 크기 is separate).
+    func accessibleTableActions(_ id: String) -> [HWPTableStructureAction] {
+        guard isEditableDocument else { return [] }
+        let available = Set(HWPTableStructureEditing.available(blocks: blocks, selectedID: id, layouts: pageLayouts)
+            + HWPTableStructureEditing.availableCells(blocks: blocks, selectedID: id, layouts: pageLayouts))
+        return HWPTableStructureAction.allCases.filter { $0 != .resize && available.contains($0) }
+    }
+
+    func accessibleTableSizing(_ id: String) -> HWPTableSizing.Selection? {
+        guard isEditableDocument else { return nil }
+        return HWPTableSizing.selection(blocks: blocks, selectedID: id, layouts: pageLayouts)
+    }
+
+    /// A message for the status line from the 간편 editors (a tool that could not run).
+    func report(_ message: String) {
+        status = message
+    }
+
     func undo() {
         guard !isSaving else { return }
         commitEditorChange()
@@ -307,7 +403,9 @@ final class HWPDocumentViewModel: ObservableObject {
     }
 
     @discardableResult
-    func insertTable(_ request: HWPTableInsertion.Request) async throws -> String {
+    /// `drafts` is the document with a paragraph typed in the 간편 문단 편집 sheet: the typed
+    /// text is written with the table, and one undo returns to `blocks` before both.
+    func insertTable(_ request: HWPTableInsertion.Request, drafts: [HWPDocumentBlock]? = nil) async throws -> String {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
@@ -315,7 +413,7 @@ final class HWPDocumentViewModel: ObservableObject {
         isSaving = true; errorDescription = nil; status = AppLocalization.string("표를 삽입하는 중…")
         defer { isSaving = false }
         do {
-            let result = try await HWPTableInsertion.applying(request, source: source, drafts: before)
+            let result = try await HWPTableInsertion.applying(request, source: source, drafts: drafts ?? before)
             apply(MutationGroup(before: before, after: result.document.blocks, oldSelection: selected, newSelection: result.focusedID,
                 beforeSource: source, afterSource: result.document, beforeDirty: dirty), forward: true, registeringUndo: true)
             syncEditor()
@@ -661,7 +759,8 @@ final class HWPDocumentViewModel: ObservableObject {
 
     @discardableResult
     func editHyperlink(_ action: HWPHyperlinkEditing.Action,
-                       selection: HWPHyperlinkEditing.Selection) async throws -> String {
+                       selection: HWPHyperlinkEditing.Selection,
+                       drafts: [HWPDocumentBlock]? = nil) async throws -> String {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
@@ -670,7 +769,7 @@ final class HWPDocumentViewModel: ObservableObject {
         defer { isSaving = false }
         do {
             let result = try await HWPHyperlinkEditing.applying(action, selection: selection,
-                source: source, drafts: before)
+                source: source, drafts: drafts ?? before)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
                 beforeSource: source, afterSource: result.document, beforeDirty: dirty),
@@ -685,7 +784,7 @@ final class HWPDocumentViewModel: ObservableObject {
     }
 
     @discardableResult
-    func editNote(_ action: HWPNoteEditing.Action) async throws -> String {
+    func editNote(_ action: HWPNoteEditing.Action, drafts: [HWPDocumentBlock]? = nil) async throws -> String {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
@@ -694,7 +793,7 @@ final class HWPDocumentViewModel: ObservableObject {
         defer { isSaving = false }
         do {
             let result = try await HWPNoteEditing.applying(action, source: source,
-                drafts: before, selectedID: selected)
+                drafts: drafts ?? before, selectedID: selected)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
                 beforeSource: source, afterSource: result.document, beforeDirty: dirty),
@@ -1246,6 +1345,11 @@ struct HWPDocumentView: View {
     @State private var viewMode = HWPDocumentViewMode.originalDocument
     @State private var showsFontManager = false
     @State private var editingTableRow: HWPAccessibleRow?
+    @State private var editingParagraph: HWPAccessibleParagraphRequest?
+    @State private var reopeningParagraph: HWPAccessibleParagraphRequest?
+    @State private var announcesParagraphResult = false
+    @State private var editingTableStructure: HWPAccessibleRow?
+    @State private var pendingTableStructureRowID: String?
     @State private var editingImage: HWPImageEditing.Target?
     @State private var describingImage: HWPImageDescriptionDraft?
     @State private var selectedImage: HWPImageEditing.Target?
@@ -1330,11 +1434,52 @@ struct HWPDocumentView: View {
                 }
             )
         }
-        .sheet(item: $editingTableRow) { row in
+        .sheet(item: $editingTableRow, onDismiss: openPendingTableStructure) { row in
             HWPAccessibleRowEditor(row: row, fieldNames: viewModel.formFieldNames,
-                onFocus: viewModel.selectBlock) { texts in
+                onFocus: viewModel.selectBlock,
+                onEditTable: canEditTable(row) ? { pendingTableStructureRowID = row.id } : nil) { texts in
                 try viewModel.applyTableRowEdits(originalBlocks: row.blocks, texts: texts)
             }
+        }
+        .sheet(item: $editingParagraph, onDismiss: paragraphEditorDismissed) { request in
+            HWPAccessibleParagraphEditor(request: request, viewModel: viewModel, documentFonts: documentFonts,
+                onClose: { changed in
+                    announcesParagraphResult = changed
+                    editingParagraph = nil
+                },
+                onReopen: { next in
+                    reopeningParagraph = next
+                    announcesParagraphResult = true
+                    editingParagraph = nil
+                },
+                onLink: { drafts, action, selection in
+                    _ = try await viewModel.editHyperlink(action, selection: selection, drafts: drafts)
+                    documentNavigation.update(blocks: viewModel.blocks, layouts: viewModel.pageLayouts)
+                },
+                onNote: { drafts, action in
+                    _ = try await viewModel.editNote(action, drafts: drafts)
+                    documentNavigation.update(blocks: viewModel.blocks, layouts: viewModel.pageLayouts)
+                },
+                onInsertTable: { drafts, request in
+                    _ = try await viewModel.insertTable(request, drafts: drafts)
+                    documentNavigation.update(blocks: viewModel.blocks, layouts: viewModel.pageLayouts)
+                })
+        }
+        .sheet(item: $editingTableStructure) { row in
+            HWPAccessibleTableEditSheet(row: row, fieldNames: viewModel.formFieldNames,
+                actions: viewModel.accessibleTableActions, sizing: viewModel.accessibleTableSizing,
+                onAction: { action, id in
+                    editingTableStructure = nil
+                    runAccessibleEdit { try await viewModel.editTable(action, selectedID: id) }
+                },
+                onFormat: { id, format in
+                    editingTableStructure = nil
+                    if viewModel.formatAccessibleCell(id, format: format) { announceStatus() }
+                },
+                onResize: { id, dimensions in
+                    editingTableStructure = nil
+                    runAccessibleEdit { try await viewModel.editTable(.resize, selectedID: id, dimensions: dimensions) }
+                })
         }
         .sheet(item: $editingImage) { target in
             HWPImageSizeSheet(target: target,
@@ -1509,9 +1654,13 @@ struct HWPDocumentView: View {
         }
     }
 
+    private var documentFonts: [String] {
+        Array(Set(viewModel.blocks.flatMap { $0.presentation.textRuns.compactMap(\.fontName) })).sorted()
+    }
+
     private var formattingRibbonTools: some View {
         HWPFormattingToolbar(section: formattingSection, editor: originalEditor,
-            documentFonts: Array(Set(viewModel.blocks.flatMap { $0.presentation.textRuns.compactMap(\.fontName) })).sorted(),
+            documentFonts: documentFonts,
             tableActions: HWPTableStructureEditing.available(blocks: viewModel.blocks,
                 selectedID: originalEditor.activation?.block.id, layouts: viewModel.pageLayouts),
             cellActions: HWPTableStructureEditing.availableCells(blocks: viewModel.blocks,
@@ -2817,7 +2966,8 @@ struct HWPDocumentView: View {
                                 HWPAccessibleTableHeader(table: table).id(entry.id)
                             case .row(let row):
                                 HWPAccessibleRowButton(row: row,
-                                    selectedBlockID: viewModel.selectedBlockID, fieldNames: fieldNames) {
+                                    selectedBlockID: viewModel.selectedBlockID, fieldNames: fieldNames,
+                                    onEditTable: canEditTable(row) ? { openTableStructure(row.id) } : nil) {
                                     viewModel.commitEditorChange()
                                     // Capture current blocks after committing the paragraph editor.
                                     let current = HWPAccessibleDocument.make(blocks: viewModel.blocks)
@@ -2918,6 +3068,67 @@ struct HWPDocumentView: View {
                 ? "두 번 탭하면 이 문단을 선택합니다."
                 : "복합 개체가 포함된 읽기 전용 문단입니다."
         )
+        .modifier(HWPAccessibleEditActionModifier(title: "문단 편집", systemImage: "pencil",
+            action: viewModel.isEditableDocument && block.isEditable ? { openParagraphEditor(block.id) } : nil))
+    }
+
+    // MARK: 간편 보기 편집
+
+    private func openParagraphEditor(_ id: String) {
+        guard viewModel.isEditableDocument, !viewModel.isSaving else { return }
+        viewModel.selectBlock(id)
+        guard let block = viewModel.blocks.first(where: { $0.id == id }), block.isEditable else { return }
+        editingParagraph = HWPAccessibleParagraphRequest(blockID: id, text: block.text)
+    }
+
+    private func paragraphEditorDismissed() {
+        if let next = reopeningParagraph {
+            reopeningParagraph = nil
+            editingParagraph = next
+        }
+        if announcesParagraphResult {
+            announcesParagraphResult = false
+            announceStatus()
+        }
+    }
+
+    private func canEditTable(_ row: HWPAccessibleRow) -> Bool {
+        viewModel.isEditableDocument && !HWPAccessibleTableEditSheet.cells(of: row).isEmpty
+    }
+
+    private func openTableStructure(_ rowID: String) {
+        guard !viewModel.isSaving else { return }
+        viewModel.commitEditorChange()
+        let current = HWPAccessibleDocument.make(blocks: viewModel.blocks)
+        editingTableStructure = current.tables.flatMap(\.rows).first { $0.id == rowID }
+    }
+
+    private func openPendingTableStructure() {
+        guard let id = pendingTableStructureRowID else { return }
+        pendingTableStructureRowID = nil
+        openTableStructure(id)
+    }
+
+    /// Reads the status line out once the sheet that made the change has gone.
+    private func announceStatus() {
+        let message = viewModel.status
+        guard !message.isEmpty else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            UIAccessibility.post(notification: .announcement, argument: message)
+        }
+    }
+
+    private func runAccessibleEdit(_ work: @escaping @MainActor () async throws -> String) {
+        originalEditor.finish()
+        Task { @MainActor in
+            do {
+                _ = try await work()
+                documentNavigation.update(blocks: viewModel.blocks, layouts: viewModel.pageLayouts)
+                announceStatus()
+            } catch {
+                exportError = error.localizedDescription
+            }
+        }
     }
 
     @ViewBuilder
@@ -3073,6 +3284,13 @@ struct HWPDocumentView: View {
                     .foregroundStyle(VisionCraftUI.secondaryText)
                 }
                 Spacer()
+                Button("문단 편집", systemImage: "slider.horizontal.3") {
+                    if let id = viewModel.selectedBlockID { openParagraphEditor(id) }
+                }
+                .buttonStyle(.bordered)
+                .disabled(!viewModel.canEditSelectedBlock)
+                .accessibilityHint("나누기·합치기, 글자·문단 서식, 표·링크·각주·쪽 나누기를 편집합니다.")
+                .accessibilityIdentifier("hwp-open-paragraph-editor")
                 Button("문단 적용") { viewModel.commitEditorChange() }
                     .buttonStyle(.borderedProminent)
                     .disabled(!viewModel.canEditSelectedBlock)

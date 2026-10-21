@@ -28,9 +28,14 @@ struct HWPNoteButton: View {
     }
 }
 
-private struct HWPNoteManager: View {
+struct HWPNoteManager: View {
     let selection: HWPNoteEditing.Selection
     let onApply: (HWPNoteEditing.Action) -> Void
+
+    init(selection: HWPNoteEditing.Selection, onApply: @escaping (HWPNoteEditing.Action) -> Void) {
+        self.selection = selection
+        self.onApply = onApply
+    }
 
     @Environment(\.dismiss) private var dismiss
 

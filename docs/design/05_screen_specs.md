@@ -181,6 +181,25 @@
 - 앱 문서 폴더가 iPadOS는 파일 앱의 "나의 iPad > VisionCraft"이고, Android는 앱 전용 `Documents/VisionCraft`와(모든 파일 접근을 허용했을 때) 내 파일의 `Documents/VisionCraft`다. 폴더 설명 문구도 그에 맞게 다르다.
 - 최근 목록에서 제거는 iPadOS는 밀어서 나오는 버튼, Android는 행 끝의 닫기 버튼과 TalkBack 사용자 지정 작업이다.
 
+## 한글 문서
+
+파일: `Documents/HWP/HWPDocumentView.swift`(`HWPDocumentView`·`HWPDocumentViewModel`, 간편 보기 `documentList`·`blockView`·`editorPanel`), `Documents/HWP/HWPAccessibleEditingSheets.swift`(간편 보기 편집 시트), `Documents/HWP/HWPAccessibleTableView.swift`(`HWPAccessibleRowButton`·`HWPAccessibleRowEditor`), 리본 `Documents/HWP/HWPFormattingToolbar.swift` (Android `document/HwpActivity.kt`·`document/HwpViewModel.kt`).
+
+### 간편 보기 편집
+
+- 문단 카드를 길게 누르거나 VoiceOver 사용자 지정 동작 `문단 편집`(편집 가능한 문서의 편집 가능한 문단만, `HWPAccessibleEditActionModifier`), 또는 편집 모드 아래 "선택한 문단 편집" 칸의 `문단 편집` 버튼으로 문단 편집 시트(`HWPAccessibleParagraphEditor`)를 연다. 열기 전에 아래 칸에 입력한 글을 먼저 확정한다.
+- 문단 편집 시트: 입력칸(이름은 엔진 `HWPAccessibleDocument.label`, 없으면 "선택한 한글 문단 편집") + `구조`(`커서에서 문단 나누기`·`앞 문단과 합치기`) + `글자`·`문단` + `삽입`(`커서에 표 넣기`·`링크`·`각주·미주`·`쪽 나누기`, 문단 앞에 쪽 나누기가 있으면 `쪽 나누기 없애기`). 위 막대 `취소`·`적용`. 도구 시트는 이 시트 위에 열리고, 취소하면 입력한 글 그대로 돌아온다. 할 수 없는 도구 줄은 흐리고 비활성으로 읽힌다(나누기·합치기는 `HWPParagraphEditing.supportsStructure`, 표 넣기·링크는 `HWPParagraphEditing.supports`, 쪽 나누기는 단이 하나인 구역의 본문 문단).
+- 모든 변경은 입력한 글과 함께 실행 취소 한 단계다(`HWPDocumentViewModel`의 `applyAccessibleParagraphText`·`formatAccessibleParagraph`·`editAccessibleParagraph`, 링크·각주·미주·표 넣기는 `accessibleParagraphDrafts`를 `editHyperlink`·`editNote`·`insertTable`의 `drafts`로 넘긴다). 나누기와 쪽 나누기 뒤에는 새 문단의 편집 시트가 바로 열리고, 합치기·쪽 나누기 없애기·서식·삽입 뒤에는 닫힌다. 파일을 다시 쓰는 링크·각주·미주·표 넣기는 끝날 때까지 시트를 열어 둔 채 잠그고(진행 표시, 입력칸·도구 줄·`취소`·`적용` 비활성, 끌어내려 닫기 막음, 한 번에 하나만 — `HWPAccessibleToolRunner`) 기다리고, 성공해야 닫는다. 실패하면 입력한 글을 그대로 둔 채 시트 위쪽에 엔진 문구를 보이고 안내로 읽는다. 결과는 상태 줄 문구("문단을 나눴습니다. 새 문단을 이어서 편집합니다.", "앞 문단과 합쳤습니다.", "서식을 바꿨습니다. 저장하면 파일에 반영됩니다." 등)를 시트가 닫힌 뒤 VoiceOver 안내로 읽는다. 할 수 없으면 시트 위쪽에 이유(엔진 `HWPParagraphEditing.unavailableMessage`, "링크로 만들 글자를 선택하세요.", "이 위치에는 표를 넣을 수 없습니다.")를 보이고 안내로 읽는다.
+- `글자`(`HWPCharacterFormattingSheet`): 선택한 글자에(없으면 문단 전체, 묶음 아래 적용 범위 안내) `글꼴`(글꼴 시트 `HWPFormattingFontPicker`), `글자 크기`(비우면 유지, 스테퍼 1pt씩 6–144pt), 스위치 굵게·기울임·밑줄·취소선·위 첨자·아래 첨자(`HWPCharacterEffects`: 선택한 글자 모두에 있을 때만 켜짐으로 시작하고, 건드린 스위치는 처음 값과 같아도 끝난 값을 보내 섞인 선택을 모두 켜거나 끌 수 있다. 위·아래 첨자는 서로 끈다), `글자색`(`유지` + 12색 + `다른 색…`), `강조색`(`유지`·`없음` + 5색 + `다른 색…`), `글자 서식 지우기`. 글꼴·크기·색은 고른 것만 보낸다.
+- `문단`(`HWPParagraphFormattingSheet`, `includesAlignment`): `문단 정렬` 세그먼트(왼쪽·가운데·오른쪽·양쪽 정렬·배분 맞춤), `글머리표·번호`(없음·글머리표·번호, `HWPListFormatting.supports`일 때만), 들여쓰기·간격. 리본에서 열면 들여쓰기·간격만이다.
+- 표 행 편집 시트(`HWPAccessibleRowEditor`) 끝의 `표 편집`(편집 가능한 문서, 편집할 수 있는 칸이 있는 행)은 입력한 칸을 먼저 적용하고 표 편집 시트(`HWPAccessibleTableEditSheet`)를 연다. 행 카드를 길게 누르거나 VoiceOver 동작 `표 편집`으로도 바로 연다. `기준 칸 고르기`(칸 이름 + 내용) → "<칸> 기준 표 편집": `셀 서식`(`HWPCellFormattingSheet`, `HWPDocumentViewModel.formatAccessibleCell`), `행·열 크기`(`HWPTableSizingSheet`, 되는 칸만), 엔진이 그 칸에서 허용하는 변경(`accessibleTableActions`: 행·열 추가와 삭제, 병합·분할, 표 삭제 — 삭제는 빨강). 할 수 있는 것이 없으면 "이 표는 행·열을 바꿀 수 없습니다.".
+- `다른 색…`(`HWPCustomColorSheet`): 리본의 글자색·강조색 메뉴, `글자` 시트의 색 메뉴, 셀 서식의 채우기·선 색상 팔레트 끝에 있다. 시스템 색 고르기와 `색 코드 (#RRGGBB)` 입력칸(VoiceOver로 직접 입력, `HWPColorCode`), `이 색 사용`. 셀 서식 팔레트에 없는 색을 고르면 `다른 색…` 칸이 그 색과 체크로 보인다.
+
+**Android와 다른 곳:**
+- 간편 보기에서 문단 카드를 누르면 iPadOS는 고르기만 하고(편집 모드면 아래 "선택한 문단 편집" 칸), 문단 편집 시트는 길게 누르기·VoiceOver 동작·`문단 편집` 버튼으로 연다. Android는 편집 모드에서 누르면 바로 다이얼로그가 열린다.
+- 표 행 카드의 길게 누르기·VoiceOver 동작 `표 편집`은 iPadOS에만 있다(Android는 행 편집 다이얼로그 안에서만).
+- `다른 색…`은 iPadOS 시스템 색 고르기 + 색 코드이고, Android는 이름 있는 색·색조·채도·밝기 슬라이더 + 색 코드 시트다.
+
 ## AI 문서 선택
 
 파일: `LLM/AIDocumentSelectionView.swift` (Android `compose/FileSelectScreen.kt`).

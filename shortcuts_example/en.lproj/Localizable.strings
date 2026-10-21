@@ -2714,3 +2714,37 @@
 "카메라/이미지" = "Camera/Images";
 "글과 문서를 읽고 편집하세요." = "Read and edit text and docs.";
 "스마트폰과 VisionCraft를 함께 사용하세요." = "Use VisionCraft with your phone.";
+
+/* HWP 간편 보기 문단·표 편집 */
+"고른 색: %@" = "Chosen color: %@";
+"색 고르기" = "Choose color";
+"색 코드 (#RRGGBB)" = "Color code (#RRGGBB)";
+"#과 16진수 여섯 자리로 입력하세요. 예: #1F6FB2" = "Enter # and six hexadecimal digits, for example #1F6FB2.";
+"이 색 사용" = "Use This Color";
+"다른 색…" = "Other Color…";
+"없음" = "None";
+"유지, %@ pt" = "Keep, %@ pt";
+"적용" = "Apply";
+"선택한 글자 ‘%@’에 적용합니다." = "Applies to the selected text “%@”.";
+"문단 전체에 적용합니다." = "Applies to the whole paragraph.";
+"선택한 한글 문단 편집" = "Edit selected Hangul paragraph";
+"구조" = "Structure";
+"커서에서 문단 나누기" = "Split at cursor";
+"앞 문단과 합치기" = "Merge with previous";
+"커서에 표 넣기" = "Insert table at cursor";
+"각주·미주" = "Footnotes and Endnotes";
+"문단 편집" = "Edit paragraph";
+"이 위치에는 표를 넣을 수 없습니다." = "A table can't be inserted here.";
+"링크로 만들 글자를 선택하세요." = "Select the text to link.";
+"기준 칸 고르기" = "Choose a cell";
+"%@ 기준 표 편집" = "Edit the table at %@";
+"이 표는 행·열을 바꿀 수 없습니다." = "This table's rows and columns can't be changed.";
+"문단 정렬" = "Paragraph alignment";
+"배분 맞춤" = "Distribute";
+"글머리표·번호" = "Bullets and numbering";
+"번호" = "Numbering";
+"서식을 바꿨습니다. 저장하면 파일에 반영됩니다." = "Changed the formatting. Save to write it to the file.";
+"문단을 나눴습니다. 새 문단을 이어서 편집합니다." = "Split the paragraph. Keep editing the new one.";
+"앞 문단과 합쳤습니다." = "Merged with the previous paragraph.";
+"행·열 추가와 삭제, 병합·분할, 셀 서식, 행·열 크기를 바꿉니다." = "Adds or deletes rows and columns, merges or splits cells, and changes cell formatting and row and column size.";
+"나누기·합치기, 글자·문단 서식, 표·링크·각주·쪽 나누기를 편집합니다." = "Split or merge, format text and paragraphs, and insert tables, links, notes and page breaks.";

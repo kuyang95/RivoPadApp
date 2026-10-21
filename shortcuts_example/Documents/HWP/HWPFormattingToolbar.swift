@@ -82,6 +82,7 @@ struct HWPFormattingToolbar: View {
     @State private var pendingCommand: HWPFormattingCommand?
     @State private var sizingSelection: HWPTableSizing.Selection?
     @State private var pendingSize: (String, HWPTableDimensions)?
+    @State private var customColor: HWPCustomColorTarget?
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -179,6 +180,9 @@ struct HWPFormattingToolbar: View {
                                     .tint(color.color)
                             }
                         }
+                        Divider()
+                        Button("다른 색…", systemImage: "paintpalette") { customColor = .text }
+                            .accessibilityIdentifier("hwp-color-other")
                     } label: {
                         VStack(spacing: 2) {
                             Image(systemName: "textformat")
@@ -198,6 +202,9 @@ struct HWPFormattingToolbar: View {
                                     .tint(color.color)
                             }.accessibilityIdentifier("hwp-highlight-\(color.rgb)")
                         }
+                        Divider()
+                        Button("다른 색…", systemImage: "paintpalette") { customColor = .highlight }
+                            .accessibilityIdentifier("hwp-highlight-other")
                     } label: {
                         VStack(spacing: 2) {
                             Image(systemName: "highlighter")
@@ -268,9 +275,16 @@ struct HWPFormattingToolbar: View {
                 }
         }
         .sheet(isPresented: $showsParagraph, onDismiss: applyPendingCommand) {
-            HWPParagraphFormattingSheet(style: editor.paragraphStyle) { command in
-                pendingCommand = command
+            HWPParagraphFormattingSheet(style: editor.paragraphStyle) { commands in
+                pendingCommand = commands.first
                 showsParagraph = false
+            }
+        }
+        .sheet(item: $customColor, onDismiss: applyPendingCommand) { target in
+            HWPCustomColorSheet(title: target.title,
+                initial: target == .text ? editor.formattingRun.textColorRGB : editor.formattingRun.backgroundColorRGB) { rgb in
+                pendingCommand = target == .text ? .color(rgb) : .highlight(rgb)
+                customColor = nil
             }
         }
         .sheet(isPresented: $showsCell, onDismiss: applyPendingCommand) {
@@ -338,10 +352,16 @@ struct HWPFormattingToolbar: View {
     }
 }
 
-private struct HWPFormattingFontPicker: View {
+struct HWPFormattingFontPicker: View {
     let documentFonts: [String]
     let selected: String?
     let onSelect: (String) -> Void
+
+    init(documentFonts: [String], selected: String?, onSelect: @escaping (String) -> Void) {
+        self.documentFonts = documentFonts
+        self.selected = selected
+        self.onSelect = onSelect
+    }
     @Environment(\.dismiss) private var dismiss
     @State private var search = ""
     private var fonts: [String] {
@@ -367,16 +387,55 @@ private struct HWPFormattingFontPicker: View {
     }
 }
 
-private struct HWPParagraphFormattingSheet: View {
+/// The 문단 sheet. From the ribbon (which has its own alignment and list buttons) it is
+/// indents and spacing; from the 간편 문단 편집 sheet it also has alignment and the list, and
+/// sends only what changed.
+struct HWPParagraphFormattingSheet: View {
     @Environment(\.dismiss) private var dismiss
+    private let original: HWPDocumentBlockPresentation
     @State private var style: HWPDocumentBlockPresentation
-    let onApply: (HWPFormattingCommand) -> Void
-    init(style: HWPDocumentBlockPresentation, onApply: @escaping (HWPFormattingCommand) -> Void) {
-        _style = State(initialValue: style); self.onApply = onApply
+    @State private var list: HWPListKind?
+    private let includesAlignment: Bool
+    private let canApplyList: Bool
+    private let listStyle: ((HWPListKind) -> HWPParagraphList)?
+    let onApply: ([HWPFormattingCommand]) -> Void
+
+    init(style: HWPDocumentBlockPresentation, includesAlignment: Bool = false, canApplyList: Bool = false,
+         listStyle: ((HWPListKind) -> HWPParagraphList)? = nil,
+         onApply: @escaping ([HWPFormattingCommand]) -> Void) {
+        original = style
+        _style = State(initialValue: style)
+        _list = State(initialValue: style.list?.kind)
+        self.includesAlignment = includesAlignment
+        self.canApplyList = canApplyList && listStyle != nil
+        self.listStyle = listStyle
+        self.onApply = onApply
     }
+
     var body: some View {
         NavigationStack {
             Form {
+                if includesAlignment {
+                    Section {
+                        Picker("문단 정렬", selection: $style.alignment) {
+                            Text("왼쪽 정렬").tag(HWPParagraphAlignment.leading)
+                            Text("가운데 정렬").tag(HWPParagraphAlignment.centered)
+                            Text("오른쪽 정렬").tag(HWPParagraphAlignment.trailing)
+                            Text("양쪽 정렬").tag(HWPParagraphAlignment.justified)
+                            Text("배분 맞춤").tag(HWPParagraphAlignment.distributed)
+                        }
+                        .pickerStyle(.segmented)
+                        .accessibilityIdentifier("hwp-paragraph-alignment")
+                        if canApplyList {
+                            Picker("글머리표·번호", selection: $list) {
+                                Text("없음").tag(Optional<HWPListKind>.none)
+                                Text("글머리표").tag(Optional(HWPListKind.bullet))
+                                Text("번호").tag(Optional(HWPListKind.number))
+                            }
+                            .accessibilityIdentifier("hwp-paragraph-list")
+                        }
+                    } header: { Text("문단 정렬") } footer: { Text("문단 전체에 적용합니다.") }
+                }
                 Section("들여쓰기") {
                     setting("왼쪽 여백", value: $style.leftMarginPoints, range: 0...360)
                     setting("오른쪽 여백", value: $style.rightMarginPoints, range: 0...360)
@@ -399,15 +458,36 @@ private struct HWPParagraphFormattingSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("적용") {
-                        onApply(.paragraph(left: style.leftMarginPoints, right: style.rightMarginPoints,
-                            indent: style.firstLineIndentPoints, before: style.spacingBeforePoints,
-                            after: style.spacingAfterPoints, linePercent: style.lineSpacingPercent))
-                    }
+                    Button("적용") { onApply(commands) }
+                        .accessibilityIdentifier("hwp-paragraph-apply")
                 }
             }
         }
     }
+
+    private var spacing: HWPFormattingCommand {
+        .paragraph(left: style.leftMarginPoints, right: style.rightMarginPoints,
+            indent: style.firstLineIndentPoints, before: style.spacingBeforePoints,
+            after: style.spacingAfterPoints, linePercent: style.lineSpacingPercent)
+    }
+
+    private var commands: [HWPFormattingCommand] {
+        // The ribbon's sheet always sends its spacing, as before.
+        guard includesAlignment else { return [spacing] }
+        var result: [HWPFormattingCommand] = []
+        if style.alignment != original.alignment { result.append(.alignment(style.alignment)) }
+        if canApplyList, list != original.list?.kind, let listStyle {
+            result.append(.list(list.map(listStyle)))
+        }
+        let spacingChanged = [
+            (style.leftMarginPoints, original.leftMarginPoints), (style.rightMarginPoints, original.rightMarginPoints),
+            (style.firstLineIndentPoints, original.firstLineIndentPoints),
+            (style.spacingBeforePoints, original.spacingBeforePoints), (style.spacingAfterPoints, original.spacingAfterPoints)
+        ].contains { abs($0.0 - $0.1) > 0.01 } || style.lineSpacingPercent != original.lineSpacingPercent
+        if spacingChanged { result.append(spacing) }
+        return result
+    }
+
     private func setting(_ title: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
         Stepper(value: value, in: range, step: 1) {
             HStack {
@@ -419,7 +499,7 @@ private struct HWPParagraphFormattingSheet: View {
     }
 }
 
-private struct HWPFormattingColor {
+struct HWPFormattingColor {
     let name: String
     let rgb: UInt32
     var color: Color { Self.color(rgb) }

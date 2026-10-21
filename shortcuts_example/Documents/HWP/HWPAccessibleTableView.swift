@@ -33,6 +33,8 @@ struct HWPAccessibleRowButton: View {
     let row: HWPAccessibleRow
     let selectedBlockID: String?
     var fieldNames: [String: String] = [:]
+    /// 표 편집 straight from the row (long press, or a VoiceOver action).
+    var onEditTable: (() -> Void)? = nil
     let onOpen: () -> Void
 
     private var isSelected: Bool { row.blocks.contains { $0.id == selectedBlockID } }
@@ -98,6 +100,27 @@ struct HWPAccessibleRowButton: View {
             ? "두 번 탭하면 이 행의 모든 값을 편집합니다."
             : "두 번 탭하면 이 행의 내용을 확인합니다.")
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .modifier(HWPAccessibleEditActionModifier(title: "표 편집", systemImage: "tablecells.badge.ellipsis",
+            action: onEditTable))
+    }
+}
+
+/// A long-press menu item and the same VoiceOver custom action, when `action` is set.
+struct HWPAccessibleEditActionModifier: ViewModifier {
+    let title: String
+    let systemImage: String
+    let action: (() -> Void)?
+
+    func body(content: Content) -> some View {
+        if let action {
+            content
+                .contextMenu {
+                    Button(AppLocalization.string(title), systemImage: systemImage, action: action)
+                }
+                .accessibilityAction(named: Text(AppLocalization.string(title)), action)
+        } else {
+            content
+        }
     }
 }
 
@@ -107,15 +130,19 @@ struct HWPAccessibleRowEditor: View {
     let fieldNames: [String: String]
     let onFocus: ((String) -> Void)?
     let onApply: ([String: String]) throws -> Void
+    /// 표 편집: called after the typed values are applied; the editor then closes.
+    let onEditTable: (() -> Void)?
     @State private var texts: [String: String]
     @State private var errorMessage: String?
     @FocusState private var focusedBlockID: String?
 
     init(row: HWPAccessibleRow, fieldNames: [String: String] = [:],
-         onFocus: ((String) -> Void)? = nil, onApply: @escaping ([String: String]) throws -> Void) {
+         onFocus: ((String) -> Void)? = nil, onEditTable: (() -> Void)? = nil,
+         onApply: @escaping ([String: String]) throws -> Void) {
         self.row = row
         self.fieldNames = fieldNames
         self.onFocus = onFocus
+        self.onEditTable = onEditTable
         self.onApply = onApply
         _texts = State(initialValue: Dictionary(uniqueKeysWithValues: row.blocks.map { ($0.id, $0.text) }))
     }
@@ -167,6 +194,24 @@ struct HWPAccessibleRowEditor: View {
                     } header: {
                         Text([fieldNames[cell.id], cell.columnDescription, cell.mergeDescription]
                             .compactMap { $0 }.joined(separator: " · "))
+                    }
+                }
+                if let onEditTable {
+                    Section {
+                        // Typed values are written first, so the table change starts from them.
+                        Button {
+                            do {
+                                if hasChanges { try onApply(texts) }
+                                onEditTable()
+                                dismiss()
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
+                        } label: {
+                            Label("표 편집", systemImage: "tablecells.badge.ellipsis").frame(minHeight: 44)
+                        }
+                        .accessibilityHint("행·열 추가와 삭제, 병합·분할, 셀 서식, 행·열 크기를 바꿉니다.")
+                        .accessibilityIdentifier("hwp-row-edit-table")
                     }
                 }
             }

@@ -5,6 +5,7 @@ struct HWPCellFormattingSheet: View {
     @State private var format: HWPCellFormat
     @State private var widthMM: Double
     @State private var borderColor: UInt32
+    @State private var customColor: HWPCustomColorTarget?
     let onApply: (HWPCellFormat) -> Void
     @Environment(\.dismiss) private var dismiss
 
@@ -91,6 +92,12 @@ struct HWPCellFormattingSheet: View {
             }
         }
         .presentationSizing(.page)
+        .sheet(item: $customColor) { target in
+            HWPCustomColorSheet(title: target.title,
+                initial: target == .fill ? format.box.backgroundColorRGB ?? 0xFFFFFF : borderColor) { rgb in
+                if target == .fill { format.setFill(rgb) } else { borderColor = rgb; updateVisibleBorders() }
+            }
+        }
     }
 
     private func updateVisibleBorders() {
@@ -110,8 +117,28 @@ struct HWPCellFormattingSheet: View {
                 }.buttonStyle(.borderless)
                     .accessibilityLabel(AppLocalization.string(name))
                     .accessibilityIdentifier("hwp-cell-\(id)-\(rgb)")
+                    .accessibilityAddTraits(selected == rgb ? .isSelected : [])
             }
+            // 다른 색…: any colour; a colour outside the palette shows here, checked.
+            let custom = selected.flatMap { rgb in colors.contains(where: { $0.1 == rgb }) ? nil : rgb }
+            Button { customColor = id == "fill" ? .fill : .border } label: {
+                RoundedRectangle(cornerRadius: 8).fill(custom.map(color) ?? Color.clear)
+                    .overlay { RoundedRectangle(cornerRadius: 8).stroke(Color.secondary.opacity(0.5)) }
+                    .overlay {
+                        Image(systemName: custom == nil ? "paintpalette" : "checkmark")
+                            .foregroundStyle(custom.map { HWPCellFormattingSheet.isDark($0) ? Color.white : .black } ?? .primary)
+                    }
+                    .frame(height: 48)
+            }.buttonStyle(.borderless)
+                .accessibilityLabel("다른 색…")
+                .accessibilityValue(custom.map(HWPColorCode.string) ?? "")
+                .accessibilityIdentifier("hwp-cell-\(id)-other")
         }
+    }
+
+    private static func isDark(_ rgb: UInt32) -> Bool {
+        let r = Double((rgb >> 16) & 255), g = Double((rgb >> 8) & 255), b = Double(rgb & 255)
+        return 0.299 * r + 0.587 * g + 0.114 * b < 140
     }
 
     private func border(_ line: HWPDocumentBorderLine) -> some View {
