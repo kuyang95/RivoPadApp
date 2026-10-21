@@ -188,7 +188,7 @@
 - 표 배율: 원본 셀 격자 왼쪽 위 모서리(`tablecells` 표시)는 스크롤해도 제자리에 있는 메뉴 버튼(`ExcelGridView.zoomCorner`)이다. VoiceOver는 "표 배율"과 값 "표 배율 N%"로 읽는다. 메뉴 머리에 현재 배율, `표 확대`·`표 축소`(끝에서는 비활성)·`표 원래 크기`(100%일 때 체크)가 있다. 단계는 50·75·100·125·150·200·250·300%(`ExcelGridZoom.steps`, 범위 0.5–3배)이고 메뉴는 고른 뒤에도 열려 있어 이어서 바꿀 수 있다. 바뀐 배율은 상태 줄 문구 "표 배율 N%"가 되어 안내로 읽는다(`ExcelWorkbookViewModel.reportGridZoom`). 두 손가락 확대·축소의 대안이다. 모서리 크기는 현재 배율의 머리글 크기를 따르되 44pt보다 작아지지 않는다.
 - 시트 관리(`ExcelSheetManagerView`): 시트 줄마다 VoiceOver 사용자 지정 동작 `위로 이동`·`아래로 이동`(시트를 관리할 수 있을 때, 끝에서는 없음)으로 손잡이를 끌지 않고 순서를 바꾼다(`ExcelSheetManagerView.paths(_:moving:by:)`).
 - 행 편집(`ExcelEditRowView`): 칸 목록 아래 `원본 셀에서 보기` 버튼. 입력한 값을 먼저 저장해 폼을 닫고 그 행의 첫 칸을 골라 원본 셀 보기로 바꾼다. 읽기 전용 시트에서도 누를 수 있다.
-- 새 행 추가(`ExcelAddRowView`): 새 행이 들어갈 칸에 드롭다운 목록이 있으면(`ExcelWorkbookViewModel.rowFieldsForAppending`, 표 아래 또는 시트 마지막 행 다음 행) 입력칸 아래 "<열> 선택지" 메뉴 줄을 둔다. 메뉴는 목록이 빈 값을 허용하면 `비움`, 다음에 목록 값. 줄 값은 고른 값, 없으면 "선택".
+- 새 행 추가(`ExcelAddRowView`): 새 행이 들어갈 칸에 드롭다운 목록이 있으면(`ExcelWorkbookViewModel.rowFieldsForAppending`. 들어갈 행은 `ExcelWorkbookViewModel.appendedRow`가 엔진 `ExcelRowEditing.appending`과 같은 규칙으로 정한다: 선택한 칸의 표 바로 아래 행, 표가 없으면 시트 마지막 행 다음 행이다. 단 그 행의 폼 열에 이미 값이 있으면 시트 마지막 행 다음 행) 입력칸 아래 "<열> 선택지" 메뉴 줄을 둔다. 메뉴는 목록이 빈 값을 허용하면 `비움`, 다음에 목록 값. 줄 값은 고른 값, 없으면 "선택".
 - 이미지·차트 등(`ExcelSheetImageManagerView`): 시트에 이 화면이 다루지 않는 그리기 개체가 있으면 맨 위에 "그 밖의 개체 N개는 그대로 둡니다."(`ExcelDrawingManagerNotice.otherObjects`, 엔진 `otherDrawingObjectCount`). 이미지 줄 동작 메뉴에 `이미지 설정`, 차트 줄 동작 메뉴에 `위치와 크기`가 있어 개체 설정(`ExcelDrawingInspector`: 이미지는 개체 이름·이미지 설명·교체, 차트는 차트 설정, 모두 `위치와 크기`의 왼쪽 위 기준 셀·오른쪽 아래 경계 셀·`위치 적용`)을 연다.
 
 ## 한글 문서

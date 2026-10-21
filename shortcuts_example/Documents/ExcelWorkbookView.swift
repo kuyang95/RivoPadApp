@@ -1478,15 +1478,28 @@ final class ExcelWorkbookViewModel: ObservableObject {
         }
     }
 
+    /// The row `appendRow` writes to. Mirrors the engine's
+    /// `ExcelRowEditing.appending` exactly (the rule lives in the
+    /// VisionCraftDocumentEngine package, which has no public helper for it):
+    /// the row below the table around `near`, else below the sheet's last row;
+    /// if any of `columns` already has a cell there, the row after the sheet's
+    /// last row instead. `appendRow` passes every form column, so `columns` is
+    /// all of the form's columns.
+    nonisolated static func appendedRow(near: ExcelCellAddress?, columns: Set<Int>, in sheet: ExcelWorksheet) -> Int {
+        let table = near.flatMap { sheet.table(containing: $0) }
+        let preferredRow = (table?.range.end.row ?? sheet.maximumRow) + 1
+        let occupied = sheet.cells.keys.contains { $0.row == preferredRow && columns.contains($0.column) }
+        return occupied ? max(sheet.maximumRow + 1, preferredRow) : preferredRow
+    }
+
     func rowFieldsForAppending() -> [RowField] {
         guard let sheet = selectedSheet else {
             return []
         }
-        // The row the new values land in (as `ExcelRowEditing.appending` picks
-        // it): a dropdown covering that cell offers its choices in the form.
-        let table = selectedAddress.flatMap { sheet.table(containing: $0) }
-        let newRow = (table?.range.end.row ?? sheet.maximumRow) + 1
-        return ExcelAccessibleRows.appendingFields(near: selectedAddress, sheet: sheet).map { field in
+        // A dropdown covering the cell the new row fills offers its choices in the form.
+        let fields = ExcelAccessibleRows.appendingFields(near: selectedAddress, sheet: sheet)
+        let newRow = Self.appendedRow(near: selectedAddress, columns: Set(fields.map(\.column)), in: sheet)
+        return fields.map { field in
             let address = ExcelCellAddress(row: newRow, column: field.column)
             let validation = sheet.dataValidations.first { $0.contains(address) && $0.inlineListValues != nil }
             return RowField(
