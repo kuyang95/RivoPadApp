@@ -25,6 +25,7 @@ struct HWPOriginalDocumentCanvas: View {
                             HWPOriginalCanvasPageView(page: page)
                                 .environment(\.hwpDocumentSearch, HWPDocumentSearchContext(
                                     result: navigation.selectedResult, pageIndex: index))
+                                .environment(\.hwpPageAccessibility, pageAccessibility(index))
                                 .offset(x: rect.minX, y: rect.minY)
                         }
                     }
@@ -50,6 +51,21 @@ struct HWPOriginalDocumentCanvas: View {
         }
     }
 
+    private func pageAccessibility(_ index: Int) -> HWPPageAccessibilityContext {
+        let navigation = navigation
+        let count = navigation.pages.count
+        func go(_ target: Int) -> @MainActor @Sendable () -> Void {
+            {
+                editing.session?.finish()
+                navigation.goToPage(target)
+                UIAccessibility.post(notification: .announcement, argument: AppLocalization.format(
+                    "%lld / %lld쪽", target + 1, count))
+            }
+        }
+        return HWPPageAccessibilityContext(previous: index > 0 ? go(index - 1) : nil,
+            next: index < count - 1 ? go(index + 1) : nil)
+    }
+
     private func visiblePageIndices(in rect: CGRect) -> [Int] {
         navigation.pages.indices.filter { index in
             navigation.viewport.pageRects[index].intersects(rect)
@@ -65,6 +81,73 @@ struct HWPOriginalDocumentCanvas: View {
 
 
 
+
+/// Whether a tap on an object can select it in this document (the engine's editing
+/// targets accept it); objects that cannot are read without button, hint or actions.
+nonisolated struct HWPCanvasObjectSelection: Sendable {
+    var canSelect: @MainActor @Sendable (_ ownerID: String, _ object: HWPDocumentCanvasObject,
+        _ hasText: Bool) -> Bool = { _, _, _ in false }
+
+    /// The objects the document view's editing contexts can select: the ones the engine
+    /// gives an editing target for (body owners; equations outside tables).
+    static func editingTargets(in blocks: [HWPDocumentBlock]) -> Self {
+        let owners = Dictionary(blocks.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return Self { ownerID, object, hasText in
+            guard let owner = owners[ownerID] else { return false }
+            if hasText { return HWPTextBoxEditing.target(owner: owner, object: object, blocks: blocks) != nil }
+            switch object.content {
+            case .image: return HWPImageEditing.target(owner: owner, object: object) != nil
+            case .shape, .group: return HWPShapeEditing.target(owner: owner, object: object) != nil
+            case .equation: return HWPEquationEditing.target(owner: owner, object: object) != nil
+            default: return false
+            }
+        }
+    }
+}
+
+/// A page's VoiceOver `이전 쪽`/`다음 쪽` (Android's page node actions), on the page
+/// and everything read on it.
+nonisolated struct HWPPageAccessibilityContext: Sendable {
+    var previous: (@MainActor @Sendable () -> Void)?
+    var next: (@MainActor @Sendable () -> Void)?
+}
+
+private struct HWPCanvasObjectSelectionKey: EnvironmentKey {
+    static let defaultValue = HWPCanvasObjectSelection()
+}
+
+private struct HWPPageAccessibilityKey: EnvironmentKey {
+    static let defaultValue = HWPPageAccessibilityContext()
+}
+
+extension EnvironmentValues {
+    var hwpCanvasObjectSelection: HWPCanvasObjectSelection {
+        get { self[HWPCanvasObjectSelectionKey.self] }
+        set { self[HWPCanvasObjectSelectionKey.self] = newValue }
+    }
+
+    var hwpPageAccessibility: HWPPageAccessibilityContext {
+        get { self[HWPPageAccessibilityKey.self] }
+        set { self[HWPPageAccessibilityKey.self] = newValue }
+    }
+}
+
+/// Adds the page's `이전 쪽`/`다음 쪽` VoiceOver actions to an element read on it.
+struct HWPPageAccessibilityActions: ViewModifier {
+    @Environment(\.hwpPageAccessibility) private var page
+
+    func body(content: Content) -> some View {
+        // SwiftUI hands VoiceOver these in reverse: 다음 쪽 is written first.
+        content.accessibilityActions {
+            if let next = page.next { Button("다음 쪽") { next() } }
+            if let previous = page.previous { Button("이전 쪽") { previous() } }
+        }
+    }
+}
+
+extension View {
+    func hwpPageAccessibilityActions() -> some View { modifier(HWPPageAccessibilityActions()) }
+}
 
 struct HWPOriginalCanvasPageView: View {
     @Environment(\.hwpShapeObjectEditing) private var shapeEditing
@@ -100,7 +183,12 @@ struct HWPOriginalCanvasPageView: View {
                     if shapeEditing.selectedID != nil { shapeEditing.onDeselect() }
                     if inlineEditing.session?.activation != nil { inlineEditing.session?.finish() }
                 }
-                .accessibilityHidden(true)
+                // The page itself, read before its text: touching paper between paragraphs reads the page.
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(AppLocalization.format("한글 원본 문서 · %lld쪽", page.pageNumber))
+                .accessibilityIdentifier("hwp-page-\(page.id)")
+                .accessibilitySortPriority(1)
+                .hwpPageAccessibilityActions()
                 .zIndex(-30_000)
 
             if let pageStyle = layout.pageStyle,
@@ -149,10 +237,8 @@ struct HWPOriginalCanvasPageView: View {
         .clipped()
         .background(.white)
         .shadow(color: showsPaperShadow ? .black.opacity(0.16) : .clear, radius: 8, y: 3)
+        // The page's name is read by its paper node (pageBackground), first on the page.
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(
-            AppLocalization.format("한글 원본 문서 · %lld쪽", page.pageNumber)
-        )
     }
 
     private func pageNumberView(_ style: HWPDocumentPageNumberStyle) -> some View {
@@ -368,6 +454,7 @@ struct HWPOriginalCanvasPageView: View {
                     )
                     .opacity(inlineEditing.hidesText(block) ? 0 : 1)
                     .accessibilityHidden(inlineEditing.source(for: block) != nil)
+                    .hwpPageAccessibilityActions()
                     .allowsHitTesting(false)
                     .offset(
                         x: layout.leftMarginPoints
@@ -394,6 +481,7 @@ struct HWPOriginalCanvasPageView: View {
             )
             .opacity(inlineEditing.hidesText(block) ? 0 : 1)
             .accessibilityHidden(inlineEditing.source(for: block) != nil)
+            .hwpPageAccessibilityActions()
             .allowsHitTesting(false)
             .offset(
                 x: layout.leftMarginPoints + block.presentation.leftMarginPoints,
@@ -494,6 +582,7 @@ struct HWPOriginalCanvasPageView: View {
                     }
                     .accessibilityElement(children: .ignore).accessibilityLabel(block.text)
                     .accessibilityIdentifier("hwp-region-\(kind.rawValue)-\(page.id)-\(index)")
+                    .hwpPageAccessibilityActions()
                 } else if !block.text.isEmpty {
                     HWPStyledRunsText(
                         text: block.text,
@@ -971,6 +1060,7 @@ private struct HWPPositionedTableCellContent: View {
                         )
                         .opacity(inlineEditing.hidesText(block) ? 0 : 1)
                         .accessibilityHidden(inlineEditing.source(for: block) != nil)
+                        .hwpPageAccessibilityActions()
                         .allowsHitTesting(false)
                         .offset(
                             x: marginLeft + block.presentation.leftMarginPoints,
@@ -1013,6 +1103,7 @@ private struct HWPPositionedTableCellContent: View {
                                 )
                                 .opacity(inlineEditing.hidesText(block) ? 0 : 1)
                                 .accessibilityHidden(inlineEditing.source(for: block) != nil)
+                                .hwpPageAccessibilityActions()
                                 .allowsHitTesting(false)
                                 .offset(
                                     x: marginLeft
@@ -1202,6 +1293,7 @@ private struct HWPDocumentCanvasObjectView: View {
     @Environment(\.hwpEquationObjectEditing) private var equationEditing
     @Environment(\.hwpTextBoxObjectEditing) private var textBoxEditing
     @Environment(\.hwpInlineEditing) private var inlineEditing
+    @Environment(\.hwpCanvasObjectSelection) private var selection
     @State private var moveTranslation = CGSize.zero
     @State private var resizeAnchor: HWPShapeEditing.ResizeAnchor?
     @State private var resizeTranslation = CGSize.zero
@@ -1225,12 +1317,27 @@ private struct HWPDocumentCanvasObjectView: View {
             || (isImageObject && imageEditing.selectedID == object.id)
     }
 
-    /// What a tap on the object does something with (`selectObject`).
+    /// Whether `selectObject` reaches an editing target for this object here (not, for
+    /// example, a picture in a header or an equation in a table cell).
     private var isSelectable: Bool {
-        if !textBlocks.isEmpty { return true }
+        selection.canSelect(ownerID, object, !textBlocks.isEmpty)
+    }
+
+    /// The object's description, else its kind as Android reads it (`HwpPageView` object labels).
+    static func accessibilityLabel(_ object: HWPDocumentCanvasObject, hasText: Bool) -> String {
+        if let description = object.description?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !description.isEmpty { return description }
+        if hasText { return AppLocalization.string("글상자") }
         switch object.content {
-        case .image, .shape, .group, .equation: return true
-        default: return false
+        case .image: return AppLocalization.string("그림")
+        case .shape: return AppLocalization.string("도형")
+        case .group: return AppLocalization.string("묶음 개체")
+        case .equation(let equation):
+            let script = equation.script.trimmingCharacters(in: .whitespacesAndNewlines)
+            return script.isEmpty ? AppLocalization.string("수식") : AppLocalization.format("수식 %@", script)
+        case .chart: return AppLocalization.string("차트")
+        case .unsupported(let label):
+            return label.isEmpty ? AppLocalization.string("한글 문서 개체") : label
         }
     }
 
@@ -1299,11 +1406,8 @@ private struct HWPDocumentCanvasObjectView: View {
             ownerID: ownerID
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            object.description?.isEmpty == false
-                ? object.description!
-                : AppLocalization.string("한글 문서 개체")
-        )
+        .accessibilityLabel(Self.accessibilityLabel(object, hasText: !textBlocks.isEmpty))
+        .accessibilityValue(textBlocks.map(\.text).filter { !$0.isEmpty }.joined(separator: "\n"))
         .accessibilityIdentifier("hwp-canvas-object-\(object.id)")
         .modifier(HWPCanvasObjectAccessibility(
             isSelectable: isSelectable,
@@ -1316,6 +1420,8 @@ private struct HWPDocumentCanvasObjectView: View {
                 applyDirectManipulation(.resize(anchor: .bottomTrailing, deltaX: delta, deltaY: delta))
             },
             onDeselect: isImageObject ? imageEditing.onDeselect : shapeEditing.onDeselect))
+        // Applied after the object's actions so VoiceOver lists the page's first (Android order).
+        .hwpPageAccessibilityActions()
         .contentShape(Rectangle())
         // A drag on a resize or rotation handle must not also move the object.
         // Keep the move recognizer on the object content, outside the overlay

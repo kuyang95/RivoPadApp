@@ -1973,17 +1973,8 @@ struct HWPDocumentView: View {
             pageLayouts: viewModel.pageLayouts,
             navigation: documentNavigation
         )
-        .environment(\.hwpInlineEditing, HWPInlineEditingContext(
-            session: viewModel.isEditableDocument ? originalEditor : nil,
-            sources: Dictionary(uniqueKeysWithValues: originalEditor.previewing(viewModel.blocks, layouts: viewModel.pageLayouts).map { ($0.id, $0) }),
-            orderedBlocks: viewModel.blocks,
-            activeID: originalEditor.activation?.block.id,
-            onSelect: viewModel.selectBlock,
-            onChange: { viewModel.editorText = $0 },
-            onCommit: viewModel.commitEditorChange,
-            onCommitBlock: viewModel.commitInlineBlock,
-            onStructure: viewModel.editParagraph
-        ))
+        .environment(\.hwpInlineEditing, inlineEditingContext)
+        .environment(\.hwpCanvasObjectSelection, .editingTargets(in: viewModel.blocks))
         .environment(\.hwpImageObjectEditing, HWPImageObjectEditingContext(
             selectedID: selectedImage?.objectID,
             onSelect: { ownerID, object in
@@ -2079,6 +2070,26 @@ struct HWPDocumentView: View {
         }
         .id(fontManager.revision)
     }
+
+    private var inlineEditingContext: HWPInlineEditingContext {
+        var openParagraph: (@MainActor @Sendable (String) -> Void)?
+        if viewModel.isEditableDocument {
+            openParagraph = { id in openOriginalParagraphEditor(id) }
+        }
+        return HWPInlineEditingContext(
+            session: viewModel.isEditableDocument ? originalEditor : nil,
+            sources: Dictionary(uniqueKeysWithValues: originalEditor.previewing(viewModel.blocks, layouts: viewModel.pageLayouts).map { ($0.id, $0) }),
+            orderedBlocks: viewModel.blocks,
+            activeID: originalEditor.activation?.block.id,
+            onSelect: viewModel.selectBlock,
+            onChange: { viewModel.editorText = $0 },
+            onCommit: viewModel.commitEditorChange,
+            onCommitBlock: viewModel.commitInlineBlock,
+            onStructure: viewModel.editParagraph,
+            onOpenParagraphEditor: openParagraph
+        )
+    }
+
 
     private func editTable(_ action: HWPTableStructureAction, selectedID: String? = nil, dimensions: HWPTableDimensions? = nil) {
         guard let id = selectedID ?? originalEditor.activation?.block.id else { return }
@@ -3110,6 +3121,12 @@ struct HWPDocumentView: View {
     }
 
     // MARK: 간편 보기 편집
+
+    /// 원본: long press or VoiceOver `문단 편집` on a paragraph.
+    private func openOriginalParagraphEditor(_ id: String) {
+        originalEditor.finish()
+        openParagraphEditor(id)
+    }
 
     private func openParagraphEditor(_ id: String) {
         guard viewModel.isEditableDocument, !viewModel.isSaving else { return }

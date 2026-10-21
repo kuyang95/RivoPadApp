@@ -54,6 +54,7 @@ final class HWPAndroidParityTests: XCTestCase {
         func pageView(selected: Bool) -> some View {
             HWPOriginalCanvasPageView(page: page)
                 .environment(\.hwpInlineEditing, HWPInlineEditingContext(session: session))
+                .environment(\.hwpCanvasObjectSelection, .editingTargets(in: blocks))
                 .environment(\.hwpImageObjectEditing, HWPImageObjectEditingContext(
                     selectedID: selected ? object.id : nil,
                     onSelect: { _, _ in selections += 1 },
@@ -68,6 +69,8 @@ final class HWPAndroidParityTests: XCTestCase {
         var node = try await element(in: window) { $0.identifier == identifier }
         XCTAssertTrue(node.accessibilityTraits.contains(.button))
         XCTAssertFalse(node.accessibilityTraits.contains(.selected))
+        // Read by kind without a description, as on Android.
+        XCTAssertEqual(node.accessibilityLabel, expectedLabel(object), "description, else 그림")
         XCTAssertTrue(names(node).isEmpty, "\(names(node))")
         XCTAssertTrue(node.accessibilityActivate())
         XCTAssertEqual(selections, 1)
@@ -102,6 +105,77 @@ final class HWPAndroidParityTests: XCTestCase {
         } else { XCTFail("\(operations[3])") }
     }
 
+    func testOnlyObjectsWithAnEditingTargetAreSelectable() async throws {
+        let (blocks, _) = try await documentWithPicture()
+        let owner = try XCTUnwrap(blocks.first { !$0.canvasObjects.isEmpty })
+        let object = try XCTUnwrap(owner.canvasObjects.first)
+        let header = HWPDocumentBlock(id: "header-owner", sectionPath: owner.sectionPath,
+            paragraphIndex: 0, text: "", tableLocation: nil, isEditable: true,
+            region: HWPDocumentRegion(kind: .header), canvasObjects: [object])
+        let selection = HWPCanvasObjectSelection.editingTargets(in: blocks + [header])
+        XCTAssertTrue(selection.canSelect(owner.id, object, false))
+        XCTAssertFalse(selection.canSelect(header.id, object, false), "header pictures have no editing target")
+        XCTAssertFalse(selection.canSelect("missing", object, false))
+        XCTAssertFalse(selection.canSelect(owner.id, object, true), "not a text box")
+    }
+
+    func testUnselectableObjectIsReadWithoutButtonOrActions() async throws {
+        let (blocks, layouts) = try await documentWithPicture(clearsDescription: true)
+        let owner = try XCTUnwrap(blocks.first { !$0.canvasObjects.isEmpty })
+        let object = try XCTUnwrap(owner.canvasObjects.first)
+        let navigation = HWPDocumentNavigation()
+        navigation.update(blocks: blocks, layouts: layouts)
+        let page = try XCTUnwrap(navigation.pages.first)
+        let window = host(HWPOriginalCanvasPageView(page: page)
+            .environment(\.hwpInlineEditing, HWPInlineEditingContext(session: HWPInlineEditingSession()))
+            .environment(\.hwpCanvasObjectSelection, HWPCanvasObjectSelection { _, _, _ in false })
+            .environment(\.hwpImageObjectEditing, HWPImageObjectEditingContext(selectedID: object.id)))
+        defer { window.isHidden = true }
+        let node = try await element(in: window) { $0.identifier == "hwp-canvas-object-\(object.id)" }
+        XCTAssertFalse(node.accessibilityTraits.contains(.button))
+        XCTAssertTrue(node.accessibilityHint?.isEmpty ?? true, node.accessibilityHint ?? "")
+        XCTAssertTrue(names(node).isEmpty, "\(names(node))")
+        XCTAssertTrue(object.description?.isEmpty ?? true, object.description ?? "")
+        // No description: read by kind, as on Android.
+        XCTAssertTrue(matches(node.accessibilityLabel ?? "", "그림"), node.accessibilityLabel ?? "")
+    }
+
+    func testOriginalPageOffersPageAndParagraphEditingActions() async throws {
+        let model = try await load(LegacyHWPXConverter.convert(text: "첫 문단"))
+        let navigation = HWPDocumentNavigation()
+        navigation.update(blocks: model.blocks, layouts: model.pageLayouts)
+        let page = try XCTUnwrap(navigation.pages.first)
+        let paragraph = try XCTUnwrap(model.blocks.first { $0.text == "첫 문단" })
+        var moves: [String] = []
+        var opened: [String] = []
+        let session = HWPInlineEditingSession()
+        let window = host(HWPOriginalCanvasPageView(page: page)
+            .environment(\.hwpInlineEditing, HWPInlineEditingContext(session: session,
+                sources: Dictionary(uniqueKeysWithValues: model.blocks.map { ($0.id, $0) }),
+                orderedBlocks: model.blocks,
+                onOpenParagraphEditor: { opened.append($0) }))
+            .environment(\.hwpPageAccessibility, HWPPageAccessibilityContext(
+                previous: { moves.append("previous") }, next: { moves.append("next") })))
+        defer { session.finish(); window.isHidden = true }
+
+        // The page reads first by its name, with Android's page actions.
+        let paper = try await element(in: window) { $0.identifier == "hwp-page-\(page.id)" }
+        XCTAssertTrue(matches(paper.accessibilityLabel ?? "", "한글 원본 문서 · %lld쪽")
+            || (paper.accessibilityLabel ?? "").contains("\(page.pageNumber)"), paper.accessibilityLabel ?? "")
+        XCTAssertEqual(names(paper).count, 2, "\(names(paper))")
+        try perform("이전 쪽", on: paper)
+        try perform("다음 쪽", on: paper)
+        XCTAssertEqual(moves, ["previous", "next"])
+
+        // A paragraph: 이전 쪽, 다음 쪽, 문단 편집 (Android's order).
+        let target = try await element(in: window) { $0.identifier == "hwp-inline-target-\(paragraph.id)" }
+        let expected = ["이전 쪽", "다음 쪽", "문단 편집"]
+        XCTAssertEqual(names(target).count, expected.count, "\(names(target))")
+        for (name, key) in zip(names(target), expected) { XCTAssertTrue(matches(name, key), "\(names(target))") }
+        try perform("문단 편집", on: target)
+        XCTAssertEqual(opened, [paragraph.id])
+    }
+
     // MARK: - Helpers
 
     private func load(_ data: Data) async throws -> HWPDocumentViewModel {
@@ -114,7 +188,7 @@ final class HWPAndroidParityTests: XCTestCase {
         return model
     }
 
-    private func documentWithPicture() async throws -> ([HWPDocumentBlock], [HWPDocumentPageLayout]) {
+    private func documentWithPicture(clearsDescription: Bool = false) async throws -> ([HWPDocumentBlock], [HWPDocumentPageLayout]) {
         let package = try HWPXDocumentPackage.load(from: LegacyHWPXConverter.convert(text: "그림"))
         let selection = try XCTUnwrap(HWPImageEditing.selection(blocks: package.blocks,
             selectedID: package.blocks[0].id, range: NSRange(location: 1, length: 0), layouts: package.pageLayouts))
@@ -128,6 +202,11 @@ final class HWPAndroidParityTests: XCTestCase {
             widthPoints: size.width, heightPoints: size.height),
             source: HWPTableStructureDocument.hwpx(package), drafts: package.blocks)
         let model = try await load(inserted.document.data)
+        if clearsDescription {
+            let owner = try XCTUnwrap(model.blocks.first { !$0.canvasObjects.isEmpty })
+            let target = try XCTUnwrap(HWPImageEditing.target(owner: owner, object: try XCTUnwrap(owner.canvasObjects.first)))
+            _ = try await model.describeImage("", target: target)
+        }
         return (model.blocks, model.pageLayouts)
     }
 
@@ -137,6 +216,11 @@ final class HWPAndroidParityTests: XCTestCase {
         window.makeKeyAndVisible()
         window.rootViewController?.view.layoutIfNeeded()
         return window
+    }
+
+    private func expectedLabel(_ object: HWPDocumentCanvasObject) -> String {
+        if let description = object.description, !description.isEmpty { return description }
+        return AppLocalization.string("그림")
     }
 
     /// The Korean key, or its translation in the app or system language.

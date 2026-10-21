@@ -443,6 +443,8 @@ nonisolated struct HWPInlineEditingContext: Sendable {
     var onCommit: @MainActor @Sendable () -> Void = {}
     var onCommitBlock: (@MainActor @Sendable (HWPDocumentBlock) -> Void)? = nil
     var onStructure: (@MainActor @Sendable (HWPDocumentBlock, HWPParagraphEdit) -> HWPParagraphEditResult?)? = nil
+    /// Long press or VoiceOver `문단 편집` on a paragraph in 원본: its paragraph editing sheet.
+    var onOpenParagraphEditor: (@MainActor @Sendable (String) -> Void)? = nil
 
     func source(for block: HWPDocumentBlock) -> HWPDocumentBlock? {
         let sourceID = HWPInlineParagraphGeometry.sourceID(block.id)
@@ -539,6 +541,17 @@ struct HWPInlineParagraphTarget: View {
                                 caretOffset: source.id == block.id ? nil : (block.lineLayouts.first?.textOffset(in: source.text) ?? 0),
                                 targetID: block.id, usesFragmentTap: source.id != block.id)
                         }
+                        .onLongPressGesture {
+                            editing.onOpenParagraphEditor?(source.id)
+                        }
+                        .accessibilityActions {
+                            if let open = editing.onOpenParagraphEditor {
+                                Button("문단 편집") { open(source.id) }
+                            }
+                        }
+                        // SwiftUI hands VoiceOver the last-applied actions first: the page's
+                        // 이전 쪽·다음 쪽, then 문단 편집, as on Android.
+                        .hwpPageAccessibilityActions()
                 }
             }
             .frame(width: max(1, rect.width), height: max(16, rect.height))
