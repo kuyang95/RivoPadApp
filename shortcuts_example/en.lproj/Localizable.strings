@@ -2748,3 +2748,10 @@
 "앞 문단과 합쳤습니다." = "Merged with the previous paragraph.";
 "행·열 추가와 삭제, 병합·분할, 셀 서식, 행·열 크기를 바꿉니다." = "Adds or deletes rows and columns, merges or splits cells, and changes cell formatting and row and column size.";
 "나누기·합치기, 글자·문단 서식, 표·링크·각주·쪽 나누기를 편집합니다." = "Split or merge, format text and paragraphs, and insert tables, links, notes and page breaks.";
+"표 배율 %lld%%" = "Table zoom %lld%%";
+"표 원래 크기" = "Table Actual Size";
+"원본 셀에서 보기" = "Show in Original Cells";
+"%@ 선택지" = "%@ choices";
+"비움" = "Blank";
+"선택" = "Choose";
+"그 밖의 개체 %lld개는 그대로 둡니다." = "%lld other objects are kept as they are.";

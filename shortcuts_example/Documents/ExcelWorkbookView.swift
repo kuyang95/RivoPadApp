@@ -1482,8 +1482,17 @@ final class ExcelWorkbookViewModel: ObservableObject {
         guard let sheet = selectedSheet else {
             return []
         }
-        return ExcelAccessibleRows.appendingFields(near: selectedAddress, sheet: sheet).map {
-            RowField(id: $0.column, column: $0.column, title: $0.title, value: "")
+        // The row the new values land in (as `ExcelRowEditing.appending` picks
+        // it): a dropdown covering that cell offers its choices in the form.
+        let table = selectedAddress.flatMap { sheet.table(containing: $0) }
+        let newRow = (table?.range.end.row ?? sheet.maximumRow) + 1
+        return ExcelAccessibleRows.appendingFields(near: selectedAddress, sheet: sheet).map { field in
+            let address = ExcelCellAddress(row: newRow, column: field.column)
+            let validation = sheet.dataValidations.first { $0.contains(address) && $0.inlineListValues != nil }
+            return RowField(
+                id: field.column, column: field.column, title: field.title, value: "",
+                dropdownValues: validation?.inlineListValues ?? [],
+                dropdownAllowsBlank: validation?.allowsBlank ?? true)
         }
     }
 
@@ -2074,6 +2083,11 @@ final class ExcelWorkbookViewModel: ObservableObject {
         return try await Task.detached(priority: .userInitiated) {
             try registry.applying(to: sourceData, workbook: workbook)
         }.value
+    }
+
+    /// A step of the grid's 표 배율 menu becomes the status, so it is shown and announced.
+    func reportGridZoom(_ zoomStatus: String) {
+        status = zoomStatus
     }
 
     func requestAccessibilityFocus() {
@@ -3020,7 +3034,11 @@ struct ExcelWorkbookView: View {
                         for: selection.row,
                         columns: region.columns
                     ),
-                    viewModel: viewModel
+                    viewModel: viewModel,
+                    onShowInGrid: {
+                        select(row: selection.row, in: region)
+                        viewMode = .cellGrid
+                    }
                 )
                 .presentationBackground(.clear)
             } else {
@@ -3095,6 +3113,9 @@ struct ExcelWorkbookView: View {
                 charts: viewModel.selectedSheetCharts,
                 shapes: viewModel.selectedSheetShapes,
                 pivotTables: viewModel.selectedSheetPivotTables,
+                otherObjectCount: viewModel.selectedSheet?.drawingObjects.otherDrawingObjectCount ?? 0,
+                sheetPath: viewModel.selectedSheet?.partPath,
+                inspectorViewModel: viewModel,
                 selectedCellReference:
                     viewModel.selectedAddress?.reference ?? "A1",
                 defaultChartSourceReference:
@@ -3218,7 +3239,8 @@ struct ExcelWorkbookView: View {
                         onDrawingSelectionChanged: { id in
                             guard !viewModel.isSaving else { return }
                             viewModel.selectedDrawingID = id
-                        }
+                        },
+                        onZoomStatus: viewModel.reportGridZoom
                     )
                 }
             }
@@ -4226,6 +4248,8 @@ struct ExcelGridView: View {
     var onDeleteDrawing: ((ExcelDrawingSelection) -> Void)? = nil
     var activeDrawingID: String? = nil
     var onDrawingSelectionChanged: ((String?) -> Void)? = nil
+    /// Hears "표 배율 N%" after a step from the corner's 표 배율 menu.
+    var onZoomStatus: ((String) -> Void)? = nil
 
     @State private var zoomScale: CGFloat = 1
     @State private var windowAddress: ExcelCellAddress?
@@ -4236,7 +4260,7 @@ struct ExcelGridView: View {
     @ScaledMetric(relativeTo: .footnote) private var footnoteFontSize = 13.0
     @ScaledMetric(relativeTo: .body) private var headerIconSize = 17.0
 
-    private let zoomRange: ClosedRange<CGFloat> = 0.5 ... 3
+    private let zoomRange = ExcelGridZoom.range
     private let rowHeaderWidth: CGFloat = 54
     private let maximumVisibleRows = 400
     private let maximumVisibleColumns = 40
@@ -4330,6 +4354,7 @@ struct ExcelGridView: View {
             }
             .frame(width: size.width * renderScale, height: size.height * renderScale, alignment: .topLeading)
         }
+        .overlay(alignment: .topLeading) { zoomCorner }
         .background(VisionCraftUI.surface)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let selectedDrawing { drawingToolbar(selectedDrawing) }
@@ -4355,6 +4380,43 @@ struct ExcelGridView: View {
         .accessibilityLabel(
             AppLocalization.format("%@ 스프레드시트", sheet.name)
         )
+    }
+
+    /// The grid's corner, kept in place over the scrolling cells, opens 표 배율:
+    /// zoom in, out and back to 100% — the alternative to pinching. The menu
+    /// stays open so the size can be stepped; each step is announced.
+    private var zoomCorner: some View {
+        let status = ExcelGridZoom.status(zoomScale)
+        return Menu {
+            Section(status) {
+                Button("표 확대", systemImage: "plus.magnifyingglass") { setZoom(ExcelGridZoom.zoomedIn(from: zoomScale)) }
+                    .disabled(!ExcelGridZoom.canZoomIn(zoomScale))
+                Button("표 축소", systemImage: "minus.magnifyingglass") { setZoom(ExcelGridZoom.zoomedOut(from: zoomScale)) }
+                    .disabled(!ExcelGridZoom.canZoomOut(zoomScale))
+                Toggle("표 원래 크기", isOn: Binding(
+                    get: { ExcelGridZoom.percent(zoomScale) == 100 },
+                    set: { _ in setZoom(1) }
+                ))
+            }
+        } label: {
+            Image(systemName: "tablecells")
+                .font(.system(size: headerIconSize * min(max(zoomScale, 0.7), 1.5)))
+                .foregroundStyle(VisionCraftUI.secondaryText)
+                .frame(width: max(44, rowHeaderWidth * zoomScale), height: max(44, 42 * zoomScale))
+                .background(VisionCraftUI.surfaceVariant)
+                .overlay(alignment: .trailing) { Divider() }
+                .overlay(alignment: .bottom) { Divider() }
+                .contentShape(Rectangle())
+        }
+        .menuActionDismissBehavior(.disabled)
+        .accessibilityLabel("표 배율")
+        .accessibilityValue(status)
+    }
+
+    private func setZoom(_ scale: CGFloat) {
+        let next = min(max(scale, zoomRange.lowerBound), zoomRange.upperBound)
+        zoomScale = next
+        onZoomStatus?(ExcelGridZoom.status(next))
     }
 
     private var drawingItems: [ExcelDrawingCanvasItem] {
@@ -4551,11 +4613,13 @@ struct ExcelGridView: View {
 
     private func columnHeader(renderScale: CGFloat, visible: CGRect) -> some View {
         HStack(spacing: 0) {
+            // The 표 배율 corner (zoomCorner) is drawn over this one and owns it for VoiceOver.
             Image(systemName: "tablecells")
                 .font(.system(size: headerIconSize * renderScale))
                 .foregroundStyle(VisionCraftUI.secondaryText)
                 .frame(width: rowHeaderWidth * renderScale, height: 42 * renderScale)
                 .background(VisionCraftUI.surfaceVariant)
+                .accessibilityHidden(true)
             ForEach(gridColumns) { column in
                 if column.x + column.width <= visible.minX || column.x >= visible.maxX {
                     Color.clear.frame(width: column.width * renderScale, height: 42 * renderScale).accessibilityHidden(true)
@@ -5344,6 +5408,8 @@ private struct ExcelSheetChartRow: View {
     let chart: ExcelSheetChart
     let onEdit: () -> Void
     let onRemove: () -> Void
+    /// Opens `ExcelDrawingInspector`: the chart's settings with its 위치와 크기.
+    var onSettings: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -5373,6 +5439,11 @@ private struct ExcelSheetChartRow: View {
                    chart.sourceRange != nil {
                     Button("차트 설정 편집", systemImage: "slider.horizontal.3") {
                         onEdit()
+                    }
+                }
+                if let onSettings {
+                    Button("위치와 크기", systemImage: "arrow.up.and.down.and.arrow.left.and.right") {
+                        onSettings()
                     }
                 }
                 Button("차트 삭제", systemImage: "trash", role: .destructive) {
@@ -5753,11 +5824,17 @@ private struct ExcelSheetImageManagerView: View {
     @State private var chartEditor: ExcelChartEditorState?
     @State private var shapeEditor: ExcelShapeEditorState?
     @State private var pivotEditor: ExcelPivotEditorState?
+    @State private var inspecting: ExcelDrawingSelection?
 
     let images: [ExcelSheetImage]
     let charts: [ExcelSheetChart]
     let shapes: [ExcelSheetShape]
     let pivotTables: [ExcelPivotTable]
+    /// Drawing objects the manager does not list (advanced shapes, groups…); kept as they are.
+    var otherObjectCount = 0
+    /// With both set, image and chart rows open `ExcelDrawingInspector` (settings and 위치와 크기).
+    var sheetPath: String? = nil
+    var inspectorViewModel: ExcelWorkbookViewModel? = nil
     let selectedCellReference: String
     let defaultChartSourceReference: String
     let defaultPivotDestinationReference: String
@@ -5795,6 +5872,9 @@ private struct ExcelSheetImageManagerView: View {
     var body: some View {
         NavigationStack {
             List {
+                if let notice = ExcelDrawingManagerNotice.otherObjects(otherObjectCount) {
+                    Section { Text(notice).foregroundStyle(VisionCraftUI.secondaryText) }
+                }
                 Section {
                     PhotosPicker(
                         selection: $newImageItem,
@@ -5821,7 +5901,8 @@ private struct ExcelSheetImageManagerView: View {
                                 image: image,
                                 onReplace: onReplace,
                                 onRemove: onRemove,
-                                onError: { errorMessage = $0 }
+                                onError: { errorMessage = $0 },
+                                onSettings: settingsAction(for: image.id)
                             )
                         }
                     }
@@ -5895,7 +5976,8 @@ private struct ExcelSheetImageManagerView: View {
                                                 ?? defaultChartSourceReference
                                     )
                                 },
-                                onRemove: { onRemoveChart(chart.id) }
+                                onRemove: { onRemoveChart(chart.id) },
+                                onSettings: settingsAction(for: chart.id)
                             )
                         }
                     }
@@ -5986,6 +6068,11 @@ private struct ExcelSheetImageManagerView: View {
             } message: {
                 Text(errorMessage ?? "")
             }
+            .sheet(item: $inspecting) { selection in
+                if let inspectorViewModel {
+                    ExcelDrawingInspector(viewModel: inspectorViewModel, selection: selection)
+                }
+            }
             .sheet(item: $chartEditor) { configuration in
                 ExcelChartEditorView(configuration: configuration) {
                     title,
@@ -6064,6 +6151,20 @@ private struct ExcelSheetImageManagerView: View {
     }
 }
 
+enum ExcelDrawingManagerNotice {
+    /// "그 밖의 개체 N개는 그대로 둡니다." when the sheet has objects the manager does not list.
+    static func otherObjects(_ count: Int) -> String? {
+        count > 0 ? AppLocalization.format("그 밖의 개체 %lld개는 그대로 둡니다.", count) : nil
+    }
+}
+
+extension ExcelSheetImageManagerView {
+    fileprivate func settingsAction(for id: String) -> (() -> Void)? {
+        guard let sheetPath, inspectorViewModel != nil else { return nil }
+        return { inspecting = ExcelDrawingSelection(id: id, sheetPath: sheetPath) }
+    }
+}
+
 private struct ExcelSheetImageRow: View {
     @State private var replacementItem: PhotosPickerItem?
 
@@ -6071,6 +6172,8 @@ private struct ExcelSheetImageRow: View {
     let onReplace: (String, Data) -> Bool
     let onRemove: (String) -> Void
     let onError: (String) -> Void
+    /// Opens `ExcelDrawingInspector`: name, description, replacement and 위치와 크기.
+    var onSettings: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -6109,6 +6212,11 @@ private struct ExcelSheetImageRow: View {
             }
             Spacer()
             Menu {
+                if let onSettings {
+                    Button("이미지 설정", systemImage: "slider.horizontal.3") {
+                        onSettings()
+                    }
+                }
                 PhotosPicker(
                     selection: $replacementItem,
                     matching: .images
@@ -6173,6 +6281,9 @@ private struct ExcelAddRowView: View {
                     ForEach($fields) { $field in
                         TextField(field.title, text: $field.value)
                             .accessibilityLabel(field.title)
+                        if !field.dropdownValues.isEmpty {
+                            dropdownPicker($field)
+                        }
                     }
                 } header: {
                     Text("열 값")
@@ -6204,6 +6315,35 @@ private struct ExcelAddRowView: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    /// A dropdown column's choices in a menu, as the row editor offers them:
+    /// 비움 when the list allows a blank, then the list.
+    private func dropdownPicker(_ field: Binding<ExcelWorkbookViewModel.RowField>) -> some View {
+        let value = field.wrappedValue.value
+        let title = AppLocalization.format("%@ 선택지", field.wrappedValue.title)
+        return Menu {
+            if field.wrappedValue.dropdownAllowsBlank {
+                Button("비움") { field.wrappedValue.value = "" }
+            }
+            ForEach(field.wrappedValue.dropdownValues, id: \.self) { choice in
+                Button(choice) { field.wrappedValue.value = choice }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Text(title).foregroundStyle(VisionCraftUI.primaryText)
+                Spacer(minLength: 8)
+                Text(value.isEmpty ? AppLocalization.string("선택") : value)
+                    .foregroundStyle(VisionCraftUI.secondaryText)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(VisionCraftUI.secondaryText)
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .accessibilityLabel(title)
+        .accessibilityValue(value.isEmpty ? AppLocalization.string("선택") : value)
     }
 }
 

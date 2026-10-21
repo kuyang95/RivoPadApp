@@ -2,6 +2,27 @@ import RivoDocumentEngine
 import SwiftUI
 import UIKit
 
+/// 표 배율: the grid's zoom range and the steps the corner menu moves through,
+/// the non-gesture alternative to pinching (Android `SpreadsheetViewModel.zoomIn`).
+enum ExcelGridZoom {
+    static let range: ClosedRange<CGFloat> = 0.5 ... 3
+    static let steps: [CGFloat] = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3]
+
+    static func zoomedIn(from scale: CGFloat) -> CGFloat {
+        steps.first { $0 > scale + 0.001 } ?? range.upperBound
+    }
+    static func zoomedOut(from scale: CGFloat) -> CGFloat {
+        steps.last { $0 < scale - 0.001 } ?? range.lowerBound
+    }
+    static func canZoomIn(_ scale: CGFloat) -> Bool { scale < range.upperBound - 0.001 }
+    static func canZoomOut(_ scale: CGFloat) -> Bool { scale > range.lowerBound + 0.001 }
+    static func percent(_ scale: CGFloat) -> Int { Int((scale * 100).rounded()) }
+    /// "표 배율 125%": the corner's value and the status each step announces.
+    static func status(_ scale: CGFloat) -> String {
+        AppLocalization.format("표 배율 %lld%%", percent(scale))
+    }
+}
+
 /// UIKit owns pan and pinch in stable document coordinates. The grid redraws
 /// at its final text size after zooming, without resizing the zoom target.
 struct ExcelZoomScrollView<Content: View>: UIViewControllerRepresentable {

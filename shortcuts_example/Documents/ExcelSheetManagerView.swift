@@ -36,6 +36,13 @@ struct ExcelSheetManagerView: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel(AppLocalization.format("%@ 시트", sheet.name))
                         .accessibilityAddTraits(selected?.id == sheet.id ? .isSelected : [])
+                        // VoiceOver moves a sheet without dragging the handle.
+                        .accessibilityActions {
+                            if viewModel.canManageSheets, let index = sheets.firstIndex(where: { $0.id == sheet.id }) {
+                                if index > 0 { Button("위로 이동") { moveOne(index, by: -1) } }
+                                if index < sheets.count - 1 { Button("아래로 이동") { moveOne(index, by: 1) } }
+                            }
+                        }
                         .moveDisabled(!viewModel.canManageSheets)
                     }
                     .onMove(perform: move)
@@ -117,9 +124,15 @@ struct ExcelSheetManagerView: View {
         run(.reorder(paths: paths))
     }
     private func moveOne(_ index: Int, by offset: Int) {
-        var paths = sheets.map(\.partPath)
-        guard paths.indices.contains(index + offset) else { return }
-        paths.swapAt(index, index + offset)
+        guard let paths = Self.paths(sheets.map(\.partPath), moving: index, by: offset) else { return }
         run(.reorder(paths: paths))
+    }
+
+    /// The sheet order after moving one sheet a place up or down; nil past either end.
+    static func paths(_ paths: [String], moving index: Int, by offset: Int) -> [String]? {
+        guard paths.indices.contains(index), paths.indices.contains(index + offset), offset != 0 else { return nil }
+        var paths = paths
+        paths.swapAt(index, index + offset)
+        return paths
     }
 }

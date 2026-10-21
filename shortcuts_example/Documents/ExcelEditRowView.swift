@@ -6,12 +6,16 @@ struct ExcelEditRowView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var session: ExcelRowEditingSession
     @State private var isClosing = false
+    /// 원본 셀에서 보기: the form closes (saving first) and the grid shows the row.
+    private let onShowInGrid: (() -> Void)?
 
     init(
         row: Int,
         initialFields: [ExcelWorkbookViewModel.RowField],
-        viewModel: ExcelWorkbookViewModel
+        viewModel: ExcelWorkbookViewModel,
+        onShowInGrid: (() -> Void)? = nil
     ) {
+        self.onShowInGrid = onShowInGrid
         _session = StateObject(wrappedValue: ExcelRowEditingSession(
             row: row,
             initialFields: initialFields,
@@ -131,12 +135,20 @@ struct ExcelEditRowView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .listRowBackground(VisionCraftUI.surface)
+                .disabled(isClosing || !session.isEditable)
+            }
+            if onShowInGrid != nil {
+                Section {
+                    Button("원본 셀에서 보기") { close(showingInGrid: true) }
+                        .frame(minHeight: 44)
+                        .disabled(isClosing)
+                }
+                .listRowBackground(VisionCraftUI.surface)
             }
         }
         .scrollContentBackground(.hidden)
         .scrollDismissesKeyboard(.interactively)
         .background(VisionCraftUI.background)
-        .disabled(isClosing || !session.isEditable)
     }
 
     private var saveError: some View {
@@ -175,6 +187,10 @@ struct ExcelEditRowView: View {
     }
 
     private func requestClose() {
+        close(showingInGrid: false)
+    }
+
+    private func close(showingInGrid: Bool) {
         guard !isClosing else { return }
         // Commit the keyboard's current composition before taking the final snapshot.
         UIApplication.shared.sendAction(
@@ -184,6 +200,7 @@ struct ExcelEditRowView: View {
         Task {
             await Task.yield()
             if await session.flush() {
+                if showingInGrid { onShowInGrid?() }
                 dismiss()
             } else {
                 isClosing = false
