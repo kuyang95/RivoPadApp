@@ -4359,7 +4359,8 @@ struct ExcelGridView: View {
                             editable: canEditDrawings && drawingGrid.canManipulate(item.anchor),
                             onSelect: { selectedDrawingID = item.id },
                             onSettings: { onEditDrawing?(.init(id: item.id, sheetPath: sheet.partPath)) },
-                            onNudge: { delta, resizing in nudgeDrawing(item, delta: delta, resizing: resizing) })
+                            onNudge: { delta, resizing in nudgeDrawing(item, delta: delta, resizing: resizing) },
+                            onDeselect: { selectedDrawingID = nil; drawingPreview = nil })
                             .offset(x: rect.minX * renderScale, y: rect.minY * renderScale)
                             .accessibilityHidden(!ownsMergedAccessibility(rect, visible: visible))
                     }

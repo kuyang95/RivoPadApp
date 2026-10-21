@@ -23,6 +23,7 @@ struct ExcelDrawingCanvasObject: View {
     let onSelect: () -> Void
     let onSettings: () -> Void
     let onNudge: (CGPoint, Bool) -> Void
+    var onDeselect: (() -> Void)? = nil
 
     var body: some View {
         ZStack {
@@ -56,15 +57,20 @@ struct ExcelDrawingCanvasObject: View {
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
         .accessibilityHint("두 번 탭하면 선택합니다. 선택한 개체를 끌어 이동하거나 모서리로 크기를 바꿀 수 있습니다.")
         .accessibilityAction { onSelect() }
-        .accessibilityAction(named: "개체 설정") { onSettings() }
+        // SwiftUI hands VoiceOver these in reverse: written last to first so the
+        // rotor reads 위로 이동 … 개체 작게, 개체 설정, 선택 해제 (ExcelAndroidParityTests).
         .accessibilityActions {
+            if selected, let onDeselect {
+                Button("선택 해제") { onDeselect() }
+            }
+            Button("개체 설정") { onSettings() }
             if editable {
-                Button("위로 이동") { onNudge(CGPoint(x: 0, y: -20), false) }
-                Button("아래로 이동") { onNudge(CGPoint(x: 0, y: 20), false) }
-                Button("왼쪽으로 이동") { onNudge(CGPoint(x: -20, y: 0), false) }
-                Button("오른쪽으로 이동") { onNudge(CGPoint(x: 20, y: 0), false) }
-                Button("개체 크게") { onNudge(CGPoint(x: 20, y: 20), true) }
                 Button("개체 작게") { onNudge(CGPoint(x: -20, y: -20), true) }
+                Button("개체 크게") { onNudge(CGPoint(x: 20, y: 20), true) }
+                Button("오른쪽으로 이동") { onNudge(CGPoint(x: 20, y: 0), false) }
+                Button("왼쪽으로 이동") { onNudge(CGPoint(x: -20, y: 0), false) }
+                Button("아래로 이동") { onNudge(CGPoint(x: 0, y: 20), false) }
+                Button("위로 이동") { onNudge(CGPoint(x: 0, y: -20), false) }
             }
         }
     }

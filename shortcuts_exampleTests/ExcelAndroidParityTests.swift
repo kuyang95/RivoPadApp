@@ -1,4 +1,6 @@
 import RivoDocumentEngine
+import SwiftUI
+import UIKit
 import XCTest
 @testable import shortcuts_example
 
@@ -145,6 +147,117 @@ final class ExcelAndroidParityTests: XCTestCase {
         XCTAssertNil(ExcelDrawingManagerNotice.otherObjects(0))
         let notice = try XCTUnwrap(ExcelDrawingManagerNotice.otherObjects(3))
         XCTAssertTrue(notice.contains("3"))
+    }
+
+    /// A picked image or chart reads Android's object actions in this order:
+    /// move ↑↓←→, 크게/작게, 설정, then 선택 해제 (only while picked).
+    func testCanvasObjectActionsReadInOrderAndRun() async throws {
+        let workbook = try ExcelWorkbookDocument.load(from: ExcelWorkbookDocument.blankWorkbookData())
+        let png = UIGraphicsImageRenderer(size: CGSize(width: 40, height: 20)).pngData { context in
+            UIColor.systemBlue.setFill(); context.fill(CGRect(x: 0, y: 0, width: 40, height: 20))
+        }
+        let anchor = ExcelDrawingAnchor(start: .init(row: 2, column: 2), end: .init(row: 6, column: 4))
+        let image = ExcelSheetImage(id: "image", name: "사진 개체", anchor: anchor, relationshipID: "rIdImage1",
+            mediaPartPath: "xl/media/image1.png", contentType: "image/png", data: png, originalAnchorXML: nil)
+        let item = ExcelDrawingCanvasItem(id: "image", name: "사진 개체", anchor: anchor, order: 0, image: image, chart: nil)
+        var nudges: [(CGPoint, Bool)] = []
+        var settings = 0, deselections = 0
+
+        func object(selected: Bool, editable: Bool) -> some View {
+            ExcelDrawingCanvasObject(item: item, workbook: workbook, size: CGSize(width: 200, height: 120),
+                renderScale: 1, zoomScale: 1, selected: selected, editable: editable,
+                onSelect: {}, onSettings: { settings += 1 },
+                onNudge: { nudges.append(($0, $1)) }, onDeselect: { deselections += 1 })
+        }
+
+        let window = host(object(selected: true, editable: true))
+        defer { window.isHidden = true }
+        var node = try await element(in: window) { $0.accessibilityLabel == "사진 개체" }
+        let expected = ["위로 이동", "아래로 이동", "왼쪽으로 이동", "오른쪽으로 이동",
+                        "개체 크게", "개체 작게", "개체 설정", "선택 해제"]
+        XCTAssertEqual(names(node).count, expected.count, "\(names(node))")
+        for (name, key) in zip(names(node), expected) { XCTAssertTrue(matches(name, key), "\(name) ≠ \(key)") }
+
+        try perform("위로 이동", on: node)
+        try perform("오른쪽으로 이동", on: node)
+        try perform("개체 크게", on: node)
+        try perform("개체 작게", on: node)
+        try perform("개체 설정", on: node)
+        try perform("선택 해제", on: node)
+        XCTAssertEqual(nudges.map(\.0), [CGPoint(x: 0, y: -20), CGPoint(x: 20, y: 0), CGPoint(x: 20, y: 20), CGPoint(x: -20, y: -20)])
+        XCTAssertEqual(nudges.map(\.1), [false, false, true, true])
+        XCTAssertEqual(settings, 1)
+        XCTAssertEqual(deselections, 1)
+
+        // Not picked and outside the editable part: only 개체 설정.
+        (window.rootViewController as? UIHostingController<AnyView>)?.rootView = AnyView(object(selected: false, editable: false))
+        node = try await element(in: window) {
+            $0.accessibilityLabel == "사진 개체" && !$0.accessibilityTraits.contains(.selected)
+        }
+        XCTAssertEqual(names(node).count, 1, "\(names(node))")
+        XCTAssertTrue(names(node).first.map { matches($0, "개체 설정") } == true)
+    }
+
+    private func host<Content: View>(_ view: Content) -> UIWindow {
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 600, height: 400))
+        window.rootViewController = UIHostingController(rootView: AnyView(view))
+        window.makeKeyAndVisible()
+        window.rootViewController?.view.layoutIfNeeded()
+        return window
+    }
+
+    private func matches(_ text: String, _ key: String) -> Bool {
+        text == key || text == AppLocalization.string(key) || text == NSLocalizedString(key, comment: "")
+    }
+
+    private func names(_ element: NSObject) -> [String] {
+        (element.accessibilityCustomActions ?? []).map(\.name)
+    }
+
+    private func perform(_ name: String, on element: NSObject) throws {
+        let action = try XCTUnwrap(element.accessibilityCustomActions?.first { matches($0.name, name) }, name)
+        if let handler = action.actionHandler {
+            XCTAssertTrue(handler(action))
+        } else if let target = action.target as? NSObject {
+            target.perform(action.selector, with: action)
+        } else {
+            XCTFail("\(name) has no handler")
+        }
+    }
+
+    private func element(in window: UIWindow, timeout: TimeInterval = 5,
+                         _ predicate: (NSObject) -> Bool) async throws -> NSObject {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            var found: [NSObject] = []
+            var visited = Set<ObjectIdentifier>()
+            collect(window, depth: 0, into: &found, visited: &visited)
+            if let match = found.first(where: predicate) { return match }
+            try await Task.sleep(for: .milliseconds(100))
+        } while Date() < deadline
+        XCTFail("Accessibility element not found")
+        throw CancellationError()
+    }
+
+    private func collect(_ object: NSObject, depth: Int, into found: inout [NSObject],
+                         visited: inout Set<ObjectIdentifier>) {
+        guard depth < 120, visited.insert(ObjectIdentifier(object)).inserted else { return }
+        if let view = object as? UIView, view.isHidden || view.alpha < 0.01 { return }
+        if object.isAccessibilityElement { found.append(object) }
+        if object.accessibilityElementsHidden { return }
+        var children: [NSObject] = []
+        if let list = object.accessibilityElements {
+            children = list.compactMap { $0 as? NSObject }
+        } else {
+            let count = object.accessibilityElementCount()
+            if count != NSNotFound, count > 0, count < 50_000 {
+                for index in 0..<count {
+                    if let child = object.accessibilityElement(at: index) as? NSObject { children.append(child) }
+                }
+            }
+        }
+        if let view = object as? UIView { children.append(contentsOf: view.subviews) }
+        for child in children { collect(child, depth: depth + 1, into: &found, visited: &visited) }
     }
 
     private func fixture() async throws -> (URL, ExcelWorkbookViewModel) {
