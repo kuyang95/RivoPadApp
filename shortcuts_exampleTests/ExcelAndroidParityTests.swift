@@ -310,13 +310,58 @@ final class ExcelAndroidParityTests: XCTestCase {
 
     /// 이름 | 값 with B2 = 1.2345 and H1 = 1.2345, both formatted 0.00, H2 = 대기;
     /// B2:B10 has a list drawn from $H$1:$H$2.
-    private func formattedListWorkbookData() throws -> Data {
+    /// A text choice read from a range keeps its type wherever it is picked:
+    /// the text "=1+1" in H1 stays text from the row editor, the new-row form
+    /// and the cell tools, instead of becoming a formula showing 2.
+    func testRangeListTextChoiceStaysTextFromTheRowFormAndTheCellTools() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AndroidParityTextChoice-\(UUID().uuidString).xlsx")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let sheet = #"<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:H3"/><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>이름</t></is></c><c r="B1" t="inlineStr"><is><t>상태</t></is></c><c r="H1" t="inlineStr"><is><t>=1+1</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>가</t></is></c><c r="B2" t="inlineStr"><is><t>가</t></is></c><c r="H2" t="inlineStr"><is><t>가</t></is></c></row></sheetData><dataValidations count="1"><dataValidation type="list" allowBlank="1" sqref="B2:B10"><formula1>$H$1:$H$2</formula1></dataValidation></dataValidations></worksheet>"#
+        try formattedListWorkbookData(sheet: sheet).write(to: url)
+        let model = ExcelWorkbookViewModel(fileURL: url, autosaveDelay: .seconds(60))
+        await model.load()
+        func isText(_ row: Int) -> Bool {
+            let cell = model.selectedSheet?.cell(at: .init(row: row, column: 2))
+            return cell?.formula == nil && cell?.displayValue == "=1+1"
+        }
+
+        // The row editor (ExcelEditRowView): saved as the field changes.
+        let columns = [ExcelAccessibleColumn(column: 1, title: "이름"), ExcelAccessibleColumn(column: 2, title: "상태")]
+        let fields = model.rowFields(for: 2, columns: columns)
+        XCTAssertEqual(fields.first { $0.column == 2 }?.dropdownValues, ["=1+1", "가"])
+        let session = ExcelRowEditingSession(row: 2, initialFields: fields, viewModel: model, debounceDelay: .milliseconds(30))
+        session.updateValue("=1+1", column: 2)
+        let saved = await session.flush()
+        XCTAssertTrue(saved)
+        XCTAssertTrue(isText(2), "\(String(describing: model.selectedSheet?.cell(at: .init(row: 2, column: 2))))")
+        let reopened = try ExcelWorkbookDocument.load(from: Data(contentsOf: url)).sheets[0].cell(at: .init(row: 2, column: 2))
+        XCTAssertNil(reopened?.formula)
+        XCTAssertEqual(reopened?.displayValue, "=1+1")
+
+        // The new-row form.
+        model.selectCell(ExcelCellAddress(row: 2, column: 1))
+        var appending = model.rowFieldsForAppending()
+        appending[try XCTUnwrap(appending.firstIndex { $0.column == 1 })].value = "나"
+        appending[try XCTUnwrap(appending.firstIndex { $0.column == 2 })].value = "=1+1"
+        model.appendRow(fields: appending)
+        XCTAssertTrue(isText(3))
+
+        // The cell tools' dropdown.
+        model.selectCell(ExcelCellAddress(row: 4, column: 2))
+        XCTAssertEqual(model.selectedDropdownValues, ["=1+1", "가"])
+        model.chooseDropdownValue("=1+1")
+        XCTAssertTrue(isText(4))
+        XCTAssertNil(model.validationWarning)
+    }
+
+    private func formattedListWorkbookData(sheet: String? = nil) throws -> Data {
         let entries = [
             "[Content_Types].xml": #"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>"#,
             "xl/workbook.xml": #"<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="목록" sheetId="1" r:id="rId1"/></sheets></workbook>"#,
             "xl/_rels/workbook.xml.rels": #"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#,
             "xl/styles.xml": #"<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font/></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0"/><xf numFmtId="2" fontId="0" fillId="0" applyNumberFormat="1"/></cellXfs></styleSheet>"#,
-            "xl/worksheets/sheet1.xml": #"<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:H2"/><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>이름</t></is></c><c r="B1" t="inlineStr"><is><t>값</t></is></c><c r="H1" s="1"><v>1.2345</v></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>가</t></is></c><c r="B2" s="1"><v>1.2345</v></c><c r="H2" t="inlineStr"><is><t>대기</t></is></c></row></sheetData><dataValidations count="1"><dataValidation type="list" allowBlank="1" sqref="B2:B10"><formula1>$H$1:$H$2</formula1></dataValidation></dataValidations></worksheet>"#,
+            "xl/worksheets/sheet1.xml": sheet ?? #"<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:H2"/><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>이름</t></is></c><c r="B1" t="inlineStr"><is><t>값</t></is></c><c r="H1" s="1"><v>1.2345</v></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>가</t></is></c><c r="B2" s="1"><v>1.2345</v></c><c r="H2" t="inlineStr"><is><t>대기</t></is></c></row></sheetData><dataValidations count="1"><dataValidation type="list" allowBlank="1" sqref="B2:B10"><formula1>$H$1:$H$2</formula1></dataValidation></dataValidations></worksheet>"#,
         ]
         let archive = try Archive(accessMode: .create)
         for (path, string) in entries.sorted(by: { $0.key < $1.key }) {
