@@ -90,6 +90,33 @@ final class DocumentLibraryViewModel:
         await recentStore.remove(id: item.id)
         await refreshRecentDocuments()
     }
+
+    /// 편집 모드의 삭제 버튼(`onDelete`): 보이는 목록의 그 행들을 최근 목록에서 뺀다.
+    /// 밀어서 나오는 "최근 목록에서 제거"와 같다.
+    func removeRecentDocuments(
+        at offsets: IndexSet
+    ) async {
+        await removeRecentDocuments(
+            recentDocuments(at: offsets)
+        )
+    }
+
+    func recentDocuments(
+        at offsets: IndexSet
+    ) -> [RecentOriginalDocument] {
+        offsets
+            .filter { recentDocuments.indices.contains($0) }
+            .map { recentDocuments[$0] }
+    }
+
+    func removeRecentDocuments(
+        _ items: [RecentOriginalDocument]
+    ) async {
+        for item in items {
+            await recentStore.remove(id: item.id)
+        }
+        await refreshRecentDocuments()
+    }
 }
 
 private enum NewDocumentKind: String, Identifiable {
@@ -148,6 +175,8 @@ struct DocumentLibraryView: View {
         NewDocumentKind.excel
     @State private var newDocument:
         NewOfficeFileDocument?
+    /// Android `DocumentLibraryScreen`의 편집/완료: 최근 문서 행 앞에 빨간 삭제 버튼을 보인다.
+    @State private var editMode = EditMode.inactive
 
     var body: some View {
         List {
@@ -198,6 +227,15 @@ struct DocumentLibraryView: View {
                     ) { item in
                         recentDocumentRow(item)
                     }
+                    .onDelete { offsets in
+                        // 지운 행은 누른 그때의 목록에서 고른다.
+                        let items = viewModel
+                            .recentDocuments(at: offsets)
+                        Task {
+                            await viewModel
+                                .removeRecentDocuments(items)
+                        }
+                    }
                 } header: {
                     Text("최근에 연 문서")
                 } footer: {
@@ -241,6 +279,41 @@ struct DocumentLibraryView: View {
         .listStyle(.insetGrouped)
         .visionCraftListScreen()
         .navigationTitle("문서 작업")
+        .environment(\.editMode, $editMode)
+        .toolbar {
+            if !viewModel.recentDocuments.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        withAnimation {
+                            editMode = editMode.isEditing
+                                ? .inactive
+                                : .active
+                        }
+                    } label: {
+                        (editMode.isEditing
+                            ? Text("완료")
+                            : Text("편집"))
+                        .fontWeight(
+                            editMode.isEditing
+                                ? .semibold
+                                : .regular
+                        )
+                    }
+                    .accessibilityLabel(
+                        editMode.isEditing
+                            ? Text("완료")
+                            : Text("최근 목록 편집")
+                    )
+                }
+            }
+        }
+        .onChange(
+            of: viewModel.recentDocuments.isEmpty
+        ) { _, isEmpty in
+            if isEmpty {
+                editMode = .inactive
+            }
+        }
         .refreshable {
             await viewModel.refreshAll()
         }
