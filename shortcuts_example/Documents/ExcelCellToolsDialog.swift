@@ -189,16 +189,17 @@ struct ExcelCellToolsDialog: View {
 
     private var dropdown: some View {
         VStack(spacing: VisionCraftUI.actionRowSpacing) {
-            if !toCurrentColumn && !viewModel.selectedDropdownValues.isEmpty {
+            if !toCurrentColumn, let choices = viewModel.selectedDropdown?.choices, !choices.isEmpty {
                 Text("드롭다운 값")
                     .font(.headline)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityAddTraits(.isHeader)
-                ForEach(viewModel.selectedDropdownValues, id: \.self) { value in
+                // Each choice reads as its label and writes its value.
+                ForEach(Array(choices.enumerated()), id: \.offset) { _, choice in
                     Button {
-                        onAction(.chooseDropdownValue(value))
+                        onAction(.chooseDropdownValue(choice.value))
                     } label: {
-                        Text(verbatim: value)
+                        Text(verbatim: choice.label)
                             .font(.body)
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)

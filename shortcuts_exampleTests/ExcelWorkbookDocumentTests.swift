@@ -1309,6 +1309,8 @@ final class ExcelWorkbookDocumentTests: XCTestCase {
             )
         )
         XCTAssertEqual(viewModel.selectedDropdownValues, ["보호자", "학생"])
+        XCTAssertEqual(viewModel.selectedDropdown?.labels, ["보호자", "학생"])
+        XCTAssertEqual(viewModel.selectedDropdownEditorValues, ["보호자", "학생"])
         XCTAssertNotNil(viewModel.validationWarning)
         XCTAssertTrue(viewModel.hasUnsavedChanges)
 

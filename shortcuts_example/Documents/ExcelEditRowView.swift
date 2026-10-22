@@ -109,15 +109,16 @@ struct ExcelEditRowView: View {
                                     session.updateValue("", column: field.column)
                                 }
                             }
-                            ForEach(field.dropdownValues, id: \.self) { value in
-                                Button(value) {
+                            // Each choice reads as its label and writes its value.
+                            ForEach(Array(field.dropdownValues.enumerated()), id: \.offset) { index, value in
+                                Button(field.dropdownLabels[index]) {
                                     session.updateValue(value, column: field.column)
                                 }
                             }
                         } label: {
                             HStack(spacing: 8) {
                                 Text(field.value.isEmpty
-                                    ? AppLocalization.string("선택") : field.value)
+                                    ? AppLocalization.string("선택") : field.dropdownDisplayValue)
                                     .font(.body.weight(.medium))
                                     .foregroundStyle(VisionCraftUI.primaryText)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -126,7 +127,7 @@ struct ExcelEditRowView: View {
                             }
                         }
                         .accessibilityLabel(field.title)
-                        .accessibilityValue(field.value)
+                        .accessibilityValue(field.dropdownDisplayValue)
                     }
                 } label: {
                     Text(field.title)

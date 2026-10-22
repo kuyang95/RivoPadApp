@@ -13,7 +13,11 @@ final class ExcelWorkbookViewModel: ObservableObject {
         let title: String
         var value: String
         let originalValue: String?
+        /// What each dropdown choice writes.
         let dropdownValues: [String]
+        /// What each of `dropdownValues` reads as (a list read from cells
+        /// shows their displayed text, e.g. "1.23" for 1.2345); same order.
+        let dropdownLabels: [String]
         let dropdownAllowsBlank: Bool
 
         init(
@@ -23,6 +27,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
             value: String,
             originalValue: String? = nil,
             dropdownValues: [String] = [],
+            dropdownLabels: [String]? = nil,
             dropdownAllowsBlank: Bool = true
         ) {
             self.id = id
@@ -31,7 +36,19 @@ final class ExcelWorkbookViewModel: ObservableObject {
             self.value = value
             self.originalValue = originalValue
             self.dropdownValues = dropdownValues
+            self.dropdownLabels = dropdownLabels.flatMap { $0.count == dropdownValues.count ? $0 : nil } ?? dropdownValues
             self.dropdownAllowsBlank = dropdownAllowsBlank
+        }
+
+        /// The choice `value` holds: the one that writes it, else the one that
+        /// reads as it (a cell showing "1.23" for 1.2345 has that choice).
+        var selectedDropdownIndex: Int? {
+            dropdownValues.firstIndex(of: value) ?? dropdownLabels.firstIndex(of: value)
+        }
+
+        /// What the dropdown row reads as: the chosen choice's label, else the value.
+        var dropdownDisplayValue: String {
+            selectedDropdownIndex.map { dropdownLabels[$0] } ?? value
         }
     }
 
@@ -421,7 +438,23 @@ final class ExcelWorkbookViewModel: ObservableObject {
         return sheet.dataValidations.first { $0.contains(canonical) }
     }
 
+    /// The selected cell's in-cell dropdown as the row forms offer it: an
+    /// inline list, or the cells its source range or name reads.
+    var selectedDropdown: ExcelAccessibleRows.Dropdown? {
+        guard let sheet = selectedSheet, let selectedAddress else { return nil }
+        return ExcelAccessibleRows.dropdown(
+            at: sheet.canonicalAddress(for: selectedAddress), sheet: sheet, workbook: workbook)
+    }
+
+    /// What the cell tools' choices write (each reads as its label).
     var selectedDropdownValues: [String] {
+        selectedDropdown?.values ?? []
+    }
+
+    /// What the dropdown editor starts with: an inline list's values. A list
+    /// read from a range or name starts empty, so saving replaces it only with
+    /// values the user typed.
+    var selectedDropdownEditorValues: [String] {
         selectedDataValidation?.inlineListValues ?? []
     }
 
@@ -1470,42 +1503,26 @@ final class ExcelWorkbookViewModel: ObservableObject {
         guard let sheet = selectedSheet else {
             return []
         }
-        return ExcelAccessibleRows.fields(row: row, columns: columns, sheet: sheet).map { field in
+        return ExcelAccessibleRows.fields(row: row, columns: columns, sheet: sheet, workbook: workbook).map { field in
             RowField(
                 id: field.column, column: field.column, title: field.title, value: field.value,
                 originalValue: field.value, dropdownValues: field.dropdownValues,
-                dropdownAllowsBlank: field.dropdownAllowsBlank)
+                dropdownLabels: field.dropdownLabels, dropdownAllowsBlank: field.dropdownAllowsBlank)
         }
     }
 
-    /// The row `appendRow` writes to. Mirrors the engine's
-    /// `ExcelRowEditing.appending` exactly (the rule lives in the
-    /// VisionCraftDocumentEngine package, which has no public helper for it):
-    /// the row below the table around `near`, else below the sheet's last row;
-    /// if any of `columns` already has a cell there, the row after the sheet's
-    /// last row instead. `appendRow` passes every form column, so `columns` is
-    /// all of the form's columns.
-    nonisolated static func appendedRow(near: ExcelCellAddress?, columns: Set<Int>, in sheet: ExcelWorksheet) -> Int {
-        let table = near.flatMap { sheet.table(containing: $0) }
-        let preferredRow = (table?.range.end.row ?? sheet.maximumRow) + 1
-        let occupied = sheet.cells.keys.contains { $0.row == preferredRow && columns.contains($0.column) }
-        return occupied ? max(sheet.maximumRow + 1, preferredRow) : preferredRow
-    }
-
+    /// Empty fields for a new row. A dropdown covering the cell the field
+    /// fills, on the row `appendRow` writes (engine
+    /// `ExcelRowEditing.appendedRow`), offers its choices in the form.
     func rowFieldsForAppending() -> [RowField] {
         guard let sheet = selectedSheet else {
             return []
         }
-        // A dropdown covering the cell the new row fills offers its choices in the form.
-        let fields = ExcelAccessibleRows.appendingFields(near: selectedAddress, sheet: sheet)
-        let newRow = Self.appendedRow(near: selectedAddress, columns: Set(fields.map(\.column)), in: sheet)
-        return fields.map { field in
-            let address = ExcelCellAddress(row: newRow, column: field.column)
-            let validation = sheet.dataValidations.first { $0.contains(address) && $0.inlineListValues != nil }
-            return RowField(
+        return ExcelAccessibleRows.appendingFields(near: selectedAddress, sheet: sheet, workbook: workbook).map { field in
+            RowField(
                 id: field.column, column: field.column, title: field.title, value: "",
-                dropdownValues: validation?.inlineListValues ?? [],
-                dropdownAllowsBlank: validation?.allowsBlank ?? true)
+                dropdownValues: field.dropdownValues, dropdownLabels: field.dropdownLabels,
+                dropdownAllowsBlank: field.dropdownAllowsBlank)
         }
     }
 
@@ -2503,17 +2520,14 @@ final class ExcelWorkbookViewModel: ObservableObject {
             return
         }
         let canonical = sheet.canonicalAddress(for: selectedAddress)
-        guard let rule = sheet.dataValidations.first(where: {
-            $0.contains(canonical)
-        }),
-        let values = rule.inlineListValues else {
+        guard let dropdown = ExcelAccessibleRows.dropdown(at: canonical, sheet: sheet, workbook: workbook) else {
             validationWarning = nil
             return
         }
         let value = sheet.cell(at: canonical)?.editText ?? ""
-        if value.isEmpty, rule.allowsBlank {
+        if value.isEmpty, dropdown.allowsBlank {
             validationWarning = nil
-        } else if values.contains(value) {
+        } else if dropdown.values.contains(value) {
             validationWarning = nil
         } else {
             validationWarning = AppLocalization.string(
@@ -3786,7 +3800,7 @@ struct ExcelWorkbookView: View {
 
     private func presentDropdownEditor(toCurrentColumn: Bool) {
         dropdownEditor = ExcelDropdownEditorState(
-            values: viewModel.selectedDropdownValues,
+            values: viewModel.selectedDropdownEditorValues,
             allowsBlank: viewModel.selectedDropdownAllowsBlank,
             appliesToCurrentColumn: toCurrentColumn
         )
@@ -6337,14 +6351,16 @@ private struct ExcelAddRowView: View {
     /// A dropdown column's choices in a menu, as the row editor offers them:
     /// 비움 when the list allows a blank, then the list.
     private func dropdownPicker(_ field: Binding<ExcelWorkbookViewModel.RowField>) -> some View {
-        let value = field.wrappedValue.value
+        // A value matching a choice reads as that choice's label.
+        let value = field.wrappedValue.dropdownDisplayValue
         let title = AppLocalization.format("%@ 선택지", field.wrappedValue.title)
         return Menu {
             if field.wrappedValue.dropdownAllowsBlank {
                 Button("비움") { field.wrappedValue.value = "" }
             }
-            ForEach(field.wrappedValue.dropdownValues, id: \.self) { choice in
-                Button(choice) { field.wrappedValue.value = choice }
+            // Each choice reads as its label and writes its value.
+            ForEach(Array(field.wrappedValue.dropdownValues.enumerated()), id: \.offset) { index, choice in
+                Button(field.wrappedValue.dropdownLabels[index]) { field.wrappedValue.value = choice }
             }
         } label: {
             HStack(spacing: 8) {

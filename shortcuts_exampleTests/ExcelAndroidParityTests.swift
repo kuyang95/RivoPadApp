@@ -2,6 +2,7 @@ import RivoDocumentEngine
 import SwiftUI
 import UIKit
 import XCTest
+import ZIPFoundation
 @testable import shortcuts_example
 
 /// Spreadsheet features ported from Android VisionCraft: 표 배율 steps, sheet
@@ -110,9 +111,9 @@ final class ExcelAndroidParityTests: XCTestCase {
         let fields = model.rowFieldsForAppending()
         let columns = Set(fields.map(\.column))
         XCTAssertEqual(columns, [1, 2])
-        let row = ExcelWorkbookViewModel.appendedRow(near: .init(row: 2, column: 1), columns: columns, in: sheet)
+        let row = ExcelRowEditing.appendedRow(near: .init(row: 2, column: 1), columns: columns, in: sheet)
         XCTAssertEqual(row, 4)
-        // Same answer as the engine's own rule.
+        // The row appending writes.
         let workbook = try XCTUnwrap(model.workbook)
         let appended = try XCTUnwrap(ExcelRowEditing.appending(
             values: fields.map { ($0.column, $0.column == 1 ? "새 사람" : "") }, near: .init(row: 2, column: 1),
@@ -138,9 +139,56 @@ final class ExcelAndroidParityTests: XCTestCase {
             partPath: "xl/tables/table1.xml")]
         book.sheets[0].maximumRow = 9
         // Row 3 is free in the form's columns, so the new row joins the table.
-        XCTAssertEqual(ExcelWorkbookViewModel.appendedRow(near: .init(row: 2, column: 1), columns: [1, 2], in: book.sheets[0]), 3)
+        XCTAssertEqual(ExcelRowEditing.appendedRow(near: .init(row: 2, column: 1), columns: [1, 2], in: book.sheets[0]), 3)
         // Away from the table it goes below the sheet's last row.
-        XCTAssertEqual(ExcelWorkbookViewModel.appendedRow(near: .init(row: 20, column: 5), columns: [5], in: book.sheets[0]), 10)
+        XCTAssertEqual(ExcelRowEditing.appendedRow(near: .init(row: 20, column: 5), columns: [5], in: book.sheets[0]), 10)
+    }
+
+    /// A list read from cells offers each choice as its displayed text and
+    /// writes the stored value: 1.2345 formatted 0.00 reads "1.23", writes 1.2345.
+    func testRangeListChoiceReadsAsItsDisplayedTextAndWritesItsValue() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AndroidParityLabels-\(UUID().uuidString).xlsx")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try formattedListWorkbookData().write(to: url)
+        let model = ExcelWorkbookViewModel(fileURL: url, autosaveDelay: .seconds(60))
+        await model.load()
+        XCTAssertEqual(model.selectedSheet?.cell(at: .init(row: 1, column: 8))?.displayValue, "1.23")
+
+        // Row form of a new row: labels shown, the value written.
+        model.selectCell(ExcelCellAddress(row: 2, column: 1))
+        var fields = model.rowFieldsForAppending()
+        let index = try XCTUnwrap(fields.firstIndex { $0.column == 2 })
+        XCTAssertEqual(fields[index].dropdownValues, ["1.2345", "대기"])
+        XCTAssertEqual(fields[index].dropdownLabels, ["1.23", "대기"])
+        fields[index].value = fields[index].dropdownValues[0]
+        XCTAssertEqual(fields[index].selectedDropdownIndex, 0)
+        XCTAssertEqual(fields[index].dropdownDisplayValue, "1.23")
+        fields[fields.firstIndex { $0.column == 1 }!].value = "나"
+        model.appendRow(fields: fields)
+        XCTAssertEqual(model.selectedSheet?.cell(at: .init(row: 3, column: 2))?.rawValue, "1.2345")
+
+        // An existing cell showing a choice's label reads as that choice, no extra entry.
+        let columns = [ExcelAccessibleColumn(column: 1, title: "이름"), ExcelAccessibleColumn(column: 2, title: "값")]
+        let existing = try XCTUnwrap(model.rowFields(for: 2, columns: columns).first { $0.column == 2 })
+        XCTAssertEqual(existing.value, "1.23")
+        XCTAssertEqual(existing.dropdownValues, ["1.2345", "대기"])
+        XCTAssertEqual(existing.selectedDropdownIndex, 0)
+        XCTAssertEqual(existing.dropdownDisplayValue, "1.23")
+
+        // Cell tools: the same choices; picking one writes its value and clears the warning.
+        model.selectCell(ExcelCellAddress(row: 4, column: 2))
+        XCTAssertEqual(model.selectedDropdown?.labels, ["1.23", "대기"])
+        XCTAssertEqual(model.selectedDropdownValues, ["1.2345", "대기"])
+        // The editor starts only from an inline list.
+        XCTAssertEqual(model.selectedDropdownEditorValues, [])
+        model.chooseDropdownValue("대기")
+        XCTAssertNil(model.validationWarning)
+        model.chooseDropdownValue("1.23")
+        XCTAssertNotNil(model.validationWarning)
+        model.chooseDropdownValue(try XCTUnwrap(model.selectedDropdownValues.first))
+        XCTAssertEqual(model.selectedSheet?.cell(at: .init(row: 4, column: 2))?.rawValue, "1.2345")
+        XCTAssertNil(model.validationWarning)
     }
 
     func testDrawingManagerNoticeCountsObjectsItDoesNotList() throws {
@@ -258,6 +306,28 @@ final class ExcelAndroidParityTests: XCTestCase {
         }
         if let view = object as? UIView { children.append(contentsOf: view.subviews) }
         for child in children { collect(child, depth: depth + 1, into: &found, visited: &visited) }
+    }
+
+    /// 이름 | 값 with B2 = 1.2345 and H1 = 1.2345, both formatted 0.00, H2 = 대기;
+    /// B2:B10 has a list drawn from $H$1:$H$2.
+    private func formattedListWorkbookData() throws -> Data {
+        let entries = [
+            "[Content_Types].xml": #"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>"#,
+            "xl/workbook.xml": #"<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="목록" sheetId="1" r:id="rId1"/></sheets></workbook>"#,
+            "xl/_rels/workbook.xml.rels": #"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#,
+            "xl/styles.xml": #"<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font/></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0"/><xf numFmtId="2" fontId="0" fillId="0" applyNumberFormat="1"/></cellXfs></styleSheet>"#,
+            "xl/worksheets/sheet1.xml": #"<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:H2"/><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>이름</t></is></c><c r="B1" t="inlineStr"><is><t>값</t></is></c><c r="H1" s="1"><v>1.2345</v></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>가</t></is></c><c r="B2" s="1"><v>1.2345</v></c><c r="H2" t="inlineStr"><is><t>대기</t></is></c></row></sheetData><dataValidations count="1"><dataValidation type="list" allowBlank="1" sqref="B2:B10"><formula1>$H$1:$H$2</formula1></dataValidation></dataValidations></worksheet>"#,
+        ]
+        let archive = try Archive(accessMode: .create)
+        for (path, string) in entries.sorted(by: { $0.key < $1.key }) {
+            let data = Data(string.utf8)
+            try archive.addEntry(with: path, type: .file, uncompressedSize: Int64(data.count), compressionMethod: .deflate) { position, size in
+                let lower = Int(position)
+                let upper = min(data.count, lower + size)
+                return lower < upper ? data.subdata(in: lower..<upper) : Data()
+            }
+        }
+        return try XCTUnwrap(archive.data)
     }
 
     private func fixture() async throws -> (URL, ExcelWorkbookViewModel) {

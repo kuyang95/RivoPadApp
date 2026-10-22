@@ -109,6 +109,7 @@ final class ExcelRowEditingSession: ObservableObject {
                     value: field.value,
                     originalValue: previousValues[field.column],
                     dropdownValues: field.dropdownValues,
+                    dropdownLabels: field.dropdownLabels,
                     dropdownAllowsBlank: field.dropdownAllowsBlank
                 )
             }
