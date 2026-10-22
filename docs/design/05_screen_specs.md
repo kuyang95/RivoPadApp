@@ -181,6 +181,14 @@
 - 앱 문서 폴더가 iPadOS는 파일 앱의 "나의 iPad > VisionCraft"이고, Android는 앱 전용 `Documents/VisionCraft`와(모든 파일 접근을 허용했을 때) 내 파일의 `Documents/VisionCraft`다. 폴더 설명 문구도 그에 맞게 다르다.
 - 최근 목록에서 제거는 iPadOS는 밀어서 나오는 버튼, Android는 행 끝의 닫기 버튼과 TalkBack 사용자 지정 작업이다.
 
+### PDF 원본 보기
+
+파일: `Documents/LocalDocumentView.swift`(`PDFOriginalPagesView`·`ZoomablePDFView`·`PDFZoomSteps`) (Android `document/LocalDocumentActivity.kt`의 `PdfPages`).
+
+- PDF는 위 "문서 보기" 분할 버튼으로 원본과 추출된 텍스트를 오간다. 원본은 페이지를 폭에 맞춰 세로로 잇는다.
+- 두 손가락 확대·축소의 대안으로 오른쪽 아래에 떠 있는 카드(면 `surface`, 모서리 12pt, 그림자)에 축소 버튼·배율 "N%"·확대 버튼(48pt)이 있다. 단계는 100·125·150·200·300·400·500%(`PDFZoomSteps.steps`)이고, 핀치로 단계 사이에 있으면 바로 위·아래 단계로 간다. 끝 단계에서는 그쪽 버튼이 흐려지고 눌리지 않는다. 핀치도 100–500%로 묶인다. 원본 보기를 다시 열면 100%다. 화면 폭이 바뀌어도 같은 배수를 유지한다.
+- VoiceOver는 페이지마다 "n/m페이지"와 그 페이지의 글을 한 요소로 읽는다(`PDFPageAccessibilityElement`). 페이지 요소에 사용자 지정 동작 `확대`·`축소`(끝 단계에서는 빠짐)가 있다. 화면 밖 페이지로 초점이 가면 그 페이지로 넘긴다. 세 손가락 쓸기는 다음·이전 페이지로 넘기고 "n/m페이지"를 알린다.
+
 ## 스프레드시트
 
 파일: `Documents/ExcelWorkbookView.swift`(`ExcelWorkbookView`·`ExcelWorkbookViewModel`·`ExcelGridView`·`ExcelAddRowView`·`ExcelSheetImageManagerView`), `Documents/ExcelZoomScrollView.swift`(`ExcelGridZoom`), `Documents/ExcelEditRowView.swift`, `Documents/ExcelSheetManagerView.swift`, `Documents/ExcelDrawingInspector.swift` (Android `document/SpreadsheetActivity.kt`·`SpreadsheetGrid.kt`·`SpreadsheetTools.kt`·`SpreadsheetViewModel.kt`).

@@ -625,7 +625,7 @@ struct LocalDocumentView: View {
 
             if displayMode == .original,
                let document = viewModel.pdfDocument {
-                PDFDocumentRepresentable(document: document)
+                PDFOriginalPagesView(document: document)
             } else if isEditing {
                 TextEditor(text: $viewModel.text)
                     .font(
@@ -2006,21 +2006,381 @@ private extension Color {
     }
 }
 
+/// Android `LocalDocumentActivity.PdfPages`의 배율 단계. 1배는 폭 맞춤이다.
+nonisolated enum PDFZoomSteps {
+    static let steps: [CGFloat] = [1, 1.25, 1.5, 2, 3, 4, 5]
+    static var minimum: CGFloat { steps[0] }
+    static var maximum: CGFloat { steps[steps.count - 1] }
+
+    static func clamped(_ zoom: CGFloat) -> CGFloat {
+        min(max(zoom, minimum), maximum)
+    }
+
+    static func canZoomIn(from zoom: CGFloat) -> Bool {
+        zoom < maximum
+    }
+
+    static func canZoomOut(from zoom: CGFloat) -> Bool {
+        zoom > minimum
+    }
+
+    /// 지금 배율보다 큰 다음 단계. 핀치로 단계 사이에 있으면 그 위 단계로 간다.
+    static func zoomIn(from zoom: CGFloat) -> CGFloat {
+        steps.first { $0 > zoom + 0.01 } ?? maximum
+    }
+
+    /// 지금 배율보다 작은 이전 단계.
+    static func zoomOut(from zoom: CGFloat) -> CGFloat {
+        steps.last { $0 < zoom - 0.01 } ?? minimum
+    }
+
+    static func percent(_ zoom: CGFloat) -> Int {
+        Int((zoom * 100).rounded())
+    }
+}
+
+/// PDF 원본 보기(Android `LocalDocumentActivity.PdfPages`): 폭에 맞춘 페이지를
+/// 세로로 잇고, 오른쪽 아래 카드의 축소·배율·확대 버튼(VoiceOver는 페이지의
+/// 사용자 지정 동작으로도)으로 100–500%를 단계별로 바꾼다. 두 손가락 확대·축소도 된다.
+private struct PDFOriginalPagesView: View {
+    let document: PDFDocument
+    @State private var zoom: CGFloat = PDFZoomSteps.minimum
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            PDFDocumentRepresentable(
+                document: document,
+                zoom: $zoom
+            )
+            zoomCard
+                .padding(16)
+        }
+    }
+
+    private var zoomCard: some View {
+        HStack(spacing: 0) {
+            PDFZoomButton(
+                title: "축소",
+                systemImage: "minus.magnifyingglass",
+                enabled: PDFZoomSteps.canZoomOut(from: zoom)
+            ) {
+                zoom = PDFZoomSteps.zoomOut(from: zoom)
+            }
+            Text(
+                AppLocalization.format(
+                    "%lld%%",
+                    PDFZoomSteps.percent(zoom)
+                )
+            )
+            .font(.footnote)
+            .foregroundStyle(VisionCraftUI.primaryText)
+            .lineLimit(1)
+            .fixedSize()
+            .frame(minWidth: 52)
+            PDFZoomButton(
+                title: "확대",
+                systemImage: "plus.magnifyingglass",
+                enabled: PDFZoomSteps.canZoomIn(from: zoom)
+            ) {
+                zoom = PDFZoomSteps.zoomIn(from: zoom)
+            }
+        }
+        .background(
+            VisionCraftUI.surface,
+            in: RoundedRectangle(
+                cornerRadius: 12,
+                style: .continuous
+            )
+        )
+        // 흰 페이지 위에서도 카드가 떨어져 보이게 띄운다.
+        .shadow(
+            color: .black.opacity(0.2),
+            radius: 3,
+            y: 1
+        )
+    }
+}
+
+private struct PDFZoomButton: View {
+    let title: String
+    let systemImage: String
+    let enabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.title3)
+                .foregroundStyle(VisionCraftUI.icon)
+                .frame(
+                    width: VisionCraftUI.minTouchTarget,
+                    height: VisionCraftUI.minTouchTarget
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.38)
+        .accessibilityLabel(
+            AppLocalization.string(title)
+        )
+    }
+}
+
 private struct PDFDocumentRepresentable: UIViewRepresentable {
     let document: PDFDocument
+    @Binding var zoom: CGFloat
 
-    func makeUIView(context: Context) -> PDFView {
-        let view = PDFView()
+    func makeUIView(context: Context) -> ZoomablePDFView {
+        let view = ZoomablePDFView()
         view.autoScales = true
         view.displayMode = .singlePageContinuous
         view.displayDirection = .vertical
         view.document = document
+        view.onZoomChange = { newZoom in
+            if abs(zoom - newZoom) > 0.001 {
+                zoom = newZoom
+            }
+        }
         return view
     }
 
-    func updateUIView(_ uiView: PDFView, context: Context) {
+    func updateUIView(
+        _ uiView: ZoomablePDFView,
+        context: Context
+    ) {
         if uiView.document !== document {
             uiView.document = document
         }
+        uiView.onZoomChange = { newZoom in
+            if abs(zoom - newZoom) > 0.001 {
+                zoom = newZoom
+            }
+        }
+        if abs(uiView.zoom - zoom) > 0.001 {
+            uiView.setZoom(zoom)
+        }
+    }
+}
+
+/// 배율을 폭 맞춤 배율의 배수(1–5배)로 다루는 `PDFView`.
+/// VoiceOver에는 페이지마다 "n/m페이지"와 그 페이지의 글을 읽는 요소를 내고,
+/// 그 요소에 `확대`·`축소` 사용자 지정 동작을 둔다.
+final class ZoomablePDFView: PDFView {
+    var onZoomChange: ((CGFloat) -> Void)?
+    private(set) var zoom = PDFZoomSteps.minimum
+    private var lastLayoutWidth: CGFloat = 0
+    private var isApplyingZoom = false
+    private var pageElements: [PDFPageAccessibilityElement] = []
+    private weak var pageElementsDocument: PDFDocument?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(scaleDidChange),
+            name: .PDFViewScaleChanged,
+            object: self
+        )
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(scaleDidChange),
+            name: .PDFViewScaleChanged,
+            object: self
+        )
+    }
+
+    func setZoom(_ newZoom: CGFloat) {
+        zoom = PDFZoomSteps.clamped(newZoom)
+        applyZoom()
+    }
+
+    /// VoiceOver 동작에서 부른다. 바뀐 배율을 SwiftUI 쪽 카드에도 전한다.
+    func stepZoom(zoomIn: Bool) -> Bool {
+        let target = zoomIn
+            ? PDFZoomSteps.zoomIn(from: zoom)
+            : PDFZoomSteps.zoomOut(from: zoom)
+        guard abs(target - zoom) > 0.001 else { return false }
+        setZoom(target)
+        onZoomChange?(zoom)
+        return true
+    }
+
+    private func applyZoom() {
+        let fit = scaleFactorForSizeToFit
+        guard fit > 0 else { return }
+        isApplyingZoom = true
+        defer { isApplyingZoom = false }
+        minScaleFactor = fit * PDFZoomSteps.minimum
+        maxScaleFactor = fit * PDFZoomSteps.maximum
+        if zoom <= PDFZoomSteps.minimum + 0.001 {
+            autoScales = true
+        } else {
+            autoScales = false
+            scaleFactor = fit * zoom
+        }
+    }
+
+    @objc private func scaleDidChange() {
+        guard !isApplyingZoom else { return }
+        let fit = scaleFactorForSizeToFit
+        guard fit > 0 else { return }
+        let newZoom = PDFZoomSteps.clamped(scaleFactor / fit)
+        guard abs(newZoom - zoom) > 0.001 else { return }
+        zoom = newZoom
+        onZoomChange?(zoom)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // 회전·분할 화면으로 폭이 바뀌면 같은 배수를 새 폭 맞춤 배율에 다시 건다.
+        if abs(bounds.width - lastLayoutWidth) > 0.5 {
+            lastLayoutWidth = bounds.width
+            applyZoom()
+        }
+    }
+
+    override var accessibilityElements: [Any]? {
+        get {
+            guard let document else { return nil }
+            if pageElementsDocument !== document
+                || pageElements.count != document.pageCount
+            {
+                pageElementsDocument = document
+                pageElements = (0..<document.pageCount).map {
+                    PDFPageAccessibilityElement(
+                        pdfView: self,
+                        pageIndex: $0
+                    )
+                }
+            }
+            return pageElements
+        }
+        set {}
+    }
+
+    /// 세 손가락 쓸기: 다음·이전 페이지로 넘기고 "n/m페이지"를 알린다.
+    override func accessibilityScroll(
+        _ direction: UIAccessibilityScrollDirection
+    ) -> Bool {
+        switch direction {
+        case .up, .previous:
+            guard canGoToPreviousPage else { return false }
+            goToPreviousPage(nil)
+        case .down, .next:
+            guard canGoToNextPage else { return false }
+            goToNextPage(nil)
+        default:
+            return false
+        }
+        guard let document,
+              let page = currentPage
+        else { return true }
+        UIAccessibility.post(
+            notification: .pageScrolled,
+            argument: AppLocalization.format(
+                "%lld/%lld페이지",
+                document.index(for: page) + 1,
+                document.pageCount
+            )
+        )
+        return true
+    }
+
+    fileprivate func frame(ofPageAt index: Int) -> CGRect {
+        guard let page = document?.page(at: index) else {
+            return .zero
+        }
+        return convert(
+            page.bounds(for: displayBox),
+            from: page
+        )
+    }
+
+    fileprivate func showPage(at index: Int) {
+        guard let page = document?.page(at: index),
+              !bounds.intersects(frame(ofPageAt: index))
+        else { return }
+        go(to: page)
+    }
+}
+
+private final class PDFPageAccessibilityElement:
+    UIAccessibilityElement
+{
+    private weak var pdfView: ZoomablePDFView?
+    private let pageIndex: Int
+
+    init(pdfView: ZoomablePDFView, pageIndex: Int) {
+        self.pdfView = pdfView
+        self.pageIndex = pageIndex
+        super.init(accessibilityContainer: pdfView)
+    }
+
+    override var accessibilityLabel: String? {
+        get {
+            guard let document = pdfView?.document else {
+                return nil
+            }
+            let label = AppLocalization.format(
+                "%lld/%lld페이지",
+                pageIndex + 1,
+                document.pageCount
+            )
+            let text = document.page(at: pageIndex)?
+                .string?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ) ?? ""
+            return text.isEmpty ? label : label + ". " + text
+        }
+        set {}
+    }
+
+    override var accessibilityFrameInContainerSpace: CGRect {
+        get {
+            guard let pdfView else { return .zero }
+            let frame = pdfView.frame(ofPageAt: pageIndex)
+            let visible = frame.intersection(pdfView.bounds)
+            return visible.isNull ? frame : visible
+        }
+        set {}
+    }
+
+    override var accessibilityCustomActions:
+        [UIAccessibilityCustomAction]?
+    {
+        get {
+            guard let pdfView else { return nil }
+            var actions: [UIAccessibilityCustomAction] = []
+            if PDFZoomSteps.canZoomIn(from: pdfView.zoom) {
+                actions.append(
+                    UIAccessibilityCustomAction(
+                        name: AppLocalization.string("확대")
+                    ) { [weak pdfView] _ in
+                        pdfView?.stepZoom(zoomIn: true) ?? false
+                    }
+                )
+            }
+            if PDFZoomSteps.canZoomOut(from: pdfView.zoom) {
+                actions.append(
+                    UIAccessibilityCustomAction(
+                        name: AppLocalization.string("축소")
+                    ) { [weak pdfView] _ in
+                        pdfView?.stepZoom(zoomIn: false) ?? false
+                    }
+                )
+            }
+            return actions
+        }
+        set {}
+    }
+
+    override func accessibilityElementDidBecomeFocused() {
+        pdfView?.showPage(at: pageIndex)
     }
 }

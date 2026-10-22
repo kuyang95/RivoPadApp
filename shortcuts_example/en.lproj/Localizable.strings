@@ -2773,3 +2773,6 @@
 "자동 저장하지 못했습니다: %@" = "Couldn’t save automatically: %@";
 "검색 결과 %lld / %lld" = "Match %lld of %lld";
 "이 검색 결과는 원본 쪽에서 찾지 못해 간편 보기로 보여 줍니다." = "This match could not be found on the original pages, so it is shown in the Simple view.";
+"%lld/%lld페이지" = "Page %lld of %lld";
+"확대" = "Zoom in";
+"축소" = "Zoom out";
