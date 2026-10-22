@@ -1766,6 +1766,14 @@ struct HWPDocumentView: View {
                 if documentNavigation.selectedResult?.pageIndex != nil { documentNavigation.revealSelectedResult() }
             }
         }
+        .onChange(of: documentNavigation.searchSelectionID) { _, _ in
+            // A result no 원본 page shows is shown in 간편 보기 instead, and said so (Android `revealInPages`).
+            guard viewMode == .originalDocument, documentNavigation.showsSearch,
+                  let result = documentNavigation.selectedResult, result.pageIndex == nil else { return }
+            viewMode = .accessibleDocument
+            viewModel.report(AppLocalization.string("이 검색 결과는 원본 쪽에서 찾지 못해 간편 보기로 보여 줍니다."))
+            announceStatus()
+        }
         .onDisappear {
             originalEditor.finish()
             DocumentBackgroundSave.run(named: "HWP autosave") { await viewModel.flushAutosave() }

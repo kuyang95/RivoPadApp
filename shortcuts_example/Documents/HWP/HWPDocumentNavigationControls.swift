@@ -166,8 +166,11 @@ struct HWPDocumentSearchBar: View {
                     .frame(minHeight: 32)
                 }
                 if let result = navigation.selectedResult {
-                    Text(AppLocalization.format("검색 결과 %lld / %lld · %lld쪽",
-                        navigation.selectedResultIndex + 1, navigation.results.count, result.pageIndex + 1))
+                    Text(result.pageIndex.map {
+                        AppLocalization.format("검색 결과 %lld / %lld · %lld쪽",
+                            navigation.selectedResultIndex + 1, navigation.results.count, $0 + 1)
+                    } ?? AppLocalization.format("검색 결과 %lld / %lld",
+                        navigation.selectedResultIndex + 1, navigation.results.count))
                         .accessibilityIdentifier("hwp-search-count")
                 } else if !navigation.query.isEmpty {
                     Text("검색 결과가 없습니다.").accessibilityIdentifier("hwp-search-count")

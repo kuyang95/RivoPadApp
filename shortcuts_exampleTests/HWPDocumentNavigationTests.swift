@@ -64,6 +64,39 @@ final class HWPDocumentNavigationTests: XCTestCase {
         XCTAssertNil(navigation.selectedResult)
     }
 
+    func testSearchKeepsMatchesNoPageShowsWithoutAPage() {
+        let shown = block("쪽에 있는 찾기", id: "shown")
+        let hidden = block("쪽에 없는 찾기", id: "hidden")
+        let blocks = [shown, hidden]
+        let pages = HWPOriginalCanvasPageBuilder.makePages(blocks: [shown], layouts: [])
+        let matches = HWPFindReplace.scan(blocks, query: "찾기").matches
+        XCTAssertEqual(matches.count, 2)
+        let results = HWPDocumentNavigation.results(for: matches, blocks: blocks, pages: pages)
+        XCTAssertEqual(results.count, 2, "A match no page shows is counted, not dropped")
+        XCTAssertEqual(results.map(\.pageIndex), [0, nil])
+        XCTAssertEqual(results[1].blockID, "hidden")
+        XCTAssertEqual(results[1].text, "쪽에 없는 찾기")
+        XCTAssertEqual(results[1].snippet, "쪽에 없는 찾기")
+        XCTAssertEqual(results[1].match.blockID, "hidden")
+        // No pages at all (a document without page layout): every match stays, none on a page.
+        XCTAssertEqual(HWPDocumentNavigation.results(for: matches, blocks: blocks, pages: []).map(\.pageIndex), [nil, nil])
+        // The page view never marks a page-less result on any page.
+        let context = HWPDocumentSearchContext(result: results[1], pageIndex: 0)
+        XCTAssertFalse(context.matches(hidden))
+    }
+
+    func testRevealSelectedResultIsANewSelectionOnItsPage() {
+        let navigation = HWPDocumentNavigation()
+        navigation.update(blocks: [block("찾기 하나", id: "a"), block("찾기 둘", id: "b", pageBreak: true)], layouts: [])
+        navigation.query = "찾기"
+        navigation.moveResult(by: 1)
+        XCTAssertEqual(navigation.currentPageIndex, 1)
+        let selection = navigation.searchSelectionID
+        navigation.revealSelectedResult()
+        XCTAssertNotEqual(navigation.searchSelectionID, selection, "Showing the result again is a new selection")
+        XCTAssertEqual(navigation.currentPageIndex, 1)
+    }
+
     func testPageJumpValidationAndStaleSearchGeometry() throws {
         let navigation = HWPDocumentNavigation()
         navigation.update(blocks: [block("찾기", id: "a"),

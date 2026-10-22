@@ -3,7 +3,9 @@ import Combine
 import SwiftUI
 
 struct HWPDocumentSearchResult: Identifiable, Equatable {
-    let pageIndex: Int
+    /// The 원본 page showing the match, or nil when no page shows it (Android shows such a match in 간편 보기).
+    let pageIndex: Int?
+    /// The page block holding the match (its source block when no page shows it).
     let blockID: String
     let text: String
     let snippet: String
@@ -151,12 +153,21 @@ final class HWPDocumentNavigation: ObservableObject {
         let previousID = selectedResult?.id
         let scan = HWPFindReplace.scan(sourceBlocks, query: query, matchCase: matchCase)
         exceedsSearchLimit = scan.exceedsLimit
+        results = Self.results(for: scan.matches, blocks: sourceBlocks, pages: pages)
+        selectedResultIndex = preservingSelection ? results.firstIndex(where: { $0.id == previousID }) ?? 0 : 0
+        if !preservingSelection { revealResult() }
+    }
+
+    /// Each match with the page showing it. A match no page shows (text the pages do not carry) is kept
+    /// without a page, so it is counted and replaced like the others (Android `revealInPages`).
+    static func results(for matches: [HWPTextMatch], blocks: [HWPDocumentBlock],
+                        pages: [HWPOriginalCanvasPage]) -> [HWPDocumentSearchResult] {
         struct Surface {
             let page: Int
             let block: HWPDocumentBlock
             let start: Int
         }
-        let sources = Dictionary(uniqueKeysWithValues: sourceBlocks.map { ($0.id, $0) })
+        let sources = Dictionary(uniqueKeysWithValues: blocks.map { ($0.id, $0) })
         var surfaces: [String: [Surface]] = [:]
         for (pageIndex, page) in pages.enumerated() {
             for block in page.bodyBlocks {
@@ -166,7 +177,7 @@ final class HWPDocumentNavigation: ObservableObject {
                 surfaces[id, default: []].append(Surface(page: pageIndex, block: block, start: start))
             }
         }
-        results = scan.matches.compactMap { match in
+        return matches.compactMap { match in
             let candidates = (surfaces[match.blockID] ?? []).sorted {
                 $0.start == $1.start ? $0.page < $1.page : $0.start < $1.start
             }
@@ -176,17 +187,15 @@ final class HWPDocumentNavigation: ObservableObject {
                 surface.start <= match.range.location
                     && candidates.first(where: { $0.start == surface.start })?.page == surface.page
             }) ?? candidates.first
-            guard let chosen, let range = Range(match.range, in: match.sourceText) else { return nil }
+            guard let range = Range(match.range, in: match.sourceText) else { return nil }
             let text = match.sourceText
             let start = text.index(range.lowerBound, offsetBy: -25, limitedBy: text.startIndex) ?? text.startIndex
             let end = text.index(range.upperBound, offsetBy: 55, limitedBy: text.endIndex) ?? text.endIndex
             let snippet = (start == text.startIndex ? "" : "…")
                 + text[start..<end].replacingOccurrences(of: "\n", with: " ") + (end == text.endIndex ? "" : "…")
-            return HWPDocumentSearchResult(pageIndex: chosen.page, blockID: chosen.block.id,
-                text: chosen.block.text, snippet: snippet, match: match)
+            return HWPDocumentSearchResult(pageIndex: chosen?.page, blockID: chosen?.block.id ?? match.blockID,
+                text: chosen?.block.text ?? match.sourceText, snippet: snippet, match: match)
         }
-        selectedResultIndex = preservingSelection ? results.firstIndex(where: { $0.id == previousID }) ?? 0 : 0
-        if !preservingSelection { revealResult() }
     }
 
     /// Shows the selected result again (a new selection for the page view to scroll to).
@@ -196,8 +205,8 @@ final class HWPDocumentNavigation: ObservableObject {
 
     private func revealResult() {
         searchSelectionID = UUID()
-        guard let result = selectedResult else { return }
-        goToPage(result.pageIndex)
+        guard let page = selectedResult?.pageIndex else { return }
+        goToPage(page)
     }
 }
 

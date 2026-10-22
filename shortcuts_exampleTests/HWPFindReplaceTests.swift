@@ -105,7 +105,7 @@ final class HWPFindReplaceTests: XCTestCase {
         navigation.update(blocks: source.blocks, layouts: source.pageLayouts)
         navigation.query = "찾기"
         XCTAssertEqual(navigation.results.count, 1_000)
-        XCTAssertGreaterThan(navigation.results.last!.pageIndex, 0)
+        XCTAssertGreaterThan(try XCTUnwrap(navigation.results.last!.pageIndex), 0)
         let selected = navigation.results.last!
         XCTAssertEqual(selected.match.blockID, source.blocks[0].id)
         let proposal = try HWPFindReplace.propose(blocks: source.blocks, query: "찾기", replacement: "발견", selected: selected.match)
