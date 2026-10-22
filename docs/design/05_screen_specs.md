@@ -240,6 +240,11 @@
 - 간편 보기는 고른 결과의 문단 카드(표 칸이면 그 행 카드)를 목록 가운데로 스크롤하고 선택한 카드처럼 표시한다(`HWPDocumentView.foundBlockID`, Android `foundEntry`). 간편 보기에서 편집하면 결과를 다시 찾는다.
 - 원본 쪽에 실리지 않은 글의 결과도 버리지 않는다(`HWPDocumentNavigation.results`: 쪽 없는 결과). 결과 수와 `모두 바꾸기`에 들어가고, 결과 문구는 쪽 없이 "검색 결과 M / N"이다. 원본 보기에서 그 결과로 가면 간편 보기로 바꿔 그 카드를 보이고, 상태 줄 "이 검색 결과는 원본 쪽에서 찾지 못해 간편 보기로 보여 줍니다."를 안내로 읽는다(Android `revealInPages`). 쪽 있는 결과를 고른 채 원본으로 돌아오면 그 쪽으로 간다.
 
+### 그림·도형 설정
+
+- 다각형의 `꼭짓점`, 연결선의 `연결점`(`HWPShapeEditingSheet`의 `HWPShapePathPointEditor`, Android `HwpPathPointEditor`): 190pt 칸에 모양 윤곽과 점마다 24pt 손잡이(첫 점은 accent). 손잡이를 끌면 그 점이 움직이고, 누르면 그 점을 고르며 고른 점에는 고리가 보인다. 아래 줄은 `점 추가`(고른 점 뒤에 다음 점과의 가운데로. 연결선의 끝 점을 골랐으면 마지막 두 점 사이에 넣어 끝은 그대로) · "N개" · `선택한 점 삭제`(빨강, 고른 점을 지움), 그다음 줄은 "선택한 점: n / m"과 `왼쪽으로 이동`·`위로 이동`·`아래로 이동`·`오른쪽으로 이동`(48pt, 모양 크기의 5%씩 — `HWPPathPoints.step`), 끝에 도움말 "점을 끌어서 모양을 바꿀 수 있습니다. 점을 눌러 고른 뒤 버튼으로 5%씩 옮기거나 지울 수 있습니다.". 점은 다각형 3–32개, 연결선 2–32개이고(`HWPPathPoints`) 한도에서는 추가·삭제가 비활성이다.
+- VoiceOver는 점마다 그리는 순서대로 "점 n / m"과 값 "가로 N%, 세로 N%"로 읽고, 고른 점은 "선택됨"이다. 두 번 탭은 그 점 고르기, 사용자 지정 동작은 `위로 이동`·`아래로 이동`·`왼쪽으로 이동`·`오른쪽으로 이동`·`점 추가`·`선택한 점 삭제`(한도에서는 빠짐)다. 점 수가 바뀌면 "N개"를 안내로 읽는다.
+
 ### 자동 저장·나가기
 
 - 자동 저장(`HWPDocumentViewModel`의 `scheduleAutosave`·`performSave`·`write`, Android `HwpViewModel` 자동 저장): 편집·실행 취소·다시 실행·AI 적용 뒤 0.9초(`HWPDocumentViewModel.autosaveDelay`) 동안 더 편집이 없으면 저장한다. 나갈 때와 앱이 백그라운드로 갈 때(`scenePhase` `.background`, 화면이 사라질 때도 `flushAutosave`)는 문서 위 편집을 먼저 끝내고 바로 저장하며, 이 저장은 UIKit 백그라운드 작업(`DocumentBackgroundSave.run`, `beginBackgroundTask`/`endBackgroundTask` — 저장이 끝나거나 시스템이 시간 만료를 알리면 끝냄) 안에서 돈다.

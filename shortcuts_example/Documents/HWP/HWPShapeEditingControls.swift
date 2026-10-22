@@ -279,6 +279,7 @@ struct HWPShapeEditingSheet: View {
     @State private var marginTop = "0"
     @State private var marginBottom = "0"
     @State private var pathPoints: [HWPShapeEditing.PathPoint] = []
+    @State private var pickedPoint = 0
     @State private var startArrow = 0
     @State private var endArrow = 0
 
@@ -390,24 +391,8 @@ struct HWPShapeEditingSheet: View {
                 if !target.isGroup {
                 if target.kind == .polygon || target.kind == .connector {
                     Section(target.kind == .polygon ? "꼭짓점" : "연결점") {
-                        HWPShapePathPointEditor(points: $pathPoints,
+                        HWPShapePathPointEditor(points: $pathPoints, selected: $pickedPoint,
                             closed: target.kind == .polygon)
-                            .frame(height: 190)
-                            .accessibilityIdentifier("hwp-shape-path-editor")
-                        HStack {
-                            Button {
-                                addPathPoint()
-                            } label: { Label("점 추가", systemImage: "plus.circle") }
-                            Spacer()
-                            Text("\(pathPoints.count)개").foregroundStyle(.secondary)
-                            Spacer()
-                            Button(role: .destructive) {
-                                removePathPoint()
-                            } label: { Label("마지막 점 삭제", systemImage: "minus.circle") }
-                            .disabled(pathPoints.count <= (target.kind == .polygon ? 3 : 2))
-                        }
-                        Text("점을 끌어서 모양을 바꿀 수 있습니다.")
-                            .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
                 Section("선") {
@@ -625,20 +610,6 @@ struct HWPShapeEditingSheet: View {
         Text("빈 사각형").tag(6)
     }
 
-    private func addPathPoint() {
-        guard pathPoints.count < 32 else { return }
-        let end = pathPoints.last ?? .init(x: 1, y: 1)
-        let previous = pathPoints.dropLast().last ?? .init(x: 0, y: 0)
-        pathPoints.insert(.init(x: (previous.x + end.x) / 2, y: (previous.y + end.y) / 2),
-            at: max(pathPoints.count - 1, 0))
-    }
-
-    private func removePathPoint() {
-        let minimum = target.kind == .polygon ? 3 : 2
-        guard pathPoints.count > minimum else { return }
-        pathPoints.remove(at: max(pathPoints.count - 2, 0))
-    }
-
     private func formatted(_ value: Double) -> String {
         value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
     }
@@ -658,10 +629,76 @@ struct HWPShapeEditingSheet: View {
     }
 }
 
+/// A polygon's or connector's points (fractions of the shape's own width and height, 0–1 each, in drawing
+/// order): a polygon has 3–32 (closed), a connector 2–32 (open). Android `HwpPathPoints`.
+nonisolated enum HWPPathPoints {
+    typealias Point = HWPShapeEditing.PathPoint
+
+    static let maximum = 32
+    /// How far a step button or VoiceOver action moves a point: 5% of the shape.
+    static let step = 0.05
+
+    static func minimum(closed: Bool) -> Int { closed ? 3 : 2 }
+
+    /// A point added after `selected`, halfway to the next one (a polygon's last point to its first); after a
+    /// connector's end, between the last two, so the end stays the end. The new list and the new point's index.
+    static func inserting(after selected: Int, in points: [Point], closed: Bool) -> (points: [Point], selected: Int)? {
+        guard points.count < maximum, !points.isEmpty else { return nil }
+        let at = min(max(selected, 0), points.count - 1)
+        let from: Point, to: Point, index: Int
+        if at < points.count - 1 {
+            (from, to, index) = (points[at], points[at + 1], at + 1)
+        } else if closed {
+            (from, to, index) = (points[at], points[0], at + 1)
+        } else if points.count >= 2 {
+            (from, to, index) = (points[points.count - 2], points[points.count - 1], points.count - 1)
+        } else {
+            (from, to, index) = (points[0], Point(x: 1, y: 1), 1)
+        }
+        var next = points
+        next.insert(Point(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2), at: index)
+        return (next, index)
+    }
+
+    /// `points` without point `selected` (never below the kind's minimum), and the point selected after.
+    static func removing(_ selected: Int, from points: [Point], closed: Bool) -> (points: [Point], selected: Int)? {
+        guard points.count > minimum(closed: closed), points.indices.contains(selected) else { return nil }
+        var next = points
+        next.remove(at: selected)
+        return (next, min(selected, next.count - 1))
+    }
+
+    /// `points` with point `index` moved by (`dx`, `dy`) fractions, kept inside the shape.
+    static func moving(_ index: Int, in points: [Point], dx: Double, dy: Double) -> [Point] {
+        points.enumerated().map { offset, point in
+            offset == index ? Point(x: point.x + dx, y: point.y + dy) : point
+        }
+    }
+
+    /// "점 n / m", as VoiceOver names a point.
+    static func label(_ index: Int, count: Int) -> String {
+        AppLocalization.format("점 %lld / %lld", index + 1, count)
+    }
+
+    /// "가로 N%, 세로 N%": where a point is, in percent of the shape.
+    static func value(_ point: Point) -> String {
+        AppLocalization.format("가로 %lld%%, 세로 %lld%%", Int((point.x * 100).rounded()), Int((point.y * 100).rounded()))
+    }
+}
+
+/// 꼭짓점 / 연결점 in the shape sheet (Android `HwpPathPointEditor`): the outline with a handle on each point
+/// (the first in the accent colour) — drag one to move it, a tap picks it and the picked one gets a ring.
+/// Under it ⊕ 점 추가 (after the picked point) · the count · ⊖ 선택한 점 삭제, then the picked point and four
+/// buttons moving it 5% each way. VoiceOver reads each point "점 n / m" with "가로 N%, 세로 N%", selected
+/// when picked, with 위로·아래로·왼쪽으로·오른쪽으로 이동, 점 추가 and 선택한 점 삭제 actions.
 private struct HWPShapePathPointEditor: View {
     @Binding var points: [HWPShapeEditing.PathPoint]
+    @Binding var selected: Int
     let closed: Bool
+    @State private var dragOrigin: HWPShapeEditing.PathPoint?
     private let handleInset: CGFloat = 14
+
+    private var picked: Int { min(max(selected, 0), max(points.count - 1, 0)) }
 
     private func position(for point: HWPShapeEditing.PathPoint, in size: CGSize) -> CGPoint {
         let drawableWidth = max(size.width - handleInset * 2, 1)
@@ -670,7 +707,76 @@ private struct HWPShapePathPointEditor: View {
             y: handleInset + point.y * drawableHeight)
     }
 
+    private func move(_ index: Int, dx: Double, dy: Double) {
+        points = HWPPathPoints.moving(index, in: points, dx: dx, dy: dy)
+        selected = index
+    }
+
+    private func add(after index: Int) {
+        guard let next = HWPPathPoints.inserting(after: index, in: points, closed: closed) else { return }
+        points = next.points
+        selected = next.selected
+        announceCount()
+    }
+
+    private func delete(_ index: Int) {
+        guard let next = HWPPathPoints.removing(index, from: points, closed: closed) else { return }
+        points = next.points
+        selected = next.selected
+        announceCount()
+    }
+
+    /// The count is read out when it changes (Android's polite live region).
+    private func announceCount() {
+        UIAccessibility.post(notification: .announcement, argument: AppLocalization.format("%lld개", points.count))
+    }
+
     var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            drawing
+                .frame(height: 190)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("hwp-shape-path-editor")
+            HStack {
+                Button { add(after: picked) } label: { Label("점 추가", systemImage: "plus.circle") }
+                    .disabled(points.count >= HWPPathPoints.maximum)
+                    .accessibilityIdentifier("hwp-shape-path-add")
+                Spacer()
+                Text(AppLocalization.format("%lld개", points.count)).foregroundStyle(.secondary)
+                Spacer()
+                Button(role: .destructive) { delete(picked) } label: {
+                    Label("선택한 점 삭제", systemImage: "minus.circle")
+                }
+                .tint(.red)
+                .disabled(points.count <= HWPPathPoints.minimum(closed: closed))
+                .accessibilityIdentifier("hwp-shape-path-delete")
+            }
+            .frame(minHeight: 48)
+            if !points.isEmpty {
+                HStack {
+                    Text(AppLocalization.format("선택한 점: %lld / %lld", picked + 1, points.count))
+                    Spacer()
+                    stepButton("왼쪽으로 이동", systemImage: "arrow.left", dx: -HWPPathPoints.step, dy: 0)
+                    stepButton("위로 이동", systemImage: "arrow.up", dx: 0, dy: -HWPPathPoints.step)
+                    stepButton("아래로 이동", systemImage: "arrow.down", dx: 0, dy: HWPPathPoints.step)
+                    stepButton("오른쪽으로 이동", systemImage: "arrow.right", dx: HWPPathPoints.step, dy: 0)
+                }
+            }
+            Text(AppLocalization.string("점을 끌어서 모양을 바꿀 수 있습니다. 점을 눌러 고른 뒤 버튼으로 5%씩 옮기거나 지울 수 있습니다."))
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+        // Several buttons in one form row: each acts on its own.
+        .buttonStyle(.borderless)
+    }
+
+    private func stepButton(_ title: LocalizedStringKey, systemImage: String, dx: Double, dy: Double) -> some View {
+        Button { move(picked, dx: dx, dy: dy) } label: {
+            Image(systemName: systemImage).frame(width: 48, height: 48)
+        }
+        .accessibilityLabel(Text(title))
+    }
+
+    private var drawing: some View {
         GeometryReader { proxy in
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
@@ -686,26 +792,67 @@ private struct HWPShapePathPointEditor: View {
                     if closed { context.fill(path, with: .color(.accentColor.opacity(0.15))) }
                     context.stroke(path, with: .color(.accentColor), lineWidth: 2)
                 }
+                .accessibilityHidden(true)
                 ForEach(points.indices, id: \.self) { index in
-                    Circle()
-                        .fill(index == 0 ? VisionCraftUI.accent : Color.accentColor)
-                        .overlay(Circle().stroke(.white, lineWidth: 2))
-                        .frame(width: 24, height: 24)
-                        .position(position(for: points[index], in: proxy.size))
-                        .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("shapePath"))
-                            .onChanged { value in
-                                let drawableWidth = proxy.size.width - handleInset * 2
-                                let drawableHeight = proxy.size.height - handleInset * 2
-                                guard drawableWidth > 0, drawableHeight > 0,
-                                      points.indices.contains(index) else { return }
-                                points[index] = .init(
-                                    x: (value.location.x - handleInset) / drawableWidth,
-                                    y: (value.location.y - handleInset) / drawableHeight)
-                            })
-                        .accessibilityLabel("점 \(index + 1)")
+                    handle(index, in: proxy.size)
                 }
             }
             .coordinateSpace(name: "shapePath")
         }
+    }
+
+    private func handle(_ index: Int, in size: CGSize) -> some View {
+        let point = points[index]
+        return Circle()
+            .fill(index == 0 ? VisionCraftUI.accent : Color.accentColor)
+            .overlay(Circle().stroke(.white, lineWidth: 2))
+            .frame(width: 24, height: 24)
+            .overlay {
+                if index == picked {
+                    Circle().stroke(Color.accentColor, lineWidth: 2).frame(width: 32, height: 32)
+                }
+            }
+            .frame(width: 44, height: 44)
+            .contentShape(Circle())
+            .position(position(for: point, in: size))
+            .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("shapePath"))
+                .onChanged { value in
+                    let drawableWidth = size.width - handleInset * 2
+                    let drawableHeight = size.height - handleInset * 2
+                    guard drawableWidth > 0, drawableHeight > 0,
+                          points.indices.contains(index) else { return }
+                    // A tap picks the point; a drag moves it from where it was, not to the finger.
+                    let origin = dragOrigin ?? points[index]
+                    if dragOrigin == nil {
+                        dragOrigin = origin
+                        selected = index
+                    }
+                    let start = position(for: origin, in: size)
+                    points[index] = .init(
+                        x: (start.x + value.translation.width - handleInset) / drawableWidth,
+                        y: (start.y + value.translation.height - handleInset) / drawableHeight)
+                }
+                .onEnded { _ in dragOrigin = nil })
+            .accessibilityElement()
+            .accessibilityLabel(HWPPathPoints.label(index, count: points.count))
+            .accessibilityValue(HWPPathPoints.value(point))
+            .accessibilityAddTraits(index == picked ? [.isButton, .isSelected] : .isButton)
+            // Read in drawing order, not by where the points sit.
+            .accessibilitySortPriority(Double(points.count - index))
+            .accessibilityAction { selected = index }
+            // SwiftUI hands VoiceOver these in reverse: written last to first so they read
+            // 위로 이동 … 선택한 점 삭제 as on Android.
+            .accessibilityActions {
+                if points.count > HWPPathPoints.minimum(closed: closed) {
+                    Button("선택한 점 삭제") { delete(index) }
+                }
+                if points.count < HWPPathPoints.maximum {
+                    Button("점 추가") { add(after: index) }
+                }
+                Button("오른쪽으로 이동") { move(index, dx: HWPPathPoints.step, dy: 0) }
+                Button("왼쪽으로 이동") { move(index, dx: -HWPPathPoints.step, dy: 0) }
+                Button("아래로 이동") { move(index, dx: 0, dy: HWPPathPoints.step) }
+                Button("위로 이동") { move(index, dx: 0, dy: -HWPPathPoints.step) }
+            }
     }
 }
