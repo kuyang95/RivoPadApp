@@ -224,6 +224,12 @@
 - 표 행 카드의 길게 누르기·VoiceOver 동작 `표 편집`은 iPadOS에만 있다(Android는 행 편집 다이얼로그 안에서만).
 - `다른 색…`은 iPadOS 시스템 색 고르기 + 색 코드이고, Android는 이름 있는 색·색조·채도·밝기 슬라이더 + 색 코드 시트다.
 
+### 찾기·바꾸기
+
+- 원본 보기는 리본 `찾기` 탭(⌘F)이, 간편 보기는 머리 막대 `실행 취소` 앞의 돋보기 `찾기·바꾸기`(`HWPDocumentFindButton`: 열려 있으면 accent 12% 바탕이고 "선택됨"으로 읽음, 누르면 열고 닫음)가 검색 막대(`HWPDocumentSearchBar`)를 연다. 원본은 리본 아래, 간편은 목록 위에 놓인다(Android `HwpSearchBar`). 간편 보기의 ⌘F는 막대를 열고, 열려 있으면 입력칸에 커서를 다시 둔다(`HWPDocumentNavigation.openSearch`). 보기를 바꿔도 막대는 열린 채이고, 원본으로 오면 `찾기` 탭이 된다.
+- 막대: `찾을 내용` 입력칸, `검색 옵션`(대소문자 구분), `이전 검색 결과`·`다음 검색 결과`(결과가 없으면 비활성), `검색 닫기`(입력을 지움). 아래 줄은 편집 가능한 문서의 `바꾸기` 펼치기와 결과 문구 — "검색 결과 M / N · P쪽", 없으면 "검색 결과가 없습니다.", 빈 입력이면 "본문과 표에서 찾습니다.". 펼치면 `바꿀 내용`·`바꾸기`(고른 결과를 편집할 수 없으면 비활성, "이 검색 결과는 편집할 수 없습니다.")·`모두 바꾸기`. 입력·옵션이 바뀔 때마다 본문과 표에서 찾는다(`HWPFindReplace.scan`).
+- 간편 보기는 고른 결과의 문단 카드(표 칸이면 그 행 카드)를 목록 가운데로 스크롤하고 선택한 카드처럼 표시한다(`HWPDocumentView.foundBlockID`, Android `foundEntry`). 간편 보기에서 편집하면 결과를 다시 찾는다.
+
 ### 자동 저장·나가기
 
 - 자동 저장(`HWPDocumentViewModel`의 `scheduleAutosave`·`performSave`·`write`, Android `HwpViewModel` 자동 저장): 편집·실행 취소·다시 실행·AI 적용 뒤 0.9초(`HWPDocumentViewModel.autosaveDelay`) 동안 더 편집이 없으면 저장한다. 나갈 때와 앱이 백그라운드로 갈 때(`scenePhase` `.background`, 화면이 사라질 때도 `flushAutosave`)는 문서 위 편집을 먼저 끝내고 바로 저장하며, 이 저장은 UIKit 백그라운드 작업(`DocumentBackgroundSave.run`, `beginBackgroundTask`/`endBackgroundTask` — 저장이 끝나거나 시스템이 시간 만료를 알리면 끝냄) 안에서 돈다.

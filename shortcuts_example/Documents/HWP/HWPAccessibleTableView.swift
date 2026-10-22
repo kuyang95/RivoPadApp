@@ -33,11 +33,15 @@ struct HWPAccessibleRowButton: View {
     let row: HWPAccessibleRow
     let selectedBlockID: String?
     var fieldNames: [String: String] = [:]
+    /// The paragraph holding the search result shown in 간편 보기; its row is marked as a selected one is.
+    var markedBlockID: String? = nil
     /// 표 편집 straight from the row (long press, or a VoiceOver action).
     var onEditTable: (() -> Void)? = nil
     let onOpen: () -> Void
 
-    private var isSelected: Bool { row.blocks.contains { $0.id == selectedBlockID } }
+    private var isSelected: Bool {
+        row.blocks.contains { $0.id == selectedBlockID || ($0.id == markedBlockID && markedBlockID != nil) }
+    }
 
     var body: some View {
         Button(action: onOpen) {

@@ -1756,9 +1756,15 @@ struct HWPDocumentView: View {
         .onChange(of: viewModel.isLegacyDocument) { _, isHWP in
             if isHWP { viewMode = .originalDocument }
         }
-        .onChange(of: viewMode) { _, _ in
+        .onChange(of: viewMode) { _, mode in
             originalEditor.finish()
             cancelShapeGrouping()
+            // An open search stays open: in 원본 it is the 찾기 tab, and the result shown is looked up on the pages.
+            if mode == .originalDocument, documentNavigation.showsSearch {
+                ribbonTab = .find
+                ribbonCollapsed = false
+                if documentNavigation.selectedResult?.pageIndex != nil { documentNavigation.revealSelectedResult() }
+            }
         }
         .onDisappear {
             originalEditor.finish()
@@ -1845,7 +1851,7 @@ struct HWPDocumentView: View {
         ribbonCollapsed = false
         if tab == .find {
             prepareSearch()
-            documentNavigation.showsSearch = true
+            documentNavigation.openSearch()
         } else {
             if documentNavigation.showsSearch { documentNavigation.closeSearch() }
             // A tab changes tools only; keep the editor's selection and composing text.
@@ -2103,7 +2109,23 @@ struct HWPDocumentView: View {
                 originalDocumentView
                     .allowsHitTesting(!viewModel.isSaving)
             } else {
+                // 간편 보기 has no ribbon: its 찾기 is the header's magnifying glass (Android `HwpSearchBar` over the list).
+                if documentNavigation.showsSearch {
+                    HWPDocumentSearchBar(navigation: documentNavigation,
+                        allowsReplacement: viewModel.isEditableDocument,
+                        finishEditing: prepareSearch, onReplace: replaceMatches)
+                }
                 documentList
+                    .background {
+                        // ⌘F opens find (and puts the cursor in it again), as Android's Ctrl+F does in 간편 보기.
+                        Button("찾기·바꾸기") {
+                            prepareSearch()
+                            documentNavigation.openSearch()
+                        }
+                        .keyboardShortcut("f", modifiers: .command)
+                        .hidden()
+                        .accessibilityHidden(true)
+                    }
                 if isEditingAccessibleDocument, viewModel.isEditableDocument {
                     Divider()
                     editorPanel
@@ -3269,6 +3291,7 @@ struct HWPDocumentView: View {
                             case .row(let row):
                                 HWPAccessibleRowButton(row: row,
                                     selectedBlockID: viewModel.selectedBlockID, fieldNames: fieldNames,
+                                    markedBlockID: foundBlockID,
                                     onEditTable: canEditTable(row) ? { openTableStructure(row.id) } : nil) {
                                     viewModel.commitEditorChange()
                                     // Capture current blocks after committing the paragraph editor.
@@ -3297,11 +3320,32 @@ struct HWPDocumentView: View {
                 guard let id, let entryID = document.entryIDByBlockID[id] else { return }
                 withAnimation { proxy.scrollTo(entryID, anchor: .center) }
             }
+            // The search result shown is scrolled to the middle of the list, also on coming here from 원본.
+            .onChange(of: documentNavigation.searchSelectionID) { _, _ in
+                guard let id = foundBlockID, let entryID = document.entryIDByBlockID[id] else { return }
+                withAnimation { proxy.scrollTo(entryID, anchor: .center) }
+            }
+            .onAppear {
+                guard let id = foundBlockID, let entryID = document.entryIDByBlockID[id] else { return }
+                proxy.scrollTo(entryID, anchor: .center)
+            }
+            // The pages that search otherwise follows edits are not shown here.
+            .onChange(of: viewModel.blocks) { _, blocks in
+                if documentNavigation.showsSearch {
+                    documentNavigation.update(blocks: blocks, layouts: viewModel.pageLayouts)
+                }
+            }
         }
     }
 
+    /// The paragraph holding the search result shown, marked in 간편 보기 as a selected one is (Android `foundEntry`).
+    private var foundBlockID: String? {
+        documentNavigation.showsSearch ? documentNavigation.selectedResult?.match.blockID : nil
+    }
+
     private func blockView(_ block: HWPDocumentBlock) -> some View {
-        Button { viewModel.selectBlock(block.id) } label: {
+        let isMarked = viewModel.selectedBlockID == block.id || foundBlockID == block.id
+        return Button { viewModel.selectBlock(block.id) } label: {
             HStack(alignment: .top, spacing: 10) {
                 Image(
                     systemName: !block.images.isEmpty
@@ -3349,17 +3393,17 @@ struct HWPDocumentView: View {
             }
             .padding(12)
             .background(
-                viewModel.selectedBlockID == block.id
+                isMarked
                     ? VisionCraftUI.primary.opacity(0.13)
                     : VisionCraftUI.surface,
                 in: RoundedRectangle(cornerRadius: 14)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 14).stroke(
-                    viewModel.selectedBlockID == block.id
+                    isMarked
                         ? VisionCraftUI.primary
                         : VisionCraftUI.outline,
-                    lineWidth: viewModel.selectedBlockID == block.id ? 2 : 1
+                    lineWidth: isMarked ? 2 : 1
                 )
             }
         }
@@ -3656,6 +3700,10 @@ struct HWPDocumentView: View {
 
     private var documentActions: some View {
         HStack(spacing: 0) {
+            if viewMode == .accessibleDocument, !viewModel.isLoading, !viewModel.blocks.isEmpty {
+                HWPDocumentFindButton(navigation: documentNavigation, finishEditing: prepareSearch)
+                    .disabled(viewModel.isSaving)
+            }
             Button("실행 취소", systemImage: "arrow.uturn.backward") {
                 if originalEditor.undo() { return }
                 originalEditor.finish()

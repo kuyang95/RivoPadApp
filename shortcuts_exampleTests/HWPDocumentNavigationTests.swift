@@ -48,6 +48,22 @@ final class HWPDocumentNavigationTests: XCTestCase {
         XCTAssertEqual(navigation.pages.first?.bodyBlocks.first?.text, "새 내용")
     }
 
+    func testOpenSearchRefocusesWhileOpenAndCloseClearsQuery() {
+        let navigation = HWPDocumentNavigation()
+        navigation.update(blocks: [block("간편 보기 찾기", id: "a")], layouts: [])
+        navigation.openSearch()
+        XCTAssertTrue(navigation.showsSearch)
+        let first = navigation.focusRequest
+        navigation.openSearch()
+        XCTAssertTrue(navigation.showsSearch)
+        XCTAssertEqual(navigation.focusRequest, first + 1, "⌘F while open puts the cursor in the field again")
+        navigation.query = "찾기"
+        XCTAssertEqual(navigation.selectedResult?.match.blockID, "a")
+        navigation.closeSearch()
+        XCTAssertFalse(navigation.showsSearch)
+        XCTAssertNil(navigation.selectedResult)
+    }
+
     func testPageJumpValidationAndStaleSearchGeometry() throws {
         let navigation = HWPDocumentNavigation()
         navigation.update(blocks: [block("찾기", id: "a"),

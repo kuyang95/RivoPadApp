@@ -62,6 +62,8 @@ final class HWPDocumentNavigation: ObservableObject {
     @Published private(set) var scrollRequest: HWPDocumentScrollRequest?
     @Published private(set) var zoomRequest: HWPDocumentZoomRequest?
     @Published var showsSearch = false
+    /// Grows each time find is opened (or ⌘F pressed while open), so the bar puts the cursor in its query field.
+    @Published private(set) var focusRequest = 0
     @Published var query = "" { didSet { if query != oldValue { replacementMessage = nil; search() } } }
     @Published var matchCase = false { didSet { if matchCase != oldValue { replacementMessage = nil; search() } } }
     @Published var showsReplacement = false
@@ -115,6 +117,12 @@ final class HWPDocumentNavigation: ObservableObject {
         guard !results.isEmpty else { return }
         selectedResultIndex = (selectedResultIndex + offset % results.count + results.count) % results.count
         revealResult()
+    }
+
+    /// Opens the search bar and asks it to focus its query field (Android `openFind`).
+    func openSearch() {
+        showsSearch = true
+        focusRequest += 1
     }
 
     func closeSearch() {
@@ -179,6 +187,11 @@ final class HWPDocumentNavigation: ObservableObject {
         }
         selectedResultIndex = preservingSelection ? results.firstIndex(where: { $0.id == previousID }) ?? 0 : 0
         if !preservingSelection { revealResult() }
+    }
+
+    /// Shows the selected result again (a new selection for the page view to scroll to).
+    func revealSelectedResult() {
+        revealResult()
     }
 
     private func revealResult() {

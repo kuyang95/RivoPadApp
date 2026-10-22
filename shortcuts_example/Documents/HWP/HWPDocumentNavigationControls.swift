@@ -101,12 +101,12 @@ struct HWPDocumentFindButton: View {
         Button("찾기·바꾸기", systemImage: "magnifyingglass") {
             finishEditing()
             if navigation.showsSearch { navigation.closeSearch() }
-            else { navigation.showsSearch = true }
+            else { navigation.openSearch() }
         }
-        .keyboardShortcut("f", modifiers: .command)
         .labelStyle(.iconOnly)
         .buttonStyle(.plain)
         .accessibilityIdentifier("hwp-search-toggle")
+        .accessibilityAddTraits(navigation.showsSearch ? .isSelected : [])
         .frame(width: 48, height: 48)
         .background(navigation.showsSearch ? Color.accentColor.opacity(0.12) : .clear,
             in: RoundedRectangle(cornerRadius: 10))
@@ -213,6 +213,7 @@ struct HWPDocumentSearchBar: View {
         .padding(.vertical, 6)
         .background(VisionCraftUI.surface)
         .task { focusedField = .query }
+        .onChange(of: navigation.focusRequest) { _, _ in focusedField = .query }
         .onChange(of: focusedField) { _, field in if field != nil { finishEditing() } }
     }
 
