@@ -191,6 +191,7 @@
 - 새 행 추가(`ExcelAddRowView`): 새 행이 들어갈 칸에 드롭다운 목록이 있으면(`ExcelWorkbookViewModel.rowFieldsForAppending`. 들어갈 행은 `ExcelWorkbookViewModel.appendedRow`가 엔진 `ExcelRowEditing.appending`과 같은 규칙으로 정한다: 선택한 칸의 표 바로 아래 행, 표가 없으면 시트 마지막 행 다음 행이다. 단 그 행의 폼 열에 이미 값이 있으면 시트 마지막 행 다음 행) 입력칸 아래 "<열> 선택지" 메뉴 줄을 둔다. 메뉴는 목록이 빈 값을 허용하면 `비움`, 다음에 목록 값. 줄 값은 고른 값, 없으면 "선택".
 - 격자 위 그림·차트(`ExcelDrawingCanvasObject`): 두 번 탭하면 선택한다. VoiceOver 사용자 지정 동작은 `위로 이동`·`아래로 이동`·`왼쪽으로 이동`·`오른쪽으로 이동`·`개체 크게`·`개체 작게`(편집할 수 있는 개체만, 한 번에 20pt), `개체 설정`, `선택 해제`(선택한 개체만) 순서다. SwiftUI가 `accessibilityActions` 순서를 거꾸로 넘기므로 코드에는 반대 순서로 적는다.
 - 이미지·차트 등(`ExcelSheetImageManagerView`): 시트에 이 화면이 다루지 않는 그리기 개체가 있으면 맨 위에 "그 밖의 개체 N개는 그대로 둡니다."(`ExcelDrawingManagerNotice.otherObjects`, 엔진 `otherDrawingObjectCount`). 이미지 줄 동작 메뉴에 `이미지 설정`, 차트 줄 동작 메뉴에 `위치와 크기`가 있어 개체 설정(`ExcelDrawingInspector`: 이미지는 개체 이름·이미지 설명·교체, 차트는 차트 설정, 모두 `위치와 크기`의 왼쪽 위 기준 셀·오른쪽 아래 경계 셀·`위치 적용`)을 연다.
+- 나갈 때·백그라운드 저장: 뒤로 버튼과 앱이 활성 상태를 벗어날 때(`scenePhase`가 `.active`가 아닐 때) 하는 `ExcelWorkbookViewModel.flushAutosave`는 UIKit 백그라운드 작업(`DocumentBackgroundSave.run`, 저장이 끝나거나 시스템이 시간 만료를 알리면 끝냄) 안에서 돌아, 앱이 화면에서 벗어나도 저장을 마친다.
 
 ## 한글 문서
 

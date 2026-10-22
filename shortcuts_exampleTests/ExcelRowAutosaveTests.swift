@@ -135,6 +135,23 @@ final class ExcelRowAutosaveTests: XCTestCase {
         XCTAssertFalse(model.hasUnsavedChanges)
     }
 
+    func testBackgroundSaveRunsTheFlushAndReturnsItsResult() async throws {
+        let (url, model, _) = try await fixture()
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        model.selectCell(.init(row: 2, column: 2))
+        model.updateEditorText("41")
+        // Leaving and going to the background run the flush inside a UIKit background task.
+        let saved = await DocumentBackgroundSave.run(named: "Excel test") {
+            await model.flushAutosave()
+        }.value
+
+        XCTAssertTrue(saved)
+        XCTAssertEqual(try cell(2, at: url)?.rawValue, "41")
+        XCTAssertEqual(try cell(3, at: url)?.rawValue, "82")
+        XCTAssertFalse(model.hasUnsavedChanges)
+    }
+
     func testEditingDuringWorkbookAutosaveSchedulesTheLatestSnapshot() async throws {
         let firstStarted = expectation(description: "First autosave started")
         let secondFinished = expectation(description: "Latest snapshot saved")

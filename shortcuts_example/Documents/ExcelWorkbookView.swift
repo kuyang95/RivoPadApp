@@ -2907,7 +2907,9 @@ struct ExcelWorkbookView: View {
             guard !viewModel.isSaving else { return }
             isEditorFocused = false
             Task {
-                let saved = await viewModel.flushAutosave()
+                let saved = await DocumentBackgroundSave.run(named: "Excel leave") {
+                    await viewModel.flushAutosave()
+                }.value
                 if saved || !viewModel.hasUnsavedChanges {
                     dismiss()
                 } else {
@@ -2957,8 +2959,9 @@ struct ExcelWorkbookView: View {
             await viewModel.load()
         }
         .onChange(of: scenePhase) { _, phase in
+            // A background task lets the write finish once the app is no longer on screen.
             guard phase != .active else { return }
-            Task { _ = await viewModel.flushAutosave() }
+            DocumentBackgroundSave.run(named: "Excel autosave") { await viewModel.flushAutosave() }
         }
         .onChange(of: viewModel.isLoading) { _, isLoading in
             guard !isLoading,
