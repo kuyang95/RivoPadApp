@@ -18,6 +18,8 @@ final class HWPDocumentViewModel: ObservableObject {
     }
 
     private struct MutationGroup {
+        /// Names this step in the history, so a save remembers which steps it wrote.
+        var id = UUID()
         var mutations: [Mutation] = []
         var before: [HWPDocumentBlock]? = nil
         var after: [HWPDocumentBlock]? = nil
@@ -25,13 +27,30 @@ final class HWPDocumentViewModel: ObservableObject {
         var newSelection: String? = nil
         var beforeSource: HWPTableStructureDocument? = nil
         var afterSource: HWPTableStructureDocument? = nil
-        var beforeDirty: Bool? = nil
     }
+
+    /// The status line's quiet save state (Android `HwpViewModel.SaveState`); failures go to `status`.
+    enum SaveState: Equatable {
+        case idle, saving, saved
+    }
+
+    /// A save that failed, for the screen to announce once.
+    struct SaveFailure: Equatable {
+        let id = UUID()
+        let message: String
+    }
+
+    /// Autosave waits this long after the last edit, undo or AI apply (Android `AUTOSAVE_DELAY_MS`).
+    static let autosaveDelay: Duration = .milliseconds(900)
 
     @Published private(set) var blocks: [HWPDocumentBlock] = []
     @Published private(set) var pageLayouts: [HWPDocumentPageLayout] = []
     @Published private(set) var isLoading = true
     @Published private(set) var isSaving = false
+    /// An autosave is writing; unlike `isSaving` it does not stop editing.
+    @Published private(set) var isAutosaving = false
+    @Published private(set) var saveState = SaveState.idle
+    @Published private(set) var saveFailure: SaveFailure?
     @Published private(set) var isLegacyReadOnly = false
     @Published private(set) var isLegacyDocument = false
     @Published private(set) var requiresSaveAs = false
@@ -43,8 +62,9 @@ final class HWPDocumentViewModel: ObservableObject {
     @Published var selectedBlockID: String?
     @Published var editorText = ""
 
-    let fileURL: URL
-    let originalDocumentID: UUID?
+    /// The file saves go to; a converted HWP gets one when its HWPX copy is first saved.
+    private(set) var fileURL: URL
+    private(set) var originalDocumentID: UUID?
 
     private var package: HWPXDocumentPackage?
     private var legacyDocument: HWP5StructuredDocument?
@@ -53,13 +73,29 @@ final class HWPDocumentViewModel: ObservableObject {
     private var undoStack: [MutationGroup] = []
     private var redoStack: [MutationGroup] = []
     private var didLoad = false
-    private var exportedBlocks: [HWPDocumentBlock]?
     private var fileSnapshot: Data?
     private let writeContents: @Sendable (URL, Data, Data) throws -> Void
+    /// The history steps the file holds: `[]` is the file as opened, nil a document never written
+    /// (a converted HWP). Edits differ from it, so undo and redo stay across saves.
+    private var savedHistoryIDs: [UUID]? = []
+    private var exportedHistoryIDs: [UUID]?
+    /// Another app changed the file: nothing more is written to it automatically.
+    private var changedElsewhere = false
+    /// 변경 내용 버리기 was chosen: leaving writes nothing.
+    private var discarded = false
+    private var autosaveDebounceTask: Task<Void, Never>?
+    private var writeTask: Task<Bool, Never>?
+    private let autosaveDelay: Duration?
+    private let recentDocuments: RecentOriginalDocumentStore
+    private var adoptedFileAccess: OriginalDocumentAccessSession?
 
+    /// `autosaveDelay` nil turns the timed autosave off (leaving and the background still save);
+    /// the screen passes `HWPDocumentViewModel.autosaveDelay`.
     init(
         fileURL: URL,
         originalDocumentID: UUID? = nil,
+        autosaveDelay: Duration? = nil,
+        recentDocuments: RecentOriginalDocumentStore = .shared,
         writeContents: @escaping @Sendable (URL, Data, Data) throws -> Void = {
             try CoordinatedDocumentFileAccess.replaceContents(
                 at: $0, with: $1, expectedContents: $2
@@ -68,6 +104,8 @@ final class HWPDocumentViewModel: ObservableObject {
     ) {
         self.fileURL = fileURL
         self.originalDocumentID = originalDocumentID
+        self.autosaveDelay = autosaveDelay
+        self.recentDocuments = recentDocuments
         self.writeContents = writeContents
     }
 
@@ -168,11 +206,13 @@ final class HWPDocumentViewModel: ObservableObject {
             install(package: package)
             undoStack.removeAll()
             redoStack.removeAll()
-            updateHistoryState()
             isLegacyReadOnly = false
             isLegacyDocument = false
+            // The original .hwp is never written: the converted document saves to a new HWPX file
+            // chosen on 이 문서에 저장 (`adoptSavedCopy`), and autosaves there after that.
             requiresSaveAs = true
-            hasUnsavedChanges = true
+            savedHistoryIDs = nil
+            updateHistoryState()
             status = AppLocalization.string(
                 "HWP 본문을 HWPX 편집본으로 변환했습니다. 원본 HWP는 변경하지 않습니다."
             )
@@ -392,7 +432,7 @@ final class HWPDocumentViewModel: ObservableObject {
         }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, oldSelection = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, oldSelection = selectedBlockID
         isSaving = true
         errorDescription = nil
         status = AppLocalization.string("표를 수정하는 중…")
@@ -401,7 +441,7 @@ final class HWPDocumentViewModel: ObservableObject {
             let result = try await source.editing(action, blocks: before, selectedID: selectedID, dimensions: dimensions)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: oldSelection, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                beforeSource: source, afterSource: result.document),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("표의 변경 사항을 적용했습니다. 저장하면 파일에 반영됩니다.")
@@ -419,13 +459,13 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil; status = AppLocalization.string("표를 삽입하는 중…")
         defer { isSaving = false }
         do {
             let result = try await HWPTableInsertion.applying(request, source: source, drafts: drafts ?? before)
             apply(MutationGroup(before: before, after: result.document.blocks, oldSelection: selected, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty), forward: true, registeringUndo: true)
+                beforeSource: source, afterSource: result.document), forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("표를 삽입했습니다. 저장하면 파일에 반영됩니다.")
             return result.focusedID
@@ -437,14 +477,14 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil; status = AppLocalization.string("그림을 삽입하는 중…")
         defer { isSaving = false }
         do {
             let result = try await HWPImageEditing.inserting(request, source: source, drafts: before)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                beforeSource: source, afterSource: result.document),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("그림을 삽입했습니다. 저장하면 파일에 반영됩니다.")
@@ -460,14 +500,14 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil; status = AppLocalization.string("그림을 수정하는 중…")
         defer { isSaving = false }
         do {
             let result = try await HWPImageEditing.applying(action, target: target, source: source, drafts: before)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                beforeSource: source, afterSource: result.document),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("그림의 변경 사항을 적용했습니다. 저장하면 파일에 반영됩니다.")
@@ -484,14 +524,14 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil; status = AppLocalization.string("그림을 수정하는 중…")
         defer { isSaving = false }
         do {
             let result = try await HWPImageEditing.describing(text, target: target, source: source, drafts: before)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                beforeSource: source, afterSource: result.document),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("그림 설명을 적용했습니다. 저장하면 파일에 반영됩니다.")
@@ -507,14 +547,14 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil; status = AppLocalization.string("도형을 삽입하는 중…")
         defer { isSaving = false }
         do {
             let result = try await HWPShapeEditing.inserting(request, source: source, drafts: before)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                beforeSource: source, afterSource: result.document),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("도형을 삽입했습니다. 저장하면 파일에 반영됩니다.")
@@ -530,14 +570,14 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil; status = AppLocalization.string("도형을 수정하는 중…")
         defer { isSaving = false }
         do {
             let result = try await HWPShapeEditing.applying(action, target: target, source: source, drafts: before)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                beforeSource: source, afterSource: result.document),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("도형의 변경 사항을 적용했습니다. 저장하면 파일에 반영됩니다.")
@@ -553,14 +593,14 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil; status = AppLocalization.string("도형을 그룹으로 묶는 중…")
         defer { isSaving = false }
         do {
             let result = try await HWPShapeEditing.grouping(request, source: source, drafts: before)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                beforeSource: source, afterSource: result.document),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("선택한 도형을 그룹으로 묶었습니다. 저장하면 파일에 반영됩니다.")
@@ -576,14 +616,14 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil; status = AppLocalization.string("도형을 정렬하는 중…")
         defer { isSaving = false }
         do {
             let result = try await HWPShapeEditing.arranging(request, source: source, drafts: before)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                beforeSource: source, afterSource: result.document),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("선택한 도형의 정렬을 적용했습니다. 저장하면 파일에 반영됩니다.")
@@ -599,7 +639,7 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil; status = AppLocalization.string("도형 크기를 맞추는 중…")
         defer { isSaving = false }
         do {
@@ -607,7 +647,7 @@ final class HWPDocumentViewModel: ObservableObject {
                 source: source, drafts: before)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                beforeSource: source, afterSource: result.document),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("선택한 도형의 크기를 맞췄습니다. 저장하면 파일에 반영됩니다.")
@@ -623,7 +663,7 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil; status = AppLocalization.string("도형을 뒤집는 중…")
         defer { isSaving = false }
         do {
@@ -631,7 +671,7 @@ final class HWPDocumentViewModel: ObservableObject {
                 source: source, drafts: before)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                beforeSource: source, afterSource: result.document),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("선택한 도형을 뒤집었습니다. 저장하면 파일에 반영됩니다.")
@@ -647,7 +687,7 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil
         status = AppLocalization.string(request.action == .duplicate
             ? "선택한 도형을 복제하는 중…" : "선택한 도형을 삭제하는 중…")
@@ -657,7 +697,7 @@ final class HWPDocumentViewModel: ObservableObject {
                 source: source, drafts: before)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                beforeSource: source, afterSource: result.document),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string(request.action == .duplicate
@@ -676,14 +716,14 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil; status = AppLocalization.string("수식을 삽입하는 중…")
         defer { isSaving = false }
         do {
             let result = try await HWPEquationEditing.inserting(request, source: source, drafts: before)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                beforeSource: source, afterSource: result.document),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("수식을 삽입했습니다. 저장하면 파일에 반영됩니다.")
@@ -700,7 +740,7 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil; status = AppLocalization.string("수식을 수정하는 중…")
         defer { isSaving = false }
         do {
@@ -708,7 +748,7 @@ final class HWPDocumentViewModel: ObservableObject {
                 source: source, drafts: before)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                beforeSource: source, afterSource: result.document),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("수식의 변경 사항을 적용했습니다. 저장하면 파일에 반영됩니다.")
@@ -725,7 +765,7 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil; status = AppLocalization.string("글상자 내용을 수정하는 중…")
         defer { isSaving = false }
         do {
@@ -733,7 +773,7 @@ final class HWPDocumentViewModel: ObservableObject {
                 source: source, drafts: before)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                beforeSource: source, afterSource: result.document),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("글상자 내용을 적용했습니다. 저장하면 파일에 반영됩니다.")
@@ -749,14 +789,14 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil; status = AppLocalization.string("글상자를 삽입하는 중…")
         defer { isSaving = false }
         do {
             let result = try await HWPTextBoxEditing.inserting(request, source: source, drafts: before)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                beforeSource: source, afterSource: result.document),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("글상자를 삽입했습니다. 저장하면 파일에 반영됩니다.")
@@ -774,7 +814,7 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil; status = AppLocalization.string("링크를 수정하는 중…")
         defer { isSaving = false }
         do {
@@ -782,7 +822,7 @@ final class HWPDocumentViewModel: ObservableObject {
                 source: source, drafts: drafts ?? before)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                beforeSource: source, afterSource: result.document),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("링크 변경 사항을 적용했습니다. 저장하면 파일에 반영됩니다.")
@@ -798,7 +838,7 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil; status = AppLocalization.string("각주·미주를 수정하는 중…")
         defer { isSaving = false }
         do {
@@ -806,7 +846,7 @@ final class HWPDocumentViewModel: ObservableObject {
                 drafts: drafts ?? before, selectedID: selected)
             apply(MutationGroup(before: before, after: result.document.blocks,
                 oldSelection: selected, newSelection: result.focusedID,
-                beforeSource: source, afterSource: result.document, beforeDirty: dirty),
+                beforeSource: source, afterSource: result.document),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("각주·미주 변경 사항을 적용했습니다. 저장하면 파일에 반영됩니다.")
@@ -823,7 +863,7 @@ final class HWPDocumentViewModel: ObservableObject {
         guard pageLayouts.contains(where: { request.sections.contains($0.sectionIndex) && !request.settings.matches($0) }) else { return }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil
         status = AppLocalization.string("쪽 설정을 적용하는 중…")
         defer { isSaving = false }
@@ -831,7 +871,7 @@ final class HWPDocumentViewModel: ObservableObject {
             let changed = try await HWPPageSetup.applying(request, source: source, drafts: before)
             let focused = before.firstIndex(where: { $0.id == selected }).flatMap { changed.blocks.indices.contains($0) ? changed.blocks[$0].id : nil }
             apply(MutationGroup(before: before, after: changed.blocks, oldSelection: selected, newSelection: focused,
-                beforeSource: source, afterSource: changed, beforeDirty: dirty), forward: true, registeringUndo: true)
+                beforeSource: source, afterSource: changed), forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("쪽 설정을 적용했습니다. 저장하면 파일에 반영됩니다.")
         } catch {
@@ -848,7 +888,7 @@ final class HWPDocumentViewModel: ObservableObject {
         }) else { return }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true
         errorDescription = nil
         status = AppLocalization.string("다단 설정을 적용하는 중…")
@@ -860,7 +900,7 @@ final class HWPDocumentViewModel: ObservableObject {
             }
             apply(MutationGroup(before: before, after: changed.blocks,
                 oldSelection: selected, newSelection: focused,
-                beforeSource: source, afterSource: changed, beforeDirty: dirty),
+                beforeSource: source, afterSource: changed),
                 forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("다단 설정을 적용했습니다. 저장하면 파일에 반영됩니다.")
@@ -875,7 +915,7 @@ final class HWPDocumentViewModel: ObservableObject {
         try HWPPageNumberEditing.validate(request, layouts: pageLayouts)
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil
         status = AppLocalization.string("쪽 번호를 적용하는 중…")
         defer { isSaving = false }
@@ -883,7 +923,7 @@ final class HWPDocumentViewModel: ObservableObject {
             let changed = try await HWPPageNumberEditing.applying(request, source: source, drafts: before)
             let focused = before.firstIndex(where: { $0.id == selected }).flatMap { changed.blocks.indices.contains($0) ? changed.blocks[$0].id : nil }
             apply(MutationGroup(before: before, after: changed.blocks, oldSelection: selected, newSelection: focused,
-                beforeSource: source, afterSource: changed, beforeDirty: dirty), forward: true, registeringUndo: true)
+                beforeSource: source, afterSource: changed), forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("쪽 번호를 적용했습니다. 저장하면 파일에 반영됩니다.")
         } catch {
@@ -901,7 +941,7 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         guard let source = editingSource else { throw HWPDocumentEditingError.unsupportedEdit }
-        let before = blocks, selected = selectedBlockID, dirty = hasUnsavedChanges
+        let before = blocks, selected = selectedBlockID
         isSaving = true; errorDescription = nil
         status = AppLocalization.string("머리말·꼬리말을 적용하는 중…")
         defer { isSaving = false }
@@ -909,7 +949,7 @@ final class HWPDocumentViewModel: ObservableObject {
             let changed = try await HWPHeaderFooterEditing.applying(request, source: source, drafts: before)
             let focused = HWPHeaderFooterEditing.remappedSelection(selected, before: before, after: changed.blocks, request: request)
             apply(MutationGroup(before: before, after: changed.blocks, oldSelection: selected, newSelection: focused,
-                beforeSource: source, afterSource: changed, beforeDirty: dirty), forward: true, registeringUndo: true)
+                beforeSource: source, afterSource: changed), forward: true, registeringUndo: true)
             syncEditor()
             status = AppLocalization.string("머리말·꼬리말을 적용했습니다. 저장하면 파일에 반영됩니다.")
         } catch { status = AppLocalization.string("머리말·꼬리말을 적용하지 못했습니다."); throw error }
@@ -925,73 +965,155 @@ final class HWPDocumentViewModel: ObservableObject {
         syncEditor()
     }
 
+    // MARK: 저장 (Android `HwpViewModel` 자동 저장)
+
+    /// 더보기 → 이 문서에 저장: writes now instead of after the autosave pause, after any save
+    /// already running. Editing waits for it; the undo history stays.
     func save() async {
         commitEditorChange()
+        cancelAutosaveDebounce()
         guard !isSaving, !requiresSaveAs else { return }
-        isSaving = true
-        errorDescription = nil
-        status = isLegacyDocument
-            ? AppLocalization.string("HWP 저장 중…")
-            : AppLocalization.string("HWPX 저장 중…")
-        do {
-            let editedBlocks = blocks
-            let destination = fileURL
-            let writeContents = writeContents
-            guard let expectedContents = fileSnapshot else { throw HWPDocumentEditingError.cannotSave }
-            let selectedIndex = selectedBlock.flatMap { selected in
-                blocks.firstIndex { $0.id == selected.id }
-            }
-            if let package {
-                let data = try await Task.detached(priority: .userInitiated) {
-                    let data = try package.serializedData(applying: editedBlocks)
-                    try writeContents(destination, data, expectedContents)
-                    return data
-                }.value
-                let reloaded = try await Task.detached {
-                    try HWPXDocumentPackage.load(from: data)
-                }.value
-                install(package: reloaded, selectedIndex: selectedIndex)
-            } else if let sourceData = legacySourceData {
-                let originalBlocks = legacyOriginalBlocks
-                let result = try await Task.detached(priority: .userInitiated) {
-                    let data = try HWP5DocumentRewriter.rewrite(
-                        sourceData: sourceData,
-                        originalBlocks: originalBlocks,
-                        editedBlocks: editedBlocks
-                    )
-                    try writeContents(destination, data, expectedContents)
-                    let document = try HWP5StructuredDocumentParser.parse(from: data)
-                    return (data, document)
-                }.value
-                install(
-                    legacyDocument: result.1,
-                    sourceData: result.0,
-                    selectedIndex: selectedIndex
-                )
-            } else {
-                throw HWPDocumentEditingError.cannotSave
-            }
-            hasUnsavedChanges = false
-            undoStack.removeAll()
-            redoStack.removeAll()
-            updateHistoryState()
-            if let originalDocumentID {
-                try? await RecentOriginalDocumentStore.shared.refreshBookmark(
-                    id: originalDocumentID,
-                    fileURL: fileURL
-                )
-            }
-            status = isLegacyDocument
+        let legacy = isLegacyDocument
+        if await performSave(automatic: false), !hasUnsavedChanges {
+            status = legacy
                 ? AppLocalization.string("원본 HWP 형식으로 저장했습니다.")
                 : AppLocalization.string("HWPX 문서에 저장했습니다.")
-        } catch {
-            errorDescription = error.localizedDescription
-            status = AppLocalization.format(
-                "저장하지 못했습니다: %@",
-                error.localizedDescription
-            )
         }
-        isSaving = false
+    }
+
+    /// Leaving or going to the background: writes what is unsaved now. True when everything is
+    /// in the file; false when it could not be (a failed save, another app's change, or a
+    /// converted HWP that has no file yet).
+    @discardableResult
+    func flushAutosave() async -> Bool {
+        commitEditorChange()
+        cancelAutosaveDebounce()
+        guard !discarded else { return false }
+        guard hasUnsavedChanges || writeTask != nil else { return true }
+        guard await performSave(automatic: true) else { return false }
+        return !hasUnsavedChanges
+    }
+
+    /// 나가기: true when the screen can close; false asks 계속 편집 / 변경 내용 버리기.
+    func prepareToLeave() async -> Bool {
+        guard !isLoading, isEditableDocument else { return true }
+        return await flushAutosave()
+    }
+
+    /// 변경 내용 버리기: nothing more is written, as the screen closes.
+    func discardChanges() {
+        discarded = true
+        cancelAutosaveDebounce()
+    }
+
+    private var canAutosave: Bool {
+        autosaveDelay != nil && didLoad && !isLoading && isEditableDocument
+            && !requiresSaveAs && !changedElsewhere && !discarded
+    }
+
+    private func cancelAutosaveDebounce() {
+        autosaveDebounceTask?.cancel()
+        autosaveDebounceTask = nil
+    }
+
+    private func scheduleAutosave() {
+        cancelAutosaveDebounce()
+        guard let delay = autosaveDelay, canAutosave, hasUnsavedChanges else { return }
+        autosaveDebounceTask = Task { [weak self] in
+            do { try await Task.sleep(for: delay) } catch { return }
+            guard let self, !Task.isCancelled else { return }
+            self.autosaveDebounceTask = nil
+            // A table, picture or conversion still running: wait another pause.
+            if self.isSaving { self.scheduleAutosave(); return }
+            await self.performSave(automatic: true)
+        }
+    }
+
+    /// One save at a time: a request while one runs waits for it, then writes whatever is still
+    /// unsaved. Edits made during a save keep the document changed and are saved next.
+    @discardableResult
+    private func performSave(automatic: Bool) async -> Bool {
+        while let running = writeTask { _ = await running.value }
+        guard hasUnsavedChanges else { return true }
+        // The task clears itself, so a waiter never finds a finished save still listed.
+        let task = Task {
+            let succeeded = await self.write(automatic: automatic)
+            self.writeTask = nil
+            return succeeded
+        }
+        writeTask = task
+        let succeeded = await task.value
+        if succeeded, hasUnsavedChanges { scheduleAutosave() }
+        return succeeded
+    }
+
+    private func write(automatic: Bool) async -> Bool {
+        guard !isSaving, !requiresSaveAs, !discarded else { return false }
+        if automatic, changedElsewhere {
+            status = DocumentFileAccessError.documentChanged.localizedDescription
+            return false
+        }
+        if automatic {
+            isAutosaving = true
+        } else {
+            isSaving = true
+            status = isLegacyDocument
+                ? AppLocalization.string("HWP 저장 중…")
+                : AppLocalization.string("HWPX 저장 중…")
+        }
+        saveState = .saving
+        errorDescription = nil
+        defer { if automatic { isAutosaving = false } else { isSaving = false } }
+        // What this save writes; the file keeps the opened package (or HWP) as its base, so the
+        // history and the editor are untouched by it.
+        let editedBlocks = blocks
+        let historyIDs = undoStack.map(\.id)
+        let destination = fileURL
+        let writeContents = writeContents
+        let package = package
+        let legacySourceData = legacySourceData
+        let originalBlocks = legacyOriginalBlocks
+        do {
+            guard let expectedContents = fileSnapshot else { throw HWPDocumentEditingError.cannotSave }
+            let data = try await Task.detached(priority: .userInitiated) {
+                let data: Data
+                if let package {
+                    data = try package.serializedData(applying: editedBlocks)
+                } else if let legacySourceData {
+                    data = try HWP5DocumentRewriter.rewrite(
+                        sourceData: legacySourceData, originalBlocks: originalBlocks,
+                        editedBlocks: editedBlocks)
+                } else {
+                    throw HWPDocumentEditingError.cannotSave
+                }
+                try writeContents(destination, data, expectedContents)
+                return data
+            }.value
+            fileSnapshot = data
+            savedHistoryIDs = historyIDs
+            updateHistoryState()
+            saveState = hasUnsavedChanges ? .idle : .saved
+            if let originalDocumentID {
+                try? await recentDocuments.refreshBookmark(id: originalDocumentID, fileURL: destination)
+            }
+            return true
+        } catch {
+            saveState = .idle
+            errorDescription = error.localizedDescription
+            let message: String
+            if case DocumentFileAccessError.documentChanged = error {
+                changedElsewhere = true
+                cancelAutosaveDebounce()
+                message = error.localizedDescription
+            } else {
+                message = AppLocalization.format(
+                    automatic ? "자동 저장하지 못했습니다: %@" : "저장하지 못했습니다: %@",
+                    error.localizedDescription)
+            }
+            status = message
+            saveFailure = SaveFailure(message: message)
+            return false
+        }
     }
 
     func outputSnapshot(opensPrintDialog: Bool = false) throws -> HWPOutputSnapshot {
@@ -1005,6 +1127,7 @@ final class HWPDocumentViewModel: ObservableObject {
         guard !isSaving else { throw DocumentFileAccessError.savingInProgress }
         commitEditorChange()
         let editedBlocks = blocks
+        let historyIDs = undoStack.map(\.id)
         let package = package
         let legacySourceData = legacySourceData
         let originalBlocks = legacyOriginalBlocks
@@ -1022,7 +1145,7 @@ final class HWPDocumentViewModel: ObservableObject {
             }
             throw HWPDocumentEditingError.cannotSave
         }.value
-        exportedBlocks = editedBlocks
+        exportedHistoryIDs = historyIDs
         return data
     }
 
@@ -1030,10 +1153,36 @@ final class HWPDocumentViewModel: ObservableObject {
         commitEditorChange()
         // A copy does not save the open original. Only a converted document
         // without an original destination can become clean after export.
-        if requiresSaveAs, exportedBlocks == blocks {
-            hasUnsavedChanges = false
+        if requiresSaveAs, let exportedHistoryIDs, exportedHistoryIDs == undoStack.map(\.id) {
+            savedHistoryIDs = exportedHistoryIDs
+            updateHistoryState()
         }
         status = AppLocalization.string("문서 복사본을 내보냈습니다.")
+    }
+
+    /// A converted HWP's copy just saved (이 문서에 저장 or 복사본 내보내기): that new HWPX file
+    /// becomes the document's file, so later edits autosave there (Android: later saves go to the
+    /// new file). The original .hwp is never written. Any other document only exported a copy.
+    func adoptSavedCopy(at url: URL) async {
+        guard requiresSaveAs else { return markExported() }
+        commitEditorChange()
+        let access = OriginalDocumentAccessSession(url: url)
+        do {
+            let data = try await Task.detached(priority: .userInitiated) {
+                try CoordinatedDocumentFileAccess.readData(from: url)
+            }.value
+            adoptedFileAccess = access
+            fileURL = url
+            fileSnapshot = data
+            requiresSaveAs = false
+            originalDocumentID = try? await recentDocuments.register(fileURL: url).id
+            savedHistoryIDs = exportedHistoryIDs
+            updateHistoryState()
+            saveState = hasUnsavedChanges ? .idle : .saved
+            status = AppLocalization.string("HWPX 문서에 저장했습니다.")
+        } catch {
+            markExported()
+        }
     }
 
     func makeAIRetrievalCatalog(
@@ -1107,8 +1256,6 @@ final class HWPDocumentViewModel: ObservableObject {
         forward: Bool,
         registeringUndo: Bool
     ) {
-        var group = group
-        if registeringUndo, group.beforeDirty == nil { group.beforeDirty = hasUnsavedChanges }
         if let source = forward ? group.afterSource : group.beforeSource {
             switch source {
             case .hwpx(let package): install(package: package, updateFileSnapshot: false)
@@ -1137,13 +1284,20 @@ final class HWPDocumentViewModel: ObservableObject {
             undoStack.append(group)
             redoStack.removeAll()
         }
-        hasUnsavedChanges = forward ? true : group.beforeDirty ?? true
         updateHistoryState()
     }
 
     private func updateHistoryState() {
         canUndo = !undoStack.isEmpty
         canRedo = !redoStack.isEmpty
+        let changed = savedHistoryIDs.map { undoStack.map(\.id) != $0 } ?? true
+        if hasUnsavedChanges != changed { hasUnsavedChanges = changed }
+        if changed {
+            if saveState == .saved { saveState = .idle }
+            scheduleAutosave()
+        } else {
+            cancelAutosaveDebounce()
+        }
     }
 
     private func install(
@@ -1341,6 +1495,7 @@ private func hwpColor(_ rgb: UInt32) -> Color {
 
 struct HWPDocumentView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var viewModel: HWPDocumentViewModel
     @StateObject private var fontManager = HWPUserFontManager.shared
     @StateObject private var originalEditor = HWPInlineEditingSession()
@@ -1348,6 +1503,7 @@ struct HWPDocumentView: View {
     @State private var isEditingAccessibleDocument = false
     @State private var showsAI = true
     @State private var showsDiscardConfirmation = false
+    @State private var isLeaving = false
     @State private var isExporting = false
     @State private var exportFile: HWPDocumentExportFile?
     @State private var outputSnapshot: HWPOutputSnapshot?
@@ -1382,7 +1538,8 @@ struct HWPDocumentView: View {
         _viewModel = StateObject(
             wrappedValue: HWPDocumentViewModel(
                 fileURL: fileURL,
-                originalDocumentID: originalDocumentID
+                originalDocumentID: originalDocumentID,
+                autosaveDelay: HWPDocumentViewModel.autosaveDelay
             )
         )
     }
@@ -1529,7 +1686,21 @@ struct HWPDocumentView: View {
             originalEditor.finish()
             cancelShapeGrouping()
         }
-        .onDisappear { originalEditor.finish() }
+        .onDisappear {
+            originalEditor.finish()
+            Task { await viewModel.flushAutosave() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Going to the background writes the edits, as Android saves on `onStop`.
+            guard phase == .background else { return }
+            originalEditor.finish()
+            Task { await viewModel.flushAutosave() }
+        }
+        .onChange(of: viewModel.saveFailure) { _, failure in
+            // Save states stay quiet on the status line; a failed save is read out.
+            guard let failure else { return }
+            UIAccessibility.post(notification: .announcement, argument: failure.message)
+        }
         .fileExporter(
             isPresented: $isExporting,
             document: exportFile,
@@ -1538,15 +1709,23 @@ struct HWPDocumentView: View {
         ) { result in
             exportFile = nil
             switch result {
-            case .success:
-                viewModel.markExported()
+            case .success(let url):
+                if viewModel.requiresSaveAs {
+                    Task { await viewModel.adoptSavedCopy(at: url) }
+                } else {
+                    viewModel.markExported()
+                }
             case .failure(let error):
                 exportError = error.localizedDescription
             }
         }
+        // Only when the edits could not be written on leaving (Android `leaving`).
         .alert("저장하지 않은 변경 사항", isPresented: $showsDiscardConfirmation) {
             Button("계속 편집", role: .cancel) {}
-            Button("변경 사항 버리기", role: .destructive) { dismiss() }
+            Button("변경 내용 버리기", role: .destructive) {
+                viewModel.discardChanges()
+                dismiss()
+            }
         } message: {
             Text("저장하지 않은 한글 문서 변경 사항이 있습니다.")
         }
@@ -3355,14 +3534,31 @@ struct HWPDocumentView: View {
     }
 
     private var statusBar: some View {
-        Text(viewModel.status)
-            .font(.footnote)
-            .foregroundStyle(VisionCraftUI.secondaryText)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(VisionCraftUI.surface)
-            .accessibilityLabel(viewModel.status)
+        HStack(spacing: 8) {
+            Text(viewModel.status)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let saveState = saveStateText {
+                Text(saveState)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+        }
+        .font(.footnote)
+        .foregroundStyle(VisionCraftUI.secondaryText)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(VisionCraftUI.surface)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// The autosave state after the status (Android `HwpStatusCaption`): shown and read when the
+    /// line is focused, never announced.
+    private var saveStateText: String? {
+        guard viewModel.isEditableDocument else { return nil }
+        if viewModel.isAutosaving { return AppLocalization.string("자동 저장 중…") }
+        if viewModel.hasUnsavedChanges { return AppLocalization.string("수정됨") }
+        if viewModel.saveState == .saved { return AppLocalization.string("자동 저장됨") }
+        return nil
     }
 
     private var documentHeader: some View {
@@ -3473,13 +3669,16 @@ struct HWPDocumentView: View {
 
     private var documentBackButton: some View {
         VisionCraftBackButton {
-            guard !viewModel.isSaving else { return }
+            guard !viewModel.isSaving, !isLeaving else { return }
             originalEditor.finish()
             viewModel.commitEditorChange()
-            if viewModel.hasUnsavedChanges {
-                showsDiscardConfirmation = true
-            } else {
-                dismiss()
+            // Unsaved edits are written first; the prompt is only for a save that failed or
+            // could not run (another app's change, a converted HWP without its file yet).
+            isLeaving = true
+            Task {
+                let canLeave = await viewModel.prepareToLeave()
+                isLeaving = false
+                if canLeave { dismiss() } else { showsDiscardConfirmation = true }
             }
         }
     }

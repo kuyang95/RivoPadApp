@@ -2769,3 +2769,5 @@
 "차트" = "Chart";
 "한글 문서 개체" = "Hangul document object";
 "한글 원본 문서 · %lld쪽" = "Original Hangul document · Page %lld";
+"자동 저장됨" = "Saved automatically";
+"자동 저장하지 못했습니다: %@" = "Couldn’t save automatically: %@";

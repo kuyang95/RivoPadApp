@@ -222,6 +222,21 @@
 - 표 행 카드의 길게 누르기·VoiceOver 동작 `표 편집`은 iPadOS에만 있다(Android는 행 편집 다이얼로그 안에서만).
 - `다른 색…`은 iPadOS 시스템 색 고르기 + 색 코드이고, Android는 이름 있는 색·색조·채도·밝기 슬라이더 + 색 코드 시트다.
 
+### 자동 저장·나가기
+
+- 자동 저장(`HWPDocumentViewModel`의 `scheduleAutosave`·`performSave`·`write`, Android `HwpViewModel` 자동 저장): 편집·실행 취소·다시 실행·AI 적용 뒤 0.9초(`HWPDocumentViewModel.autosaveDelay`) 동안 더 편집이 없으면 저장한다. 나갈 때와 앱이 백그라운드로 갈 때(`scenePhase` `.background`, 화면이 사라질 때도 `flushAutosave`)는 문서 위 편집을 먼저 끝내고 바로 저장한다. HWPX는 HWPX로, 바로 편집하는 HWP는 원본 HWP 형식(`HWP5DocumentRewriter`)으로 원본 파일에 쓴다.
+- 한 번에 하나만 저장한다. 저장 중에 들어온 저장 요청은 앞 저장이 끝난 뒤 남은 변경을 쓰고, 자동 저장 중에도 편집은 계속된다(`isAutosaving`은 화면을 잠그지 않는다). 저장 중에 한 편집은 문서를 "수정됨"으로 남겨 다음 저장에 쓴다. 표·그림처럼 엔진이 파일을 다시 만드는 편집이 진행 중이면(`isSaving`) 자동 저장은 한 번 더 기다린다.
+- 저장해도 실행 취소·다시 실행 기록과 선택·편집 중인 문단은 그대로다. 저장은 연 문서(패키지·HWP 원본)에 지금 문단을 적용해 쓰고, 어느 기록 단계까지 썼는지(`savedHistoryIDs`)를 기억해 그 뒤 편집·실행 취소면 다시 "수정됨"이 된다.
+- 상태 줄(`statusBar`): 왼쪽에 마지막 상태 문구, 오른쪽에 저장 상태(`saveStateText`) — 자동 저장 중이면 "자동 저장 중…", 쓰지 않은 변경이 있으면 "수정됨", 다 썼으면 "자동 저장됨". 저장 상태는 보이기만 하고 읽어 주지 않는다(상태 줄에 초점이 가면 함께 읽음). 저장 실패는 상태 문구로 바꾸고 VoiceOver로 알린다(`saveFailure`): "자동 저장하지 못했습니다: 이유"(이 문서에 저장은 "저장하지 못했습니다: 이유").
+- 연 뒤 다른 앱이 파일을 바꿨으면(`CoordinatedDocumentFileAccess.replaceContents`가 쓰기 직전 마지막으로 읽거나 쓴 바이트와 비교, `DocumentFileAccessError.documentChanged`) 쓰지 않고 "다른 앱에서 문서가 변경되어 저장하지 않았습니다. 수정 내용을 복사본으로 내보내거나 문서를 다시 열어 주세요."를 띄우며 그 뒤로는 자동 저장하지 않는다. 편집 내용과 실행 취소 기록은 남는다.
+- `더보기` → `이 문서에 저장`(`save`, 쓰지 않은 변경이 있거나 변환한 문서일 때 켜짐): 자동 저장 대기를 취소하고 진행 중인 저장을 기다린 뒤 바로 쓴다. 쓰는 동안은 화면이 잠기고("HWPX 저장 중…"/"HWP 저장 중…"), 끝나면 "HWPX 문서에 저장했습니다."(HWP는 "원본 HWP 형식으로 저장했습니다.").
+- HWPX로 변환한 HWP(`convertLegacyForEditing`, `requiresSaveAs`): 원본 .hwp에는 절대 쓰지 않는다. 처음 `이 문서에 저장`(또는 `복사본 내보내기`)이 시스템 저장 위치 선택으로 "<이름>-편집본.hwpx"를 만들면 그 파일이 이 문서의 파일이 되고(`adoptSavedCopy`: 보안 범위 접근 유지, 최근 문서에 등록), 그 뒤 편집은 그 파일에 자동 저장한다. 그 전까지는 자동 저장하지 않고 "수정됨"으로 남는다.
+- 나가기(머리 줄 뒤로 가기, `documentBackButton` → `prepareToLeave`): 남은 변경을 먼저 저장하고 다 쓰였으면 바로 닫는다. 저장이 실패했거나 쓸 수 없을 때(다른 앱의 변경, 아직 파일이 없는 변환 문서)만 "저장하지 않은 변경 사항" / "저장하지 않은 한글 문서 변경 사항이 있습니다." / `계속 편집`·`변경 내용 버리기`(`discardChanges` 뒤로는 아무것도 쓰지 않고 닫는다).
+
+**Android와 다른 곳:**
+- 변환한 HWP의 첫 저장 위치를 iPadOS는 시스템 저장 위치 선택으로 사용자가 고르고(엑셀 XLS 변환과 같은 흐름), 그 전에는 자동 저장하지 않는다. Android는 첫 자동 저장 때 `Documents/VisionCraft`에 새 HWPX를 만든다. 원본에 쓸 수 없을 때 복사본으로 저장하는 Android 동작은 iPadOS에 없다(실패로 알린다).
+- iPadOS 상태 줄은 쓰지 않은 변경이 있으면 "수정됨"을 보인다(Android는 저장 중·저장됨만). `이 문서에 저장`이 쓰는 동안 iPadOS는 편집을 잠근다.
+
 ## AI 문서 선택
 
 파일: `LLM/AIDocumentSelectionView.swift` (Android `compose/FileSelectScreen.kt`).
