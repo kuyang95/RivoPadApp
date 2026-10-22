@@ -1,5 +1,6 @@
 import RivoDocumentEngine
 import Foundation
+import UIKit
 import XCTest
 @testable import shortcuts_example
 
@@ -200,6 +201,160 @@ final class HWPAutosaveTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: url), external)
     }
 
+    func testOriginalEditorDraftAutosavesWithoutCommittingOrEndingTheEditor() async throws {
+        let (url, _) = try hwpx("원문")
+        let model = HWPDocumentViewModel(fileURL: url, autosaveDelay: .milliseconds(150))
+        await model.load()
+        let block = try XCTUnwrap(model.blocks.first)
+        let session = HWPInlineEditingSession()
+        session.begin(block: block, at: .zero, onSelect: { _ in }, onChange: { _ in }, onCommit: {},
+            onCommitBlock: { model.commitInlineBlock($0) })
+        let token = try XCTUnwrap(session.activation?.token)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: 300))
+        let input = UITextView(frame: window.bounds)
+        window.addSubview(input)
+        input.text = block.text
+        session.attach(input, token: token)
+        model.inlineDraft = { session.autosaveDraft() }
+        session.onDraftChange = { model.inlineDraftChanged() }
+
+        input.text = "입력 중"
+        input.selectedRange = NSRange(location: 2, length: 0)
+        session.changed(input.text, token: token)
+        XCTAssertTrue(model.needsSave)
+        XCTAssertFalse(model.hasUnsavedChanges, "The draft is not in the history yet")
+        try await waitUntil { !model.needsSave }
+        XCTAssertNil(model.errorDescription)
+        XCTAssertEqual(try savedText(url), "입력 중")
+        XCTAssertEqual(model.saveState, .saved)
+        // The editor goes on as it was: same session, text and cursor, no extra undo step.
+        XCTAssertEqual(session.activation?.token, token)
+        XCTAssertEqual(input.text, "입력 중")
+        XCTAssertEqual(input.selectedRange, NSRange(location: 2, length: 0))
+        XCTAssertEqual(model.blocks.first?.text, "원문")
+        XCTAssertFalse(model.canUndo)
+
+        // While the IME composes (marked text) nothing is taken; the next change saves.
+        input.selectedRange = NSRange(location: input.text.utf16.count, length: 0)
+        input.setMarkedText("ㄱ", selectedRange: NSRange(location: 1, length: 0))
+        XCTAssertNotNil(input.markedTextRange, "Marked text is needed for this check")
+        session.changed(input.text, token: token)
+        XCTAssertEqual(session.autosaveDraft(), .composing(block.id))
+        try await Task.sleep(for: .milliseconds(500))
+        XCTAssertEqual(try savedText(url), "입력 중")
+        XCTAssertTrue(model.needsSave)
+        input.unmarkText()
+        session.changed(input.text, token: token)
+        try await waitUntil { !model.needsSave }
+        XCTAssertEqual(try savedText(url), "입력 중ㄱ")
+        XCTAssertNotNil(session.activation)
+
+        // Committing makes it one undo step, saved again with the same text.
+        session.finish()
+        XCTAssertEqual(model.blocks.first?.text, "입력 중ㄱ")
+        XCTAssertTrue(model.canUndo)
+        try await waitUntil { !model.needsSave }
+        XCTAssertEqual(try savedText(url), "입력 중ㄱ")
+    }
+
+    func testUndoingACommittedDraftThatWasAutosavedIsSavedOnLeaving() async throws {
+        let (url, _) = try hwpx("원문")
+        let model = HWPDocumentViewModel(fileURL: url, autosaveDelay: .milliseconds(150))
+        await model.load()
+        let block = try XCTUnwrap(model.blocks.first)
+        let session = HWPInlineEditingSession()
+        session.begin(block: block, at: .zero, onSelect: { _ in }, onChange: { _ in }, onCommit: {},
+            onCommitBlock: { model.commitInlineBlock($0) })
+        let token = try XCTUnwrap(session.activation?.token)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: 300))
+        let input = UITextView(frame: window.bounds)
+        window.addSubview(input)
+        input.text = block.text
+        session.attach(input, token: token)
+        model.inlineDraft = { session.autosaveDraft() }
+        session.onDraftChange = { model.inlineDraftChanged() }
+
+        input.text = "되돌릴 입력"
+        session.changed(input.text, token: token)
+        try await waitUntil { !model.needsSave }
+        XCTAssertEqual(try savedText(url), "되돌릴 입력")
+        // Commit, then undo it before the next autosave: the file still holds the draft.
+        session.finish()
+        XCTAssertTrue(model.canUndo)
+        model.undo()
+        XCTAssertEqual(model.blocks.first?.text, "원문")
+        XCTAssertTrue(model.hasUnsavedChanges, "The file holds the undone draft")
+        XCTAssertTrue(model.needsSave)
+        let canLeave = await model.prepareToLeave()
+        XCTAssertTrue(canLeave)
+        XCTAssertEqual(try savedText(url), "원문")
+        let reopened = HWPDocumentViewModel(fileURL: url)
+        await reopened.load()
+        XCTAssertEqual(reopened.blocks.first?.text, "원문")
+    }
+
+    func testCompositionStartingDuringADraftSaveNeverPutsTheOlderParagraphBack() async throws {
+        let (url, _) = try hwpx("원문\n둘째 문단")
+        let gate = CountingWriteGate()
+        defer { for _ in 0..<4 { gate.release.signal() } }
+        let model = HWPDocumentViewModel(fileURL: url, autosaveDelay: .milliseconds(50), writeContents: gate.write)
+        await model.load()
+        let block = try XCTUnwrap(model.blocks.first { $0.text == "원문" })
+        let second = try XCTUnwrap(model.blocks.first { $0.text == "둘째 문단" })
+        let session = HWPInlineEditingSession()
+        session.begin(block: block, at: .zero, onSelect: { _ in }, onChange: { _ in }, onCommit: {},
+            onCommitBlock: { model.commitInlineBlock($0) })
+        let token = try XCTUnwrap(session.activation?.token)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: 300))
+        let input = UITextView(frame: window.bounds)
+        window.addSubview(input)
+        input.text = block.text
+        session.attach(input, token: token)
+        model.inlineDraft = { session.autosaveDraft() }
+        session.onDraftChange = { model.inlineDraftChanged() }
+
+        input.text = "저장된 입력"
+        session.changed(input.text, token: token)
+        try await waitUntil { gate.started == 1 }
+        // The IME starts composing while that draft is being written.
+        input.selectedRange = NSRange(location: input.text.utf16.count, length: 0)
+        input.setMarkedText("ㄱ", selectedRange: NSRange(location: 1, length: 0))
+        XCTAssertNotNil(input.markedTextRange)
+        session.changed(input.text, token: token)
+        gate.release.signal()
+        try await waitUntil { !model.isAutosaving }
+        XCTAssertEqual(try texts(url).first, "저장된 입력")
+        XCTAssertFalse(model.hasUnsavedChanges, "The file holds the open paragraph's draft")
+        try await Task.sleep(for: .milliseconds(400))
+        XCTAssertEqual(gate.started, 1, "Composing alone writes nothing")
+
+        // Another paragraph changes while composing goes on: that save keeps the saved draft.
+        XCTAssertTrue(model.applyAccessibleParagraphText(second.id, text: "둘째 수정"))
+        try await waitUntil { gate.started == 2 }
+        gate.release.signal()
+        try await waitUntil { !model.hasUnsavedChanges && !model.isAutosaving }
+        XCTAssertEqual(try texts(url), ["저장된 입력", "둘째 수정"])
+        XCTAssertNotNil(session.activation)
+
+        // Composition ends: the paragraph as typed is saved.
+        input.unmarkText()
+        session.changed(input.text, token: token)
+        try await waitUntil { gate.started == 3 }
+        gate.release.signal()
+        try await waitUntil { !model.needsSave && !model.isAutosaving }
+        XCTAssertEqual(try texts(url), ["저장된 입력ㄱ", "둘째 수정"])
+    }
+
+    func testBackgroundSaveRunsTheSaveAndReturnsItsResult() async throws {
+        let (url, _) = try hwpx("원문")
+        let model = HWPDocumentViewModel(fileURL: url)
+        await model.load()
+        edit(model, "백그라운드 저장")
+        let saved = await DocumentBackgroundSave.run(named: "HWP test") { await model.flushAutosave() }.value
+        XCTAssertTrue(saved)
+        XCTAssertEqual(try savedText(url), "백그라운드 저장")
+    }
+
     // MARK: Helpers
 
     private func edit(_ model: HWPDocumentViewModel, _ text: String) {
@@ -210,6 +365,10 @@ final class HWPAutosaveTests: XCTestCase {
 
     private func savedText(_ url: URL) throws -> String? {
         try HWPXDocumentPackage.load(from: Data(contentsOf: url)).blocks.first?.text
+    }
+
+    private func texts(_ url: URL) throws -> [String] {
+        try HWPXDocumentPackage.load(from: Data(contentsOf: url)).blocks.map(\.text).filter { !$0.isEmpty }
     }
 
     private func hwpx(_ text: String) throws -> (URL, Data) {

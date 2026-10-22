@@ -224,7 +224,8 @@
 
 ### 자동 저장·나가기
 
-- 자동 저장(`HWPDocumentViewModel`의 `scheduleAutosave`·`performSave`·`write`, Android `HwpViewModel` 자동 저장): 편집·실행 취소·다시 실행·AI 적용 뒤 0.9초(`HWPDocumentViewModel.autosaveDelay`) 동안 더 편집이 없으면 저장한다. 나갈 때와 앱이 백그라운드로 갈 때(`scenePhase` `.background`, 화면이 사라질 때도 `flushAutosave`)는 문서 위 편집을 먼저 끝내고 바로 저장한다. HWPX는 HWPX로, 바로 편집하는 HWP는 원본 HWP 형식(`HWP5DocumentRewriter`)으로 원본 파일에 쓴다.
+- 자동 저장(`HWPDocumentViewModel`의 `scheduleAutosave`·`performSave`·`write`, Android `HwpViewModel` 자동 저장): 편집·실행 취소·다시 실행·AI 적용 뒤 0.9초(`HWPDocumentViewModel.autosaveDelay`) 동안 더 편집이 없으면 저장한다. 나갈 때와 앱이 백그라운드로 갈 때(`scenePhase` `.background`, 화면이 사라질 때도 `flushAutosave`)는 문서 위 편집을 먼저 끝내고 바로 저장하며, 이 저장은 UIKit 백그라운드 작업(`DocumentBackgroundSave.run`, `beginBackgroundTask`/`endBackgroundTask` — 저장이 끝나거나 시스템이 시간 만료를 알리면 끝냄) 안에서 돈다.
+- 원본 보기에서 문서 위에 입력 중인 문단(`HWPInlineEditingSession`)도 입력·서식·입력칸 실행 취소가 멈추고 0.9초 뒤 자동 저장한다(`onDraftChange` → `inlineDraftChanged`, `autosaveDraft`를 `inlineDraft`로 읽음). 확정할 때와 같은 자리에 넣어(`HWPBlockEditing.committing`) 파일에만 쓰고, 편집은 끝내지 않으며 커서·입력칸 실행 취소·문서 실행 취소 기록은 그대로다(확정할 때 실행 취소 한 단계가 된다). 파일에 들어간 입력 중 문단은 `savedDraft`로 기억해, 그 문단이 확정·변경되거나 실행 취소로 사라지면 기록이 저장 때와 같아도 다시 "수정됨"이 되어 저장한다. IME가 조합 중(marked text)이면 그 문단은 건너뛰고 다음 변경 때 다시 저장한다. 조합 중에 다른 변경을 저장할 때는 그 문단을 파일에 이미 들어간 입력(`savedDraft`)으로 두어, 더 오래된 글로 되돌려 쓰지 않는다. HWPX는 HWPX로, 바로 편집하는 HWP는 원본 HWP 형식(`HWP5DocumentRewriter`)으로 원본 파일에 쓴다.
 - 한 번에 하나만 저장한다. 저장 중에 들어온 저장 요청은 앞 저장이 끝난 뒤 남은 변경을 쓰고, 자동 저장 중에도 편집은 계속된다(`isAutosaving`은 화면을 잠그지 않는다). 저장 중에 한 편집은 문서를 "수정됨"으로 남겨 다음 저장에 쓴다. 표·그림처럼 엔진이 파일을 다시 만드는 편집이 진행 중이면(`isSaving`) 자동 저장은 한 번 더 기다린다.
 - 저장해도 실행 취소·다시 실행 기록과 선택·편집 중인 문단은 그대로다. 저장은 연 문서(패키지·HWP 원본)에 지금 문단을 적용해 쓰고, 어느 기록 단계까지 썼는지(`savedHistoryIDs`)를 기억해 그 뒤 편집·실행 취소면 다시 "수정됨"이 된다.
 - 상태 줄(`statusBar`): 왼쪽에 마지막 상태 문구, 오른쪽에 저장 상태(`saveStateText`) — 자동 저장 중이면 "자동 저장 중…", 쓰지 않은 변경이 있으면 "수정됨", 다 썼으면 "자동 저장됨". 저장 상태는 보이기만 하고 읽어 주지 않는다(상태 줄에 초점이 가면 함께 읽음). 저장 실패는 상태 문구로 바꾸고 VoiceOver로 알린다(`saveFailure`): "자동 저장하지 못했습니다: 이유"(이 문서에 저장은 "저장하지 못했습니다: 이유").
@@ -235,7 +236,7 @@
 
 **Android와 다른 곳:**
 - 변환한 HWP의 첫 저장 위치를 iPadOS는 시스템 저장 위치 선택으로 사용자가 고르고(엑셀 XLS 변환과 같은 흐름), 그 전에는 자동 저장하지 않는다. Android는 첫 자동 저장 때 `Documents/VisionCraft`에 새 HWPX를 만든다. 원본에 쓸 수 없을 때 복사본으로 저장하는 Android 동작은 iPadOS에 없다(실패로 알린다).
-- iPadOS 상태 줄은 쓰지 않은 변경이 있으면 "수정됨"을 보인다(Android는 저장 중·저장됨만). `이 문서에 저장`이 쓰는 동안 iPadOS는 편집을 잠근다.
+- iPadOS 상태 줄은 쓰지 않은 변경이 있으면 "수정됨"을 보인다(Android는 저장 중·저장됨만). 문서 위에 입력 중인 문단을 iPadOS는 확정 전에도 자동 저장하고, Android는 확정(`commitInline`)하거나 화면이 멈출 때만 저장한다. `이 문서에 저장`이 쓰는 동안 iPadOS는 편집을 잠근다.
 
 ## AI 문서 선택
 

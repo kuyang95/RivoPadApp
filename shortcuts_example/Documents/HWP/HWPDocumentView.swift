@@ -40,6 +40,15 @@ final class HWPDocumentViewModel: ObservableObject {
         let message: String
     }
 
+    /// The 원본 editor's paragraph being typed and not yet committed (`HWPInlineEditingSession.autosaveDraft`).
+    enum InlineDraft: Equatable {
+        /// No editing session, or nothing typed in it.
+        case none
+        /// The IME is composing in paragraph `id`: no snapshot now.
+        case composing(String)
+        case typed(HWPDocumentBlock)
+    }
+
     /// Autosave waits this long after the last edit, undo or AI apply (Android `AUTOSAVE_DELAY_MS`).
     static let autosaveDelay: Duration = .milliseconds(900)
 
@@ -51,6 +60,12 @@ final class HWPDocumentViewModel: ObservableObject {
     @Published private(set) var isAutosaving = false
     @Published private(set) var saveState = SaveState.idle
     @Published private(set) var saveFailure: SaveFailure?
+    /// The 원본 editor changed its draft since the last write (`inlineDraftChanged`).
+    @Published private(set) var hasUnsavedInlineDraft = false
+    /// Set by the screen: the 원본 editor's draft, written by autosave together with the
+    /// document while the editor stays open. The draft joins the history only when committed.
+    var inlineDraft: (() -> InlineDraft)?
+    private var inlineDraftRevision = 0
     @Published private(set) var isLegacyReadOnly = false
     @Published private(set) var isLegacyDocument = false
     @Published private(set) var requiresSaveAs = false
@@ -78,6 +93,10 @@ final class HWPDocumentViewModel: ObservableObject {
     /// The history steps the file holds: `[]` is the file as opened, nil a document never written
     /// (a converted HWP). Edits differ from it, so undo and redo stay across saves.
     private var savedHistoryIDs: [UUID]? = []
+    /// The 원본 editor's uncommitted paragraph the file also holds, written by a draft autosave.
+    /// The file then matches the history only while that same draft is still open: once it is
+    /// committed, changed or undone away, the document needs saving again.
+    private var savedDraft: HWPDocumentBlock?
     private var exportedHistoryIDs: [UUID]?
     /// Another app changed the file: nothing more is written to it automatically.
     private var changedElsewhere = false
@@ -212,6 +231,7 @@ final class HWPDocumentViewModel: ObservableObject {
             // chosen on 이 문서에 저장 (`adoptSavedCopy`), and autosaves there after that.
             requiresSaveAs = true
             savedHistoryIDs = nil
+            savedDraft = nil
             updateHistoryState()
             status = AppLocalization.string(
                 "HWP 본문을 HWPX 편집본으로 변환했습니다. 원본 HWP는 변경하지 않습니다."
@@ -989,9 +1009,21 @@ final class HWPDocumentViewModel: ObservableObject {
         commitEditorChange()
         cancelAutosaveDebounce()
         guard !discarded else { return false }
-        guard hasUnsavedChanges || writeTask != nil else { return true }
+        guard needsSave || writeTask != nil else { return true }
         guard await performSave(automatic: true) else { return false }
-        return !hasUnsavedChanges
+        return !needsSave
+    }
+
+    /// Something is not in the file yet: a history step, or the 원본 editor's open draft.
+    var needsSave: Bool { hasUnsavedChanges || hasUnsavedInlineDraft }
+
+    /// The 원본 editor's draft changed (typing, formatting, its own undo): autosave it after the
+    /// pause, together with the document, without ending the editing session.
+    func inlineDraftChanged() {
+        inlineDraftRevision &+= 1
+        if !hasUnsavedInlineDraft { hasUnsavedInlineDraft = true }
+        if saveState == .saved { saveState = .idle }
+        scheduleAutosave()
     }
 
     /// 나가기: true when the screen can close; false asks 계속 편집 / 변경 내용 버리기.
@@ -1018,7 +1050,7 @@ final class HWPDocumentViewModel: ObservableObject {
 
     private func scheduleAutosave() {
         cancelAutosaveDebounce()
-        guard let delay = autosaveDelay, canAutosave, hasUnsavedChanges else { return }
+        guard let delay = autosaveDelay, canAutosave, needsSave else { return }
         autosaveDebounceTask = Task { [weak self] in
             do { try await Task.sleep(for: delay) } catch { return }
             guard let self, !Task.isCancelled else { return }
@@ -1034,7 +1066,7 @@ final class HWPDocumentViewModel: ObservableObject {
     @discardableResult
     private func performSave(automatic: Bool) async -> Bool {
         while let running = writeTask { _ = await running.value }
-        guard hasUnsavedChanges else { return true }
+        guard needsSave else { return true }
         // The task clears itself, so a waiter never finds a finished save still listed.
         let task = Task {
             let succeeded = await self.write(automatic: automatic)
@@ -1043,7 +1075,8 @@ final class HWPDocumentViewModel: ObservableObject {
         }
         writeTask = task
         let succeeded = await task.value
-        if succeeded, hasUnsavedChanges { scheduleAutosave() }
+        // Also retries a draft that was still composing.
+        if succeeded, needsSave { scheduleAutosave() }
         return succeeded
     }
 
@@ -1052,6 +1085,33 @@ final class HWPDocumentViewModel: ObservableObject {
         if automatic, changedElsewhere {
             status = DocumentFileAccessError.documentChanged.localizedDescription
             return false
+        }
+        // The 원본 editor's draft goes into this write as committing it would place it
+        // (`commitInlineBlock`), but stays out of `blocks` and the history until it is committed.
+        let draft = inlineDraft?() ?? .none
+        let draftRevision = inlineDraftRevision
+        var draftComposing = false
+        var writtenDraft: HWPDocumentBlock?
+        var editedBlocks = blocks
+        let draftBlock: HWPDocumentBlock?
+        switch draft {
+        case .none:
+            draftBlock = nil
+        case .composing(let id):
+            draftComposing = true
+            // Only the composing draft is new: nothing to write yet.
+            if !hasUnsavedChanges { return true }
+            // Other changes are written, but that paragraph keeps the draft the file already
+            // holds: a write never puts back an older version of it while the IME composes.
+            draftBlock = savedDraft?.id == id ? savedDraft : nil
+        case .typed(let block):
+            draftBlock = block
+        }
+        if let draftBlock, isEditableDocument,
+           let original = blocks.first(where: { $0.id == draftBlock.id }),
+           original.isEditable, original != draftBlock {
+            editedBlocks = HWPBlockEditing.committing(draftBlock, in: blocks, layouts: pageLayouts)
+            writtenDraft = draftBlock
         }
         if automatic {
             isAutosaving = true
@@ -1066,7 +1126,6 @@ final class HWPDocumentViewModel: ObservableObject {
         defer { if automatic { isAutosaving = false } else { isSaving = false } }
         // What this save writes; the file keeps the opened package (or HWP) as its base, so the
         // history and the editor are untouched by it.
-        let editedBlocks = blocks
         let historyIDs = undoStack.map(\.id)
         let destination = fileURL
         let writeContents = writeContents
@@ -1091,8 +1150,10 @@ final class HWPDocumentViewModel: ObservableObject {
             }.value
             fileSnapshot = data
             savedHistoryIDs = historyIDs
+            savedDraft = writtenDraft
+            if !draftComposing, inlineDraftRevision == draftRevision { hasUnsavedInlineDraft = false }
             updateHistoryState()
-            saveState = hasUnsavedChanges ? .idle : .saved
+            saveState = needsSave ? .idle : .saved
             if let originalDocumentID {
                 try? await recentDocuments.refreshBookmark(id: originalDocumentID, fileURL: destination)
             }
@@ -1155,6 +1216,7 @@ final class HWPDocumentViewModel: ObservableObject {
         // without an original destination can become clean after export.
         if requiresSaveAs, let exportedHistoryIDs, exportedHistoryIDs == undoStack.map(\.id) {
             savedHistoryIDs = exportedHistoryIDs
+            savedDraft = nil
             updateHistoryState()
         }
         status = AppLocalization.string("문서 복사본을 내보냈습니다.")
@@ -1177,6 +1239,7 @@ final class HWPDocumentViewModel: ObservableObject {
             requiresSaveAs = false
             originalDocumentID = try? await recentDocuments.register(fileURL: url).id
             savedHistoryIDs = exportedHistoryIDs
+            savedDraft = nil
             updateHistoryState()
             saveState = hasUnsavedChanges ? .idle : .saved
             status = AppLocalization.string("HWPX 문서에 저장했습니다.")
@@ -1290,9 +1353,17 @@ final class HWPDocumentViewModel: ObservableObject {
     private func updateHistoryState() {
         canUndo = !undoStack.isEmpty
         canRedo = !redoStack.isEmpty
-        let changed = savedHistoryIDs.map { undoStack.map(\.id) != $0 } ?? true
+        var changed = savedHistoryIDs.map { undoStack.map(\.id) != $0 } ?? true
+        if !changed, let savedDraft {
+            switch inlineDraft?() ?? .none {
+            case .typed(let open): changed = open != savedDraft
+            // Composing in that paragraph: the file keeps its draft; the next change saves the rest.
+            case .composing(let id): changed = id != savedDraft.id
+            case .none: changed = true
+            }
+        }
         if hasUnsavedChanges != changed { hasUnsavedChanges = changed }
-        if changed {
+        if needsSave {
             if saveState == .saved { saveState = .idle }
             scheduleAutosave()
         } else {
@@ -1571,6 +1642,9 @@ struct HWPDocumentView: View {
         .visionCraftHandlesBackNavigation()
         .toolbar(.hidden, for: .navigationBar)
         .task {
+            // Autosave reads the 원본 editor's open draft without ending it.
+            viewModel.inlineDraft = { [weak originalEditor] in originalEditor?.autosaveDraft() ?? .none }
+            originalEditor.onDraftChange = { [weak viewModel] in viewModel?.inlineDraftChanged() }
             await viewModel.load()
         }
         .fullScreenCover(
@@ -1688,13 +1762,14 @@ struct HWPDocumentView: View {
         }
         .onDisappear {
             originalEditor.finish()
-            Task { await viewModel.flushAutosave() }
+            DocumentBackgroundSave.run(named: "HWP autosave") { await viewModel.flushAutosave() }
         }
         .onChange(of: scenePhase) { _, phase in
-            // Going to the background writes the edits, as Android saves on `onStop`.
+            // Going to the background writes the edits, as Android saves on `onStop`; a
+            // background task lets the write finish once the app is no longer on screen.
             guard phase == .background else { return }
             originalEditor.finish()
-            Task { await viewModel.flushAutosave() }
+            DocumentBackgroundSave.run(named: "HWP autosave") { await viewModel.flushAutosave() }
         }
         .onChange(of: viewModel.saveFailure) { _, failure in
             // Save states stay quiet on the status line; a failed save is read out.
@@ -3556,7 +3631,7 @@ struct HWPDocumentView: View {
     private var saveStateText: String? {
         guard viewModel.isEditableDocument else { return nil }
         if viewModel.isAutosaving { return AppLocalization.string("자동 저장 중…") }
-        if viewModel.hasUnsavedChanges { return AppLocalization.string("수정됨") }
+        if viewModel.needsSave { return AppLocalization.string("수정됨") }
         if viewModel.saveState == .saved { return AppLocalization.string("자동 저장됨") }
         return nil
     }
@@ -3676,7 +3751,9 @@ struct HWPDocumentView: View {
             // could not run (another app's change, a converted HWP without its file yet).
             isLeaving = true
             Task {
-                let canLeave = await viewModel.prepareToLeave()
+                let canLeave = await DocumentBackgroundSave.run(named: "HWP leave") {
+                    await viewModel.prepareToLeave()
+                }.value
                 isLeaving = false
                 if canLeave { dismiss() } else { showsDiscardConfirmation = true }
             }

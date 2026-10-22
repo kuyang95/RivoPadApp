@@ -31,6 +31,10 @@ final class HWPInlineEditingSession: ObservableObject {
     @Published private(set) var hasMixedSize = false
     @Published private(set) var canUndo = false
     @Published private(set) var canRedo = false
+    /// Called on every change to the typed paragraph (text or format), so the document can
+    /// autosave the draft after a pause without ending this editing session. Not published:
+    /// a keystroke must not redraw the screen.
+    var onDraftChange: (() -> Void)?
     private var applyingFormatting = false
     private var pendingTyping: (range: NSRange, attributes: [NSAttributedString.Key: Any])?
     private var publishBlock: ((HWPDocumentBlock) -> Void)?
@@ -161,7 +165,19 @@ final class HWPInlineEditingSession: ObservableObject {
         draft = text
         let changed = text != activation.block.text || !HWPDocumentFormatting.matches(currentBlock(), activation.block)
         if hasChanges != changed { hasChanges = changed }
+        onDraftChange?()
         schedulePreview()
+    }
+
+    /// The paragraph as typed so far, for autosave: read only, so the input view, its
+    /// selection, its undo and the composition are untouched. While the IME is composing
+    /// (marked text), nothing is taken; the next change asks again.
+    func autosaveDraft() -> HWPDocumentViewModel.InlineDraft {
+        guard let activation else { return .none }
+        if inputView?.markedTextRange != nil { return .composing(activation.block.id) }
+        guard hasChanges else { return .none }
+        let block = currentBlock()
+        return block == activation.block ? .none : .typed(block)
     }
 
     private func schedulePreview() {
