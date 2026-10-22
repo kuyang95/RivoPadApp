@@ -203,6 +203,9 @@
 - 이미지·차트 등(`ExcelSheetImageManagerView`): 시트에 이 화면이 다루지 않는 그리기 개체가 있으면 맨 위에 "그 밖의 개체 N개는 그대로 둡니다."(`ExcelDrawingManagerNotice.otherObjects`, 엔진 `otherDrawingObjectCount`). 이미지 줄 동작 메뉴에 `이미지 설정`, 차트 줄 동작 메뉴에 `위치와 크기`가 있어 개체 설정(`ExcelDrawingInspector`: 이미지는 개체 이름·이미지 설명·교체, 차트는 차트 설정, 모두 `위치와 크기`의 왼쪽 위 기준 셀·오른쪽 아래 경계 셀·`위치 적용`)을 연다.
 - 나갈 때·백그라운드 저장: 뒤로 버튼과 앱이 활성 상태를 벗어날 때(`scenePhase`가 `.active`가 아닐 때) 하는 `ExcelWorkbookViewModel.flushAutosave`는 UIKit 백그라운드 작업(`DocumentBackgroundSave.run`, 저장이 끝나거나 시스템이 시간 만료를 알리면 끝냄) 안에서 돌아, 앱이 화면에서 벗어나도 저장을 마친다.
 
+**Android와 다른 곳:**
+- 원본 파일에 쓸 수 없을 때 Android는 `Documents/VisionCraft`에 복사본을 만들어 "원본에 쓸 수 없어 복사본을 저장했습니다: 경로"를 알리고 그다음 저장은 그 파일에 한다(한글 문서와 같다). iPadOS에는 이 동작이 없다(자동 저장 실패로 알린다).
+
 ## 한글 문서
 
 파일: `Documents/HWP/HWPDocumentView.swift`(`HWPDocumentView`·`HWPDocumentViewModel`, 간편 보기 `documentList`·`blockView`·`editorPanel`), `Documents/HWP/HWPAccessibleEditingSheets.swift`(간편 보기 편집 시트), `Documents/HWP/HWPAccessibleTableView.swift`(`HWPAccessibleRowButton`·`HWPAccessibleRowEditor`), 리본 `Documents/HWP/HWPFormattingToolbar.swift` (Android `document/HwpActivity.kt`·`document/HwpViewModel.kt`).
