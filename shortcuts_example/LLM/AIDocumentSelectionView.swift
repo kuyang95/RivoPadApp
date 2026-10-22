@@ -85,6 +85,7 @@ struct AIDocumentSelectionView: View {
                             .frame(maxWidth: .infinity, minHeight: 80)
                     } else {
                         ForEach(filteredDocuments) { item in
+                            let opener = AIDocumentOriginalOpener(pathExtension: item.pathExtension)
                             Button {
                                 Task { await openDocument(item) }
                             } label: {
@@ -107,6 +108,12 @@ struct AIDocumentSelectionView: View {
                                             .visionCraftAndroidText(14)
                                             .foregroundStyle(VisionCraftUI.secondaryText)
                                     }
+                                    if opener != nil {
+                                        // 위에 겹친 열기 버튼 자리.
+                                        Color.clear
+                                            .frame(width: VisionCraftUI.minTouchTarget - 8)
+                                            .accessibilityHidden(true)
+                                    }
                                 }
                                 .foregroundStyle(VisionCraftUI.primaryText)
                                 .padding(16)
@@ -116,6 +123,27 @@ struct AIDocumentSelectionView: View {
                             .buttonStyle(VisionCraftHomePressStyle())
                             .disabled(isImporting)
                             .accessibilityLabel("\(item.name). \(item.relativePath)")
+                            .overlay(alignment: .trailing) {
+                                if let opener {
+                                    Button {
+                                        Task { await openOriginal(item) }
+                                    } label: {
+                                        Image(systemName: opener.systemImage)
+                                            .font(.title3)
+                                            .foregroundStyle(VisionCraftUI.icon)
+                                            .frame(
+                                                width: VisionCraftUI.minTouchTarget,
+                                                height: VisionCraftUI.minTouchTarget
+                                            )
+                                            .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .padding(.trailing, 8)
+                                    .disabled(isImporting)
+                                    .opacity(isImporting ? 0.38 : 1)
+                                    .accessibilityLabel(AppLocalization.string(opener.labelKey))
+                                }
+                            }
                         }
                     }
                 }
@@ -199,6 +227,19 @@ struct AIDocumentSelectionView: View {
         }
     }
 
+    /// 행의 열기 버튼: AI 대화 대신 엑셀 편집기·한글 문서 화면에서 원본을 연다(문서 작업과 같은 경로).
+    private func openOriginal(_ item: AuthorizedDocumentItem) async {
+        isImporting = true
+        defer { isImporting = false }
+        do {
+            let record = try await AuthorizedDocumentLibrary.shared
+                .registerOriginalDocument(relativePath: item.relativePath)
+            appRouter.route = .originalDocument(documentID: record.id)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     private func importForChat(_ url: URL) async {
         isImporting = true
         defer { isImporting = false }
@@ -245,5 +286,25 @@ struct AIDocumentSelectionView: View {
             return
         }
         errorMessage = error.localizedDescription
+    }
+}
+
+/// Android `FileSelectScreen.DocumentFileRow`의 행 끝 아이콘 버튼: xlsx는 엑셀 편집기로,
+/// hwp·hwpx는 한글 문서 화면으로 연다. 다른 형식은 버튼이 없다.
+nonisolated struct AIDocumentOriginalOpener: Equatable {
+    let systemImage: String
+    let labelKey: String
+
+    init?(pathExtension: String) {
+        switch pathExtension.lowercased() {
+        case "xlsx":
+            systemImage = "pencil"
+            labelKey = "aiDocument.openSpreadsheetEditor"
+        case "hwp", "hwpx":
+            systemImage = "book"
+            labelKey = "aiDocument.readHangul"
+        default:
+            return nil
+        }
     }
 }

@@ -2783,3 +2783,5 @@
 "확대" = "拡大";
 "축소" = "縮小";
 "최근 목록 편집" = "最近の項目を編集";
+"aiDocument.openSpreadsheetEditor" = "表計算で編集";
+"aiDocument.readHangul" = "読む";

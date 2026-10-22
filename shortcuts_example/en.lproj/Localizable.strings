@@ -2783,3 +2783,5 @@
 "확대" = "Zoom in";
 "축소" = "Zoom out";
 "최근 목록 편집" = "Edit recent list";
+"aiDocument.openSpreadsheetEditor" = "Edit spreadsheet";
+"aiDocument.readHangul" = "Read";

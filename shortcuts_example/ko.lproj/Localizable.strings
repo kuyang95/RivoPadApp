@@ -1,3 +1,5 @@
 /* Category home menu */
 "home.category.documents" = "문서";
 "home.category.scan" = "문서 스캔";
+"aiDocument.openSpreadsheetEditor" = "엑셀에서 편집";
+"aiDocument.readHangul" = "읽기";
