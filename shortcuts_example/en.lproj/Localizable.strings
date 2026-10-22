@@ -2791,6 +2791,14 @@
 "세로 이동" = "Vertical Offset";
 "농도" = "Opacity";
 "단 사이" = "Column Spacing";
+"그림: %@" = "Image: %@";
+"계열: %@" = "Series: %@";
+"막대형 차트" = "Bar chart";
+"꺾은선형 차트" = "Line chart";
+"원형 차트" = "Pie chart";
+"영역형 차트" = "Area chart";
+"분산형 차트" = "Scatter chart";
+"방사형 차트" = "Radar chart";
 "%lld/%lld페이지" = "Page %lld of %lld";
 "확대" = "Zoom in";
 "축소" = "Zoom out";

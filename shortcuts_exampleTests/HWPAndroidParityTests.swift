@@ -69,8 +69,8 @@ final class HWPAndroidParityTests: XCTestCase {
         var node = try await element(in: window) { $0.identifier == identifier }
         XCTAssertTrue(node.accessibilityTraits.contains(.button))
         XCTAssertFalse(node.accessibilityTraits.contains(.selected))
-        // Read by kind without a description, as on Android.
-        XCTAssertEqual(node.accessibilityLabel, expectedLabel(object), "description, else 그림")
+        // Read as Android reads a picture: "그림: <설명>", else "그림".
+        XCTAssertEqual(node.accessibilityLabel, expectedLabel(object), "그림: description, else 그림")
         XCTAssertTrue(names(node).isEmpty, "\(names(node))")
         XCTAssertTrue(node.accessibilityActivate())
         XCTAssertEqual(selections, 1)
@@ -219,7 +219,10 @@ final class HWPAndroidParityTests: XCTestCase {
     }
 
     private func expectedLabel(_ object: HWPDocumentCanvasObject) -> String {
-        if let description = object.description, !description.isEmpty { return description }
+        // Android `objectText`: "그림: <설명>", else "그림".
+        if let description = object.description?.trimmingCharacters(in: .whitespacesAndNewlines), !description.isEmpty {
+            return AppLocalization.format("그림: %@", description)
+        }
         return AppLocalization.string("그림")
     }
 

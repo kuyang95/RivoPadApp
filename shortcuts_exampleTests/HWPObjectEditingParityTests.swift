@@ -3,7 +3,7 @@ import XCTest
 @testable import shortcuts_example
 
 /// HWP object editing carried over from Android: polygon and connector point editing (`HwpPathPoints`)
-/// and the notices saying why 적용 is dimmed (`HwpRangeNotice`).
+/// the notices saying why 적용 is dimmed (`HwpRangeNotice`) and the objects' VoiceOver labels (`objectText`).
 @MainActor
 final class HWPObjectEditingParityTests: XCTestCase {
     private var previousLanguage: String?
@@ -135,5 +135,51 @@ final class HWPObjectEditingParityTests: XCTestCase {
         let narrow = HWPRangeProblems.columns(count: 4, gapPoints: 144, layouts: layouts)
         XCTAssertEqual(narrow.problems, ["단 너비가 너무 좁습니다. 단 수나 단 사이를 줄여 주세요."])
         XCTAssertFalse(narrow.showsHelp)
+    }
+
+    // MARK: Object labels on the 원본 pages (Android `HwpPageText.objectText`)
+
+    private func object(_ content: HWPDocumentCanvasContent, description: String? = nil) -> HWPDocumentCanvasObject {
+        HWPDocumentCanvasObject(id: "object",
+            placement: HWPDocumentObjectPlacement(xPoints: 0, yPoints: 0, widthPoints: 100, heightPoints: 80),
+            content: content, description: description)
+    }
+
+    private func image(description: String?) -> HWPDocumentImage {
+        HWPDocumentImage(id: "image", binaryID: 1, data: Data(), widthPoints: 100, heightPoints: 80,
+            description: description)
+    }
+
+    func testPicturesReadAsPictureWithTheirDescription() {
+        XCTAssertEqual(HWPCanvasObjectLabel.text(object(.image(image(description: nil))), hasText: false), "그림")
+        XCTAssertEqual(HWPCanvasObjectLabel.text(object(.image(image(description: nil)), description: "회사 로고"),
+            hasText: false), "그림: 회사 로고")
+        XCTAssertEqual(HWPCanvasObjectLabel.text(object(.image(image(description: " 지도 "))), hasText: false),
+            "그림: 지도", "The picture's own description when the object has none")
+    }
+
+    func testChartsReadTheirKindTitleAndSeries() {
+        let chart = HWPDocumentChart(kind: .bar, title: "월별 매출", categories: ["1월", "2월"],
+            series: [.init(id: "a", name: "2025", values: [1, 2]), .init(id: "b", name: " ", values: [3, 4]),
+                     .init(id: "c", name: "2026", values: [5, 6])])
+        XCTAssertEqual(HWPCanvasObjectLabel.text(object(.chart(chart), description: "설명"), hasText: false),
+            "막대형 차트. 월별 매출. 계열: 2025, 2026")
+        let untitled = HWPDocumentChart(kind: .unknown, title: nil, categories: [], series: [])
+        XCTAssertEqual(HWPCanvasObjectLabel.text(object(.chart(untitled), description: "판매 추이"), hasText: false),
+            "차트. 판매 추이", "No title: the description")
+        XCTAssertEqual(HWPCanvasObjectLabel.text(object(.chart(untitled)), hasText: false), "차트")
+        let pie = HWPDocumentChart(kind: .pie, title: nil, categories: [], series: [])
+        XCTAssertEqual(HWPCanvasObjectLabel.text(object(.chart(pie)), hasText: false), "원형 차트")
+    }
+
+    func testOtherObjectsKeepTheirLabels() {
+        let equation = HWPDocumentEquation(script: "a+b", fontSizePoints: 10, colorRGB: 0, baselinePercent: 85,
+            fontName: nil)
+        XCTAssertEqual(HWPCanvasObjectLabel.text(object(.equation(equation), description: "덧셈"), hasText: false),
+            "수식 a+b", "An equation reads its script, as on Android")
+        XCTAssertEqual(HWPCanvasObjectLabel.text(object(.group([])), hasText: false), "묶음 개체")
+        XCTAssertEqual(HWPCanvasObjectLabel.text(object(.group([]), description: "도면"), hasText: false), "도면")
+        XCTAssertEqual(HWPCanvasObjectLabel.text(object(.unsupported("")), hasText: true), "글상자")
+        XCTAssertEqual(HWPCanvasObjectLabel.text(object(.unsupported("")), hasText: false), "한글 문서 개체")
     }
 }

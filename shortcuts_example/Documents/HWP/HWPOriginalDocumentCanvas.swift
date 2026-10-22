@@ -1323,24 +1323,6 @@ private struct HWPDocumentCanvasObjectView: View {
         selection.canSelect(ownerID, object, !textBlocks.isEmpty)
     }
 
-    /// The object's description, else its kind as Android reads it (`HwpPageView` object labels).
-    static func accessibilityLabel(_ object: HWPDocumentCanvasObject, hasText: Bool) -> String {
-        if let description = object.description?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !description.isEmpty { return description }
-        if hasText { return AppLocalization.string("글상자") }
-        switch object.content {
-        case .image: return AppLocalization.string("그림")
-        case .shape: return AppLocalization.string("도형")
-        case .group: return AppLocalization.string("묶음 개체")
-        case .equation(let equation):
-            let script = equation.script.trimmingCharacters(in: .whitespacesAndNewlines)
-            return script.isEmpty ? AppLocalization.string("수식") : AppLocalization.format("수식 %@", script)
-        case .chart: return AppLocalization.string("차트")
-        case .unsupported(let label):
-            return label.isEmpty ? AppLocalization.string("한글 문서 개체") : label
-        }
-    }
-
     private var isGroupChildSelected: Bool {
         guard case .group = object.content else { return false }
         return shapeEditing.selectedID?.hasPrefix(object.id + "#group-child-") == true
@@ -1406,7 +1388,7 @@ private struct HWPDocumentCanvasObjectView: View {
             ownerID: ownerID
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Self.accessibilityLabel(object, hasText: !textBlocks.isEmpty))
+        .accessibilityLabel(HWPCanvasObjectLabel.text(object, hasText: !textBlocks.isEmpty))
         .accessibilityValue(textBlocks.map(\.text).filter { !$0.isEmpty }.joined(separator: "\n"))
         .accessibilityIdentifier("hwp-canvas-object-\(object.id)")
         .modifier(HWPCanvasObjectAccessibility(
@@ -1626,6 +1608,60 @@ private struct HWPDocumentCanvasObjectView: View {
 /// does (again: its settings); a picked picture or shape moves 20 pt 위로·아래로·
 /// 왼쪽으로·오른쪽으로, grows or shrinks 20 pt from its bottom-right corner
 /// (개체 크게·작게), opens 개체 설정, or is let go (선택 해제).
+/// What VoiceOver reads for an object on the 원본 pages, as Android's `HwpPageText.objectText` does: a picture
+/// "그림: <설명>", a chart its kind, title (else description) and "계열: …", an equation its script.
+nonisolated enum HWPCanvasObjectLabel {
+    static func text(_ object: HWPDocumentCanvasObject, hasText: Bool) -> String {
+        let description = [object.description, imageDescription(object)]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
+        switch object.content {
+        case .image:
+            let image = AppLocalization.string("그림")
+            return description.map { AppLocalization.format("그림: %@", $0) } ?? image
+        case .equation(let equation):
+            let script = equation.script.trimmingCharacters(in: .whitespacesAndNewlines)
+            let shown = script.isEmpty ? (description ?? "") : script
+            return shown.isEmpty ? AppLocalization.string("수식") : AppLocalization.format("수식 %@", shown)
+        case .chart(let chart):
+            let title = chart.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let series = chart.series.map(\.name).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            return [
+                kind(chart.kind),
+                title?.isEmpty == false ? title : description,
+                series.isEmpty ? nil : AppLocalization.format("계열: %@", series.joined(separator: ", ")),
+            ].compactMap { $0 }.joined(separator: ". ")
+        case .shape, .group, .unsupported:
+            if let description { return description }
+            if hasText { return AppLocalization.string("글상자") }
+            switch object.content {
+            case .shape: return AppLocalization.string("도형")
+            case .group: return AppLocalization.string("묶음 개체")
+            case .unsupported(let label):
+                return label.isEmpty ? AppLocalization.string("한글 문서 개체") : label
+            default: return AppLocalization.string("한글 문서 개체")
+            }
+        }
+    }
+
+    private static func imageDescription(_ object: HWPDocumentCanvasObject) -> String? {
+        if case .image(let image) = object.content { return image.description }
+        return nil
+    }
+
+    private static func kind(_ kind: HWPDocumentChartKind) -> String {
+        switch kind {
+        case .bar: AppLocalization.string("막대형 차트")
+        case .line: AppLocalization.string("꺾은선형 차트")
+        case .pie: AppLocalization.string("원형 차트")
+        case .area: AppLocalization.string("영역형 차트")
+        case .scatter: AppLocalization.string("분산형 차트")
+        case .radar: AppLocalization.string("방사형 차트")
+        case .unknown: AppLocalization.string("차트")
+        }
+    }
+}
+
 private struct HWPCanvasObjectAccessibility: ViewModifier {
     static let nudgePoints = 20.0
 
