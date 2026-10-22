@@ -185,6 +185,11 @@ struct HWPImageSizeSheet: View {
             effect: effect, transparencyPercent: Int(transparency.rounded()))
         return value.isValid ? value : nil
     }
+    /// Values the document brought outside the engine's range (Android `rangeProblem`): 적용 waits for them.
+    private var rangeProblems: [String] {
+        HWPRangeProblems.image(hasBorder: hasBorder, borderWidth: borderWidth, brightness: brightness,
+            contrast: contrast, transparency: transparency, supportsTransparency: target.supportsTransparency)
+    }
     private var previewImage: UIImage? {
         guard let original = UIImage(data: target.imageData),
               let source = original.cgImage, let crop else { return nil }
@@ -201,6 +206,7 @@ struct HWPImageSizeSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                HWPRangeNotice(problems: rangeProblems)
                 if let previewImage {
                     Section("미리보기") {
                         Image(uiImage: previewImage)
@@ -411,7 +417,8 @@ struct HWPImageSizeSheet: View {
                         dismiss()
                         onApply(.update(crop, dimensions, presentation, appearance))
                     }
-                    .disabled(dimensions == nil || crop == nil || presentation == nil || appearance == nil)
+                    .disabled(dimensions == nil || crop == nil || presentation == nil || appearance == nil
+                        || !rangeProblems.isEmpty)
                 }
             }
             .onAppear {

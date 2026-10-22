@@ -39,6 +39,13 @@ struct HWPColumnSetupSheet: View {
         return .init(settings: settings, sections: sections)
     }
 
+    /// Why 적용 is dimmed for a section the file brought outside 1–4 columns, a 0–144 pt gap or 36 pt columns
+    /// (Android's column setup notice).
+    private var rangeProblems: (problems: [String], showsHelp: Bool) {
+        HWPRangeProblems.columns(count: count, gapPoints: settings.gapPoints,
+            layouts: selection.layouts.filter { sections.contains($0.sectionIndex) })
+    }
+
     private var columnWidthMM: Double {
         let layout = selection.layout
         let content = layout.widthPoints - layout.leftMarginPoints - layout.rightMarginPoints
@@ -49,6 +56,7 @@ struct HWPColumnSetupSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                HWPRangeNotice(problems: rangeProblems.problems, showsHelp: rangeProblems.showsHelp)
                 if selection.layouts.count > 1 {
                     Section {
                         Picker("적용 범위", selection: $allSections) {
@@ -61,6 +69,8 @@ struct HWPColumnSetupSheet: View {
                 Section("단 수") {
                     Picker("단 수", selection: $count) {
                         ForEach(1...4, id: \.self) { Text("\($0)단").tag($0) }
+                        // A count the file brought outside 1–4 is shown as it is until another is chosen.
+                        if !(1...4).contains(count) { Text("\(count)").tag(count) }
                     }
                     .pickerStyle(.segmented)
                     .accessibilityIdentifier("hwp-column-count")

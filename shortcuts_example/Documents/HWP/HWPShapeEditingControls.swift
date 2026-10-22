@@ -310,9 +310,16 @@ struct HWPShapeEditingSheet: View {
         return value.isValid ? value : nil
     }
 
+    /// Values the document brought outside the engine's range (Android `rangeProblem`): 적용 waits for them.
+    private var rangeProblems: [String] {
+        HWPRangeProblems.shape(isGroup: target.isGroup, strokeWidth: strokeWidth, hasShadow: hasShadow,
+            shadowX: shadowX, shadowY: shadowY, shadowOpacity: shadowOpacity)
+    }
+
     var body: some View {
         NavigationStack {
             Form {
+                HWPRangeNotice(problems: rangeProblems)
                 Section("위치") {
                     valueRow("가로 X", text: $x)
                     valueRow("세로 Y", text: $y)
@@ -528,7 +535,7 @@ struct HWPShapeEditingSheet: View {
                         dismiss()
                         onUpdate(layout)
                     }
-                    .disabled(layout == nil)
+                    .disabled(layout == nil || !rangeProblems.isEmpty)
                     .accessibilityIdentifier("hwp-shape-apply")
                 }
             }
