@@ -197,8 +197,17 @@ struct HomeView: View {
         .accessibilityAction(.escape) {
             navigateBackFromCategory()
         }
-        .onChange(of: documentAppearance) { _, value in
-            LocalDocumentAppearanceStore().save(value)
+        // 뷰어·설정 화면이 그 사이 저장한 값을 홈의 옛 스냅샷으로 덮어쓰지 않도록,
+        // 돌아올 때 다시 읽고 바뀐 필드만 얹어 저장한다.
+        .onAppear {
+            documentAppearance = LocalDocumentAppearanceStore().load()
+        }
+        .onChange(of: documentAppearance) { old, value in
+            let merged = LocalDocumentAppearanceStore()
+                .save(changesFrom: old, to: value)
+            if merged != value {
+                documentAppearance = merged
+            }
         }
         .onChange(
             of: selectedTextViewPhotoItem
@@ -892,8 +901,15 @@ struct HomeAllSettingsView: View {
         .tint(VisionCraftUI.primary)
         .toolbar(.hidden, for: .navigationBar)
         .visionCraftHandlesBackNavigation()
-        .onChange(of: documentAppearance) { _, value in
-            LocalDocumentAppearanceStore().save(value)
+        .onAppear {
+            documentAppearance = LocalDocumentAppearanceStore().load()
+        }
+        .onChange(of: documentAppearance) { old, value in
+            let merged = LocalDocumentAppearanceStore()
+                .save(changesFrom: old, to: value)
+            if merged != value {
+                documentAppearance = merged
+            }
         }
     }
 }

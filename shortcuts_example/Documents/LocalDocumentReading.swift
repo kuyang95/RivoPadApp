@@ -121,27 +121,40 @@ nonisolated struct LocalDocumentAppearance:
 final class LocalDocumentAppearanceStore {
     private let defaults: UserDefaults
     private let key: String
+    private let legacyKey: String
+
+    /// 글꼴 표가 10단계에서 20단계로 늘며 작은 글꼴 10단계가 앞에 붙어,
+    /// v1에 저장된 1~10단계는 v2에서 11~20단계에 해당한다.
+    static let fontLevelMigrationOffset = 10
 
     init(
         defaults: UserDefaults = .standard,
         key: String =
+            "LocalDocumentAppearance.v2",
+        legacyKey: String =
             "LocalDocumentAppearance.v1"
     ) {
         self.defaults = defaults
         self.key = key
+        self.legacyKey = legacyKey
     }
 
     func load() -> LocalDocumentAppearance {
-        guard let data =
-                defaults.data(forKey: key),
-              let decoded =
-                try? JSONDecoder().decode(
-                    LocalDocumentAppearance.self,
-                    from: data
-                ) else {
-            return .defaultValue
+        if let current = decode(forKey: key) {
+            return current.normalized()
         }
-        return decoded.normalized()
+        // v1 값은 처음 읽을 때 한 번만 옮기고 지운다.
+        if legacyKey != key,
+           let legacy = decode(forKey: legacyKey) {
+            var migrated = legacy
+            migrated.fontLevel +=
+                Self.fontLevelMigrationOffset
+            let normalized = migrated.normalized()
+            save(normalized)
+            defaults.removeObject(forKey: legacyKey)
+            return normalized
+        }
+        return .defaultValue
     }
 
     func save(
@@ -154,6 +167,46 @@ final class LocalDocumentAppearanceStore {
             return
         }
         defaults.set(data, forKey: key)
+    }
+
+    /// 화면이 들고 있던 스냅샷(`old`)과 새 값(`new`)에서 바뀐 필드만 현재 저장값 위에 얹어
+    /// 저장한다. 다른 화면이 그 사이 저장한 나머지 필드를 옛 스냅샷으로 덮어쓰지 않는다.
+    @discardableResult
+    func save(
+        changesFrom old: LocalDocumentAppearance,
+        to new: LocalDocumentAppearance
+    ) -> LocalDocumentAppearance {
+        var merged = load()
+        if new.fontLevel != old.fontLevel {
+            merged.fontLevel = new.fontLevel
+        }
+        if new.lineHeightLevel != old.lineHeightLevel {
+            merged.lineHeightLevel = new.lineHeightLevel
+        }
+        if new.colorIndex != old.colorIndex {
+            merged.colorIndex = new.colorIndex
+        }
+        if new.showsLineSeparators != old.showsLineSeparators {
+            merged.showsLineSeparators = new.showsLineSeparators
+        }
+        if new.usesSingleLineInLandscape != old.usesSingleLineInLandscape {
+            merged.usesSingleLineInLandscape = new.usesSingleLineInLandscape
+        }
+        let normalized = merged.normalized()
+        save(normalized)
+        return normalized
+    }
+
+    private func decode(
+        forKey key: String
+    ) -> LocalDocumentAppearance? {
+        guard let data = defaults.data(forKey: key) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(
+            LocalDocumentAppearance.self,
+            from: data
+        )
     }
 }
 

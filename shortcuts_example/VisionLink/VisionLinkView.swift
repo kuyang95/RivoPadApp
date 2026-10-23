@@ -1226,6 +1226,9 @@ struct VisionLinkView: View {
             return AppLocalization.string(
                 "새 연결 코드를 만들어 다시 연결할 수 있습니다."
             )
+        case .failed(let message) where !message.isEmpty:
+            // 호환성 실패 등 매니저가 준 이유를 그대로 보여주고 읽는다.
+            return message
         case .disconnected, .failed:
             return AppLocalization.string(
                 "VisionLink의 연결 상태를 확인해주세요."
