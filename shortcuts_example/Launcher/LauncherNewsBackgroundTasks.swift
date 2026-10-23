@@ -11,13 +11,9 @@ enum LauncherNewsBackgroundTasks {
         guard !registered else { return }
         registered = BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: nil) { task in
             let operation = Task { @MainActor in
-                #if DEBUG
                 schedule()
                 let success = await LauncherNewsRefresh.prefetch(revalidate: true)
                 return success && !Task.isCancelled
-                #else
-                return true
-                #endif
             }
             task.expirationHandler = { operation.cancel() }
             Task { task.setTaskCompleted(success: await operation.value) }

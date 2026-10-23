@@ -1,4 +1,3 @@
-#if DEBUG
 import SwiftUI
 
 /// Keep the reader inside the widget without nesting the app's navigation stack.
@@ -43,4 +42,3 @@ struct RatioDaisyWidgetView: View {
         .toolbar(.hidden, for: .navigationBar)
     }
 }
-#endif

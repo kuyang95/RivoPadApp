@@ -1,4 +1,3 @@
-#if DEBUG
 import SwiftUI
 
 /// Shared launcher appearance on every home page; widget colors remain user controlled.
@@ -11,4 +10,3 @@ struct RatioExperience {
     var ink: Color { VisionCraftUI.fixedColor(0x101010) }
     var corner: CGFloat { 8 }
 }
-#endif

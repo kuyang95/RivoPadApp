@@ -1,6 +1,6 @@
 # 영속 데이터 (UserDefaults / App Group / 파일 / Keychain / Assets)
 
-점검일: 2026-10-23 · 기준 코드: `c5865248`+작업 트리 (이지 유튜브 재생 의도·기존 저장소 범위) · 런처 유틸리티 대조: 2026-10-22 `514e00f5`+작업 트리 · 현재 위치 날씨 대조: 2026-10-22 `f56b06f0`+작업 트리 · 타이머 시각 설정 대조: 2026-10-22 `f56b06f0`+작업 트리 · 브라우저 즐겨찾기 대조: 2026-10-22 `f56b06f0`+작업 트리 · 데이지 본문 유지·자원 수명 대조: 2026-10-22 `f56b06f0`+작업 트리 · 즐겨찾기 아이콘 저장 대조: 2026-10-22 `f56b06f0`+작업 트리 · 유튜브 탭 목록 캐시 대조: 2026-10-22 `f56b06f0`+작업 트리 · 현재 페이지 빈자리 우선 추가 대조: 2026-10-23 `f56b06f0`+작업 트리 · 브라우저 광고 차단 설정 대조: 2026-10-23 `f56b06f0`+작업 트리 · 날씨 30분 갱신·큰 글자·원형 새로고침 대조: 2026-10-23 `f56b06f0`+작업 트리 · 전체 페이지 뉴스 위젯 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 다중 언론사 뉴스 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 출처·표본 확대 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 74개 매체 목록 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 선택 분야 수신·HTML 정리 대조: 2026-10-23 `2d5aae7e`+작업 트리
+점검일: 2026-10-23 · 기준 코드: `c5865248`+작업 트리 (쉬운 유튜브 재생 의도·기존 저장소 범위) · 런처 유틸리티 대조: 2026-10-22 `514e00f5`+작업 트리 · 현재 위치 날씨 대조: 2026-10-22 `f56b06f0`+작업 트리 · 타이머 시각 설정 대조: 2026-10-22 `f56b06f0`+작업 트리 · 브라우저 즐겨찾기 대조: 2026-10-22 `f56b06f0`+작업 트리 · 데이지 본문 유지·자원 수명 대조: 2026-10-22 `f56b06f0`+작업 트리 · 즐겨찾기 아이콘 저장 대조: 2026-10-22 `f56b06f0`+작업 트리 · 유튜브 탭 목록 캐시 대조: 2026-10-22 `f56b06f0`+작업 트리 · 현재 페이지 빈자리 우선 추가 대조: 2026-10-23 `f56b06f0`+작업 트리 · 브라우저 광고 차단 설정 대조: 2026-10-23 `f56b06f0`+작업 트리 · 날씨 30분 갱신·큰 글자·원형 새로고침 대조: 2026-10-23 `f56b06f0`+작업 트리 · 전체 페이지 뉴스 위젯 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 다중 언론사 뉴스 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 출처·표본 확대 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 74개 매체 목록 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 선택 분야 수신·HTML 정리 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리
 
 Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 데이터는 전부 **JSON 파일** 또는 **UserDefaults(Codable 인코딩)**.
 
@@ -76,9 +76,9 @@ Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 �
 
 사용자 문서(HWP/HWPX/XLSX/XLS/DOCX/PDF/TXT/EPUB)는 Files 앱에서 직접 열거나(`LocalFileOpening`, `LocalDocumentImportService`) `AuthorizedDocumentLibrary` 가 북마크한 폴더에서 나열 (지원 확장자 `supportedExtensions`, 최대 5,000개 / 깊이 64). 테스트 산출물도 `Documents/` 에 쓴다.
 
-## Debug 접근성 웹 세션
+## 쉬운 브라우저 세션
 
-`Settings/AccessibleWeb/AccessibleWebBrowserModel.swift`는 `WKWebsiteDataStore.nonPersistent()`를 사용한다. 웹 쿠키·로그인·localStorage는 열린 브라우저와 그 팝업 사이에서만 공유하고 디스크에 영속 저장하지 않는다. 화면을 닫고 다시 열면 새 저장소가 생긴다. 주소·방문 내역·색상 통일 여부·팔레트는 화면 메모리에만 둔다. 사용자가 추가한 즐겨찾기와 광고 차단 설정은 별도 UserDefaults 키에 저장한다. 기존 문서용 WebView나 앱의 네이티브 데이터 브리지를 사용하지 않는다.
+`Settings/AccessibleWeb/AccessibleWebBrowserModel.swift`는 일반 브라우저 전용 `WKWebsiteDataStore(forIdentifier:)`(UUID `382B897A-44FB-49CB-9A93-FCDA0D815DB1`)를 사용한다. 웹 쿠키·로그인·localStorage는 위젯·단독 화면·팝업이 공유하고 화면 종료 후에도 유지한다. YouTube는 기존 별도 UUID를 유지한다. 주소·방문 내역·색상 통일 여부·팔레트는 화면 메모리에만 둔다. 사용자가 추가한 즐겨찾기와 광고 차단 설정은 별도 UserDefaults 키에 저장한다. 기존 문서용 WebView나 앱의 네이티브 데이터 브리지를 사용하지 않는다.
 
 ## Keychain
 
@@ -101,7 +101,7 @@ Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 �
 
 ## Ratio 홈 설정
 
-`Launcher/RatioLauncherView.swift`(Debug)의 UserDefaults: `ratio.home.favorites.v1`는 ID 쉼표 목록(기본 magnifier,live,chat,books), `ratio.home.apps.v1`는 앱 이름·URL·UUID 배열의 JSON Data(기본 빈 배열), `ratio.home.textSize.v1`는 Double 28(24~40), `ratio.home.clock.v1`는 Bool false, `ratio.home.icons.v1`는 Bool true. `Assets.xcassets/RatioBlueMist.imageset`는 Android와 같은 Unsplash 사진이며 라이선스는 `Launcher/wallpaper-license.txt`다.
+`Launcher/RatioLauncherView.swift`의 UserDefaults: `ratio.home.favorites.v1`는 ID 쉼표 목록(기본 magnifier,live,chat,books), `ratio.home.apps.v1`는 앱 이름·URL·UUID 배열의 JSON Data(기본 빈 배열), `ratio.home.textSize.v1`는 Double 28(24~40), `ratio.home.clock.v1`는 Bool false, `ratio.home.icons.v1`는 Bool true. `Assets.xcassets/RatioBlueMist.imageset`는 Android와 같은 Unsplash 사진이며 라이선스는 `Launcher/wallpaper-license.txt`다.
 
 `ratio.home.widgets.v2`는 `{id,name,textOnly,columns,rows,textSize,iconOnly?,colorKey?}` 배열 JSON Data다. `widget:search` ID는 검색 위젯이다. v2가 없으면 v1을 디코딩해 기존 검색 크기의 검색 항목을 맨 앞에 추가하고 이전 첫 사각형은 lemon으로 보존한다. 기존 즐겨찾기 마이그레이션도 검색 항목을 포함한다. v2 빈 배열·검색 삭제를 보존한다. `ratio.home.searchColumns.v1`·`ratio.home.searchRows.v1`는 이전 검색 크기 이관용이다. `ratio.home.apps.v1` 항목에는 선택적 `iconData`(128×128 PNG Data)를 저장하며 기존 아이콘 없는 항목도 디코딩된다. PhotosPicker로 선택한 이미지에만 접근한다.
 
@@ -109,23 +109,23 @@ Ratio v2 위젯은 선택적인 `iconText`를 추가 저장한다(기본 false, 
 
 텍스트 바로가기 공통 글자 크기는 `ratio.home.shortcutTextSize.v1`에 저장한다. 기본 36, UI 범위 24~56, 증감 4. 기존 위젯별 textSize는 호환용으로 보존하지만 표시에는 사용하지 않는다. 저장된 공통 값이 없으면 개별 값과 무관하게 36으로 표시한다.
 
-Ratio 브라우저 위젯 ID `widget:browser`(Android kind BROWSER, iPad ID)는 전체 페이지로 표시한다. 과거 columns·rows는 호환 데이터로 보존하며 실제 렌더링 높이에는 사용하지 않는다. URL·쿠키·입력은 기존 임시 웹 세션에 속한다.
+Ratio 브라우저 위젯 ID `widget:browser`(Android kind BROWSER, iPad ID)는 전체 페이지로 표시한다. 과거 columns·rows는 호환 데이터로 보존하며 실제 렌더링 높이에는 사용하지 않는다. URL·입력·스크롤은 열린 화면의 세션에 속하며 쿠키·로그인은 전용 영속 웹 저장소를 공유한다.
 
 Ratio 데이지 위젯 ID `widget:daisy`(Android kind DAISY)는 전체 페이지다. 배치 외 책·진행·보기 데이터는 기존 독서 저장소를 공유한다. 페이지 이동 중의 본문·스크롤은 세션 메모리에만 유지하고 영속 저장 키는 추가하지 않는다.
 
-## Debug 이지 유튜브 저장소
+## 쉬운 유튜브 저장소
 
 `AccessibleWebBrowserModel(easyYouTube: true)`는 `WKWebsiteDataStore(forIdentifier:)`와 고정 UUID `6492E698-D7FC-4721-9F45-A2EC60B94889`를 사용한다. YouTube 로그인·사이트 저장소를 다음 진입에도 유지하며 `.default()`·문서 웹뷰·일반 접근성 웹의 `.nonPersistent()` 저장소와 공유하지 않는다.
 
 비밀번호·쿠키를 네이티브 코드에서 읽거나 기존 임시 브라우저 로그인 정보를 복사하지 않는다. 로그아웃은 YouTube의 로그인 서비스에서 처리한다. 주소·추천 목록·별도 화면 모드 설정을 앱 저장소에 추가하지 않는다.
 
-이지 유튜브 로그인 배경은 기본 이미지 생성 도구로 만든 투명 재생 타일이다. Android Debug 원본 `easy-youtube-login.webp`와 같은 바이트를 `easy-youtube.js`·iPad의 `EasyYouTubePage.source`에 data URL로 포함한다. 다운로드나 사용자 저장소 키를 추가하지 않으며 별도 이미지 파일을 Release 에셋에 추가하지 않는다. 배경을 바꾸면 두 스크립트의 내장 이미지도 함께 갱신한다. 생성 프롬프트는 `docs/design/easy-youtube-login-art.json`에 둔다.
+쉬운 유튜브 로그인 배경은 기본 이미지 생성 도구로 만든 투명 재생 타일이다. Android 번들 원본 `easy-youtube-login.webp`와 같은 바이트를 `easy-youtube.js`·iPad의 `EasyYouTubePage.source`에 data URL로 포함한다. 다운로드나 사용자 저장소 키를 추가하지 않으며 별도 이미지 파일을 Release 에셋에 추가하지 않는다. 배경을 바꾸면 두 스크립트의 내장 이미지도 함께 갱신한다. 생성 프롬프트는 `docs/design/easy-youtube-login-art.json`에 둔다.
 
 ### 전체 페이지 위젯의 최초 배치
 
-UserDefaults `ratio.home.fullPageWidgets.v1`는 Int(기본 0)다. 첫 Ratio 홈 진입 때 `installFullPageWidgets`로 일반 바로가기를 그대로 보존하고 이지 유튜브·이지 브라우저·데이지를 뒤에 한 번 추가한 뒤 1로 기록한다. 이후 사용자 제거·순서·빈 목록은 보존한다. 새 ID는 `widget:youtube`이며 기존 `ratio.home.widgets.v2` JSON Data 배열에 함께 저장한다. 과거 브라우저·데이지 rows는 데이터 호환용으로 유지하며 현재 표시 높이는 페이지 가용 높이다. 이지 유튜브 쿠키는 기존 영속 WKWebsiteDataStore를 공유하고 브라우저는 비영속 저장소를 유지한다.
+UserDefaults `ratio.home.fullPageWidgets.v1`는 Int(기본 0)다. 첫 Ratio 홈 진입 때 `installFullPageWidgets`로 일반 바로가기를 그대로 보존하고 쉬운 유튜브·쉬운 브라우저·데이지를 뒤에 한 번 추가한 뒤 1로 기록한다. 이후 사용자 제거·순서·빈 목록은 보존한다. 새 ID는 `widget:youtube`이며 기존 `ratio.home.widgets.v2` JSON Data 배열에 함께 저장한다. 과거 브라우저·데이지 rows는 데이터 호환용으로 유지하며 현재 표시 높이는 페이지 가용 높이다. 쉬운 유튜브 쿠키는 기존 영속 WKWebsiteDataStore를 공유하고 브라우저도 모드 전용 영속 저장소를 공유한다.
 
-### 이지 유튜브의 탭 내 재생 의도
+### 쉬운 유튜브의 탭 내 재생 의도
 
 YouTube 페이지의 `sessionStorage` 키 `rivo.youtube.playback.v1`은 사용자가 누른 일반 영상/쇼츠의 화면 이동을 연결한다. 종류(`watch`/`shorts`), 공개 영상 ID·제목(일반 영상), 생성 시각만 담는다. 2분이 지난 값은 재생 의도로 사용하지 않는다. 일반 영상 값은 재생창을 열 때 소비하고 쇼츠 값은 같은 탭의 연속 이동에 사용하며 뒤로/채널 이동 때 지운다. 쿠키·비밀번호·계정 식별자는 읽거나 복사하지 않는다. 네이티브 앱 저장소 키를 추가하지 않으며 댓글·채널 목록도 앱에 저장하지 않는다.
 
@@ -145,9 +145,9 @@ UserDefaults `browser.favorites.v1`은 `{name,url,icon?}` 배열 JSON Data다. `
 
 즐겨찾기 `icon`은 사이트에서 읽은 이미지를 긴 변 96px 이하 PNG로 변환한 `data:image/png;base64,...` 문자열이다. 필드가 없는 기존 자료는 이전 첫 글자 아이콘으로 표시한다. 주소만 입력하면 사이트 이름을 자동 추출하고 실패 시 도메인을 저장한다. 원본 HTML·외부 이미지 URL·쿠키는 저장하지 않으며 기본 네 사이트 아이콘은 기존 로컬 기호를 사용한다.
 
-이지 유튜브 목록 복원은 YouTube 탭의 sessionStorage `rivo.youtube.feed.v1`에 저장한다. `{routes,lastSeen,needsRefresh?}`이며 routes는 최대 4개 경로의 `{route,section,scroll,items}`이고 items는 최대 120개 공개 영상 카드 정보다(영상 ID·제목·썸네일 URL·길이·보조 문구). 이미지 바이트·DOM·댓글·채널 본문·쿠키·계정 식별자를 저장하지 않는다. 현재 표시 목록만 DOM 카드로 만들고 나머지는 텍스트 메타데이터로 보관한다. 네이티브 페이지 활성·앱 생명주기와 웹 문서 가시성으로 30분 비활성을 판단하고, 영상을 보는 동안에는 사용 시각을 최대 15초 간격으로 갱신한다. 홈 목록 수동 새로고침·30분 비활성·로그아웃 확인 때 목록을 비우며, 영상에서 뒤로 돌아오는 동작은 기존 자료를 유지한다. 네이티브 앱 저장 키는 추가하지 않는다.
+쉬운 유튜브 목록 복원은 YouTube 탭의 sessionStorage `rivo.youtube.feed.v1`에 저장한다. `{routes,lastSeen,needsRefresh?}`이며 routes는 최대 4개 경로의 `{route,section,scroll,items}`이고 items는 최대 120개 공개 영상 카드 정보다(영상 ID·제목·썸네일 URL·길이·보조 문구). 이미지 바이트·DOM·댓글·채널 본문·쿠키·계정 식별자를 저장하지 않는다. 현재 표시 목록만 DOM 카드로 만들고 나머지는 텍스트 메타데이터로 보관한다. 네이티브 페이지 활성·앱 생명주기와 웹 문서 가시성으로 30분 비활성을 판단하고, 영상을 보는 동안에는 사용 시각을 최대 15초 간격으로 갱신한다. 홈 목록 수동 새로고침·30분 비활성·로그아웃 확인 때 목록을 비우며, 영상에서 뒤로 돌아오는 동작은 기존 자료를 유지한다. 네이티브 앱 저장 키는 추가하지 않는다.
 
-일반 이지 브라우저 광고 차단 선택은 Android SharedPreferences `debug_browser_privacy/ad_block_enabled`, iPad UserDefaults `browser.adBlock.enabled` Bool이며 없으면 true다. 광고 URL·차단 이력·방문 페이지는 저장하거나 전송하지 않는다. 필터 목록과 CSS는 앱에 번들하며 WebView 기본 프로필·책 저장소·YouTube 로그인 프로필에는 적용하지 않는다. iPad는 WebKit 콘텐츠 규칙 저장소 식별자 `rivo-browser-ads-v1`의 컴파일된 규칙을 재사용한다. 기존 임시 웹 세션과 구분되는 앱 설정이다.
+일반 쉬운 브라우저 광고 차단 선택은 Android SharedPreferences `debug_browser_privacy/ad_block_enabled`, iPad UserDefaults `browser.adBlock.enabled` Bool이며 없으면 true다. 광고 URL·차단 이력·방문 페이지는 저장하거나 전송하지 않는다. 필터 목록과 CSS는 앱에 번들하며 WebView 기본 프로필·책 저장소·YouTube 로그인 프로필에는 적용하지 않는다. iPad는 WebKit 콘텐츠 규칙 저장소 식별자 `rivo-browser-ads-v1`의 컴파일된 규칙을 재사용한다. 기존 임시 웹 세션과 구분되는 앱 설정이다.
 
 ### 날씨 갱신 수명
 
@@ -164,3 +164,7 @@ UserDefaults `browser.favorites.v1`은 `{name,url,icon?}` 배열 JSON Data다. `
 ### 뉴스 분야와 표시 텍스트
 
 뉴스 목록은 `docs/news_publishers.json`의 74개 매체 등록부에서 확인된 **분야 전용 RSS만** 사용한다. 최신은 별도 전체 RSS를 요청하지 않고 사용자가 고른 분야의 캐시만 합친다. 기본 선택은 사회·경제·문화이고, 상단 ‘뉴스 분야 설정’에서 정치·국제·IT·과학·건강·스포츠·연예를 포함한 9개 분야를 복수 선택해 저장한다(‘IT·과학’은 한 분야). 설정은 재시작 후에도 유지하며 모든 분야를 끄면 안내만 표시하고 수신하지 않는다. 분야 탭도 선택한 것만 표시한다. 현재 사회·경제·문화에는 기존 8개 매체, 정치·국제·스포츠에는 뉴시스·SBS·동아일보, 연예에는 뉴시스·SBS, IT·과학에는 뉴시스·동아일보, 건강에는 동아일보를 연결한다. 뉴시스 IT·바이오와 동아일보 IT·의학은 IT·과학에 포함한다. 매체가 분류한 분야를 따르며 별도의 의미 분류는 하지 않는다. 분야 피드가 없는 매체는 전체/다른 분야로 대체하지 않는다. 전체 피드 주소는 등록부의 참고 자료로만 보존하며 자동 수신에는 사용하지 않는다. 사용자별 언론사 선택 화면은 포함하지 않는다. 제목과 소개는 길이를 자르기 전에 HTML 엔티티 해제와 태그 제거를 최대 6회 반복하고 마지막 잔여 태그·이미지 자리 문자·공백을 정리한다. script/style 본문과 닫히지 않은 태그도 제거하며 숫자 엔티티와 중첩 인코딩을 처리한다. 저장된 분야 캐시에도 같은 정리를 적용한다. HTML 렌더러나 외부 이미지 요청은 사용하지 않는다.
+
+## 앱 시작 홈과 미디어 탐색 표시
+
+iPad UserDefaults `home.launcher.v1` 문자열은 `standard`(기본) / `widgets`, `home.media.visible.v1` Boolean은 기본 true다. `AppHomeRoot`와 기존 홈·설정은 같은 AppStorage 키를 사용한다. `standardHome` 경로는 저장된 위젯 런처 선택과 관계없이 기존 홈을 연다. 기존 목록형/카테고리형·위젯 배치·로그인·즐겨찾기 값은 유지한다.

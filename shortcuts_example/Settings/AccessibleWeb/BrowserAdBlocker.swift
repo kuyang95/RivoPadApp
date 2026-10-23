@@ -1,4 +1,3 @@
-#if DEBUG
 import WebKit
 
 /// Bundled browser-only rules. No remote list downloads or browsing-data service.
@@ -107,4 +106,3 @@ enum BrowserAdBlocker {
 })();
 """#
 }
-#endif

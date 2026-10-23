@@ -1,6 +1,6 @@
 # 의존성 / 라이브러리 버전
 
-점검일: 2026-10-23 · 기준 코드: `a0e8981d`+작업 트리 (이지 유튜브·접근성 웹 실기기 검증 범위) · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리
+점검일: 2026-10-23 · 기준 코드: `a0e8981d`+작업 트리 (쉬운 유튜브·접근성 웹 실기기 검증 범위) · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리
 
 `Podfile.lock`, `shortcuts_example.xcworkspace/xcshareddata/swiftpm/Package.resolved`, Xcode 프로젝트의 로컬 패키지 참조, GitHub `kuyang95/VisionCraftDocumentEngine`의 `Package.swift` 출처.
 
@@ -61,7 +61,7 @@ HWP 글자 측정·이미지 변환·지역화 계약은 `Support/DocumentEngine
 | `MLKit` (Pod) | `OCRService` — 한국어 텍스트 인식 |
 | `Vision` | `DocumentScan/SentenceBox.swift`, `OCRResultView.swift` 에서만 import (좌표 유틸). OCR 인식 경로는 ML Kit |
 | `PDFKit` | PDF 뷰어/텍스트 추출, HWP PDF 렌더 |
-| `WebKit` | `WebKitRenderedContentLoader` (웹 본문 추출), Debug 전용 `AccessibleWebBrowserModel`·`AccessibleWebBrowserView` (분리된 스크립트 월드·비영속 저장소의 접근성 웹, 추가 라이브러리 없음) |
+| `WebKit` | `WebKitRenderedContentLoader` (웹 본문 추출), `AccessibleWebBrowserModel`·`AccessibleWebBrowserView` (분리된 스크립트 월드와 모드별 전용 영속 저장소의 쉬운 브라우저, Debug·Release 공통, 추가 라이브러리 없음) |
 | `AppIntents` / `WidgetKit` | App Shortcuts, 위젯 |
 | `Security` | Keychain (`VisionLinkCredentialStore`) |
 | `CryptoKit` | 모델·글꼴 SHA-256 검증 |
@@ -95,10 +95,14 @@ Apple `FoundationModels`, `Translation` 프레임워크는 사용하지 않는�
 - `backend/excel-ai-groq-worker/` — Cloudflare Worker (TypeScript). 앱이 호출하지 않음.
 - `docs/design/`, `docs/local-ai/` — 설계 문서.
 
-### Debug 이지 유튜브
+### 쉬운 유튜브
 
 추가 패키지 없이 기존 WebKit을 사용한다. `EasyYouTubePage`의 공유 JavaScript가 공식 YouTube IFrame Player API를 불러온다. 일반 접근성 웹의 분리된 WKContentWorld 대신 이 모드에만 `.page` 주 문서 스크립트를 사용하며 네이티브 데이터 브리지는 추가하지 않는다.
 
 ## 뉴스 백그라운드 수신
 
 Apple 시스템 BackgroundTasks 프레임워크의 BGProcessingTask/BGTaskScheduler를 사용한다. 추가 Pod·SwiftPM 의존성은 없다. 앱의 processing 모드·허용 식별자·시작 시 핸들러 등록은 `app_metadata.md`의 뉴스 백그라운드 작업을 따른다.
+
+## 릴리즈 런처와 쉬운 브라우저
+
+Launcher와 AccessibleWeb 소스는 DEBUG 조건 없이 본 앱에 포함한다. 기존 WebKit·BackgroundTasks·CoreLocation·UserNotifications만 사용하며 새 패키지는 없다. 개발 도구·라이브 AI 실험의 조건부 컴파일은 유지한다.

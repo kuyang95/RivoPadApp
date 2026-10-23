@@ -1,4 +1,3 @@
-#if DEBUG
 import CoreLocation
 
 @MainActor
@@ -56,4 +55,3 @@ final class LauncherWeatherLocation: NSObject, CLLocationManagerDelegate {
     }
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) { finish(.failure(Failure.unavailable)) }
 }
-#endif

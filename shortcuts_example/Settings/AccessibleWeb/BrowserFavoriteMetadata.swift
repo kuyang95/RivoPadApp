@@ -1,4 +1,3 @@
-#if DEBUG
 import Foundation
 import CoreFoundation
 import UIKit
@@ -111,4 +110,3 @@ struct BrowserFavoriteMetadata {
         return result
     }
 }
-#endif

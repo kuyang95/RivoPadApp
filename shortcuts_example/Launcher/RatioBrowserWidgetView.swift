@@ -1,4 +1,3 @@
-#if DEBUG
 import SwiftUI
 import Combine
 
@@ -62,4 +61,3 @@ struct RatioBrowserWidgetView: View {
         }
     }
 }
-#endif

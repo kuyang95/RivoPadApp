@@ -1,4 +1,3 @@
-#if DEBUG
 import Foundation
 
 /// A readable label; the URL used for editing and navigation is never rewritten.
@@ -29,4 +28,3 @@ enum BrowserAddressDisplay {
         return (scheme == "http" ? "http://" : "") + authority + (readable == "/" ? "" : readable)
     }
 }
-#endif

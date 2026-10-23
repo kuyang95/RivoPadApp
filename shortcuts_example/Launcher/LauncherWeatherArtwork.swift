@@ -1,4 +1,3 @@
-#if DEBUG
 import SwiftUI
 
 /// Local vector artwork shared in appearance with the Android weather widget.
@@ -50,4 +49,3 @@ struct LauncherWeatherArtwork: View {
         }.accessibilityHidden(true)
     }
 }
-#endif

@@ -13,6 +13,7 @@ struct HomeView: View {
     @ObservedObject private var settings = AppSettingsStore.shared
     @ObservedObject private var appFonts = AppFontCatalogStore.shared
     @AppStorage(HomeLayoutMode.storageKey) private var homeLayoutModeRaw = HomeLayoutMode.list.rawValue
+    @AppStorage(AppLauncherMode.mediaKey) private var showsMedia = true
     @AppStorage(HomeGuideVisitStore.storageKey) private var homeGuideVisitCount = 0
     @State private var isHomeVisible = false
     @State private var hasRecordedCurrentHomeVisit = false
@@ -183,6 +184,7 @@ struct HomeView: View {
                 recordHomeVisitIfNeeded()
             }
         }
+        .onChange(of: showsMedia) { _, value in if !value && openCategory?.id == "media" { openCategory = nil } }
         .onChange(of: homeLayoutModeRaw) { _, _ in
             openCategory = nil
         }
@@ -258,7 +260,8 @@ struct HomeView: View {
             VisionCraftHomeCategory(id: "camera", title: "카메라/이미지", tone: .camera, artName: "HomeTileCamera", description: "확대해서 보고, 글자와 이미지를 인식하세요.", items: categoryCameraActions),
             VisionCraftHomeCategory(id: "reading", title: "텍스트/문서", tone: .reading, artName: "HomeTileReading", description: "글과 문서를 읽고 편집하세요.", items: readingActions.map(categoryMenuItem)),
             VisionCraftHomeCategory(id: "link", title: "비전링크", tone: .link, artName: "HomeTilePhoneLink", description: "스마트폰과 VisionCraft를 함께 사용하세요.", items: connectionActions),
-        ]
+        ] + (showsMedia ? [VisionCraftHomeCategory(id: "media", title: "미디어 탐색", tone: .link, artName: nil,
+            systemImage: "globe", description: "웹과 영상을 편하게 찾아보세요.", items: mediaActions)] : [])
     }
 
     /// 카테고리의 기능 타일에만 쓰는 그림. 목록·카메라 내부 버튼은 기존 심벌을 쓴다.
@@ -373,6 +376,12 @@ struct HomeView: View {
         VisionCraftHomeSectionHeader(title: "읽기와 문서", tone: .reading)
         VisionCraftHomeActionList(items: readingActions)
 
+        if showsMedia {
+            sectionSpacer(height: 28)
+            VisionCraftHomeSectionHeader(title: "미디어 탐색", tone: .link)
+            VisionCraftHomeActionList(items: mediaActions)
+        }
+
         // 비전링크 카드는 섹션 제목 없이 28 띄워 이어 붙인다.
         sectionSpacer(height: 28)
         VisionCraftHomeActionList(items: connectionActions)
@@ -398,6 +407,13 @@ struct HomeView: View {
     }
 
     // MARK: - 항목 목록 (두 구성이 같이 쓴다)
+
+    private var mediaActions: [VisionCraftActionItem] {
+        [VisionCraftActionItem(id: "easy-browser", icon: "globe", title: "쉬운 브라우저",
+            description: "검색과 즐겨찾기로 웹을 둘러봅니다.", action: { appRouter.route = .easyBrowser }),
+         VisionCraftActionItem(id: "easy-youtube", icon: "play.rectangle", title: "쉬운 유튜브",
+            description: "큰 글자와 간단한 조작으로 영상을 봅니다.", action: { appRouter.route = .easyYouTube })]
+    }
 
     private var chatActions: [VisionCraftActionItem] {
         var actions = [
@@ -887,6 +903,8 @@ struct HomeAllSettingsView: View {
 /// Android `HomeSettingsContent`: 목록형 홈과 전체 설정 화면이 같이 쓰는 설정 그룹.
 /// 그룹은 VcPanel, 값은 VcValueButton → VcOptionDialog, 켜고 끄는 항목은 VcSwitchRow.
 struct HomeSettingsPanel: View {
+    @AppStorage(AppLauncherMode.storageKey) private var launcherModeRaw = AppLauncherMode.standard.rawValue
+    @AppStorage(AppLauncherMode.mediaKey) private var showsMedia = true
     @ObservedObject private var settings = AppSettingsStore.shared
     @ObservedObject private var appFonts = AppFontCatalogStore.shared
     @Binding var selectionDialog: HomeSelectionDialog?
@@ -978,6 +996,11 @@ struct HomeSettingsPanel: View {
     private var appearanceSettings: some View {
         VisionCraftSettingsGroup(title: "화면 및 글꼴") {
             VisionCraftSettingsGrid {
+                VisionCraftSettingValueTile(label: "런처 변경",
+                    value: AppLocalization.string((AppLauncherMode(rawValue: launcherModeRaw) ?? .standard).title),
+                    action: { selectionDialog = .launcher })
+                VisionCraftSettingSwitchTile(label: "미디어 탐색 표시",
+                    hint: "목록형과 카테고리형 홈에 미디어 탐색을 표시합니다.", isOn: $showsMedia)
                 VisionCraftSettingValueTile(
                     label: "앱 테마",
                     value: AppLocalization.string(settings.appTheme.title),
@@ -1064,6 +1087,8 @@ struct HomeSettingsPanel: View {
 /// 설정 값 고르기 다이얼로그(Android `HomeSettingsDialogs`): `VcOptionDialog` 한 벌.
 /// 색 조합은 각 줄을 그 색으로 칠하고 "가 나 다 라" 미리보기, 글꼴은 그 글꼴로 이름을 보여 준다.
 struct HomeSettingsDialogs: View {
+    @EnvironmentObject private var appRouter: AppRouter
+    @AppStorage(AppLauncherMode.storageKey) private var launcherModeRaw = AppLauncherMode.standard.rawValue
     @ObservedObject private var settings = AppSettingsStore.shared
     @ObservedObject private var appFonts = AppFontCatalogStore.shared
     @Binding var selectionDialog: HomeSelectionDialog?
@@ -1165,6 +1190,8 @@ struct HomeSettingsDialogs: View {
             return String(documentAppearance.colorIndex)
         case .quickMenuColor:
             return String(settings.rivoQuickMenuColorIndex)
+        case .launcher:
+            return launcherModeRaw
         case .homeLayout:
             return homeLayoutModeRaw
         }
@@ -1202,6 +1229,11 @@ struct HomeSettingsDialogs: View {
         case .quickMenuColor:
             if let value = Int(option.id) {
                 settings.rivoQuickMenuColorIndex = value
+            }
+        case .launcher:
+            if let value = AppLauncherMode(rawValue: option.id) {
+                launcherModeRaw = value.rawValue
+                appRouter.requestSelectedHome()
             }
         case .homeLayout:
             if let value = HomeLayoutMode(rawValue: option.id) {
@@ -1408,6 +1440,7 @@ enum HomeSelectionDialog: String, Identifiable {
     case documentColor
     case quickMenuColor
     case homeLayout
+    case launcher
 
     var id: String {
         rawValue
@@ -1433,6 +1466,8 @@ enum HomeSelectionDialog: String, Identifiable {
             return "텍스트뷰어 색 조합"
         case .quickMenuColor:
             return "리모컨 조작 메뉴 색 조합"
+        case .launcher:
+            return "런처 변경"
         case .homeLayout:
             return "홈 화면 구성"
         }
@@ -1480,6 +1515,8 @@ enum HomeSelectionDialog: String, Identifiable {
                         accessibilityLabel: theme.displayName
                     )
                 }
+        case .launcher:
+            return AppLauncherMode.allCases.map { VisionCraftSelectionOption(id: $0.rawValue, title: AppLocalization.string($0.title)) }
         case .homeLayout:
             return HomeLayoutMode.allCases.map {
                 VisionCraftSelectionOption(id: $0.rawValue, title: AppLocalization.string($0.title))

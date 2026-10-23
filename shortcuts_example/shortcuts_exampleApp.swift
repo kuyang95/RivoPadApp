@@ -65,7 +65,7 @@ struct shortcuts_exampleApp: App {
     var body: some Scene {
         WindowGroup {
             NavigationStack(path: $path) {
-                HomeView()
+                AppHomeRoot()
                     .environmentObject(shortcutRouter)
                     .navigationDestination(for: AppRoute.self) { event in
                         Group {
@@ -74,6 +74,12 @@ struct shortcuts_exampleApp: App {
                             AppSettingsView()
                         case .allSettings:
                             HomeAllSettingsView()
+                        case .standardHome:
+                            HomeView()
+                        case .easyBrowser:
+                            AccessibleWebBrowserView()
+                        case .easyYouTube:
+                            AccessibleWebBrowserView(easyYouTube: true)
                         case .releaseNotes:
                             HelpReleaseNotesView(
                                 notes: (try? HelpContentLibrary.releaseNotes(
@@ -706,11 +712,12 @@ struct shortcuts_exampleApp: App {
                         || rivoRemoteControlCenter
                             .isCommandModeActive
             )
+            .onChange(of: appRouter.selectedHomeRequestID) { _, _ in path = NavigationPath() }
             .task {
                 #if DEBUG
                 if await LocalLLMBenchmark.runIfRequested() { return }
-                LauncherNewsRefresh.applicationActive(scenePhase == .active)
                 #endif
+                LauncherNewsRefresh.applicationActive(scenePhase == .active)
                 visionLinkManager
                     .setApplicationActive(
                         scenePhase == .active
@@ -725,10 +732,8 @@ struct shortcuts_exampleApp: App {
             }
           //  .onAppear { router.consumeLastIfNeeded() }
             .onChange(of: scenePhase) { _, phase in
-                #if DEBUG
                 LauncherNewsRefresh.applicationActive(phase == .active)
                 if phase == .background { LauncherNewsRefresh.endReadingSession(); LauncherNewsBackgroundTasks.schedule() }
-                #endif
                 visionLinkManager
                     .setApplicationActive(
                         phase == .active

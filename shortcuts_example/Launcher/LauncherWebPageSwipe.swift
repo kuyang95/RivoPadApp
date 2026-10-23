@@ -1,4 +1,3 @@
-#if DEBUG
 import UIKit
 import WebKit
 
@@ -77,4 +76,3 @@ final class LauncherWebPageSwipe: NSObject, UIGestureRecognizerDelegate {
     }
 
 }
-#endif

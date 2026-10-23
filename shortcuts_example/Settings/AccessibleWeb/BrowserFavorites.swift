@@ -1,4 +1,3 @@
-#if DEBUG
 import SwiftUI
 
 struct BrowserFavorite: Codable {
@@ -68,4 +67,3 @@ struct BrowserAddFavoriteView: View {
         }.presentationDetents([.medium, .large]).onChange(of: address) { _, _ in invalid = false }.onDisappear { saveTask?.cancel() }
     }
 }
-#endif

@@ -1,4 +1,3 @@
-#if DEBUG
 import SwiftUI
 import WebKit
 
@@ -167,7 +166,7 @@ struct AccessibleWebBrowserView: View {
         }
         .overlay(alignment: .topLeading) {
             if !embedded && (isBrowserHome || (browser.easyYouTube && (browser.isLoading || browser.errorMessage != nil || !["m.youtube.com", "www.youtube.com", "youtube.com"].contains(browser.webView.url?.host ?? "")))) {
-                VisionCraftIconButton(systemImage: "chevron.left", label: browser.easyYouTube ? "이지 유튜브 닫기" : "접근성 웹 닫기", tint: chromeAccent) { close() }
+                VisionCraftIconButton(systemImage: "chevron.left", label: browser.easyYouTube ? "쉬운 유튜브 닫기" : "접근성 웹 닫기", tint: chromeAccent) { close() }
                     .background(chromeSurface, in: RoundedRectangle(cornerRadius: 12))
                     .padding(8)
             }
@@ -282,4 +281,3 @@ private struct AccessibleWebSurface: UIViewRepresentable {
         ])
     }
 }
-#endif

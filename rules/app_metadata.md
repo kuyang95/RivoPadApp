@@ -1,6 +1,6 @@
 # 앱 메타데이터 / 빌드 정보
 
-점검일: 2026-10-23 · 기준 코드: `c5865248`+작업 트리 (런처 웹 내부 탐색 URL 범위) · 런처 유틸리티 대조: 2026-10-22 `514e00f5`+작업 트리 · 현재 위치 날씨 대조: 2026-10-22 `f56b06f0`+작업 트리 · 브라우저 즐겨찾기 대조: 2026-10-22 `f56b06f0`+작업 트리 · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리
+점검일: 2026-10-23 · 기준 코드: `c5865248`+작업 트리 (런처 웹 내부 탐색 URL 범위) · 런처 유틸리티 대조: 2026-10-22 `514e00f5`+작업 트리 · 현재 위치 날씨 대조: 2026-10-22 `f56b06f0`+작업 트리 · 브라우저 즐겨찾기 대조: 2026-10-22 `f56b06f0`+작업 트리 · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리
 
 `shortcuts_example.xcodeproj/project.pbxproj`, `shortcuts-example-Info.plist`, `*.entitlements` 출처. 코드 안 봐도 한눈에 알 수 있는 정보만.
 
@@ -54,7 +54,7 @@
 | `CFBundleDocumentTypes` | XLSX (`org.openxmlformats.spreadsheetml.sheet`, Editor/Owner), XLS (`com.microsoft.excel.xls`, Viewer/Owner), HWP (`net.rivo.visioncraft.hwp`, Viewer/Alternate), HWPX (`net.rivo.visioncraft.hwpx`, Editor/Alternate) |
 | `UTImportedTypeDeclarations` | `net.rivo.visioncraft.hwp` (`hwp`, `application/x-hwp`, conforms `public.data`), `net.rivo.visioncraft.hwpx` (`hwpx`, `application/hwp+zip`, conforms `public.archive`+`public.data`) |
 | `LSSupportsOpeningDocumentsInPlace` / `UIFileSharingEnabled` | `true` — Files 앱과 iTunes 파일 공유에서 `Documents/` 노출 |
-| `UIBackgroundModes` | `bluetooth-central` (Rivo 리모컨 백그라운드 유지) |
+| `UIBackgroundModes` | `bluetooth-central` (Rivo 리모컨 백그라운드 유지), `processing` (뉴스 사전 수신) |
 | `UIAppFonts` | 15개 파일 (NanumSquareRound EB, Batang/Gungsuh/Gulim/Dotum, Pretendard R/B, SUIT R/B, NanumSquareNeo Rg/Eb, MaruBuri R/B, PureBatang M/B). 출처·SHA 는 `shortcuts_example/HWP_FONT_SOURCES.md` |
 | `UILaunchScreen` | 색 `LaunchBackground`, 이미지 `LaunchLogo` |
 | `NSBluetoothAlwaysUsageDescription` | "Rivo Three 또는 Mini 리모컨을 검색하고 앱 내부 기능을 조작하기 위해 Bluetooth를 사용합니다." |
@@ -111,15 +111,15 @@ Tools/  docs/  backend/      # 도구 스크립트·설계 문서·Cloudflare wo
 
 ## Ratio 웹 위젯 내부 페이지 이동
 
-Debug 웹 위젯의 `rivo-launcher://page/next`·`rivo-launcher://page/previous`는 현재 활성 웹뷰의 주 문서 탐색에서만 가로채 한 페이지만 이동한다. 외부 앱 URL 스킴·Manifest/Info.plist 등록은 없고 외부 앱으로 전달하지 않는다. 이지 유튜브의 기존 `rivo-easy-youtube://page/next`·`rivo-easy-youtube://page/previous`도 해당 모드에서만 처리한다. 구현: Android `AccessibleWebSession`·`LauncherBrowserWidgetFactory`, iPadOS `AccessibleWebBrowserModel`·`RatioBrowserWidgetView`, 양쪽 `LauncherWebAppearance`/`launcher-widget.js`.
+웹 위젯의 `rivo-launcher://page/next`·`rivo-launcher://page/previous`는 현재 활성 웹뷰의 주 문서 탐색에서만 가로채 한 페이지만 이동한다. 외부 앱 URL 스킴·Manifest/Info.plist 등록은 없고 외부 앱으로 전달하지 않는다. 쉬운 유튜브의 기존 `rivo-easy-youtube://page/next`·`rivo-easy-youtube://page/previous`도 해당 모드에서만 처리한다. 구현: Android `AccessibleWebSession`·`LauncherBrowserWidgetFactory`, iPadOS `AccessibleWebBrowserModel`·`RatioBrowserWidgetView`, 양쪽 `LauncherWebAppearance`/`launcher-widget.js`.
 
 ## 런처 타이머·알람
 
-Debug 내부 런처가 UserNotifications 로컬 알림을 사용한다. 사용자 시작 동작에서 alert/sound 권한을 요청하고 고정 식별자 `ratio.launcher.timer`의 UNTimeIntervalNotificationTrigger 한 건을 예약한다. 권한 거절 시 예약하지 않는다. 별도 entitlement·URL 스킴·백그라운드 모드는 추가하지 않는다. 위젯이 생성될 때 기존 알림 delegate가 없는 경우에만 자체 delegate를 설치해 전경 배너·기본 소리를 제공한다.
+내부 런처가 UserNotifications 로컬 알림을 사용한다. 사용자 시작 동작에서 alert/sound 권한을 요청하고 고정 식별자 `ratio.launcher.timer`의 UNTimeIntervalNotificationTrigger 한 건을 예약한다. 권한 거절 시 예약하지 않는다. 별도 entitlement·URL 스킴·백그라운드 모드는 추가하지 않는다. 위젯이 생성될 때 기존 알림 delegate가 없는 경우에만 자체 delegate를 설치해 전경 배너·기본 소리를 제공한다.
 
 ## 런처 현재 위치 날씨
 
-`NSLocationWhenInUseUsageDescription`을 본 앱 Info.plist와 ko/en/ja InfoPlist.strings에 둔다. 현재 위치의 날씨를 위젯에 표시하기 위해 앱 사용 중 위치를 확인한다. Debug 런처에서 CoreLocation으로 1회 위치를 요청하며 백그라운드 모드·항상 위치 권한은 추가하지 않는다.
+`NSLocationWhenInUseUsageDescription`을 본 앱 Info.plist와 ko/en/ja InfoPlist.strings에 둔다. 현재 위치의 날씨를 위젯에 표시하기 위해 앱 사용 중 위치를 확인한다. 런처에서 CoreLocation으로 1회 위치를 요청하며 백그라운드 모드·항상 위치 권한은 추가하지 않는다.
 
 ## 브라우저 즐겨찾기 추가 동작
 
@@ -127,4 +127,8 @@ Debug 내부 런처가 UserNotifications 로컬 알림을 사용한다. 사용�
 
 ## 뉴스 백그라운드 작업
 
-`UIBackgroundModes`는 기존 `bluetooth-central`에 `processing`을 포함한다. `BGTaskSchedulerPermittedIdentifiers`는 `me.rivo.launcher.news.refresh`이며 `shortcuts_exampleApp.init`에서 `LauncherNewsBackgroundTasks.register`로 앱 시작 완료 전에 단 한 번 등록한다. Info.plist에 식별자가 있는 모든 빌드에서 핸들러를 등록하지만, 뉴스 수신/예약은 Ratio 뉴스가 있는 Debug에서만 수행한다. Release 핸들러는 실행을 완료하고 다시 예약하지 않는다. BGProcessingTaskRequest는 earliestBeginDate=현재+2시간·네트워크 필요·외부 전원 불필요이며 이미 대기 중인 요청은 덮어쓰지 않는다. 실행 시작 시 다음 예약을 제출하고 시간 만료 핸들러는 작업 Task를 취소한다. setTaskCompleted는 비동기 작업 정리 후 한 번만 호출한다. 위젯 삭제 시 예약을 취소한다. 앱 활성 중에는 공유 prefetch Task를 사용하고 비활성 시 취소하며, 저장된 중간 결과를 유지한다. 새 Pod·사용자 권한 팝업·오디오 백그라운드 모드는 추가하지 않는다.
+`UIBackgroundModes`는 기존 `bluetooth-central`에 `processing`을 포함한다. `BGTaskSchedulerPermittedIdentifiers`는 `me.rivo.launcher.news.refresh`이며 `shortcuts_exampleApp.init`에서 `LauncherNewsBackgroundTasks.register`로 앱 시작 완료 전에 단 한 번 등록한다. Info.plist에 식별자가 있는 모든 빌드에서 핸들러를 등록하지만, 뉴스 수신/예약은 Ratio 뉴스가 배치된 경우 Debug·Release 모두 수행한다. BGProcessingTaskRequest는 earliestBeginDate=현재+2시간·네트워크 필요·외부 전원 불필요이며 이미 대기 중인 요청은 덮어쓰지 않는다. 실행 시작 시 다음 예약을 제출하고 시간 만료 핸들러는 작업 Task를 취소한다. setTaskCompleted는 비동기 작업 정리 후 한 번만 호출한다. 위젯 삭제 시 예약을 취소한다. 앱 활성 중에는 공유 prefetch Task를 사용하고 비활성 시 취소하며, 저장된 중간 결과를 유지한다. 새 Pod·사용자 권한 팝업·오디오 백그라운드 모드는 추가하지 않는다.
+
+## 릴리즈 진입과 런처 선택
+
+`AppHomeRoot`가 저장된 시작 홈에 따라 기존 `HomeView` 또는 `RatioLauncherView`를 표시한다. 앱 설정·미디어 탐색은 일반 AppRoute로 진입하고 명시적인 기존 홈 경로는 시작 홈 선택을 바꾸지 않는다. `LauncherNewsBackgroundTasks`는 모든 빌드에서 같은 뉴스 사전 수신 핸들러를 실행한다.

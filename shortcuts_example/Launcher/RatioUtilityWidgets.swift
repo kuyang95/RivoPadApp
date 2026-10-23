@@ -1,4 +1,3 @@
-#if DEBUG
 import SwiftUI
 import Combine
 import UserNotifications
@@ -362,4 +361,3 @@ struct RatioUtilityWidget: View {
         ForEach([5, 10, 25], id: \.self) { minutes in UtilityButton(title: "\(minutes)분", selected: draftMinutes == minutes) { draftMinutes = minutes } }
     }
 }
-#endif

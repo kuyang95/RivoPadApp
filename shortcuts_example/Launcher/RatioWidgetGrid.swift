@@ -1,4 +1,3 @@
-#if DEBUG
 import SwiftUI
 
 struct RatioHomeItem: Identifiable, Codable {
@@ -179,9 +178,9 @@ func ratioWidgetInsertionIndex(_ items: [RatioHomeItem], widget: RatioHomeItem, 
 
 func installFullPageWidgets(_ items: [RatioHomeItem]) -> [RatioHomeItem] {
     let ordinary = items.filter { !$0.isFullPage }
-    let youtube = items.first(where: \.isYouTube) ?? RatioHomeItem(id: "widget:youtube", name: "이지 유튜브", columns: 4, rows: 10)
-    var browser = items.first(where: \.isBrowser) ?? RatioHomeItem(id: "widget:browser", name: "이지 브라우저", columns: 4, rows: 8)
-    browser.name = "이지 브라우저"
+    let youtube = items.first(where: \.isYouTube) ?? RatioHomeItem(id: "widget:youtube", name: "쉬운 유튜브", columns: 4, rows: 10)
+    var browser = items.first(where: \.isBrowser) ?? RatioHomeItem(id: "widget:browser", name: "쉬운 브라우저", columns: 4, rows: 8)
+    browser.name = "쉬운 브라우저"
     let daisy = items.first(where: \.isDaisy) ?? RatioHomeItem(id: "widget:daisy", name: "데이지 플레이어", columns: 4, rows: 6)
     return ordinary + [youtube, browser, daisy] + items.filter(\.isNews)
 }
@@ -224,4 +223,3 @@ enum RatioIconColor {
         cache.setObject(result, forKey: key); return Color(uiColor: result)
     }
 }
-#endif

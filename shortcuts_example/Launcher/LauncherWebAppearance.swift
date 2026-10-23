@@ -1,4 +1,3 @@
-#if DEBUG
 import Foundation
 
 enum LauncherWebAppearance {
@@ -142,4 +141,3 @@ window.__rivoLauncherEmbedded = true;
 })();
 """#
 }
-#endif

@@ -1,4 +1,3 @@
-#if DEBUG
 import Foundation
 
 enum AccessibleWebPalette: String, CaseIterable, Identifiable {
@@ -588,4 +587,3 @@ enum AccessibleWebAppearance {
 })();
 """#
 }
-#endif

@@ -1,4 +1,3 @@
-#if DEBUG
 import Foundation
 
 /// Runs in the page world to use the official YouTube IFrame API; never exposes native data.
@@ -247,7 +246,7 @@ enum EasyYouTubePage {
       const root=host.attachShadow({mode:'open'});
       root.appendChild(element('style',{},[`
         :host{color-scheme:dark;${themeCSS};display:block;background:var(--bg);color:var(--text);font:17px/1.5 system-ui,-apple-system,sans-serif}
-        
+
         ${window.__rivoLauncherEmbedded?':host{background:transparent}':''}
         *{box-sizing:border-box}[hidden]{display:none!important}main{height:100%;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:12px;display:flex;flex-direction:column;gap:14px;max-width:1400px;margin:auto}main>*{flex-shrink:0}h1{font-size:22px;line-height:1.45;margin:0;overflow-wrap:anywhere}h2{font-size:22px;margin:8px 0}p{margin:0;color:var(--muted)}
         button,select{font:inherit;min-height:56px;padding:12px 18px;border:1px solid var(--border);border-radius:16px;background:var(--surface);color:var(--text)}button{cursor:pointer}button:disabled,select:disabled{opacity:.55}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
@@ -761,8 +760,8 @@ enum EasyYouTubePage {
     `));
     const main=make('main',{id:'content',hidden:''}),header=make('header');
     header.hidden=!!window.__rivoLauncherEmbedded;
-    const exit=make('button',{'class':'exit','aria-label':'이지 유튜브 닫기'},'←');exit.onclick=()=>{location.href='rivo-easy-youtube://close';};header.appendChild(exit);
-    const title=make('div');title.appendChild(make('div',{'class':'brand'},'이지 유튜브'));title.appendChild(make('h1',{id:'heading',tabindex:'-1'}));header.appendChild(title);
+    const exit=make('button',{'class':'exit','aria-label':'쉬운 유튜브 닫기'},'←');exit.onclick=()=>{location.href='rivo-easy-youtube://close';};header.appendChild(exit);
+    const title=make('div');title.appendChild(make('div',{'class':'brand'},'쉬운 유튜브'));title.appendChild(make('h1',{id:'heading',tabindex:'-1'}));header.appendChild(title);
     main.appendChild(header);
     const nav=make('nav',{'aria-label':'유튜브 메뉴'});
     const icons={home:['M3 11 12 3l9 8','M5 10v11h5v-7h4v7h5V10'],subscriptions:['M4 8h16v13H4z','M7 4h10','M10 12l5 3-5 3z'],shorts:['M15 3 5 9v5l4 1-3 3 3 3 10-6v-5l-4-1 3-3z','M10 9v6l5-3z'],search:['M20 20l-5-5','M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0']};
@@ -862,4 +861,3 @@ enum EasyYouTubePage {
 })();
 """#
 }
-#endif

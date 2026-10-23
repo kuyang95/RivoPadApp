@@ -1,4 +1,3 @@
-#if DEBUG
 import SwiftUI
 import UIKit
 
@@ -14,4 +13,3 @@ enum AccessibleWebTheme {
         return "window.__rivoWebTheme = {bg:'\(hex(theme.background))',surface:'\(hex(theme.surface))',text:'\(hex(theme.text))',edge:'\(hex(theme.outline))',link:'\(hex(theme.accent))',scheme:'dark'};\n"
     }
 }
-#endif

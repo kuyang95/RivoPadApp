@@ -1,4 +1,3 @@
-#if DEBUG
 import SwiftUI
 import Foundation
 import CoreFoundation
@@ -807,4 +806,3 @@ private struct NewsLoadingWave: View {
         }.frame(width: 144, height: 80).accessibilityHidden(true)
     }
 }
-#endif

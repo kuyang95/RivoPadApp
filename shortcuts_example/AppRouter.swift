@@ -25,6 +25,9 @@ final class AppRouter: ObservableObject {
         return true
     }
 
+    @Published private(set) var selectedHomeRequestID: UInt64 = 0
+    func requestSelectedHome() { selectedHomeRequestID &+= 1 }
+
     func requestFileImport() {
         fileImportRequestID &+= 1
     }
@@ -38,6 +41,9 @@ enum AppRoute: Hashable {
     case settings
     /// 홈 제목 줄의 설정 아이콘 → 전체 설정 화면(Android `AllSettingsScreen`).
     case allSettings
+    case standardHome
+    case easyBrowser
+    case easyYouTube
     /// 홈 업데이트 기록 카드의 "이전 업데이트 기록보기"(Android `FullChangeLogsScreen`).
     case releaseNotes
     case help

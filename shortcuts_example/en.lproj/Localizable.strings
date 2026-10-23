@@ -2805,3 +2805,17 @@
 "최근 목록 편집" = "Edit recent list";
 "aiDocument.openSpreadsheetEditor" = "Edit spreadsheet";
 "aiDocument.readHangul" = "Read";
+
+/* Launcher and media discovery */
+"미디어 탐색" = "Media";
+"쉬운 브라우저" = "Easy Browser";
+"쉬운 유튜브" = "Easy YouTube";
+"웹과 영상을 편하게 찾아보세요." = "Browse the web and watch videos.";
+"검색과 즐겨찾기로 웹을 둘러봅니다." = "Browse with search and favorites.";
+"큰 글자와 간단한 조작으로 영상을 봅니다." = "Watch videos with large text and simple controls.";
+"미디어 탐색 표시" = "Show Media";
+"목록형과 카테고리형 홈에 미디어 탐색을 표시합니다." = "Show Media in both list and category home layouts.";
+"런처 변경" = "Change launcher";
+"기존 홈" = "Classic home";
+"위젯 런처" = "Widget launcher";
+"앱 설정" = "App settings";

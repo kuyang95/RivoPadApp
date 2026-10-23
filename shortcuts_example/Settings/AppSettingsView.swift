@@ -2,6 +2,9 @@ import SwiftUI
 import UIKit
 
 struct AppSettingsView: View {
+    @EnvironmentObject private var appRouter: AppRouter
+    @AppStorage(AppLauncherMode.storageKey) private var launcherModeRaw = AppLauncherMode.standard.rawValue
+    @AppStorage(AppLauncherMode.mediaKey) private var showsMedia = true
     @ObservedObject private var settings =
         AppSettingsStore.shared
     @ObservedObject private var appFonts =
@@ -36,6 +39,13 @@ struct AppSettingsView: View {
             webSearchSection
             scannerSection
             appearanceSection
+            Section("홈") {
+                Picker("런처 변경", selection: $launcherModeRaw) {
+                    ForEach(AppLauncherMode.allCases, id: \.rawValue) { mode in Text(AppLocalization.string(mode.title)).tag(mode.rawValue) }
+                }.onChange(of: launcherModeRaw) { _, _ in appRouter.requestSelectedHome() }
+                Toggle("미디어 탐색 표시", isOn: $showsMedia)
+                    .accessibilityHint("목록형과 카테고리형 홈에 미디어 탐색을 표시합니다.")
+            }
             rivoQuickMenuSection
             documentSection
             readerSection
@@ -563,6 +573,8 @@ struct AppSettingsView: View {
     }
 
     private func resetSettings() {
+        launcherModeRaw = AppLauncherMode.standard.rawValue
+        showsMedia = true
         settings.resetToDefaults()
         appFonts.resetSelection()
         MagnifierDisplayPreferenceStore()

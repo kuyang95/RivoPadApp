@@ -1,4 +1,3 @@
-#if DEBUG
 import Combine
 import SwiftUI
 import Foundation
@@ -97,7 +96,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     @Published var voiceSearchRequested = false
     @Published var errorMessage: String?
 
-    // The nonpersistent browser session also owns its per-host page preferences.
+    // Page zoom preferences remain local to each open screen.
     let defaultZoomPercent: Int
     @Published private(set) var zoomPercent: Int
     private var siteZoom: [String: Int] = [:]
@@ -105,6 +104,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     private var launcherSwipes: [ObjectIdentifier: LauncherWebPageSwipe] = [:]
     func launcherSwipe(for view: WKWebView) -> LauncherWebPageSwipe? { launcherSwipes[ObjectIdentifier(view)] }
     private var observations: [NSKeyValueObservation] = []
+    private static let browserStoreIdentifier = UUID(uuidString: "382B897A-44FB-49CB-9A93-FCDA0D815DB1")!
     private static let world = WKContentWorld.world(name: "RivoAccessibleWeb")
     private var activeDialog: UIAlertController?
     private var cancelDialog: (() -> Void)?
@@ -119,9 +119,8 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
         defaultZoomPercent = preferredPercent
         zoomPercent = preferredPercent
         let configuration = WKWebViewConfiguration()
-        // Keep this experimental browser separate from document viewers and
-        // their trusted local content. Easy YouTube alone keeps its dedicated login store.
-        configuration.websiteDataStore = easyYouTube ? WKWebsiteDataStore(forIdentifier: EasyYouTubePage.storeIdentifier) : .nonPersistent()
+        // Widgets and standalone screens share login; document viewers retain their own stores.
+        configuration.websiteDataStore = WKWebsiteDataStore(forIdentifier: easyYouTube ? EasyYouTubePage.storeIdentifier : Self.browserStoreIdentifier)
         if easyYouTube || embedded { configuration.defaultWebpagePreferences.preferredContentMode = .mobile }
         configuration.allowsInlineMediaPlayback = true
         if easyYouTube { configuration.mediaTypesRequiringUserActionForPlayback = [] }
@@ -280,6 +279,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     private var youtubeContentActive = true
     func setContentActive(_ active: Bool) {
         youtubeContentActive = active
+        if active && !easyYouTube { applyAppearance() }
         if easyYouTube { webView.evaluateJavaScript("window.__rivoYouTubeContentActive=\(active);window.__rivoYouTubePrototype?.setActive?.(\(active));", completionHandler: nil) }
     }
     func pauseMedia() {
@@ -483,4 +483,3 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
         cancel?()
     }
 }
-#endif

@@ -1,4 +1,3 @@
-#if DEBUG
 import SwiftUI
 import UIKit
 import PhotosUI
@@ -107,7 +106,10 @@ struct RatioLauncherView: View {
             RatioEntry(id: "photos", name: "사진 분석", icon: "photo", route: .imageAnalysisPhoto),
             RatioEntry(id: "text", name: "텍스트 보기", icon: "text.alignleft", route: .textEditorText(title: "텍스트", text: "")),
             RatioEntry(id: "history", name: "대화 기록", icon: "clock.arrow.circlepath", route: .chatHistory),
-            RatioEntry(id: "browser", name: "리보 브라우저", icon: "globe")
+            RatioEntry(id: "browser", name: "쉬운 브라우저", icon: "globe"),
+            RatioEntry(id: "youtube", name: "쉬운 유튜브", icon: "play.rectangle", route: .easyYouTube),
+            RatioEntry(id: "app-settings", name: "앱 설정", icon: "gearshape", route: .allSettings),
+            RatioEntry(id: "standard-home", name: "기존 홈", icon: "house", route: .standardHome)
         ] + apps.map { RatioEntry(id: $0.id, name: $0.name, icon: "app", address: $0.address) }
     }
     private var widgets: [RatioHomeItem] {
@@ -570,8 +572,6 @@ struct RatioLauncherView: View {
                     }
                 }
             }
-            settingsAction("리보패드 전체 설정") { router.route = .allSettings }
-            settingsAction("기존 홈으로 돌아가기") { dismiss() }
         }.foregroundStyle(VisionCraftHomeUI.text).padding(.bottom, 24)
     }
 
@@ -657,8 +657,8 @@ struct RatioLauncherView: View {
          RatioHomeItem(id: "widget:weather", name: "날씨", columns: 2, rows: 2),
          RatioHomeItem(id: "widget:timer", name: "타이머 · 알람", columns: 2, rows: 2),
          RatioHomeItem(id: "widget:search", name: "통합 검색", columns: 4, rows: 1),
-         RatioHomeItem(id: "widget:youtube", name: "이지 유튜브", columns: 4, rows: 10),
-         RatioHomeItem(id: "widget:browser", name: "이지 브라우저", columns: 4, rows: 8),
+         RatioHomeItem(id: "widget:youtube", name: "쉬운 유튜브", columns: 4, rows: 10),
+         RatioHomeItem(id: "widget:browser", name: "쉬운 브라우저", columns: 4, rows: 8),
          RatioHomeItem(id: "widget:daisy", name: "데이지 플레이어", columns: 4, rows: 6)]
     }
     private var widgetAddCatalog: some View {
@@ -1001,4 +1001,3 @@ private enum RatioSearch {
         return response.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 }
-#endif

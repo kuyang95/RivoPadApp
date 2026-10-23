@@ -1,4 +1,3 @@
-#if DEBUG
 import Foundation
 
 /// Google-only presentation; the original live AI section keeps citations and expansion.
@@ -557,4 +556,3 @@ enum AccessibleGooglePage {
 })();
 """#
 }
-#endif

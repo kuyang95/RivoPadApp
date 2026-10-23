@@ -27,25 +27,6 @@ struct DebugDevelopmentView: View {
 
                 Section {
                     NavigationLink {
-                        RatioLauncherView()
-                    } label: {
-                        Label("Ratio 런처", systemImage: "square.grid.2x2")
-                    }
-                    NavigationLink {
-                        AccessibleWebBrowserView()
-                    } label: {
-                        Label("접근성 웹", systemImage: "globe")
-                    }
-                    .accessibilityHint("사진을 유지하고 웹 색상을 통일하는 브라우저를 엽니다.")
-
-                    NavigationLink {
-                        AccessibleWebBrowserView(easyYouTube: true)
-                    } label: {
-                        Label("이지 유튜브", systemImage: "play.rectangle")
-                    }
-                    .accessibilityHint("주소창 없이 큰 메뉴와 조작 버튼으로 유튜브를 엽니다.")
-
-                    NavigationLink {
                         HWPReferenceComparisonView()
                             .visionCraftRouteBackButton()
                             .toolbar(.visible, for: .navigationBar)
