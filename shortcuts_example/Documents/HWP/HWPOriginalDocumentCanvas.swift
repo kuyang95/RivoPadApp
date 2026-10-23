@@ -1603,11 +1603,6 @@ private struct HWPDocumentCanvasObjectView: View {
 
 }
 
-/// VoiceOver for an object on the page, the non-gesture alternative to tapping and
-/// dragging it (Android `objectAccessibilityActions`): double-tap selects it as a tap
-/// does (again: its settings); a picked picture or shape moves 20 pt 위로·아래로·
-/// 왼쪽으로·오른쪽으로, grows or shrinks 20 pt from its bottom-right corner
-/// (개체 크게·작게), opens 개체 설정, or is let go (선택 해제).
 /// What VoiceOver reads for an object on the 원본 pages, as Android's `HwpPageText.objectText` does: a picture
 /// "그림: <설명>", a chart its kind, title (else description) and "계열: …", an equation its script.
 nonisolated enum HWPCanvasObjectLabel {
@@ -1662,6 +1657,11 @@ nonisolated enum HWPCanvasObjectLabel {
     }
 }
 
+/// VoiceOver for an object on the page, the non-gesture alternative to tapping and
+/// dragging it (Android `objectAccessibilityActions`): double-tap selects it as a tap
+/// does (again: its settings); a picked picture or shape moves 20 pt 위로·아래로·
+/// 왼쪽으로·오른쪽으로, grows or shrinks 20 pt from its bottom-right corner
+/// (개체 크게·작게), opens 개체 설정, or is let go (선택 해제).
 private struct HWPCanvasObjectAccessibility: ViewModifier {
     static let nudgePoints = 20.0
 
