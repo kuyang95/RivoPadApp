@@ -39,6 +39,11 @@ nonisolated struct ReaderBookSummary:
 /// Android `DaisyFileOpenScreen`: 안내 문장 → VcActionRow(계속 읽기 / 도서 파일 선택) → 로딩·오류·요약 패널.
 /// iOS 고유의 "내 서재" 목록은 그 아래에 유지한다.
 struct ReaderLibraryView: View {
+    var embedded = false
+    var onOpenBook: ((URL) -> Void)? = nil
+    private func openBook(_ url: URL) {
+        if let onOpenBook { onOpenBook(url) } else { appRouter.route = .epubReader(fileURL: url) }
+    }
     @EnvironmentObject private var appRouter: AppRouter
     @State private var isImporterPresented = false
     @State private var isImporting = false
@@ -98,7 +103,7 @@ struct ReaderLibraryView: View {
             }
             .visionCraftScreenPadding()
         }
-        .visionCraftListScreen()
+        .visionCraftListScreen(background: embedded ? .clear : VisionCraftUI.background)
         .navigationTitle(
             "도서 읽기"
         )
@@ -166,9 +171,7 @@ struct ReaderLibraryView: View {
                         guard !isImporting else {
                             return
                         }
-                        appRouter.route = .epubReader(
-                            fileURL: lastBook.fileURL
-                        )
+                        openBook(lastBook.fileURL)
                     }
                 )
             )
@@ -492,9 +495,7 @@ struct ReaderLibraryView: View {
     ) -> some View {
         HStack(spacing: 0) {
             Button {
-                appRouter.route = .epubReader(
-                    fileURL: book.fileURL
-                )
+                openBook(book.fileURL)
             } label: {
                 HStack(spacing: 14) {
                     Image(
@@ -653,10 +654,7 @@ struct ReaderLibraryView: View {
                 } else {
                     statusDescription = nil
                 }
-                appRouter.route = .epubReader(
-                    fileURL:
-                        importResult.book.fileURL
-                )
+                openBook(importResult.book.fileURL)
             } catch {
                 errorDescription = error.localizedDescription
             }

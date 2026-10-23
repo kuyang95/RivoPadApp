@@ -5,3 +5,5 @@
 "NSMotionUsageDescription" = "Motion access is required to detect device shake during automatic document capture.";
 "NSPhotoLibraryAddUsageDescription" = "Photo add access is required to save pictures captured with the camera.";
 "NSSpeechRecognitionUsageDescription" = "Speech recognition is required to convert voice input to text.";
+
+"NSLocationWhenInUseUsageDescription" = "Your location is used while the app is open to show local weather in the widget.";

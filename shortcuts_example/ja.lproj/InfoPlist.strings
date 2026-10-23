@@ -5,3 +5,5 @@
 "NSMotionUsageDescription" = "書類の自動撮影中にデバイスの揺れを検出するにはモーションセンサーが必要です。";
 "NSPhotoLibraryAddUsageDescription" = "カメラで撮影した写真を写真ライブラリに保存するには追加権限が必要です。";
 "NSSpeechRecognitionUsageDescription" = "音声入力をテキストに変換するには音声認識が必要です。";
+
+"NSLocationWhenInUseUsageDescription" = "アプリの使用中に現在地の天気をウィジェットに表示するため位置情報を使用します。";

@@ -7,6 +7,7 @@ import UIKit
 
 enum ChatIntentInput: Equatable {
     case textChat(conversationID: UUID?)
+    case launcherQuestion(question: String)
     case voiceQuestion(question: String)
     case sharedTextQuestion(
         text: String,
@@ -64,6 +65,7 @@ private extension ChatIntentInput {
             return automaticallyStarts
         case .textChat,
              .voiceQuestion,
+             .launcherQuestion,
              .imageAnalysis,
              .capturedImageAnalysis,
              .documentQA,
@@ -119,7 +121,7 @@ struct LLMContentView: View {
         case .textChat(let conversationID):
             storedConversationID = conversationID ?? UUID()
             persistsHistory = true
-        case .voiceQuestion:
+        case .voiceQuestion, .launcherQuestion:
             storedConversationID = UUID()
             persistsHistory = true
         case .sharedTextQuestion:
@@ -181,6 +183,7 @@ struct LLMContentView: View {
             )
         case .textChat,
              .voiceQuestion,
+             .launcherQuestion,
              .sharedTextQuestion,
              .sharedAttachmentQuestion,
              .documentQA,
@@ -833,7 +836,7 @@ struct LLMContentView: View {
     private var navigationTitle: String {
         switch intent {
         case .textChat,
-             .voiceQuestion:
+             .voiceQuestion, .launcherQuestion:
             return AppLocalization.string(
                 "로컬 AI"
             )

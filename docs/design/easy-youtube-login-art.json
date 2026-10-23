@@ -1,0 +1,10 @@
+{
+  "tool": "Built-in image_gen",
+  "prompt": "Use case: stylized-concept. Asset type: decorative background illustration for a low-vision-friendly YouTube sign-in gate in an accessibility tablet app. Primary request: one beautifully crafted soft three-dimensional rounded rectangular video play tile, viewed nearly straight on with a slight isometric tilt, a recessed triangular play symbol in its center. A single quiet sculptural object, generous transparent margins on all sides, centered square composition. Materials: frosted porcelain and softly brushed silver, gentle sage green edge tint, tactile bevels, subtle studio highlights and soft self-shadow. Low visual complexity, warm and calm, elegant like a premium accessibility onboarding illustration. Actual transparent background. No hands, no people, no text, no letters, no watermark, no interface screenshot, no extra decorative objects, no bright red branding. The object should remain recognizable when displayed at 20 percent opacity behind a high-contrast text and button.",
+  "sourceAsset": "Android app/src/debug/assets/easy-youtube-login.webp",
+  "consumers": [
+    "Android easy-youtube.js data URL",
+    "iPad DEBUG EasyYouTubePage.source data URL"
+  ],
+  "encoding": "WebP, preserved alpha, quality 85"
+}

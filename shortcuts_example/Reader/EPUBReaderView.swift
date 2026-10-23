@@ -653,6 +653,13 @@ private enum EPUBReaderTheme: String, CaseIterable, Identifiable {
 }
 
 struct EPUBReaderView: View {
+    private let embedded: Bool
+    private let active: Bool
+    private let allowAutoplay: Bool
+    private let onPlaybackStateChanged: (Bool) -> Void
+    @State private var screenReader = UIAccessibility.isVoiceOverRunning
+    @State private var pageIsVisible: Bool
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var remoteControl:
         RivoScreenRemoteControlCenter
@@ -691,7 +698,13 @@ struct EPUBReaderView: View {
     @AppStorage("reader.epub.originalLayout")
     private var usesOriginalLayout = true
 
-    init(fileURL: URL) {
+    init(fileURL: URL, embedded: Bool = false, active: Bool = true, allowAutoplay: Bool = true,
+         onPlaybackStateChanged: @escaping (Bool) -> Void = { _ in }) {
+        self.embedded = embedded
+        self.active = active
+        self.allowAutoplay = allowAutoplay
+        _pageIsVisible = State(initialValue: active)
+        self.onPlaybackStateChanged = onPlaybackStateChanged
         _viewModel = StateObject(
             wrappedValue: EPUBReaderViewModel(
                 fileURL: fileURL
@@ -709,14 +722,17 @@ struct EPUBReaderView: View {
         EPUBReaderTheme(rawValue: themeID) ?? .light
     }
 
+    private var readerBackground: Color { embedded ? .clear : theme.background }
+    private var readerForeground: Color { embedded ? VisionCraftUI.fixedColor(0xF5F5F2) : theme.foreground }
+
     var body: some View {
         ZStack {
-            theme.background.ignoresSafeArea()
+            readerBackground.ignoresSafeArea()
 
             if viewModel.isLoading {
                 ProgressView("책을 여는 중")
-                    .tint(theme.foreground)
-                    .foregroundStyle(theme.foreground)
+                    .tint(readerForeground)
+                    .foregroundStyle(readerForeground)
             } else if let error = viewModel.errorDescription {
                 ContentUnavailableView(
                     "책을 열 수 없습니다",
@@ -740,36 +756,24 @@ struct EPUBReaderView: View {
         .toolbar {
             // Android `DaisyFileOpenScreen` 제목 줄: 목차(List) · 검색(Search) · 설정(Settings).
             // 목차가 없으면 목차 버튼은 비활성(38%).
-            ToolbarItemGroup(placement: .primaryAction) {
-                if viewModel.book != nil {
-                    VisionCraftIconButton(
-                        systemImage: "list.bullet",
-                        label: "목차",
-                        tint: hasContents
-                            ? VisionCraftUI.primaryText
-                            : VisionCraftUI.primaryText
-                                .opacity(0.38)
-                    ) {
-                        isContentsPresented = true
-                    }
-                    .disabled(!hasContents)
-
-                    VisionCraftIconButton(
-                        systemImage: "magnifyingglass",
-                        label: "검색 열기",
-                        tint: VisionCraftUI.primaryText
-                    ) {
-                        isSearchPresented = true
-                    }
-
-                    VisionCraftIconButton(
-                        systemImage: "gearshape",
-                        label: "설정 열기",
-                        tint: VisionCraftUI.primaryText
-                    ) {
-                        isSettingsPresented = true
-                    }
+            if !embedded {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    readerTools
                 }
+            }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if embedded {
+                HStack {
+                    Text(viewModel.book?.title ?? AppLocalization.string("독서"))
+                        .font(.headline)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer(minLength: 8)
+                    readerTools
+                }
+                .padding(.horizontal, 12)
+                .foregroundStyle(readerForeground)
+                .background(readerBackground)
             }
         }
         .overlay {
@@ -824,7 +828,7 @@ struct EPUBReaderView: View {
         .onChange(
             of: remoteControl.latestEvent
         ) { _, event in
-            handleRemoteEvent(event)
+            if !embedded { handleRemoteEvent(event) }
         }
         .onChange(
             of: isReaderSheetPresented
@@ -832,6 +836,27 @@ struct EPUBReaderView: View {
             handleReaderSheetPresentation(
                 isPresented
             )
+        }
+        .onChange(of: active) { _, value in
+            pageIsVisible = value
+            if embedded && !value {
+                viewModel.flushProgress()
+                mediaOverlayPlayer.releaseIdleAudio()
+            }
+        }
+        .onChange(of: mediaOverlayPlayer.isPlaying) { _, value in
+            onPlaybackStateChanged(value)
+            if embedded && !active { mediaOverlayPlayer.releaseIdleAudio() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIAccessibility.voiceOverStatusDidChangeNotification)) { _ in
+            screenReader = UIAccessibility.isVoiceOverRunning
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if embedded && phase == .background {
+                viewModel.flushProgress()
+                mediaOverlayPlayer.pause()
+                mediaOverlayPlayer.releaseIdleAudio()
+            }
         }
         .onDisappear {
             viewModel.flushProgress()
@@ -907,6 +932,9 @@ struct EPUBReaderView: View {
                     .navigationTargetSegmentIndex,
                 style:
                     originalLayoutStyle,
+                windowed: embedded,
+                active: active,
+                screenReader: screenReader,
                 onVisibleSegment: {
                     viewModel
                         .noteVisibleSegment(
@@ -930,7 +958,7 @@ struct EPUBReaderView: View {
                 }
             )
             .background(
-                theme.background
+                readerBackground
             )
         } else {
             textChapterView(chapter)
@@ -1000,7 +1028,7 @@ struct EPUBReaderView: View {
                             )
                             ? EPUBReaderTheme
                                 .readingHighlightText
-                            : theme.foreground
+                            : readerForeground
                         )
                         .accessibilityLabel(
                             segment.text
@@ -1039,7 +1067,7 @@ struct EPUBReaderView: View {
                         }
                     }
                 }
-                .foregroundStyle(theme.foreground)
+                .foregroundStyle(readerForeground)
                 .padding(.horizontal, 32)
                 .padding(.vertical, 28)
                 .frame(
@@ -1128,6 +1156,27 @@ struct EPUBReaderView: View {
             return 0
         }
         return result.matchLength
+    }
+
+    @ViewBuilder private var readerTools: some View {
+        if viewModel.book != nil {
+            VisionCraftIconButton(
+                systemImage: "list.bullet",
+                label: "목차",
+                tint: hasContents ? VisionCraftUI.primaryText : VisionCraftUI.primaryText.opacity(0.38)
+            ) { isContentsPresented = true }
+            .disabled(!hasContents)
+            VisionCraftIconButton(
+                systemImage: "magnifyingglass",
+                label: "검색 열기",
+                tint: VisionCraftUI.primaryText
+            ) { isSearchPresented = true }
+            VisionCraftIconButton(
+                systemImage: "gearshape",
+                label: "설정 열기",
+                tint: VisionCraftUI.primaryText
+            ) { isSettingsPresented = true }
+        }
     }
 
     /// Android `PlayerBottomBar`: 슬라이더(항상) + 시간/퍼센트 + [재생 56][이전 48][단위 알약 56][다음 48].
@@ -1343,20 +1392,19 @@ struct EPUBReaderView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
-        .background(VisionCraftUI.surface)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(
-                    VisionCraftUI.secondaryText
-                        .opacity(0.7)
-                )
-                .frame(height: 1)
+        .background(VisionCraftUI.surface, in: RoundedRectangle(cornerRadius: 24))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24)
+                .strokeBorder(VisionCraftUI.secondaryText.opacity(0.25), lineWidth: 1)
+                .allowsHitTesting(false)
         }
         .shadow(
-            color: VisionCraftHomeUI.shadow.opacity(0.5),
-            radius: 16,
-            y: -2
+            color: VisionCraftHomeUI.shadow.opacity(0.3),
+            radius: 8,
+            y: 2
         )
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     private func transportButton(
@@ -1519,7 +1567,7 @@ struct EPUBReaderView: View {
     private func startAutoplayIfNeeded()
         async
     {
-        guard !didTriggerAutoplay else {
+        guard allowAutoplay && active && !didTriggerAutoplay else {
             return
         }
         didTriggerAutoplay = true
@@ -1533,7 +1581,7 @@ struct EPUBReaderView: View {
         try? await Task.sleep(
             nanoseconds: delay
         )
-        guard !Task.isCancelled,
+        guard !Task.isCancelled, pageIsVisible,
               EPUBReaderAutoplayPolicy
               .shouldStart(
                   canPlay:
@@ -2098,10 +2146,10 @@ struct EPUBReaderView: View {
         }
         return EPUBOriginalMarkupStyle(
             backgroundColor:
-                colors.background,
+                embedded ? "transparent" : colors.background,
             foregroundColor:
-                colors.foreground,
-            linkColor: colors.link,
+                embedded ? "#F5F5F2" : colors.foreground,
+            linkColor: embedded ? "#9FCDE5" : colors.link,
             fontScale: fontScale,
             lineHeight: lineHeight
         )

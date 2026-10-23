@@ -116,3 +116,7 @@ STT: `STTManager.swift` — `AppSettingsStore.appLanguage.speechLanguageCode`에
 ## 효과음
 
 `SoundEffectManager.swift` · `SoundEffect`: `record`(pop_up_3) `recordComplete`(good_sound) `complete`(glow_4) `docScanGuideBeep`(doc_scan_tick.wav) `cameraShot2`(camera2.wav) `connected`(correct_9) `disconnected`(correct_9_reverse) `bbob`(water_droplet_sound) `popUp2` `waiting`(pencil_write_eng) `fail`(correct_11_low_slow_descending) `toggleButtonPressed`(woosh_sound) `toggleButtonReleased`(tiny_button_push_sound_reverse) `recording` `startingLLM`. 앱 시작 시 `preloadAll()`.
+
+## Ratio 검색 의도
+
+`RatioSearch.destination`은 앱·기능 이름 일치가 없는 입력에 로컬 `LLMService.streamText`를 한 번 호출한다. chat/browser/unclear 라벨만 허용하며 최신 정보 여부와 웹페이지 탐색 의도를 구분한다. 분류 원문은 클라우드로 보내지 않는다. 로컬 모델 준비는 기존 `LocalModelPreparationView`로 표시한다. `ChatIntentInput.launcherQuestion`은 새 대화에 원문을 전송하고 자동 음성 낭독은 켜지 않는다. Android의 Gemini 기반 의도 분류와 구현 차이가 있다.

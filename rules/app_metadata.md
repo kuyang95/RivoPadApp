@@ -1,6 +1,6 @@
 # 앱 메타데이터 / 빌드 정보
 
-점검일: 2026-10-13 · 기준 코드: `c25bf291` (이번 기능 변경 범위)
+점검일: 2026-10-23 · 기준 코드: `c5865248`+작업 트리 (런처 웹 내부 탐색 URL 범위) · 런처 유틸리티 대조: 2026-10-22 `514e00f5`+작업 트리 · 현재 위치 날씨 대조: 2026-10-22 `f56b06f0`+작업 트리 · 브라우저 즐겨찾기 대조: 2026-10-22 `f56b06f0`+작업 트리 · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리
 
 `shortcuts_example.xcodeproj/project.pbxproj`, `shortcuts-example-Info.plist`, `*.entitlements` 출처. 코드 안 봐도 한눈에 알 수 있는 정보만.
 
@@ -108,3 +108,23 @@ shortcuts_example/           # 앱 타깃 (Swift 300개)
 rivoWidget/ shareExtension/ actionExtension/   # 익스텐션 타깃
 Tools/  docs/  backend/      # 도구 스크립트·설계 문서·Cloudflare worker (앱 코드에서 참조 안 함)
 ```
+
+## Ratio 웹 위젯 내부 페이지 이동
+
+Debug 웹 위젯의 `rivo-launcher://page/next`·`rivo-launcher://page/previous`는 현재 활성 웹뷰의 주 문서 탐색에서만 가로채 한 페이지만 이동한다. 외부 앱 URL 스킴·Manifest/Info.plist 등록은 없고 외부 앱으로 전달하지 않는다. 이지 유튜브의 기존 `rivo-easy-youtube://page/next`·`rivo-easy-youtube://page/previous`도 해당 모드에서만 처리한다. 구현: Android `AccessibleWebSession`·`LauncherBrowserWidgetFactory`, iPadOS `AccessibleWebBrowserModel`·`RatioBrowserWidgetView`, 양쪽 `LauncherWebAppearance`/`launcher-widget.js`.
+
+## 런처 타이머·알람
+
+Debug 내부 런처가 UserNotifications 로컬 알림을 사용한다. 사용자 시작 동작에서 alert/sound 권한을 요청하고 고정 식별자 `ratio.launcher.timer`의 UNTimeIntervalNotificationTrigger 한 건을 예약한다. 권한 거절 시 예약하지 않는다. 별도 entitlement·URL 스킴·백그라운드 모드는 추가하지 않는다. 위젯이 생성될 때 기존 알림 delegate가 없는 경우에만 자체 delegate를 설치해 전경 배너·기본 소리를 제공한다.
+
+## 런처 현재 위치 날씨
+
+`NSLocationWhenInUseUsageDescription`을 본 앱 Info.plist와 ko/en/ja InfoPlist.strings에 둔다. 현재 위치의 날씨를 위젯에 표시하기 위해 앱 사용 중 위치를 확인한다. Debug 런처에서 CoreLocation으로 1회 위치를 요청하며 백그라운드 모드·항상 위치 권한은 추가하지 않는다.
+
+## 브라우저 즐겨찾기 추가 동작
+
+`rivo-browser://add-favorite`는 HTTPS 구글 홈의 활성 주 프레임에서만 앱의 즐겨찾기 추가 창을 요청한다. iPad는 sourceFrame도 주 프레임인지 검사한다. 스킴에는 사용자 입력을 실어 보내지 않고 네이티브 입력창에서 이름·주소를 확인해 저장한다. 외부 스킴 등록·권한 추가는 없다. 자바스크립트나 파일 URL·주소 내 계정 정보는 저장하지 않는다.
+
+## 뉴스 백그라운드 작업
+
+`UIBackgroundModes`는 기존 `bluetooth-central`에 `processing`을 포함한다. `BGTaskSchedulerPermittedIdentifiers`는 `me.rivo.launcher.news.refresh`이며 `shortcuts_exampleApp.init`에서 `LauncherNewsBackgroundTasks.register`로 앱 시작 완료 전에 단 한 번 등록한다. Info.plist에 식별자가 있는 모든 빌드에서 핸들러를 등록하지만, 뉴스 수신/예약은 Ratio 뉴스가 있는 Debug에서만 수행한다. Release 핸들러는 실행을 완료하고 다시 예약하지 않는다. BGProcessingTaskRequest는 earliestBeginDate=현재+2시간·네트워크 필요·외부 전원 불필요이며 이미 대기 중인 요청은 덮어쓰지 않는다. 실행 시작 시 다음 예약을 제출하고 시간 만료 핸들러는 작업 Task를 취소한다. setTaskCompleted는 비동기 작업 정리 후 한 번만 호출한다. 위젯 삭제 시 예약을 취소한다. 앱 활성 중에는 공유 prefetch Task를 사용하고 비활성 시 취소하며, 저장된 중간 결과를 유지한다. 새 Pod·사용자 권한 팝업·오디오 백그라운드 모드는 추가하지 않는다.

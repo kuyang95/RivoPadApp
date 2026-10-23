@@ -11,6 +11,8 @@ final class AccessibleWebBrowserTests: XCTestCase {
         XCTAssertEqual(AccessibleWebAddress.resolve("example.com:8443/shop")?.host, "example.com")
         XCTAssertEqual(AccessibleWebAddress.resolve("https://example.com/cart?q=1")?.path, "/cart")
         let search = try XCTUnwrap(AccessibleWebAddress.resolve("빨간 신발 & 가방"))
+        XCTAssertEqual(search.host, "www.google.com")
+        XCTAssertEqual(URLComponents(url: search, resolvingAgainstBaseURL: false)?.queryItems?.first?.name, "q")
         XCTAssertEqual(URLComponents(url: search, resolvingAgainstBaseURL: false)?.queryItems?.first?.value, "빨간 신발 & 가방")
         for unsafe in ["javascript:alert(1)", "data:text/html,hello", "file:///etc/hosts", "intent://shop", "tel:123", "   "] {
             XCTAssertNil(AccessibleWebAddress.resolve(unsafe), unsafe)
@@ -20,16 +22,16 @@ final class AccessibleWebBrowserTests: XCTestCase {
     func testThemePreservesMediaAndRestoresOriginalWithoutLosingFormValues() async throws {
         let web = try await fixture()
         let result = try await values(web)
-        XCTAssertEqual(result["body"], "rgb(0, 0, 0)")
-        XCTAssertEqual(result["text"], "rgb(240, 244, 250)")
-        XCTAssertEqual(result["button"], "rgb(23, 23, 23)")
-        XCTAssertEqual(result["link"], "rgb(255, 209, 102)")
+        XCTAssertEqual(result["body"], "rgb(32, 33, 36)")
+        XCTAssertEqual(result["text"], "rgb(241, 243, 244)")
+        XCTAssertEqual(result["button"], "rgb(41, 42, 45)")
+        XCTAssertEqual(result["link"], "rgb(241, 243, 244)")
         XCTAssertEqual(result["svg"], "rgb(255, 0, 0)")
         XCTAssertEqual(result["swatch"], "rgb(0, 128, 0)")
         XCTAssertTrue(result["photo"]?.contains("data:image") == true)
         XCTAssertTrue(result["backgroundPhoto"]?.contains("data:image") == true)
         XCTAssertEqual(result["gradient"], "none")
-        XCTAssertEqual(result["mask"], "rgb(240, 244, 250)")
+        XCTAssertEqual(result["mask"], "rgb(241, 243, 244)")
         XCTAssertEqual(result["indicator"], "rgb(187, 198, 215)")
 
         _ = try await web.evaluateJavaScript("document.querySelector('input').value = '선택한 상품';")
@@ -120,7 +122,7 @@ final class AccessibleWebBrowserTests: XCTestCase {
               });
             })()
             """) as? String
-        XCTAssertEqual(actual, #"{"stroke":"rgb(240, 244, 250)","hollow":"none","raster":true,"coloured":"none","pseudo":true,"sprite":true,"colouredCrop":"none","opaque":"none","textured":"none","logo":"rgb(51, 51, 51)","colourSVG":"rgb(224, 48, 32)","opaqueSVG":false}"#)
+        XCTAssertEqual(actual, #"{"stroke":"rgb(241, 243, 244)","hollow":"none","raster":true,"coloured":"none","pseudo":true,"sprite":true,"colouredCrop":"none","opaque":"none","textured":"none","logo":"rgb(51, 51, 51)","colourSVG":"rgb(224, 48, 32)","opaqueSVG":false}"#)
         try await setAppearance(web, enabled: true, palette: .light)
         try await wait(web, for: "getComputedStyle(document.getElementById('oneStroke')).stroke === 'rgb(40, 53, 70)'")
         _ = try await web.evaluateJavaScript("document.getElementById('two').src=window.replacementGraphic; true;")
@@ -141,16 +143,123 @@ final class AccessibleWebBrowserTests: XCTestCase {
             """)
         try await wait(web, for: "document.getElementById('dynamic').hasAttribute('data-rivo-web-surface')")
         let dynamicColor = try await web.evaluateJavaScript("getComputedStyle(document.getElementById('dynamic')).backgroundColor") as? String
-        XCTAssertEqual(dynamicColor, "rgb(23, 23, 23)")
+        XCTAssertEqual(dynamicColor, "rgb(41, 42, 45)")
         try await setAppearance(web, enabled: true, palette: .light)
         let light = try await values(web)
         XCTAssertEqual(light["body"], "rgb(255, 255, 255)")
-        try await setAppearance(web, enabled: true, palette: .contrast)
+        try await setAppearance(web, enabled: true, palette: .dark)
         let contrast = try await values(web)
-        XCTAssertEqual(contrast["text"], "rgb(255, 255, 0)")
+        XCTAssertEqual(contrast["text"], "rgb(241, 243, 244)")
         try await setAppearance(web, enabled: false)
         let originalColor = try await web.evaluateJavaScript("getComputedStyle(document.getElementById('dynamic')).backgroundColor") as? String
         XCTAssertEqual(originalColor, "rgb(255, 165, 0)")
+    }
+
+    func testPageZoomPreservesFixedFieldsAndHostPreferences() async throws {
+        let browser = AccessibleWebBrowserModel()
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = UIHostingController(rootView: AccessibleWebBrowserView(browser: browser))
+        window.makeKeyAndVisible()
+        defer { browser.shutdown(); window.isHidden = true; window.rootViewController = nil }
+        let web = browser.webView
+        let html = """
+        <!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
+        <style>body{margin:0}header{height:48px;display:flex;align-items:center;justify-content:flex-end}
+        button{font:14px/18px sans-serif;height:40px;box-sizing:border-box;margin:4px 16px;padding:10px 12px}
+        textarea{font:16px/24px sans-serif;height:24px;padding:0;border:0;overflow:hidden;display:block}</style>
+        <header><button id="login">로그인</button></header><textarea id="search">검색어 유지</textarea>
+        """
+        func load(_ host: String) async throws {
+            web.stopLoading()
+            web.loadHTMLString(html, baseURL: URL(string: "https://\(host)/page"))
+            try await wait(web, for: "location.hostname==='\(host)' && document.readyState==='complete' && !!document.getElementById('search')")
+            try await Task.sleep(for: .milliseconds(150))
+        }
+        try await load("zoom-one.test")
+        browser.setZoom(100)
+        try await Task.sleep(for: .milliseconds(100))
+        let normalViewportResult = try await web.evaluateJavaScript("window.innerWidth")
+        let normalViewport = try XCTUnwrap(normalViewportResult as? Double)
+        browser.setZoom(170)
+        try await Task.sleep(for: .milliseconds(100))
+        let enlargedViewportResult = try await web.evaluateJavaScript("window.innerWidth")
+        let enlargedViewport = try XCTUnwrap(enlargedViewportResult as? Double)
+        XCTAssertLessThan(enlargedViewport, normalViewport * 0.9, "Page zoom must reflow the viewport, not merely update a stored value")
+        XCTAssertEqual(web.pageZoom, 1.7, accuracy: 0.001)
+        let fits = try await web.evaluateJavaScript("document.getElementById('search').scrollHeight<=document.getElementById('search').clientHeight+1 && document.getElementById('login').getBoundingClientRect().top>=0") as? Bool
+        XCTAssertEqual(fits, true)
+        browser.appearanceEnabled = false
+        browser.applyAppearance()
+        XCTAssertEqual(web.pageZoom, 1.7, accuracy: 0.001)
+        let input = try await web.evaluateJavaScript("document.getElementById('search').value") as? String
+        XCTAssertEqual(input, "검색어 유지")
+        browser.setZoom(150)
+        try await load("zoom-two.test")
+        XCTAssertEqual(web.pageZoom, CGFloat(browser.defaultZoomPercent) / 100, accuracy: 0.001)
+        try await load("zoom-one.test")
+        XCTAssertEqual(browser.zoomPercent, 150)
+        XCTAssertEqual(web.pageZoom, 1.5, accuracy: 0.001)
+        browser.resetZoom()
+        XCTAssertEqual(web.pageZoom, CGFloat(browser.defaultZoomPercent) / 100, accuracy: 0.001)
+        browser.setZoom(100)
+        XCTAssertEqual(web.pageZoom, 1, accuracy: 0.001)
+    }
+
+    func testGooglePageZoomPreview() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["RIVO_CAPTURE_GOOGLE_ZOOM"] == "1", "Opt-in live-site capture")
+        let browser = AccessibleWebBrowserModel()
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: scene)
+        let host = UIHostingController(rootView: AccessibleWebBrowserView(browser: browser))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { browser.shutdown(); window.isHidden = true; window.rootViewController = nil }
+        browser.navigate("https://www.google.com/search?q=알리바바+완+2.2")
+        try await wait(browser.webView, for: "location.hostname.includes('google') && document.readyState==='complete' && !!document.querySelector('textarea,input[name=q]')", attempts: 600)
+        browser.setZoom(170)
+        try await Task.sleep(for: .seconds(2))
+        host.view.layoutIfNeeded()
+        let image = UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true) }
+        let folder = URL.documentsDirectory.appendingPathComponent("AccessibleWebPreview", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try image.pngData()?.write(to: folder.appendingPathComponent("google-pagezoom-ipad.png"))
+        let attachment = XCTAttachment(image: image)
+        attachment.name = "구글 페이지 확대 170% 실제 iPad"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    func testNaverModePreview() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["RIVO_CAPTURE_NAVER"] == "1", "Opt-in live-site capture")
+        let browser = AccessibleWebBrowserModel()
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: scene)
+        let host = UIHostingController(rootView: AccessibleWebBrowserView(browser: browser))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { browser.shutdown(); window.isHidden = true; window.rootViewController = nil }
+        browser.navigate("https://www.naver.com")
+        try await wait(browser.webView, for: "location.hostname.endsWith('naver.com') && document.readyState==='complete' && document.body.innerText.length>100", attempts: 600)
+        try await Task.sleep(for: .seconds(2)) // Let live-site feeds and image requests settle before capture.
+        for palette in [AccessibleWebPalette.light, .dark] {
+            browser.palette = palette
+            browser.applyAppearance()
+            try await wait(browser.webView, for: "getComputedStyle(document.documentElement).filter==='\("none")'")
+            _ = try await browser.webView.evaluateJavaScript("document.activeElement?.blur(); window.scrollTo(0,0); true;")
+            try await Task.sleep(for: .milliseconds(500))
+            host.view.layoutIfNeeded()
+            let image = UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in
+                host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
+            }
+            let folder = URL.documentsDirectory.appendingPathComponent("AccessibleWebPreview", isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try image.pngData()?.write(to: folder.appendingPathComponent("naver-\(palette.rawValue)-ipad.png"))
+            let attachment = XCTAttachment(image: image)
+            attachment.name = "네이버 \(palette.title) 실제 iPad 화면"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
     }
 
     func testBrowserScreenAndPopupSession() async throws {
@@ -218,8 +327,8 @@ final class AccessibleWebBrowserTests: XCTestCase {
         return web
     }
 
-    private func wait(_ web: WKWebView, for expression: String) async throws {
-        for _ in 0..<100 {
+    private func wait(_ web: WKWebView, for expression: String, attempts: Int = 100) async throws {
+        for _ in 0..<attempts {
             if (try? await web.evaluateJavaScript(expression)) as? Bool == true { return }
             try await Task.sleep(for: .milliseconds(50))
         }

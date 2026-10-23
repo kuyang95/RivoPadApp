@@ -453,6 +453,9 @@ struct EPUBOriginalLayoutView:
     let navigationRevision: Int
     let targetSegmentIndex: Int
     let style: EPUBOriginalMarkupStyle
+    var windowed = false
+    var active = true
+    var screenReader = false
     let onVisibleSegment: (Int) -> Void
     let onNavigationFinished:
         (Int, Int) -> Void
@@ -477,7 +480,7 @@ struct EPUBOriginalLayoutView:
         controller.addUserScript(
             WKUserScript(
                 source:
-                    Coordinator.bridgeScript,
+                    ReaderViewportWindow.source + "\n" + Coordinator.bridgeScript,
                 injectionTime:
                     .atDocumentEnd,
                 forMainFrameOnly: true
@@ -612,6 +615,9 @@ struct EPUBOriginalLayoutView:
                 EPUBOriginalLayoutView,
             webView: WKWebView
         ) {
+            windowed = view.windowed
+            active = view.active
+            screenReader = view.screenReader
             onVisibleSegment =
                 view.onVisibleSegment
             onNavigationFinished =
@@ -665,6 +671,7 @@ struct EPUBOriginalLayoutView:
                 )
                 return
             }
+            updateViewport(webView)
             guard lastNavigationRevision
                     != view.navigationRevision else {
                 return
@@ -787,6 +794,14 @@ struct EPUBOriginalLayoutView:
             }
         }
 
+        private var windowed = false
+        private var active = true
+        private var screenReader = false
+
+        private func updateViewport(_ webView: WKWebView) {
+            webView.evaluateJavaScript("window.__rivoReaderWindow?.configure(\(windowed), \(screenReader));window.__rivoReaderWindow?.setActive(\(active));", completionHandler: nil)
+        }
+
         private func configureAndNavigate(
             webView: WKWebView,
             revision: Int,
@@ -803,6 +818,8 @@ struct EPUBOriginalLayoutView:
             let script = """
             window.__rivoReader.configure(\(segmentCount), \(mapJSON));
             window.__rivoReader.scrollToSegment(\(target));
+            window.__rivoReaderWindow?.configure(\(windowed), \(screenReader));
+            window.__rivoReaderWindow?.setActive(\(active));
             """
             webView.evaluateJavaScript(
                 script
@@ -917,6 +934,11 @@ struct EPUBOriginalLayoutView:
                 state.positionedElement.classList.remove('rivo-reader-position');
                 state.positionedElement = null;
               }
+              // A target fragment may be inside a block whose descendants were evicted.
+              var targetId = Object.keys(state.fragments).sort(function(a,b) {
+                return Math.abs(state.fragments[a]-index)-Math.abs(state.fragments[b]-index);
+              })[0];
+              if (targetId && window.__rivoReaderWindow) window.__rivoReaderWindow.ensure(targetId);
               var nearest = null;
               var nearestDistance = Infinity;
               Object.keys(state.fragments).forEach(function(id) {

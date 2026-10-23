@@ -1,0 +1,1124 @@
+{
+  "version": 5,
+  "checkedAt": "2026-10-23",
+  "publishers": [
+    {
+      "id": "newsis",
+      "label": "뉴시스",
+      "group": "통신사",
+      "domains": [
+        "newsis.com"
+      ],
+      "coverage": "섹션(속보)",
+      "feeds": {
+        "sokbo": "https://www.newsis.com/RSS/sokbo.xml",
+        "society": "https://www.newsis.com/RSS/society.xml",
+        "economy": "https://www.newsis.com/RSS/economy.xml",
+        "culture": "https://www.newsis.com/RSS/culture.xml",
+        "politics": "https://www.newsis.com/RSS/politics.xml",
+        "world": "https://www.newsis.com/RSS/international.xml",
+        "technology": "https://www.newsis.com/RSS/health.xml",
+        "sports": "https://www.newsis.com/RSS/sports.xml",
+        "entertainment": "https://www.newsis.com/RSS/entertain.xml"
+      },
+      "reference": "https://www.newsis.com/RSS/sokbo.xml"
+    },
+    {
+      "id": "sbs",
+      "label": "SBS",
+      "group": "방송",
+      "domains": [
+        "sbs.co.kr"
+      ],
+      "coverage": "섹션(속보)",
+      "feeds": {
+        "sokbo": "https://news.sbs.co.kr/news/newsflashRssFeed.do?plink=RSSREADER",
+        "society": "https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=03&plink=RSSREADER",
+        "economy": "https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=02&plink=RSSREADER",
+        "culture": "https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=08&plink=RSSREADER",
+        "politics": "https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01&plink=RSSREADER",
+        "world": "https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=07&plink=RSSREADER",
+        "sports": "https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=09&plink=RSSREADER",
+        "entertainment": "https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=14&plink=RSSREADER"
+      },
+      "reference": "https://news.sbs.co.kr/news/newsflashRssFeed.do"
+    },
+    {
+      "id": "khan",
+      "label": "경향신문",
+      "group": "종합일간지",
+      "domains": [
+        "khan.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.khan.co.kr/rss/rssdata/total_news.xml",
+        "society": "https://www.khan.co.kr/rss/rssdata/society_news.xml",
+        "economy": "https://www.khan.co.kr/rss/rssdata/economy_news.xml",
+        "culture": "https://www.khan.co.kr/rss/rssdata/culture_news.xml"
+      },
+      "reference": "https://www.khan.co.kr/rss/rssdata/total_news.xml"
+    },
+    {
+      "id": "donga",
+      "label": "동아일보",
+      "group": "종합일간지",
+      "domains": [
+        "donga.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://rss.donga.com/total.xml",
+        "society": "https://rss.donga.com/national.xml",
+        "economy": "https://rss.donga.com/economy.xml",
+        "culture": "https://rss.donga.com/culture.xml",
+        "politics": "https://rss.donga.com/politics.xml",
+        "world": "https://rss.donga.com/international.xml",
+        "health": "https://rss.donga.com/health.xml",
+        "sports": "https://rss.donga.com/sports.xml",
+        "technology": "https://rss.donga.com/science.xml"
+      },
+      "reference": "https://rss.donga.com/total.xml"
+    },
+    {
+      "id": "etoday",
+      "label": "이투데이",
+      "group": "경제지",
+      "domains": [
+        "etoday.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://rss.etoday.co.kr/eto/etoday_news_all.xml",
+        "society": "https://rss.etoday.co.kr/eto/society_news.xml",
+        "economy": "https://rss.etoday.co.kr/eto/economy_news.xml",
+        "culture": "https://rss.etoday.co.kr/eto/culture-life_news.xml"
+      },
+      "reference": "https://rss.etoday.co.kr/eto/etoday_news_all.xml"
+    },
+    {
+      "id": "ohmy",
+      "label": "오마이뉴스",
+      "group": "인터넷 / 시사",
+      "domains": [
+        "ohmynews.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://rss.ohmynews.com/rss/ohmynews.xml",
+        "society": "https://rss.ohmynews.com/rss/society.xml",
+        "economy": "https://rss.ohmynews.com/rss/economy.xml",
+        "culture": "https://rss.ohmynews.com/rss/culture.xml"
+      },
+      "reference": "https://rss.ohmynews.com/rss/ohmynews.xml"
+    },
+    {
+      "id": "kmib",
+      "label": "국민일보",
+      "group": "종합일간지",
+      "domains": [
+        "kmib.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.kmib.co.kr/rss/data/kmibRssAll.xml",
+        "society": "https://www.kmib.co.kr/rss/data/kmibSocRss.xml",
+        "economy": "https://www.kmib.co.kr/rss/data/kmibEcoRss.xml",
+        "culture": "https://www.kmib.co.kr/rss/data/kmibLifeRss.xml"
+      },
+      "reference": "https://www.kmib.co.kr/rss/data/kmibRssAll.xml"
+    },
+    {
+      "id": "straight",
+      "label": "스트레이트뉴스",
+      "group": "종합일간지",
+      "domains": [
+        "straightnews.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.straightnews.co.kr/rss/allArticle.xml",
+        "society": "https://www.straightnews.co.kr/rss/S1N15.xml",
+        "economy": "https://www.straightnews.co.kr/rss/S1N14.xml",
+        "culture": "https://www.straightnews.co.kr/rss/S1N17.xml"
+      },
+      "reference": "https://www.straightnews.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "itdonga",
+      "label": "IT동아",
+      "group": "IT / 과학 / 전문",
+      "domains": [
+        "donga.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://it.donga.com/feeds/rss/"
+      },
+      "reference": "https://it.donga.com/feeds/rss/"
+    },
+    {
+      "id": "bloter",
+      "label": "블로터",
+      "group": "IT / 과학 / 전문",
+      "domains": [
+        "bloter.net"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://cdn.bloter.net/rss/gns_allArticle.xml"
+      },
+      "reference": "https://cdn.bloter.net/rss/gns_allArticle.xml"
+    },
+    {
+      "id": "etnews",
+      "label": "전자신문",
+      "group": "IT / 과학 / 전문",
+      "domains": [
+        "etnews.com"
+      ],
+      "coverage": "최신(Section901)",
+      "feeds": {
+        "sokbo": "https://rss.etnews.com/Section901.xml"
+      },
+      "reference": "https://rss.etnews.com/Section901.xml"
+    },
+    {
+      "id": "zdnet",
+      "label": "지디넷코리아",
+      "group": "IT / 과학 / 전문",
+      "domains": [
+        "zdnet.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://feeds.feedburner.com/zdkorea"
+      },
+      "reference": "https://feeds.feedburner.com/zdkorea"
+    },
+    {
+      "id": "kormedi",
+      "label": "코메디닷컴",
+      "group": "IT / 과학 / 전문",
+      "domains": [
+        "kormedi.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://kormedi.com/feed/"
+      },
+      "reference": "https://kormedi.com/feed/"
+    },
+    {
+      "id": "techm",
+      "label": "테크M",
+      "group": "IT / 과학 / 전문",
+      "domains": [
+        "techm.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.techm.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.techm.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "greenpostkorea",
+      "label": "그린포스트코리아",
+      "group": "건설 / 부동산 / 에너지",
+      "domains": [
+        "greenpostkorea.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.greenpostkorea.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.greenpostkorea.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "koscaj",
+      "label": "대한전문건설신문",
+      "group": "건설 / 부동산 / 에너지",
+      "domains": [
+        "koscaj.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.koscaj.com/rss/allArticle.xml"
+      },
+      "reference": "https://www.koscaj.com/rss/allArticle.xml"
+    },
+    {
+      "id": "e2news",
+      "label": "이투뉴스",
+      "group": "건설 / 부동산 / 에너지",
+      "domains": [
+        "e2news.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.e2news.com/rss/allArticle.xml"
+      },
+      "reference": "https://www.e2news.com/rss/allArticle.xml"
+    },
+    {
+      "id": "todayenergy",
+      "label": "투데이에너지",
+      "group": "건설 / 부동산 / 에너지",
+      "domains": [
+        "todayenergy.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.todayenergy.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.todayenergy.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "housingherald",
+      "label": "하우징헤럴드",
+      "group": "건설 / 부동산 / 에너지",
+      "domains": [
+        "housingherald.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.housingherald.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.housingherald.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "ebn",
+      "label": "EBN",
+      "group": "경제지",
+      "domains": [
+        "ebn.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://cdn.ebn.co.kr/rss/gns_allArticle.xml"
+      },
+      "reference": "https://cdn.ebn.co.kr/rss/gns_allArticle.xml"
+    },
+    {
+      "id": "newscape",
+      "label": "뉴스케이프",
+      "group": "경제지",
+      "domains": [
+        "newscape.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.newscape.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.newscape.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "mt",
+      "label": "머니투데이",
+      "group": "경제지",
+      "domains": [
+        "mt.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://rss.mt.co.kr/mt_news.xml"
+      },
+      "reference": "https://rss.mt.co.kr/mt_news.xml"
+    },
+    {
+      "id": "metroseoul",
+      "label": "메트로",
+      "group": "경제지",
+      "domains": [
+        "metroseoul.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.metroseoul.co.kr/news/rss"
+      },
+      "reference": "https://www.metroseoul.co.kr/news/rss"
+    },
+    {
+      "id": "viva100",
+      "label": "브릿지경제",
+      "group": "경제지",
+      "domains": [
+        "viva100.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.viva100.com/rssAll.xml"
+      },
+      "reference": "https://www.viva100.com/rssAll.xml"
+    },
+    {
+      "id": "seoulfn",
+      "label": "서울파이낸스",
+      "group": "경제지",
+      "domains": [
+        "seoulfn.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://cdn.seoulfn.com/rss/gn_rss_allArticle.xml"
+      },
+      "reference": "https://cdn.seoulfn.com/rss/gn_rss_allArticle.xml"
+    },
+    {
+      "id": "asiae",
+      "label": "아시아경제",
+      "group": "경제지",
+      "domains": [
+        "asiae.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://view.asiae.co.kr/rss/all.htm"
+      },
+      "reference": "https://view.asiae.co.kr/rss/all.htm"
+    },
+    {
+      "id": "chosun_biz",
+      "label": "조선비즈",
+      "group": "경제지",
+      "domains": [
+        "chosun.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://biz.chosun.com/arc/outboundfeeds/rss/?outputType=xml"
+      },
+      "reference": "https://biz.chosun.com/arc/outboundfeeds/rss/?outputType=xml"
+    },
+    {
+      "id": "joseilbo",
+      "label": "조세일보",
+      "group": "경제지",
+      "domains": [
+        "joseilbo.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.joseilbo.com/Contents/rss/rss_total.php"
+      },
+      "reference": "https://www.joseilbo.com/Contents/rss/rss_total.php"
+    },
+    {
+      "id": "newsprime",
+      "label": "프라임경제",
+      "group": "경제지",
+      "domains": [
+        "newsprime.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.newsprime.co.kr/data/rss/news.xml"
+      },
+      "reference": "https://www.newsprime.co.kr/data/rss/news.xml"
+    },
+    {
+      "id": "labortoday",
+      "label": "매일노동뉴스",
+      "group": "교육 / 법률 / 노동",
+      "domains": [
+        "labortoday.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.labortoday.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.labortoday.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "lawtimes",
+      "label": "법률신문",
+      "group": "교육 / 법률 / 노동",
+      "domains": [
+        "lawtimes.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://cdn.lawtimes.co.kr/rss/gn_rss_allArticle.xml"
+      },
+      "reference": "https://cdn.lawtimes.co.kr/rss/gn_rss_allArticle.xml"
+    },
+    {
+      "id": "veritas_a",
+      "label": "베리타스알파",
+      "group": "교육 / 법률 / 노동",
+      "domains": [
+        "veritas-a.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.veritas-a.com/rss/allArticle.xml"
+      },
+      "reference": "https://www.veritas-a.com/rss/allArticle.xml"
+    },
+    {
+      "id": "hangyo",
+      "label": "한국교육신문",
+      "group": "교육 / 법률 / 노동",
+      "domains": [
+        "hangyo.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.hangyo.com/data/rss/news.xml"
+      },
+      "reference": "https://www.hangyo.com/data/rss/news.xml"
+    },
+    {
+      "id": "newsfc",
+      "label": "금융소비자뉴스",
+      "group": "금융 / 보험 전문지",
+      "domains": [
+        "newsfc.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.newsfc.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.newsfc.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "kbanker",
+      "label": "대한금융신문",
+      "group": "금융 / 보험 전문지",
+      "domains": [
+        "kbanker.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.kbanker.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.kbanker.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "fins",
+      "label": "보험매일",
+      "group": "금융 / 보험 전문지",
+      "domains": [
+        "fins.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.fins.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.fins.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "insjournal",
+      "label": "보험저널",
+      "group": "금융 / 보험 전문지",
+      "domains": [
+        "insjournal.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.insjournal.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.insjournal.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "ftoday",
+      "label": "파이낸셜투데이",
+      "group": "금융 / 보험 전문지",
+      "domains": [
+        "ftoday.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.ftoday.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.ftoday.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "insnews",
+      "label": "한국보험신문",
+      "group": "금융 / 보험 전문지",
+      "domains": [
+        "insnews.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.insnews.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.insnews.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "aflnews",
+      "label": "농수축산신문",
+      "group": "농업 / 환경",
+      "domains": [
+        "aflnews.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.aflnews.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.aflnews.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "ikpnews",
+      "label": "한국농정신문",
+      "group": "농업 / 환경",
+      "domains": [
+        "ikpnews.net"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.ikpnews.net/rss/allArticle.xml"
+      },
+      "reference": "https://www.ikpnews.net/rss/allArticle.xml"
+    },
+    {
+      "id": "mbn",
+      "label": "MBN",
+      "group": "방송",
+      "domains": [
+        "mbn.co.kr"
+      ],
+      "coverage": "정치",
+      "feeds": {
+        "sokbo": "https://www.mbn.co.kr/rss/politics/"
+      },
+      "reference": "https://www.mbn.co.kr/rss/politics/"
+    },
+    {
+      "id": "tvchosun",
+      "label": "TV조선",
+      "group": "방송",
+      "domains": [
+        "tvchosun.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://news.tvchosun.com/site/data/rss/rss.xml"
+      },
+      "reference": "https://news.tvchosun.com/site/data/rss/rss.xml"
+    },
+    {
+      "id": "sportschosun",
+      "label": "스포츠조선",
+      "group": "스포츠 / 연예",
+      "domains": [
+        "sportschosun.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.sportschosun.com/rss/index_all.htm"
+      },
+      "reference": "https://www.sportschosun.com/rss/index_all.htm"
+    },
+    {
+      "id": "tenasia",
+      "label": "텐아시아",
+      "group": "스포츠 / 연예",
+      "domains": [
+        "tenasia.co.kr"
+      ],
+      "coverage": "음악",
+      "feeds": {
+        "sokbo": "https://www.tenasia.co.kr/rss/music/"
+      },
+      "reference": "https://www.tenasia.co.kr/rss/music/"
+    },
+    {
+      "id": "rapportian",
+      "label": "라포르시안",
+      "group": "의약 / 바이오",
+      "domains": [
+        "rapportian.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.rapportian.com/rss/allArticle.xml"
+      },
+      "reference": "https://www.rapportian.com/rss/allArticle.xml"
+    },
+    {
+      "id": "doctorsnews",
+      "label": "의협신문",
+      "group": "의약 / 바이오",
+      "domains": [
+        "doctorsnews.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.doctorsnews.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.doctorsnews.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "docdocdoc",
+      "label": "청년의사",
+      "group": "의약 / 바이오",
+      "domains": [
+        "docdocdoc.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.docdocdoc.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.docdocdoc.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "pharmnews",
+      "label": "팜뉴스",
+      "group": "의약 / 바이오",
+      "domains": [
+        "pharmnews.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.pharmnews.com/rss/allArticle.xml"
+      },
+      "reference": "https://www.pharmnews.com/rss/allArticle.xml"
+    },
+    {
+      "id": "hitnews",
+      "label": "히트뉴스",
+      "group": "의약 / 바이오",
+      "domains": [
+        "hitnews.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.hitnews.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.hitnews.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "nocutnews",
+      "label": "노컷뉴스",
+      "group": "인터넷 / 시사",
+      "domains": [
+        "nocutnews.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://rss.nocutnews.co.kr/news/news.xml"
+      },
+      "reference": "https://rss.nocutnews.co.kr/news/news.xml"
+    },
+    {
+      "id": "dailynk",
+      "label": "데일리NK",
+      "group": "인터넷 / 시사",
+      "domains": [
+        "dailynk.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.dailynk.com/feed/"
+      },
+      "reference": "https://www.dailynk.com/feed/"
+    },
+    {
+      "id": "mediaus",
+      "label": "미디어스",
+      "group": "인터넷 / 시사",
+      "domains": [
+        "mediaus.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.mediaus.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.mediaus.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "mediatoday",
+      "label": "미디어오늘",
+      "group": "인터넷 / 시사",
+      "domains": [
+        "mediatoday.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.mediatoday.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.mediatoday.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "sisaweek",
+      "label": "시사위크",
+      "group": "인터넷 / 시사",
+      "domains": [
+        "sisaweek.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.sisaweek.com/rss/allArticle.xml"
+      },
+      "reference": "https://www.sisaweek.com/rss/allArticle.xml"
+    },
+    {
+      "id": "sisajournal",
+      "label": "시사저널",
+      "group": "인터넷 / 시사",
+      "domains": [
+        "sisajournal.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.sisajournal.com/rss/allArticle.xml"
+      },
+      "reference": "https://www.sisajournal.com/rss/allArticle.xml"
+    },
+    {
+      "id": "polinews",
+      "label": "폴리뉴스",
+      "group": "인터넷 / 시사",
+      "domains": [
+        "polinews.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.polinews.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.polinews.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "pressian",
+      "label": "프레시안",
+      "group": "인터넷 / 시사",
+      "domains": [
+        "pressian.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.pressian.com/api/v3/site/rss/news"
+      },
+      "reference": "https://www.pressian.com/api/v3/site/rss/news"
+    },
+    {
+      "id": "journalist",
+      "label": "한국기자협회",
+      "group": "인터넷 / 시사",
+      "domains": [
+        "journalist.or.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.journalist.or.kr/data/rss/news.xml"
+      },
+      "reference": "https://www.journalist.or.kr/data/rss/news.xml"
+    },
+    {
+      "id": "motorgraph",
+      "label": "모터그래프",
+      "group": "자동차 / 산업",
+      "domains": [
+        "motorgraph.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.motorgraph.com/rss/allArticle.xml"
+      },
+      "reference": "https://www.motorgraph.com/rss/allArticle.xml"
+    },
+    {
+      "id": "autoherald",
+      "label": "오토헤럴드",
+      "group": "자동차 / 산업",
+      "domains": [
+        "autoherald.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.autoherald.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.autoherald.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "seoul",
+      "label": "서울신문",
+      "group": "종합일간지",
+      "domains": [
+        "seoul.co.kr"
+      ],
+      "coverage": "기획",
+      "feeds": {
+        "sokbo": "https://www.seoul.co.kr/xml/rss/google_plan.xml"
+      },
+      "reference": "https://www.seoul.co.kr/xml/rss/google_plan.xml"
+    },
+    {
+      "id": "segye",
+      "label": "세계일보",
+      "group": "종합일간지",
+      "domains": [
+        "segye.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.segye.com/Articles/RSSList/segye_recent.xml"
+      },
+      "reference": "https://www.segye.com/Articles/RSSList/segye_recent.xml"
+    },
+    {
+      "id": "chosun",
+      "label": "조선일보",
+      "group": "종합일간지",
+      "domains": [
+        "chosun.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml"
+      },
+      "reference": "https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml"
+    },
+    {
+      "id": "kado",
+      "label": "강원도민일보",
+      "group": "지역지",
+      "domains": [
+        "kado.net"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.kado.net/rss/allArticle.xml"
+      },
+      "reference": "https://www.kado.net/rss/allArticle.xml"
+    },
+    {
+      "id": "idomin",
+      "label": "경남도민일보",
+      "group": "지역지",
+      "domains": [
+        "idomin.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.idomin.com/rss/allArticle.xml"
+      },
+      "reference": "https://www.idomin.com/rss/allArticle.xml"
+    },
+    {
+      "id": "daejonilbo",
+      "label": "대전일보",
+      "group": "지역지",
+      "domains": [
+        "daejonilbo.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.daejonilbo.com/rss/allArticle.xml"
+      },
+      "reference": "https://www.daejonilbo.com/rss/allArticle.xml"
+    },
+    {
+      "id": "incheonilbo",
+      "label": "인천일보",
+      "group": "지역지",
+      "domains": [
+        "incheonilbo.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.incheonilbo.com/rss/allArticle.xml"
+      },
+      "reference": "https://www.incheonilbo.com/rss/allArticle.xml"
+    },
+    {
+      "id": "jnilbo",
+      "label": "전남일보",
+      "group": "지역지",
+      "domains": [
+        "jnilbo.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://cdn.jnilbo.com/rss/gn_rss_allArticle.xml"
+      },
+      "reference": "https://cdn.jnilbo.com/rss/gn_rss_allArticle.xml"
+    },
+    {
+      "id": "jjan",
+      "label": "전북일보",
+      "group": "지역지",
+      "domains": [
+        "jjan.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.jjan.kr/news/rssAll"
+      },
+      "reference": "https://www.jjan.kr/news/rssAll"
+    },
+    {
+      "id": "jejunews",
+      "label": "제주일보",
+      "group": "지역지",
+      "domains": [
+        "jejunews.com"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.jejunews.com/rss/allArticle.xml"
+      },
+      "reference": "https://www.jejunews.com/rss/allArticle.xml"
+    },
+    {
+      "id": "cctoday",
+      "label": "충청투데이",
+      "group": "지역지",
+      "domains": [
+        "cctoday.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.cctoday.co.kr/rss/allArticle.xml"
+      },
+      "reference": "https://www.cctoday.co.kr/rss/allArticle.xml"
+    },
+    {
+      "id": "ihalla",
+      "label": "한라일보",
+      "group": "지역지",
+      "domains": [
+        "ihalla.com"
+      ],
+      "coverage": "피드 section=73",
+      "feeds": {
+        "sokbo": "https://www.ihalla.com/rss.php?section=73"
+      },
+      "reference": "https://www.ihalla.com/rss.php?section=73"
+    },
+    {
+      "id": "yna",
+      "label": "연합뉴스",
+      "group": "통신사",
+      "domains": [
+        "yna.co.kr"
+      ],
+      "coverage": "전체",
+      "feeds": {
+        "sokbo": "https://www.yna.co.kr/rss/news.xml"
+      },
+      "reference": "https://www.yna.co.kr/rss/news.xml"
+    }
+  ],
+  "excluded": [
+    {
+      "label": "한겨레",
+      "url": "https://www.hani.co.kr/rss/",
+      "reason": "HTTP Error 403: Forbidden"
+    },
+    {
+      "label": "매일경제",
+      "url": "https://www.mk.co.kr/rss/30000001/",
+      "reason": "HTTP Error 403: Forbidden"
+    },
+    {
+      "label": "서울경제",
+      "url": "https://www.sedaily.com/rss/newsall",
+      "reason": "HTTP Error 403: Forbidden"
+    },
+    {
+      "label": "아주경제",
+      "url": "https://www.ajunews.com/rss/sokbo.xml",
+      "reason": "HTTP Error 403: Forbidden"
+    },
+    {
+      "label": "이데일리",
+      "url": "https://rss.edaily.co.kr/edaily_news.xml",
+      "reason": "<urlopen error [Errno 54] Connection reset by peer>"
+    },
+    {
+      "label": "파이낸셜뉴스",
+      "url": "https://www.fnnews.com/rss/r20/fn_realnews_all.xml",
+      "reason": "HTTP Error 403: Forbidden"
+    },
+    {
+      "label": "한국경제",
+      "url": "https://www.hankyung.com/feed/all-news",
+      "reason": "HTTP Error 403: Forbidden"
+    },
+    {
+      "label": "헤럴드경제",
+      "url": "https://biz.heraldcorp.com/rss/google/newsAll",
+      "reason": "HTTP Error 403: Forbidden"
+    },
+    {
+      "label": "바이라인네트워크",
+      "url": "https://byline.network/feed/",
+      "reason": "HTTP Error 403: Forbidden"
+    },
+    {
+      "label": "보안뉴스",
+      "url": "https://www.boannews.com/media/news_rss.xml",
+      "reason": "syntax error: line 1, column 0"
+    },
+    {
+      "label": "아이뉴스24",
+      "url": "https://www.inews24.com/rss/news_all.xml",
+      "reason": "HTTP Error 403: Forbidden"
+    },
+    {
+      "label": "JTBC",
+      "url": "https://fs.jtbc.co.kr/RSS/newsflash.xml",
+      "reason": "공개 피드의 최근 기사 시각이 2024년으로 갱신 중단"
+    },
+    {
+      "label": "연합뉴스TV",
+      "url": "https://www.yonhapnewstv.co.kr/browse/feed/",
+      "reason": "HTTP Error 403: Forbidden"
+    },
+    {
+      "label": "시사IN",
+      "url": "https://www.sisain.co.kr/rss/allArticle.xml",
+      "reason": "2024년 기사와 이전 제작 서버 링크로 갱신 중단"
+    },
+    {
+      "label": "주간경향",
+      "url": "https://weekly.khan.co.kr/rss/rssdata/world_news.xml",
+      "reason": "HTTP Error 403: Forbidden"
+    },
+    {
+      "label": "한겨레21",
+      "url": "https://h21.hani.co.kr/rss/",
+      "reason": "HTTP Error 403: Forbidden"
+    },
+    {
+      "label": "OSEN",
+      "url": "https://rss.mt.co.kr/osen_news.xml",
+      "reason": "공개 피드의 최근 기사 시각이 2011년으로 갱신 중단"
+    },
+    {
+      "label": "일간스포츠",
+      "url": "https://isplus.com/rss",
+      "reason": "HTTP Error 502: Bad Gateway"
+    },
+    {
+      "label": "MBC",
+      "url": "https://imnews.imbc.com/rss/news/news_00.xml",
+      "ok": false,
+      "error": "mismatched tag: line 40, column 2"
+    },
+    {
+      "label": "YTN",
+      "url": "https://www.ytn.co.kr/_rss/all.xml",
+      "ok": false,
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "label": "KBS WORLD 한국어",
+      "url": "https://world.kbs.co.kr/rss/rss_enternews.htm?lang=k",
+      "ok": false,
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "label": "뉴스1",
+      "url": "https://www.news1.kr/rss/industry.xml",
+      "ok": false,
+      "count": 0,
+      "entries": []
+    }
+  ],
+  "topicPolicy": "Latest is derived only from user-selected section feeds. Generic sokbo feeds are catalog references, never a fallback for a topic. Default: society,economy,culture."
+}

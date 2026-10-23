@@ -53,6 +53,7 @@ struct shortcuts_exampleApp: App {
             return
         }
         #endif
+        LauncherNewsBackgroundTasks.register()
         FirebaseRuntime.configureIfAvailable()
         AppBootstrap.prepareAppGroup()
         _ = TTSManager.shared
@@ -201,6 +202,10 @@ struct shortcuts_exampleApp: App {
                                         .localAIChat
                                     )
                             }
+                        case .launcherQuestion(let question):
+                            LLMContentView(intent: .launcherQuestion(question: question))
+                                .onAppear { rivoScreenRemoteControlCenter.activate(.localAIChat) }
+                                .onDisappear { rivoScreenRemoteControlCenter.deactivate(.localAIChat) }
                         case .voiceQuestion(let question):
                             LLMContentView(
                                 intent: .voiceQuestion(
@@ -704,6 +709,7 @@ struct shortcuts_exampleApp: App {
             .task {
                 #if DEBUG
                 if await LocalLLMBenchmark.runIfRequested() { return }
+                LauncherNewsRefresh.applicationActive(scenePhase == .active)
                 #endif
                 visionLinkManager
                     .setApplicationActive(
@@ -719,6 +725,10 @@ struct shortcuts_exampleApp: App {
             }
           //  .onAppear { router.consumeLastIfNeeded() }
             .onChange(of: scenePhase) { _, phase in
+                #if DEBUG
+                LauncherNewsRefresh.applicationActive(phase == .active)
+                if phase == .background { LauncherNewsRefresh.endReadingSession(); LauncherNewsBackgroundTasks.schedule() }
+                #endif
                 visionLinkManager
                     .setApplicationActive(
                         phase == .active
@@ -1256,7 +1266,7 @@ struct shortcuts_exampleApp: App {
         case .appOrientation(let action):
             updateAppOrientation(action)
         case .home:
-            path = NavigationPath()
+            if !appRouter.requestLauncherHome() { path = NavigationPath() }
         case .back:
             if !path.isEmpty {
                 path.removeLast()

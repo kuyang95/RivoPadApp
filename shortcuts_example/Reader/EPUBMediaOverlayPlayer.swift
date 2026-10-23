@@ -156,6 +156,11 @@ actor EPUBMediaOverlayResourceStore {
         return destination
     }
 
+    func releaseIdleResources() {
+        // Extracted files stay on disk until this book session ends; a rapid resume can reuse them.
+        archive = nil
+    }
+
     private func loadedArchive() throws -> EPUBArchive {
         if let archive {
             return archive
@@ -945,6 +950,18 @@ final class EPUBMediaOverlayPlaybackController:
                 )
         }
         isPlaying = false
+    }
+
+    /// Preserve the reading/playback position while dropping an idle AVPlayerItem and speech buffer.
+    func releaseIdleAudio() {
+        guard !isPlaying else { return }
+        cancelLoad()
+        removeEndObserver()
+        pendingAudioStartSeconds = currentTimeSeconds
+        stopSpeech()
+        player.replaceCurrentItem(with: nil)
+        loadedItemID = nil
+        Task { await resourceStore.releaseIdleResources() }
     }
 
     func stop() {

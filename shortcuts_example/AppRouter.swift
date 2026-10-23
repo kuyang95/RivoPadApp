@@ -16,6 +16,15 @@ final class AppRouter: ObservableObject {
     @Published private(set) var textSourceRequestID:
         UInt64 = 0
 
+    var launcherIsVisible = false
+    @Published private(set) var launcherHomeRequestID: UInt64 = 0
+
+    func requestLauncherHome() -> Bool {
+        guard launcherIsVisible else { return false }
+        launcherHomeRequestID &+= 1
+        return true
+    }
+
     func requestFileImport() {
         fileImportRequestID &+= 1
     }
@@ -62,6 +71,7 @@ enum AppRoute: Hashable {
         question: String,
         speaksResponse: Bool
     )
+    case launcherQuestion(question: String)
     case voiceQuestion(question: String)
     case sharedTextQuestion(
         text: String,

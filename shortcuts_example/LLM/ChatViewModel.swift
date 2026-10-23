@@ -404,7 +404,7 @@ final class ChatViewModel: ObservableObject {
         switch intent {
         case .textChat:
             break
-        case .voiceQuestion(let question):
+        case .voiceQuestion(let question), .launcherQuestion(let question):
             input = question
             sendUserMessage()
         case .sharedTextQuestion(
@@ -445,6 +445,7 @@ final class ChatViewModel: ObservableObject {
                 loadedKind = .vision
             case .textChat,
                  .voiceQuestion,
+             .launcherQuestion,
                  .sharedTextQuestion,
                  .sharedAttachmentQuestion:
                 if fileAttachment?.kind
@@ -488,6 +489,7 @@ final class ChatViewModel: ObservableObject {
         switch intent {
         case .textChat,
              .voiceQuestion,
+             .launcherQuestion,
              .sharedTextQuestion,
              .sharedAttachmentQuestion:
             return

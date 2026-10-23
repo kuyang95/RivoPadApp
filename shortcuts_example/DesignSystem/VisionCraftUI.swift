@@ -438,10 +438,11 @@ private struct VisionCraftNavigationScreenModifier: ViewModifier {
 }
 
 private struct VisionCraftListScreenModifier: ViewModifier {
+    let background: Color
     func body(content: Content) -> some View {
         content
             .scrollContentBackground(.hidden)
-            .background(VisionCraftUI.background.ignoresSafeArea())
+            .background(background.ignoresSafeArea())
             .tint(VisionCraftUI.primary)
             .toolbarBackground(VisionCraftUI.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -641,8 +642,8 @@ extension View {
         modifier(VisionCraftNavigationScreenModifier())
     }
 
-    func visionCraftListScreen() -> some View {
-        modifier(VisionCraftListScreenModifier())
+    func visionCraftListScreen(background: Color = VisionCraftUI.background) -> some View {
+        modifier(VisionCraftListScreenModifier(background: background))
     }
 
     func visionCraftRouteBackButton() -> some View {

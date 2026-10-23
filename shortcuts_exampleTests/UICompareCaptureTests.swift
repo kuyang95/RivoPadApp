@@ -1,6 +1,7 @@
 import RivoDocumentEngine
 import SwiftUI
 import UIKit
+import WebKit
 import XCTest
 @testable import shortcuts_example
 
@@ -63,6 +64,157 @@ final class UICompareCaptureTests: XCTestCase {
         else { UserDefaults.standard.removeObject(forKey: "RecentOriginalDocumentStore.records.v1") }
         try? FileManager.default.removeItem(at: workDirectory)
         flushLog()
+    }
+
+    // MARK: - Text source selection
+
+    func testDaisyWidgetCanEnterAndReenterInsideAppNavigation() async throws {
+        let holder = PathHolder()
+        await showRoot(PushedRoot(holder: holder) {
+            RatioDaisyWidgetView()
+                .environmentObject(RivoScreenRemoteControlCenter())
+        })
+        for _ in 0..<2 {
+            holder.path.append(1)
+            let picker = await waitFor(timeout: 8) { $0.label.contains("도서 파일 선택") }
+            XCTAssertNotNil(picker)
+            XCTAssertFalse(elements().contains { $0.label == "위젯 설정" })
+            capture("ratio-daisy-page")
+            holder.path.removeLast()
+            await pump(0.8)
+        }
+        XCTAssertTrue(holder.path.isEmpty)
+    }
+
+    func testLauncherUtilityWidgetControls() async throws {
+        let saved = UserDefaults.standard.data(forKey: "ratio.home.widgets.v2")
+        await show(VStack(alignment: .leading, spacing: 12) {
+                RatioUtilityWidget(widget: RatioHomeItem(id: "widget:weather", name: "날씨", columns: 2, rows: 3), active: false, onEdit: {})
+                    .frame(width: 360, height: 288)
+                RatioUtilityWidget(widget: RatioHomeItem(id: "widget:timer", name: "타이머", columns: 4, rows: 3), active: false, onEdit: {})
+                    .frame(height: 388)
+                Spacer()
+            }.padding(32).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background { GeometryReader { geometry in Image("RatioForestMist").resizable().scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height).clipped().overlay(Color.black.opacity(0.7)) } }
+        )
+        await pump(1)
+        XCTAssertTrue(elements().contains { $0.label == "지역 선택" })
+        XCTAssertTrue(elements().contains { $0.label == "시작" })
+        XCTAssertTrue(elements().contains { $0.label == "알람" })
+        capture("ratio-utility-widgets")
+        XCTAssertEqual(saved, UserDefaults.standard.data(forKey: "ratio.home.widgets.v2"))
+    }
+
+    func testLauncherSingleStylePreservesSavedLayout() async throws {
+        await show(RatioLauncherView().environmentObject(RivoScreenRemoteControlCenter()))
+        let pageDot = await waitFor(timeout: 8) { $0.label.contains("페이지 중") }
+        let dot = try XCTUnwrap(pageDot)
+        let count = try XCTUnwrap(Int(dot.label.components(separatedBy: "페이지")[0]))
+        let saved = UserDefaults.standard.data(forKey: "ratio.home.widgets.v2")
+        let names = ["잉크 + 레몬", "종이 + 잉크", "사진 + 단정한 타일"]
+        for index in 0..<min(count, 2) {
+            try await activate(label: "\(count)페이지 중 \(index + 1)페이지")
+            await pump(1)
+            XCTAssertFalse(elements().contains { names.contains($0.label) })
+            capture("ratio-single-style-\(index + 1)")
+        }
+        XCTAssertEqual(saved, UserDefaults.standard.data(forKey: "ratio.home.widgets.v2"))
+        try await activate(label: "\(count)페이지 중 1페이지")
+    }
+
+    func testLauncherFeaturePagesShowWallpaperWithoutWidgetChrome() async throws {
+        let savedLayout = UserDefaults.standard.data(forKey: "ratio.home.widgets.v2")
+        await show(RatioLauncherView().environmentObject(RivoScreenRemoteControlCenter()))
+        let pageDot = await waitFor(timeout: 8) { $0.label.contains("페이지 중") }
+        let dot = try XCTUnwrap(pageDot)
+        let count = try XCTUnwrap(Int(dot.label.components(separatedBy: "페이지")[0]))
+        XCTAssertGreaterThanOrEqual(count, 4)
+        for index in (count - 2)...count {
+            try await activate(label: "\(count)페이지 중 \(index)페이지")
+            await pump(2)
+            XCTAssertFalse(elements().contains { $0.label == "이전 화면" })
+            XCTAssertFalse(elements().contains { $0.label == "위젯 설정" })
+            XCTAssertFalse(elements().contains { $0.label == "이지 유튜브" })
+            capture("ratio-clear-page-\(index)")
+        }
+        try await activate(label: "\(count)페이지 중 1페이지")
+        XCTAssertEqual(savedLayout, UserDefaults.standard.data(forKey: "ratio.home.widgets.v2"))
+    }
+
+    func testWebWidgetsTrackDragAndSettleWithoutRemovingSource() async throws {
+        let savedLayout = UserDefaults.standard.data(forKey: "ratio.home.widgets.v2")
+        await show(RatioLauncherView().environmentObject(RivoScreenRemoteControlCenter()))
+        let pageDot = await waitFor(timeout: 8) { $0.label.contains("페이지 중") }
+        let dot = try XCTUnwrap(pageDot)
+        let count = try XCTUnwrap(Int(dot.label.components(separatedBy: "페이지")[0]))
+        let window = try XCTUnwrap(window)
+        var checked = 0
+        for index in 1...count {
+            try await activate(label: "\(count)페이지 중 \(index)페이지")
+            await pump(0.6)
+            guard let web = allViews(in: window).compactMap({ $0 as? WKWebView }).first(where: {
+                $0.convert($0.bounds, to: window).intersection(window.bounds).width > $0.bounds.width * 0.95
+            }), let swipe = web.gestureRecognizers?.compactMap({ $0.delegate as? LauncherWebPageSwipe }).first else { continue }
+            for _ in 0..<40 {
+                swipe.prepare(at: CGPoint(x: web.bounds.width * 0.5, y: web.bounds.height * 0.45))
+                await pump(0.05)
+                if swipe.eligible { break }
+            }
+            XCTAssertTrue(swipe.eligible)
+            let origin = web.convert(.zero, to: window).x
+            // A short/cancelled pan returns the same native view to its original position.
+            swipe.update(translation: CGPoint(x: -80, y: 0))
+            await pump(0.1)
+            XCTAssertLessThan(web.convert(.zero, to: window).x, origin - 40)
+            XCTAssertNotNil(web.superview)
+            swipe.finish(translation: CGPoint(x: -80, y: 0), cancelled: true)
+            await pump(0.6)
+            XCTAssertEqual(web.convert(.zero, to: window).x, origin, accuracy: 2)
+            swipe.prepare(at: CGPoint(x: web.bounds.width * 0.5, y: web.bounds.height * 0.45))
+            await pump(0.1)
+            let distance = -web.bounds.width * 0.3
+            swipe.update(translation: CGPoint(x: distance, y: 0))
+            await pump(0.1)
+            XCTAssertEqual(web.convert(.zero, to: window).x, origin + distance, accuracy: 3)
+            capture("ratio-web-drag-\(index)")
+            swipe.finish(translation: CGPoint(x: distance, y: 0))
+            await pump(0.6)
+            XCTAssertTrue(elements().contains { $0.label == "\(count)페이지 중 \(min(count,index+1))페이지" && $0.traits.contains(.selected) })
+            checked += 1
+        }
+        XCTAssertEqual(checked, 2)
+        try await activate(label: "\(count)페이지 중 1페이지")
+        XCTAssertEqual(savedLayout, UserDefaults.standard.data(forKey: "ratio.home.widgets.v2"))
+    }
+
+    func testTextSourceReplacesEditorUntilClipboardLoads() async throws {
+        let savedClipboard = UIPasteboard.general.items
+        defer { UIPasteboard.general.items = savedClipboard }
+        UIPasteboard.general.string = ""
+        await show(
+            TextEditorViewerView(title: "텍스트", text: "")
+                .environmentObject(RivoScreenRemoteControlCenter())
+        )
+        let source = await waitFor(timeout: 5) { $0.identifier == "text.source.clipboard" }
+        XCTAssertNotNil(source)
+        XCTAssertFalse(elements().contains { $0.label.contains("여기에 텍스트를 입력하세요.") })
+        XCTAssertFalse(elements().contains { $0.label == "에디터 메뉴 열기" })
+        capture("text-source-selection")
+
+        try await activate { $0.identifier == "text.source.clipboard" }
+        let emptyFeedback = await waitFor(timeout: 3) { $0.label == "클립보드가 비었습니다." }
+        XCTAssertNotNil(emptyFeedback)
+        XCTAssertTrue(elements().contains { $0.identifier == "text.source.clipboard" })
+        capture("text-source-empty-clipboard")
+
+        UIPasteboard.general.string = "가져온 본문만 표시합니다."
+        try await activate { $0.identifier == "text.source.clipboard" }
+        let loaded = await waitFor(timeout: 5) { $0.label == "가져온 본문만 표시합니다." }
+        XCTAssertNotNil(loaded)
+        XCTAssertFalse(elements().contains { $0.identifier.hasPrefix("text.source.") })
+        XCTAssertTrue(elements().contains { $0.label == "에디터 메뉴 열기" })
+        capture("text-source-loaded")
     }
 
     // MARK: - Library and legacy XLS
