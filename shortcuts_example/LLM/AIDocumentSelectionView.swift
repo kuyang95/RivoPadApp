@@ -246,7 +246,18 @@ struct AIDocumentSelectionRow: View {
 
     var body: some View {
         let opener = AIDocumentOriginalOpener(pathExtension: item.pathExtension)
-        return Button {
+        // The open button sits over the row's end; VoiceOver reads the row first, then its button.
+        return ZStack(alignment: .trailing) {
+            rowButton(opener: opener)
+            if let opener {
+                openButton(opener)
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func rowButton(opener: AIDocumentOriginalOpener?) -> some View {
+        Button {
             onOpen()
         } label: {
             HStack(spacing: 14) {
@@ -283,27 +294,27 @@ struct AIDocumentSelectionRow: View {
         .buttonStyle(VisionCraftHomePressStyle())
         .disabled(isImporting)
         .accessibilityLabel("\(item.name). \(item.relativePath)")
-        .overlay(alignment: .trailing) {
-            if let opener {
-                Button {
-                    onOpenOriginal()
-                } label: {
-                    Image(systemName: opener.systemImage)
-                        .font(.title3)
-                        .foregroundStyle(VisionCraftUI.icon)
-                        .frame(
-                            width: VisionCraftUI.minTouchTarget,
-                            height: VisionCraftUI.minTouchTarget
-                        )
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .padding(.trailing, 8)
-                .disabled(isImporting)
-                .opacity(isImporting ? 0.38 : 1)
-                .accessibilityLabel(AppLocalization.string(opener.labelKey))
-            }
+        .accessibilitySortPriority(1)
+    }
+
+    private func openButton(_ opener: AIDocumentOriginalOpener) -> some View {
+        Button {
+            onOpenOriginal()
+        } label: {
+            Image(systemName: opener.systemImage)
+                .font(.title3)
+                .foregroundStyle(VisionCraftUI.icon)
+                .frame(
+                    width: VisionCraftUI.minTouchTarget,
+                    height: VisionCraftUI.minTouchTarget
+                )
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .padding(.trailing, 8)
+        .disabled(isImporting)
+        .opacity(isImporting ? 0.38 : 1)
+        .accessibilityLabel(AppLocalization.string(opener.labelKey))
     }
 }
 
