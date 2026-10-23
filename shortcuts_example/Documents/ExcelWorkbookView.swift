@@ -2916,6 +2916,11 @@ struct ExcelWorkbookView: View {
         )
     }
 
+    /// A screen over a model made elsewhere (tests).
+    init(viewModel: @autoclosure @escaping () -> ExcelWorkbookViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel())
+    }
+
     private var documentBackButton: some View {
         VisionCraftBackButton {
             guard !viewModel.isSaving else { return }

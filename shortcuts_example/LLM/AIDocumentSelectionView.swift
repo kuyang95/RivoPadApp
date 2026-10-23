@@ -85,65 +85,12 @@ struct AIDocumentSelectionView: View {
                             .frame(maxWidth: .infinity, minHeight: 80)
                     } else {
                         ForEach(filteredDocuments) { item in
-                            let opener = AIDocumentOriginalOpener(pathExtension: item.pathExtension)
-                            Button {
-                                Task { await openDocument(item) }
-                            } label: {
-                                HStack(spacing: 14) {
-                                    Text(String(item.pathExtension.uppercased().prefix(3)))
-                                        .visionCraftAndroidText(14, weight: .bold)
-                                        .frame(width: 52, height: 52)
-                                        .background(VisionCraftUI.primary.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(item.name)
-                                            .visionCraftAndroidText(18, weight: .semibold)
-                                        Text(item.relativePath)
-                                            .visionCraftAndroidText(14)
-                                            .foregroundStyle(VisionCraftUI.secondaryText)
-                                            .lineLimit(1)
-                                    }
-                                    Spacer(minLength: 8)
-                                    if let date = item.modificationDate {
-                                        Text(date, format: .dateTime.year().month().day())
-                                            .visionCraftAndroidText(14)
-                                            .foregroundStyle(VisionCraftUI.secondaryText)
-                                    }
-                                    if opener != nil {
-                                        // 위에 겹친 열기 버튼 자리.
-                                        Color.clear
-                                            .frame(width: VisionCraftUI.minTouchTarget - 8)
-                                            .accessibilityHidden(true)
-                                    }
-                                }
-                                .foregroundStyle(VisionCraftUI.primaryText)
-                                .padding(16)
-                                .frame(maxWidth: .infinity, minHeight: 80, alignment: .leading)
-                                .visionCraftHomeSurface()
-                            }
-                            .buttonStyle(VisionCraftHomePressStyle())
-                            .disabled(isImporting)
-                            .accessibilityLabel("\(item.name). \(item.relativePath)")
-                            .overlay(alignment: .trailing) {
-                                if let opener {
-                                    Button {
-                                        Task { await openOriginal(item) }
-                                    } label: {
-                                        Image(systemName: opener.systemImage)
-                                            .font(.title3)
-                                            .foregroundStyle(VisionCraftUI.icon)
-                                            .frame(
-                                                width: VisionCraftUI.minTouchTarget,
-                                                height: VisionCraftUI.minTouchTarget
-                                            )
-                                            .contentShape(Rectangle())
-                                    }
-                                    .buttonStyle(.plain)
-                                    .padding(.trailing, 8)
-                                    .disabled(isImporting)
-                                    .opacity(isImporting ? 0.38 : 1)
-                                    .accessibilityLabel(AppLocalization.string(opener.labelKey))
-                                }
-                            }
+                            AIDocumentSelectionRow(
+                                item: item,
+                                isImporting: isImporting,
+                                onOpen: { Task { await openDocument(item) } },
+                                onOpenOriginal: { Task { await openOriginal(item) } }
+                            )
                         }
                     }
                 }
@@ -286,6 +233,77 @@ struct AIDocumentSelectionView: View {
             return
         }
         errorMessage = error.localizedDescription
+    }
+}
+
+/// A recent document row of AI 문서 선택: the row opens the AI chat; an xlsx, hwp or hwpx row also has a
+/// button at its end opening the original in its editor (Android `FileSelectScreen.DocumentFileRow`).
+struct AIDocumentSelectionRow: View {
+    let item: AuthorizedDocumentItem
+    let isImporting: Bool
+    let onOpen: () -> Void
+    let onOpenOriginal: () -> Void
+
+    var body: some View {
+        let opener = AIDocumentOriginalOpener(pathExtension: item.pathExtension)
+        return Button {
+            onOpen()
+        } label: {
+            HStack(spacing: 14) {
+                Text(String(item.pathExtension.uppercased().prefix(3)))
+                    .visionCraftAndroidText(14, weight: .bold)
+                    .frame(width: 52, height: 52)
+                    .background(VisionCraftUI.primary.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.name)
+                        .visionCraftAndroidText(18, weight: .semibold)
+                    Text(item.relativePath)
+                        .visionCraftAndroidText(14)
+                        .foregroundStyle(VisionCraftUI.secondaryText)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                if let date = item.modificationDate {
+                    Text(date, format: .dateTime.year().month().day())
+                        .visionCraftAndroidText(14)
+                        .foregroundStyle(VisionCraftUI.secondaryText)
+                }
+                if opener != nil {
+                    // 위에 겹친 열기 버튼 자리.
+                    Color.clear
+                        .frame(width: VisionCraftUI.minTouchTarget - 8)
+                        .accessibilityHidden(true)
+                }
+            }
+            .foregroundStyle(VisionCraftUI.primaryText)
+            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: 80, alignment: .leading)
+            .visionCraftHomeSurface()
+        }
+        .buttonStyle(VisionCraftHomePressStyle())
+        .disabled(isImporting)
+        .accessibilityLabel("\(item.name). \(item.relativePath)")
+        .overlay(alignment: .trailing) {
+            if let opener {
+                Button {
+                    onOpenOriginal()
+                } label: {
+                    Image(systemName: opener.systemImage)
+                        .font(.title3)
+                        .foregroundStyle(VisionCraftUI.icon)
+                        .frame(
+                            width: VisionCraftUI.minTouchTarget,
+                            height: VisionCraftUI.minTouchTarget
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 8)
+                .disabled(isImporting)
+                .opacity(isImporting ? 0.38 : 1)
+                .accessibilityLabel(AppLocalization.string(opener.labelKey))
+            }
+        }
     }
 }
 

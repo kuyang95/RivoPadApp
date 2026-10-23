@@ -2042,7 +2042,7 @@ nonisolated enum PDFZoomSteps {
 /// PDF 원본 보기(Android `LocalDocumentActivity.PdfPages`): 폭에 맞춘 페이지를
 /// 세로로 잇고, 오른쪽 아래 카드의 축소·배율·확대 버튼(VoiceOver는 페이지의
 /// 사용자 지정 동작으로도)으로 100–500%를 단계별로 바꾼다. 두 손가락 확대·축소도 된다.
-private struct PDFOriginalPagesView: View {
+struct PDFOriginalPagesView: View {
     let document: PDFDocument
     @State private var zoom: CGFloat = PDFZoomSteps.minimum
 

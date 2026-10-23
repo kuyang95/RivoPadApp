@@ -1615,6 +1615,11 @@ struct HWPDocumentView: View {
         )
     }
 
+    /// A screen over a model made elsewhere (tests).
+    init(viewModel: @autoclosure @escaping () -> HWPDocumentViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel())
+    }
+
     var body: some View {
         Group {
             if viewModel.isLoading {

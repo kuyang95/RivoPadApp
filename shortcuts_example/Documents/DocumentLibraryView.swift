@@ -163,8 +163,8 @@ private enum NewDocumentKind: String, Identifiable {
 struct DocumentLibraryView: View {
     @EnvironmentObject private var appRouter:
         AppRouter
-    @StateObject private var viewModel =
-        DocumentLibraryViewModel()
+    @StateObject private var viewModel:
+        DocumentLibraryViewModel
     @State private var isFilePickerPresented =
         false
     @State private var isNewDocumentTypePickerPresented =
@@ -177,6 +177,19 @@ struct DocumentLibraryView: View {
         NewOfficeFileDocument?
     /// Android `DocumentLibraryScreen`의 편집/완료: 최근 문서 행 앞에 빨간 삭제 버튼을 보인다.
     @State private var editMode = EditMode.inactive
+
+    init() {
+        _viewModel = StateObject(
+            wrappedValue: DocumentLibraryViewModel()
+        )
+    }
+
+    /// A screen over a model made elsewhere (tests).
+    init(
+        viewModel: @autoclosure @escaping () -> DocumentLibraryViewModel
+    ) {
+        _viewModel = StateObject(wrappedValue: viewModel())
+    }
 
     var body: some View {
         List {
