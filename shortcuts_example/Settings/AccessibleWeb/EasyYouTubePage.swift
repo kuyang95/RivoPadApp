@@ -129,6 +129,8 @@ enum EasyYouTubePage {
     return node;
   };
   let closeCurrent = null, activePlayer = null, changeShort = null, prepareShort = null;
+  // The launcher marks a page it has left (or a background scene) inactive; nothing may start playing there.
+  const contentInactive = () => window.__rivoYouTubeContentActive === false;
   const originalAction = fn => { const old=document.body.inert;document.body.inert=false;try{return fn();}finally{document.body.inert=old;} };
   const channelURL = value => {
     try { const u=new URL(value,location.href);if(!['m.youtube.com','www.youtube.com','youtube.com'].includes(u.hostname))return null;
@@ -235,6 +237,7 @@ enum EasyYouTubePage {
     },
     open({videoId,title,startSeconds=0,short=false,autoplay=false,onChannel,onPrevious,onNext}) {
       if(!/^[\w-]{11}$/.test(videoId||''))throw new Error('올바른 영상 ID가 필요해요.');
+      if(contentInactive())autoplay=false;
       if(typeof window.YT?.Player!=='function')throw new Error('플레이어를 준비하고 있어요.');
       if(short&&changeShort?.({videoId,title,startSeconds,autoplay}))return 'Rivo official Shorts updated';
       closeCurrent?.();
@@ -338,7 +341,8 @@ enum EasyYouTubePage {
           captionDefaultsDone=false;captionModuleSeen=false;captionDefaultChanges=0;captionInitialRequested=false;captionDeadline=Infinity;captionPlaybackStarted=false;
           shortSwitching=true;updateShortState(null);host.setAttribute('data-video-id',next.videoId);
           player.getIframe().title=next.title||'YouTube 쇼츠';
-          player.loadVideoById({videoId:next.videoId,startSeconds:Math.max(0,next.startSeconds||0)});
+          const load={videoId:next.videoId,startSeconds:Math.max(0,next.startSeconds||0)};
+          if(contentInactive())player.cueVideoById(load);else player.loadVideoById(load);
           return true;
         };
       }
@@ -398,8 +402,9 @@ enum EasyYouTubePage {
             onReady:event=>{if(closed){event.target.destroy();return;}ready=true;activePlayer=event.target;applyDefaultCaptionsOff(event.target);speed.disabled=false;
               speed.replaceChildren(...event.target.getAvailablePlaybackRates().map(rate=>element('option',{value:rate,'aria-label':`${rate}배`},[`${rate}×`])));
               const frame=event.target.getIframe();frame.title=title||'YouTube 동영상';frame.setAttribute('allow','autoplay; encrypted-media; picture-in-picture; fullscreen');frame.removeAttribute('aria-hidden');frame.setAttribute('tabindex','0');
-              if(autoplay)event.target.playVideo?.();present();updateShortState(event.target.getPlayerState?.());say('');update();},
+              if(autoplay&&!contentInactive())event.target.playVideo?.();present();updateShortState(event.target.getPlayerState?.());say('');update();},
             onStateChange:event=>{if(closed)return;
+              if(event.data===1&&contentInactive()){(event.target||player).pauseVideo?.();return;}
               if(event.data===0&&short&&!shortSwitching){
                 const finishedID=host.getAttribute('data-video-id');
                 if(endedShortID!==finishedID){endedShortID=finishedID;if(onNext?.()===true)return;}
