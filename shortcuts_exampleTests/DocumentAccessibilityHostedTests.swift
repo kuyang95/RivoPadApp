@@ -10,10 +10,12 @@ import ZIPFoundation
 /// The document screens hosted in a window, read through the UIKit accessibility tree as VoiceOver
 /// reads them: labels, values, traits and custom actions, with the actions run through their handlers.
 /// Everything works on temporary files and fresh UserDefaults suites; the app's own recent documents
-/// and Documents folder are only read.
+/// and Documents folder are only read. The in-process accessibility flag is turned on for the suite, so it
+/// runs the same with or without VoiceOver.
 @MainActor
 final class DocumentAccessibilityHostedTests: XCTestCase {
     private var previousLanguage: String?
+    private var accessibilityWasEnabled = false
     private var windows: [UIWindow] = []
     private var cleanup: [URL] = []
     private var suites: [String] = []
@@ -22,6 +24,8 @@ final class DocumentAccessibilityHostedTests: XCTestCase {
         try await super.setUp()
         previousLanguage = UserDefaults.standard.string(forKey: AppLanguage.preferenceKey)
         UserDefaults.standard.set(AppLanguage.korean.rawValue, forKey: AppLanguage.preferenceKey)
+        accessibilityWasEnabled = InProcessAccessibility.isEnabled
+        InProcessAccessibility.setEnabled(true)
     }
 
     override func tearDown() async throws {
@@ -34,6 +38,7 @@ final class DocumentAccessibilityHostedTests: XCTestCase {
         for suite in suites { UserDefaults().removePersistentDomain(forName: suite) }
         cleanup = []
         suites = []
+        InProcessAccessibility.setEnabled(accessibilityWasEnabled)
         if let previousLanguage {
             UserDefaults.standard.set(previousLanguage, forKey: AppLanguage.preferenceKey)
         } else {
@@ -504,7 +509,8 @@ final class DocumentAccessibilityHostedTests: XCTestCase {
             if let found = first(type, in: window) { return found }
             try await settle(100)
         } while Date() < deadline
-        throw XCTSkip("no \(type) in the window")
+        XCTFail("no \(type) in the window\n\(viewTree(window))")
+        throw CancellationError()
     }
 
     private func first<T: UIView>(_ type: T.Type, in view: UIView) -> T? {
@@ -544,24 +550,28 @@ final class DocumentAccessibilityHostedTests: XCTestCase {
         return found
     }
 
+    /// What VoiceOver reaches: an accessibility element is a leaf (its implementation subviews are not read),
+    /// and a container's own elements (accessibilityElements or the indexed container methods) replace its
+    /// subviews.
     private func collect(_ object: NSObject, depth: Int, into found: inout [NSObject],
                          visited: inout Set<ObjectIdentifier>) {
         guard depth < 120, visited.insert(ObjectIdentifier(object)).inserted else { return }
         if let view = object as? UIView, view.isHidden || view.alpha < 0.01 { return }
-        if object.isAccessibilityElement { found.append(object) }
         if object.accessibilityElementsHidden { return }
+        if object.isAccessibilityElement {
+            found.append(object)
+            return
+        }
         var children: [NSObject] = []
         if let list = object.accessibilityElements {
             children = list.compactMap { $0 as? NSObject }
-        } else {
-            let count = object.accessibilityElementCount()
-            if count != NSNotFound, count > 0, count < 50_000 {
-                for index in 0..<count {
-                    if let child = object.accessibilityElement(at: index) as? NSObject { children.append(child) }
-                }
+        } else if case let count = object.accessibilityElementCount(), count != NSNotFound, count > 0 {
+            for index in 0..<min(count, 50_000) {
+                if let child = object.accessibilityElement(at: index) as? NSObject { children.append(child) }
             }
+        } else if let view = object as? UIView {
+            children = view.subviews
         }
-        if let view = object as? UIView { children.append(contentsOf: view.subviews) }
         for child in children { collect(child, depth: depth + 1, into: &found, visited: &visited) }
     }
 
@@ -724,6 +734,26 @@ private struct PhaseHost<Content: View>: View {
 
     var body: some View {
         content().environment(\.scenePhase, phase.value)
+    }
+}
+
+/// The in-process accessibility flag XCUITest and VoiceOver turn on; SwiftUI builds the full accessibility
+/// tree of nested hosting views only while it is on.
+private enum InProcessAccessibility {
+    private typealias Getter = @convention(c) () -> Bool
+    private typealias Setter = @convention(c) (Bool) -> Void
+    private static let handle = dlopen("/usr/lib/libAccessibility.dylib", RTLD_NOW)
+
+    static var isEnabled: Bool {
+        guard let handle, let symbol = dlsym(handle, "_AXSApplicationAccessibilityEnabled") else { return false }
+        return unsafeBitCast(symbol, to: Getter.self)()
+    }
+
+    static func setEnabled(_ enabled: Bool) {
+        guard let handle else { return }
+        for name in ["_AXSApplicationAccessibilitySetEnabled", "_AXSSetAutomationEnabled"] {
+            if let symbol = dlsym(handle, name) { unsafeBitCast(symbol, to: Setter.self)(enabled) }
+        }
     }
 }
 
