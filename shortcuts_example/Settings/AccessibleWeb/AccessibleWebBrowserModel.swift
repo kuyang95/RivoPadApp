@@ -385,6 +385,9 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        if easyYouTube {
+            webView.evaluateJavaScript(AccessibleWebTheme.script + EasyYouTubePage.source, completionHandler: nil)
+        }
         if webView === self.webView { setContentActive(youtubeContentActive) }
         applyZoom(to: webView)
     }

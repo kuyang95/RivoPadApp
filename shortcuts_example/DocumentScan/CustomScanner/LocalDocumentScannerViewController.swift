@@ -2007,6 +2007,9 @@ final class LocalDocumentScannerViewController: UIViewController {
                     scale: 1,
                     orientation: .up
                 )
+                let upright = await OCRService.shared.uprightDocument(image)
+                try Task.checkCancellation()
+                guard isProcessing(ticket: ticket) else { return }
                 outcome = "success"
                 let pageID = UUID()
                 pendingCapture = nil
@@ -2019,7 +2022,7 @@ final class LocalDocumentScannerViewController: UIViewController {
                         pageID: pageID
                     )
                 )
-                onScanCompleted?(image)
+                onScanCompleted?(upright)
             } catch is CancellationError {
                 return
             } catch {

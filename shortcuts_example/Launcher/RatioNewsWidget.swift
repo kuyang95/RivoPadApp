@@ -417,6 +417,25 @@ private nonisolated final class NewsRSSParser: NSObject, XMLParserDelegate {
         }
         return result
     }
+    private struct DisplayRandom: RandomNumberGenerator {
+        var state: UInt64
+        mutating func next() -> UInt64 {
+            state = state &* 6364136223846793005 &+ 1442695040888963407
+            return state
+        }
+    }
+    static func displayOrder(_ snapshot: NewsSnapshot) -> [NewsArticle] {
+        let seed = snapshot.items.reduce(UInt64(14695981039346656037)) { value, article in
+            article.url.utf8.reduce(value) { ($0 ^ UInt64($1)) &* 1099511628211 }
+        }
+        var random = DisplayRandom(state: seed)
+        let grouped = Dictionary(grouping: snapshot.items, by: \.source)
+        let groups = grouped.keys.sorted { $0.rawValue < $1.rawValue }
+            .map { grouped[$0, default: []].shuffled(using: &random) }.shuffled(using: &random)
+        return (0..<(groups.map(\.count).max() ?? 0)).flatMap { index in
+            groups.compactMap { index < $0.count ? $0[index] : nil }
+        }
+    }
     static func fetch(_ source: NewsSource, category: NewsCategory) async throws -> [NewsArticle] {
         guard let url = source.feed(category) else { throw URLError(.unsupportedURL) }
         var request = URLRequest(url: url)
@@ -694,15 +713,20 @@ struct RatioNewsWidget: View {
                 Image(systemName: "slider.horizontal.3").font(.system(size: 28)).frame(width: 56, height: 56)
                     .background(style.surface.opacity(0.7), in: Circle())
             }.accessibilityLabel("뉴스 분야 설정")
-            Button { request += 1 } label: {
-                Image(systemName: "arrow.clockwise").font(.system(size: 28)).frame(width: 56, height: 56)
-                    .background(style.surface.opacity(0.7), in: Circle())
-            }.accessibilityLabel("뉴스 새로고침").disabled(!enabled || store.topics.isEmpty || busy)
         }
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             controls
+            HStack(spacing: 12) {
+            Button { request += 1 } label: {
+                Image(systemName: "arrow.clockwise").font(.system(size: 28)).frame(width: 56, height: 56)
+                    .background(style.surface.opacity(0.7), in: Circle())
+            }.accessibilityLabel("뉴스 새로고침").disabled(!enabled || store.topics.isEmpty || busy)
+                if let snapshot = store.snapshots[category] {
+                    Text("\(snapshot.fetched.formatted(date: .omitted, time: .shortened)) 갱신").visionCraftAndroidText(16)
+                }
+            }
             if store.pending[category] != nil {
                 Button("새 뉴스가 있어요 · 보기") { store.apply(category); scrollRequest += 1 }
                     .visionCraftAndroidText(20).foregroundStyle(style.accent).frame(minHeight: 56)
@@ -712,7 +736,6 @@ struct RatioNewsWidget: View {
                     .visionCraftAndroidText(18).fixedSize(horizontal: false, vertical: true)
             }
             if let snapshot = store.snapshots[category] {
-                Text("여러 언론사 · \(snapshot.fetched.formatted(date: .omitted, time: .shortened)) 갱신").visionCraftAndroidText(16)
                 if snapshot.partial && !busy {
                     Text("일부 언론사의 갱신이 늦어지고 있어요. 받아온 뉴스와 이전 기사를 표시합니다.")
                         .visionCraftAndroidText(16).foregroundStyle(style.text.opacity(0.75)).fixedSize(horizontal: false, vertical: true)
@@ -721,9 +744,10 @@ struct RatioNewsWidget: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             Color.clear.frame(height: 1).id("newsTop").accessibilityHidden(true)
-                            ForEach(snapshot.items) { article in
+                            let displayedItems = NewsRSSParser.displayOrder(snapshot)
+                            ForEach(displayedItems) { article in
                                 articleRow(article)
-                                if article.id != snapshot.items.last?.id {
+                                if article.id != displayedItems.last?.id {
                                     Rectangle().fill(style.outline.opacity(0.28)).frame(height: 1).accessibilityHidden(true)
                                 }
                             }

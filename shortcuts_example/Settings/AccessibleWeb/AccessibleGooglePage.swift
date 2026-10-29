@@ -78,7 +78,7 @@ enum AccessibleGooglePage {
     html[data-rivo-google-simple] #rivo-google-search :is(button,.voice-search) {display:flex!important;flex:none!important;align-items:center!important;justify-content:center!important;width:56px!important;height:56px!important;min-width:56px!important;min-height:56px!important;padding:12px!important;border:0!important;border-radius:50%!important;text-decoration:none!important;}
     html[data-rivo-google-simple] #rivo-google-search svg {display:block!important;width:28px!important;height:28px!important;flex:none!important;}
     html[data-rivo-google-simple] #rivo-google-search [hidden] {display:none!important;}
-    html[data-rivo-google-simple="home"] #rivo-google-search {min-height:calc(var(--rivo-home-height,100dvh) - 40px)!important;display:flex!important;flex-direction:column!important;justify-content:center!important;padding:32px 0!important;}
+    html[data-rivo-google-simple="home"] #rivo-google-search {box-sizing:border-box!important;min-height:calc(var(--rivo-home-height,100dvh) - 40px)!important;display:flex!important;flex-direction:column!important;justify-content:center!important;padding:32px 0!important;}
     html[data-rivo-google-simple] #rivo-google-search nav {display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important;max-width:none!important;margin:0!important;}
     html[data-rivo-google-simple] #rivo-google-search .favorite {position:relative!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:flex-start!important;gap:12px!important;width:112px!important;max-width:100%!important;min-width:0!important;min-height:136px!important;padding:16px 8px!important;border:0!important;border-radius:20px!important;text-align:center!important;transition:transform .18s ease,background-color .18s ease!important;}
     html[data-rivo-google-simple] #rivo-google-search .favorite-mark {display:grid!important;place-items:center!important;width:72px!important;height:72px!important;border-radius:24px!important;font-size:30px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 8px 20px rgba(0,0,0,.08)!important;font-weight:800!important;line-height:1!important;}
@@ -113,6 +113,14 @@ enum AccessibleGooglePage {
     html[data-rivo-google-simple] #rivo-google-search .voice-search{width:56px!important;height:56px!important;min-width:56px!important;min-height:56px!important;padding:0!important;}
     html[data-rivo-google-simple] #rivo-google-search button:disabled{opacity:.5!important;}
   `;
+  function updateHomeHeight() {
+    if (!header) return;
+    // CSS zoom scales authored lengths again; viewport measurements are already visible CSS pixels.
+    // WK pageZoom is represented in the viewport itself, and normally has CSS zoom 1.
+    const zoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+    const height = window.visualViewport?.height || window.innerHeight;
+    header.style.setProperty('--rivo-home-height',`${height / zoom}px`);
+  }
   function viewportWidthCSS() {
     if (!config.nativePageZoom) return '';
     // WebKit can retain Google's original containing-block width after pageZoom.
@@ -260,7 +268,7 @@ enum AccessibleGooglePage {
     if(kind==='home'){
       const brand=node('h1','Browser');brand.className='browser-brand';
       const dot=node('span');dot.className='browser-brand-dot';dot.setAttribute('aria-hidden','true');brand.appendChild(dot);header.appendChild(brand);
-      header.style.setProperty('--rivo-home-height',`${Math.round(window.visualViewport?.height||window.innerHeight)}px`);
+      updateHomeHeight();
     }
     form.append(input,submit,voice);header.append(form,error);
     if(kind==='home'){
@@ -550,7 +558,9 @@ enum AccessibleGooglePage {
   });
   observer.observe(document, {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:['aria-modal','role']});
   document.addEventListener('DOMContentLoaded', refresh, {once:true});
-  window.addEventListener('resize',()=>{if(header)header.style.setProperty('--rivo-home-height',`${Math.round(window.visualViewport?.height||window.innerHeight)}px`);schedule();});
+  window.addEventListener('resize',()=>{updateHomeHeight();schedule();});
+  window.visualViewport?.addEventListener('resize', updateHomeHeight);
+  window.addEventListener('rivo-page-zoom', updateHomeHeight);
   window.addEventListener('pageshow', schedule); window.addEventListener('popstate', schedule);
   refresh();
 })();

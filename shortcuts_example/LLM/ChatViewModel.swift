@@ -782,6 +782,7 @@ final class ChatViewModel: ObservableObject {
                         "클립보드"
                     )
             )
+            appendNotice(String(rawText.prefix(300)) + (rawText.count > 300 ? "…" : ""))
             appendNotice(
                 AppLocalization.format(
                     "%@ 첨부 완료",
@@ -1052,6 +1053,10 @@ final class ChatViewModel: ObservableObject {
                 preferredTitle:
                     attachment.name
             )
+            if attachment.kind == .image,
+               let preview = try? await attachmentStore.loadImage(for: attachment) {
+                messages.append(Msg(role: "user", image: preview, isNotice: true))
+            }
             if oldAttachment?.storedName
                 != attachment.storedName {
                 await attachmentStore.delete(

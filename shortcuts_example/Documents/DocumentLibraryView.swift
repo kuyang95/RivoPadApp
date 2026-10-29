@@ -508,7 +508,7 @@ struct DocumentLibraryView: View {
         Button {
             openAppFolderDocument(item)
         } label: {
-            HStack(spacing: 14) {
+            HStack(alignment: .top, spacing: 14) {
                 documentTypeBadge(item.pathExtension)
 
                 VStack(
@@ -559,7 +559,10 @@ struct DocumentLibraryView: View {
         )
         .font(.caption.bold())
         .foregroundStyle(.white)
-        .frame(width: 52, height: 42)
+        .fixedSize(horizontal: true, vertical: true)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .frame(minWidth: 52, minHeight: 42)
         .background(Color.indigo)
         .clipShape(
             RoundedRectangle(
@@ -577,7 +580,7 @@ struct DocumentLibraryView: View {
                 documentID: item.id
             )
         } label: {
-            HStack(spacing: 14) {
+            HStack(alignment: .top, spacing: 14) {
                 documentTypeBadge(item.pathExtension)
 
                 VStack(

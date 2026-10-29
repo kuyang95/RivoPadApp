@@ -1,6 +1,6 @@
 # 문서 스캔 파이프라인 (자체 스캐너, Android 패리티)
 
-점검일 2026-10-13 · 기준 코드 `b1be61d0` + 작업 트리 (스캐너 안내 음성)
+점검일 2026-10-29 · 기준 코드 `c2f1d72d` + 작업 트리 (이번 변경 범위)
 
 VisionKit `VNDocumentCameraViewController` 를 쓰지 않고 Android VisionCraft 와 **같은 모델·같은 수치** 로 동작하는 자체 스캐너. 코드는 `shortcuts_example/DocumentScan/CustomScanner/`. 목표는 Android 문서 [scanner_pipeline.md](../../../AndroidProject/VisionCraft/rules/scanner_pipeline.md) 의 Step 0-5 결과를 iPad 에서 재현하는 것 (`Tools/ScannerParity/` 로 결과 비교).
 
@@ -85,3 +85,7 @@ AVCaptureSession(.photo, builtInWideAngleCamera, continuousAutoFocus)      Local
 - ONNX EP: XNNPACK/NNAPI 대신 Core ML EP + CPU. 라이브 검출은 패리티 비교를 위해 일부러 CPU.
 - 그리드 워프·원근·회전에 Metal 사용 (Android 는 순수 Kotlin).
 - 정지 감지는 CoreMotion `userAcceleration` (Android `TYPE_LINEAR_ACCELERATION`), 초점은 AVFoundation `focusMode .autoFocus → .locked` 순서로 잠근 뒤 촬영.
+
+## 텍스트 정방향 표시
+
+스캔 결과를 표시·저장하기 전에 긴 변 1200px 이하 OCR 입력으로 0/90/180/270도 방향을 비교한다. 정방향 가로 텍스트의 글자 수가 가장 많은 방향으로 원본을 회전한다. 동점·인식 실패·텍스트 없음은 카메라 방향을 유지한다. 클라우드 호출은 하지 않는다.

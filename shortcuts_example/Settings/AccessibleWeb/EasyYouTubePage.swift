@@ -50,14 +50,22 @@ enum EasyYouTubePage {
     html[data-rivo-google-login] #identifierNext button,
     html[data-rivo-google-login] #passwordNext button { min-height:64px!important;min-width:144px!important;font-size:22px!important }
     html[data-rivo-google-login] :is(input,button):focus-visible { outline:3px solid #0b57d0!important;outline-offset:4px!important }
+    html[data-rivo-google-login] {height:auto!important;min-height:0!important;}
+    html[data-rivo-google-login] body {width:var(--rivo-google-login-width,100%)!important;height:auto!important;padding:16px!important;}
+    html[data-rivo-google-login] [data-rivo-login-container] {width:100%!important;max-width:624px!important;min-width:0!important;height:auto!important;min-height:0!important;box-sizing:border-box!important;padding:0!important;margin:0!important;}
+    html[data-rivo-google-login] main {max-width:560px!important;min-width:0!important;}
   `;
   let waitingForDOM = document.readyState === 'loading';
   const pathMode = () => /\/(?:v3\/signin|signin\/v2)\/identifier\/?$/.test(location.pathname) ? 'identifier'
     : /\/(?:v3\/signin|signin\/v2)\/challenge\/pwd\/?$/.test(location.pathname) ? 'password' : null;
   const sizeViewport = () => {
-    const height = Math.max(1, Math.round(window.visualViewport?.height || window.innerHeight)) + 'px';
-    if (document.documentElement.style.getPropertyValue('--rivo-google-login-height') !== height)
-      document.documentElement.style.setProperty('--rivo-google-login-height', height);
+    const zoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+    const viewport = window.visualViewport;
+    for (const [name, value] of [['height',(viewport?.height || window.innerHeight) / zoom],['width',(viewport?.width || window.innerWidth) / zoom]]) {
+      const pixels = `${Math.max(1, value)}px`;
+      if (document.documentElement.style.getPropertyValue(`--rivo-google-login-${name}`) !== pixels)
+        document.documentElement.style.setProperty(`--rivo-google-login-${name}`, pixels);
+    }
   };
   const visible = element => !!element && element.getClientRects().length > 0 && getComputedStyle(element).visibility !== 'hidden';
   const update = () => {
@@ -80,7 +88,10 @@ enum EasyYouTubePage {
     const password = pathMode() === 'password' && visible(document.querySelector('input[name="Passwd"]')) && document.getElementById('passwordNext');
     const extraCheck = [...document.querySelectorAll('[role="dialog"],[role="alertdialog"],#ca,iframe[src*="recaptcha"]')].some(visible);
     const mode = !extraCheck && document.querySelector('main #headingText') ? (identifier ? 'identifier' : password ? 'password' : null) : null;
+    document.querySelectorAll('[data-rivo-login-container]').forEach(element => element.removeAttribute('data-rivo-login-container'));
     if (mode) {
+      for (let container = document.querySelector('main')?.parentElement; container && container !== document.body; container = container.parentElement)
+        container.setAttribute('data-rivo-login-container', '');
       for (const link of document.querySelectorAll('button,a,[role="button"]')) {
         if (/^(비밀번호를 잊으셨나요\??|Forgot password\??|パスワードをお忘れの場合)$/i.test(link.textContent.trim()))
           link.setAttribute('data-rivo-login-secondary', '');
@@ -105,6 +116,7 @@ enum EasyYouTubePage {
     window.addEventListener('hashchange', schedule);
     window.addEventListener('resize', schedule);
     window.visualViewport?.addEventListener('resize', schedule);
+    window.addEventListener('rivo-page-zoom', schedule);
   };
   start();
 })();
@@ -760,8 +772,8 @@ enum EasyYouTubePage {
     `));
     const main=make('main',{id:'content',hidden:''}),header=make('header');
     header.hidden=!!window.__rivoLauncherEmbedded;
-    const exit=make('button',{'class':'exit','aria-label':'쉬운 유튜브 닫기'},'←');exit.onclick=()=>{location.href='rivo-easy-youtube://close';};header.appendChild(exit);
-    const title=make('div');title.appendChild(make('div',{'class':'brand'},'쉬운 유튜브'));title.appendChild(make('h1',{id:'heading',tabindex:'-1'}));header.appendChild(title);
+    const exit=make('button',{'class':'exit','aria-label':'이지 유튜브 닫기'},'←');exit.onclick=()=>{location.href='rivo-easy-youtube://close';};header.appendChild(exit);
+    const title=make('div');title.appendChild(make('div',{'class':'brand'},'이지 유튜브'));title.appendChild(make('h1',{id:'heading',tabindex:'-1'}));header.appendChild(title);
     main.appendChild(header);
     const nav=make('nav',{'aria-label':'유튜브 메뉴'});
     const icons={home:['M3 11 12 3l9 8','M5 10v11h5v-7h4v7h5V10'],subscriptions:['M4 8h16v13H4z','M7 4h10','M10 12l5 3-5 3z'],shorts:['M15 3 5 9v5l4 1-3 3 3 3 10-6v-5l-4-1 3-3z','M10 9v6l5-3z'],search:['M20 20l-5-5','M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0']};
