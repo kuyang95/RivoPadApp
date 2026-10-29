@@ -616,6 +616,88 @@ final class LocalDocumentImportTests: XCTestCase {
             "첫 문장입니다."
         )
     }
+
+    func testAppearanceStoreMigratesLegacyFontLevelOnce() throws {
+        let suiteName =
+            "LocalDocumentImportTests.migration.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(
+            UserDefaults(suiteName: suiteName)
+        )
+        defer {
+            defaults.removePersistentDomain(
+                forName: suiteName
+            )
+        }
+        // 글꼴 10단계 시절(v1)에 저장된 5단계는 20단계 표에서 15단계다.
+        defaults.set(
+            try JSONEncoder().encode(
+                LocalDocumentAppearance(
+                    fontLevel: 5,
+                    lineHeightLevel: 3,
+                    colorIndex: 2,
+                    showsLineSeparators: true
+                )
+            ),
+            forKey: "legacy"
+        )
+        let store = LocalDocumentAppearanceStore(
+            defaults: defaults,
+            key: "current",
+            legacyKey: "legacy"
+        )
+
+        let migrated = store.load()
+
+        XCTAssertEqual(migrated.fontLevel, 15)
+        XCTAssertEqual(migrated.lineHeightLevel, 3)
+        XCTAssertEqual(migrated.colorIndex, 2)
+        XCTAssertTrue(migrated.showsLineSeparators)
+        XCTAssertNil(defaults.data(forKey: "legacy"))
+        XCTAssertNotNil(defaults.data(forKey: "current"))
+        // 두 번째 읽기는 v2 값을 그대로 돌려준다(다시 더하지 않는다).
+        XCTAssertEqual(store.load().fontLevel, 15)
+    }
+
+    func testAppearanceStoreMergesOnlyChangedFields() throws {
+        let suiteName =
+            "LocalDocumentImportTests.merge.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(
+            UserDefaults(suiteName: suiteName)
+        )
+        defer {
+            defaults.removePersistentDomain(
+                forName: suiteName
+            )
+        }
+        let store = LocalDocumentAppearanceStore(
+            defaults: defaults,
+            key: "current",
+            legacyKey: "legacy"
+        )
+        let snapshot = LocalDocumentAppearance(
+            fontLevel: 5,
+            lineHeightLevel: 5,
+            colorIndex: 0,
+            showsLineSeparators: false
+        )
+        store.save(snapshot)
+        // 다른 화면이 글꼴과 줄간격을 바꿔 저장했다.
+        var elsewhere = snapshot
+        elsewhere.fontLevel = 12
+        elsewhere.lineHeightLevel = 8
+        store.save(elsewhere)
+
+        // 옛 스냅샷을 든 화면이 색상만 바꾼다.
+        var edited = snapshot
+        edited.colorIndex = 3
+        let merged = store.save(changesFrom: snapshot, to: edited)
+
+        XCTAssertEqual(merged.fontLevel, 12)
+        XCTAssertEqual(merged.lineHeightLevel, 8)
+        XCTAssertEqual(merged.colorIndex, 3)
+        XCTAssertEqual(store.load(), merged)
+    }
+
 }
 
 @MainActor
@@ -711,4 +793,5 @@ final class DocumentLibraryAppFolderTests: XCTestCase {
             fileSize: nil, modificationDate: nil
         )))
     }
+
 }

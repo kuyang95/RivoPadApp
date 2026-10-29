@@ -10,7 +10,11 @@ nonisolated enum AppLauncherMode: String, CaseIterable {
 struct AppHomeRoot: View {
     @AppStorage(AppLauncherMode.storageKey) private var mode = AppLauncherMode.standard.rawValue
     var body: some View {
-        if AppLauncherMode(rawValue: mode) == .widgets { RatioLauncherView() }
-        else { HomeView() }
+        Group {
+            if AppLauncherMode(rawValue: mode) == .widgets { RatioLauncherView() }
+            else { HomeView() }
+        }
+        // The launcher has no HomeView, so the file and text-source requests are handled here for both homes.
+        .modifier(HomeImportRequestPresenter())
     }
 }

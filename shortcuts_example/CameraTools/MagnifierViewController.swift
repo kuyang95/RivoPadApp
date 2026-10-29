@@ -1535,13 +1535,32 @@ final class MagnifierViewController:
             session.sessionPreset = .high
         }
 
-        if let cameraInput {
-            session.removeInput(cameraInput)
-        }
-
+        // 새 입력을 먼저 만들어 보고, 그 다음에야 기존 입력을 뗀다. 실패하면 세션이
+        // 입력 없이 남지 않게 하고, 되살릴 입력이 없으면 `cameraInput`도 비워
+        // 다음 진입에서 다시 구성하게 한다.
         guard let device = cameraDevice(position: position),
-              let input = try? AVCaptureDeviceInput(device: device),
-              session.canAddInput(input) else {
+              let input = try? AVCaptureDeviceInput(device: device) else {
+            session.commitConfiguration()
+            publishStatus(
+                AppLocalization.string(
+                    mode == .liveTextReader
+                    ? "카메라를 열 수 없습니다."
+                    : "카메라를 사용할 수 없습니다."
+                )
+            )
+            return
+        }
+        let previousInput = cameraInput
+        if let previousInput {
+            session.removeInput(previousInput)
+        }
+        guard session.canAddInput(input) else {
+            if let previousInput,
+               session.canAddInput(previousInput) {
+                session.addInput(previousInput)
+            } else {
+                cameraInput = nil
+            }
             session.commitConfiguration()
             publishStatus(
                 AppLocalization.string(

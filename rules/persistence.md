@@ -31,7 +31,7 @@ Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 �
 | `RecentOriginalDocumentStore.records.v1` | JSON, 최대 100건 | `Documents/RecentOriginalDocumentStore.swift` |
 | `AuthorizedDocumentLibrary.bookmark.v1` / `AuthorizedDocumentLibrary.folderName.v1` | security-scoped bookmark Data / String | `Documents/AuthorizedDocumentLibrary.swift` — 사용자가 고른 문서 폴더 |
 | `rivo.remote.connectionDiagnostics` | JSON, 최근 80건 | `RivoRemote/RivoRemoteManager.swift` · `DefaultsKey`. 기기 UUID·타입·Bluetooth 활성화 이력은 저장하지 않고, 초기화 시 이전 버전의 `rivo.remote.peripheralIdentifier` / `rivo.remote.deviceType` / `rivo.remote.hasActivatedBluetooth` 값을 제거한다 |
-| `LocalDocumentAppearance.v1` | `LocalDocumentAppearance` JSON (fontLevel 1~20·기본 5, lineHeightLevel 1~10·기본 5, colorIndex, showsLineSeparators, usesSingleLineInLandscape) — 문서 뷰어 글자/줄간격/색상·가로 한 줄 보기 | `Documents/LocalDocumentReading.swift` |
+| `LocalDocumentAppearance.v2` | `LocalDocumentAppearance` JSON (fontLevel 1~20·기본 5, lineHeightLevel 1~10·기본 5, colorIndex, showsLineSeparators, usesSingleLineInLandscape) — 문서 뷰어 글자/줄간격/색상·가로 한 줄 보기. 옛 `LocalDocumentAppearance.v1`(글꼴 10단계)이 있으면 처음 읽을 때 fontLevel에 `LocalDocumentAppearanceStore.fontLevelMigrationOffset`(10)을 더해 v2로 옮기고 v1은 지운다. 홈·설정 화면은 `save(changesFrom:to:)`로 바뀐 필드만 현재 저장값 위에 얹어 저장한다 | `Documents/LocalDocumentReading.swift` |
 
 ## App Group `group.net.rivo.visioncraft`
 

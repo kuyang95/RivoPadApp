@@ -131,4 +131,4 @@ Tools/  docs/  backend/      # 도구 스크립트·설계 문서·Cloudflare wo
 
 ## 릴리즈 진입과 런처 선택
 
-`AppHomeRoot`가 저장된 시작 홈에 따라 기존 `HomeView` 또는 `RatioLauncherView`를 표시한다. 앱 설정·미디어 탐색은 일반 AppRoute로 진입하고 명시적인 기존 홈 경로는 시작 홈 선택을 바꾸지 않는다. `LauncherNewsBackgroundTasks`는 모든 빌드에서 같은 뉴스 사전 수신 핸들러를 실행한다.
+`AppHomeRoot`가 저장된 시작 홈에 따라 기존 `HomeView` 또는 `RatioLauncherView`를 표시한다. 음성 동작의 파일 열기(`AppRouter.requestFileImport`)와 리모컨·사용법 안내의 텍스트 원본 선택(`AppRouter.requestTextSource`)은 두 홈 공통으로 `AppHomeRoot`에 붙은 `HomeImportRequestPresenter`가 받아 파일 선택기·`텍스트 가져오기` 선택창을 띄운다. 앱 설정·미디어 탐색은 일반 AppRoute로 진입하고 명시적인 기존 홈 경로는 시작 홈 선택을 바꾸지 않는다. `LauncherNewsBackgroundTasks`는 모든 빌드에서 같은 뉴스 사전 수신 핸들러를 실행한다.

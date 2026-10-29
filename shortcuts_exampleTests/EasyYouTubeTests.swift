@@ -243,6 +243,32 @@ final class EasyYouTubeTests: XCTestCase {
         XCTAssertEqual(channel, "https://m.youtube.com/@rivo/videos")
     }
 
+    /// A launcher page the user has left is inactive: a player that becomes ready there does not autoplay,
+    /// and a play event while inactive is paused at once.
+    func testInactiveLauncherPageNeverStartsPlayback() async throws {
+        let browser = AccessibleWebBrowserModel(easyYouTube: true, embedded: true)
+        defer { browser.shutdown() }
+        let web = browser.webView
+        web.frame = CGRect(x: 0, y: 0, width: 900, height: 1000)
+        web.stopLoading()
+        web.loadHTMLString(Self.watchHTML, baseURL: URL(string: EasyYouTubePage.home))
+        try await waitForLogin(web, expression: "!!window.__rivoYouTubePrototype && document.readyState==='complete'")
+        browser.setContentActive(false)
+        try await waitForLogin(web, expression: "window.__rivoYouTubeContentActive===false")
+        _ = try await web.evaluateJavaScript("window.__rivoOfficialPlayer.open({videoId:'dQw4w9WgXcQ',title:'영상',autoplay:true});true")
+        try await waitForLogin(web, expression: "document.querySelector('[data-rivo-official-player]')?.shadowRoot.getElementById('speed')?.disabled===false")
+        let idle = try await web.evaluateJavaScript("window.rivoPlayRequested!==true && window.rivoPlayerOptions.playerVars.autoplay===0") as? Bool
+        XCTAssertEqual(idle, true, "an inactive page neither asks the iframe to autoplay nor calls playVideo on ready")
+        _ = try await web.evaluateJavaScript("window.rivoPlayerEvents.onStateChange({data:1,target:{pauseVideo:()=>{window.rivoPausedInactive=true}}});true")
+        let paused = try await web.evaluateJavaScript("window.rivoPausedInactive===true") as? Bool
+        XCTAssertEqual(paused, true, "playback that starts on an inactive page is paused")
+
+        browser.setContentActive(true)
+        try await waitForLogin(web, expression: "window.__rivoYouTubeContentActive===true")
+        _ = try await web.evaluateJavaScript("window.__rivoOfficialPlayer.open({videoId:'dQw4w9WgXcQ',title:'영상',autoplay:true});true")
+        try await waitForLogin(web, expression: "window.rivoPlayRequested===true && window.rivoPlayerOptions.playerVars.autoplay===1")
+    }
+
     private static let watchHTML = #"""
     <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script>window.ytcfg={get:key=>key==='LOGGED_IN'?true:undefined};window.YT={Player:function(target,options){window.rivoPlayerOptions=options;window.rivoPlayerEvents=options.events;const f=document.createElement('iframe');f.id='test-official-player';target.replaceWith(f);let rate=1,state=5;this.getIframe=()=>f;this.destroy=()=>f.remove();this.getCurrentTime=()=>5;this.getDuration=()=>60;this.getPlayerState=()=>state;this.getPlaybackRate=()=>rate;this.getAvailablePlaybackRates=()=>[.5,1,1.5,2];this.setPlaybackRate=value=>{rate=value;window.rivoPlaybackRate=value};this.seekTo=value=>window.rivoSeek=value;this.pauseVideo=()=>{state=2};this.playVideo=()=>{state=1;window.rivoPlayRequested=true};setTimeout(()=>options.events.onReady({target:this}),0);}};</script></head><body><h1>테스트 영상</h1><a class="slim-video-owner-icon" href="/@rivo" aria-label="리보 채널, 구독자 123명. 채널로 이동합니다."><img src="https://yt3.ggpht.com/rivo-avatar" alt=""></a><ytm-video-with-context-renderer><a href="/watch?v=dQw4w9WgXcQ" onclick="event.preventDefault();history.pushState({},'',this.getAttribute('href'))"><h3>테스트 영상</h3></a></ytm-video-with-context-renderer><script>for(let i=0;i<12;i++){const thread=document.createElement('ytm-comment-thread-renderer');const author=document.createElement('span');author.className='YtmCommentRendererTitle';author.textContent='작성자 '+i;const text=document.createElement('p');text.className='YtmCommentRendererText';text.textContent='실제 DOM 댓글 '+i;thread.append(author,text);document.body.append(thread);}</script></body></html>
     """#
