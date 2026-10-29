@@ -2007,7 +2007,13 @@ final class LocalDocumentScannerViewController: UIViewController {
                     scale: 1,
                     orientation: .up
                 )
+                stageStartedAt = ProcessInfo.processInfo.systemUptime
                 let upright = await OCRService.shared.uprightDocument(image)
+                scannerDiagnostics.logDuration(
+                    "textOrientation",
+                    milliseconds: ScannerDiagnostics.milliseconds(since: stageStartedAt),
+                    ticket: ticket
+                )
                 try Task.checkCancellation()
                 guard isProcessing(ticket: ticket) else { return }
                 outcome = "success"

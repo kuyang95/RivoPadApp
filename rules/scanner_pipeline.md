@@ -89,3 +89,5 @@ AVCaptureSession(.photo, builtInWideAngleCamera, continuousAutoFocus)      Local
 ## 텍스트 정방향 표시
 
 스캔 결과를 표시·저장하기 전에 긴 변 1200px 이하 OCR 입력으로 0/90/180/270도 방향을 비교한다. 정방향 가로 텍스트의 글자 수가 가장 많은 방향으로 원본을 회전한다. 동점·인식 실패·텍스트 없음은 카메라 방향을 유지한다. 클라우드 호출은 하지 않는다.
+
+텍스트 방향 판별은 각 OCR 패스 사이에 취소 상태를 확인하며 스캐너의 `textOrientation` 진단 단계로 소요 시간을 기록한다.

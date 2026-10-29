@@ -782,7 +782,8 @@ final class ChatViewModel: ObservableObject {
                         "클립보드"
                     )
             )
-            appendNotice(String(rawText.prefix(300)) + (rawText.count > 300 ? "…" : ""))
+            let previewText = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+            appendNotice(String(previewText.prefix(300)) + (previewText.count > 300 ? "…" : ""))
             appendNotice(
                 AppLocalization.format(
                     "%@ 첨부 완료",
@@ -1054,7 +1055,7 @@ final class ChatViewModel: ObservableObject {
                     attachment.name
             )
             if attachment.kind == .image,
-               let preview = try? await attachmentStore.loadImage(for: attachment) {
+               let preview = try? await attachmentStore.loadImage(for: attachment, maximumEdge: 512) {
                 messages.append(Msg(role: "user", image: preview, isNotice: true))
             }
             if oldAttachment?.storedName

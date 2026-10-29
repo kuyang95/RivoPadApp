@@ -719,10 +719,10 @@ struct RatioNewsWidget: View {
         VStack(alignment: .leading, spacing: 14) {
             controls
             HStack(spacing: 12) {
-            Button { request += 1 } label: {
-                Image(systemName: "arrow.clockwise").font(.system(size: 28)).frame(width: 56, height: 56)
-                    .background(style.surface.opacity(0.7), in: Circle())
-            }.accessibilityLabel("뉴스 새로고침").disabled(!enabled || store.topics.isEmpty || busy)
+                Button { request += 1 } label: {
+                    Image(systemName: "arrow.clockwise").font(.system(size: 28)).frame(width: 56, height: 56)
+                        .background(style.surface.opacity(0.7), in: Circle())
+                }.accessibilityLabel("뉴스 새로고침").disabled(!enabled || store.topics.isEmpty || busy)
                 if let snapshot = store.snapshots[category] {
                     Text("\(snapshot.fetched.formatted(date: .omitted, time: .shortened)) 갱신").visionCraftAndroidText(16)
                 }

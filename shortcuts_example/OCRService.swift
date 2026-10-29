@@ -34,6 +34,7 @@ actor OCRService {
         var best = 0
         var bestScore = 0
         for turn in 0..<4 {
+            if Task.isCancelled { return image }
             let candidate = rotatedDocument(thumbnail, turns: turn)
             let input = VisionImage(image: candidate)
             input.orientation = .up
