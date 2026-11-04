@@ -32,6 +32,11 @@ struct DebugDevelopmentView: View {
                         Label("쇼핑 상품 연동", systemImage: "cart")
                     }
                     NavigationLink {
+                        ScannerCalibrationView()
+                    } label: {
+                        Label("문서스캔 실측보정", systemImage: "doc.viewfinder")
+                    }
+                    NavigationLink {
                         HWPReferenceComparisonView()
                             .visionCraftRouteBackButton()
                             .toolbar(.visible, for: .navigationBar)

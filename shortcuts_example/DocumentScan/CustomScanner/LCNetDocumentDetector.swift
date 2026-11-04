@@ -151,6 +151,7 @@ actor LCNetDocumentDetector: DocumentCornerDetecting {
 
     private let session: ScannerONNXSession
     private let imageBridge = ScannerCIImageBridge()
+    private let calibration = ScannerCalibrationRecorder.current
 
     init(
         bundle: Bundle = .main,
@@ -235,6 +236,13 @@ actor LCNetDocumentDetector: DocumentCornerDetecting {
                 shape: prepared.shape
             )
         )
+        if let calibration, output.shape.count == 4 {
+            let count = output.shape[2] * output.shape[3]
+            let peaks = (0..<min(4, output.shape[1])).map { channel in
+                output.values[(channel*count)..<((channel+1)*count)].max() ?? 0
+            }
+            calibration.event("detector_heatmap", ["heatmapPeaks": peaks, "threshold": LCNetHeatmapDecoder.threshold])
+        }
         return try LCNetHeatmapDecoder.decode(
             output,
             letterbox: letterbox

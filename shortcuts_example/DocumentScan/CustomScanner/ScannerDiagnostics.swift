@@ -27,6 +27,7 @@ nonisolated final class ScannerDiagnostics: @unchecked Sendable {
     private var livePreprocessingMilliseconds: [Double] = []
     private var liveDetectionCount = 0
 
+    private let calibration = ScannerCalibrationRecorder.current
     let isEnabled: Bool
 
     init(
@@ -34,7 +35,7 @@ nonisolated final class ScannerDiagnostics: @unchecked Sendable {
         environment: [String: String] =
             ProcessInfo.processInfo.environment
     ) {
-        isEnabled = Self.isRequested(
+        isEnabled = ScannerCalibrationRecorder.current != nil || Self.isRequested(
             arguments: arguments,
             environment: environment
         )
@@ -78,6 +79,7 @@ nonisolated final class ScannerDiagnostics: @unchecked Sendable {
         guard isEnabled else {
             return
         }
+        calibration?.event("stage", ["stage": stage, "durationMs": milliseconds, "ticket": ticket?.uuidString ?? "", "details": details])
         let ticketText = ticket.map {
             " ticket=\($0.uuidString.prefix(8))"
         } ?? ""
@@ -307,6 +309,7 @@ nonisolated final class ScannerDiagnostics: @unchecked Sendable {
         guard isEnabled else {
             return
         }
+        calibration?.event("scanner_event", ["name": event, "details": details])
         emit(event + (details.isEmpty ? "" : " \(details)"))
     }
 
@@ -319,6 +322,7 @@ nonisolated final class ScannerDiagnostics: @unchecked Sendable {
         minimumAvailableBytes: UInt64,
         maximumThermalRank: Int
     ) {
+        calibration?.event("processing_summary", ["ticket": ticket.uuidString, "outcome": outcome, "durationMs": elapsedMilliseconds, "peakBytes": peakFootprintBytes, "thermal": maximumThermalRank])
         let footprintDelta = peakFootprintBytes > baseline.footprintBytes
             ? peakFootprintBytes - baseline.footprintBytes
             : 0
@@ -345,6 +349,7 @@ nonisolated final class ScannerDiagnostics: @unchecked Sendable {
         final: ScannerResourceSnapshot,
         details: String
     ) {
+        calibration?.event("stage", ["stage": stage, "ticket": ticket.uuidString, "outcome": outcome, "durationMs": elapsedMilliseconds, "startBytes": baseline.footprintBytes, "endBytes": final.footprintBytes, "details": details])
         let detailsText = details.isEmpty ? "" : " \(details)"
         let deltaMegabytes = Self.signedMegabytesDelta(
             from: baseline.footprintBytes,
@@ -382,6 +387,7 @@ nonisolated final class ScannerDiagnostics: @unchecked Sendable {
     }
 
     private func emit(_ message: String) {
+        calibration?.event("diagnostic", ["message": message])
         logger.notice("[ScannerDiagnostics] \(message, privacy: .public)")
         print("[ScannerDiagnostics] \(message)")
     }

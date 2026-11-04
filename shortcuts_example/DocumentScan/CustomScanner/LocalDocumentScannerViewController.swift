@@ -27,6 +27,7 @@ nonisolated enum ScannerInterfaceOrientationRotation {
 
 nonisolated private struct ScannerAnalysisPayload: Sendable {
     let modelInput: ScannerPreparedTensor
+    let cameraTimestamp: TimeInterval
     let transform: ScannerViewportTransform
     let sharpness: Double
     let meanLuminance: Double
@@ -187,6 +188,7 @@ final class LocalDocumentScannerViewController: UIViewController {
         )
     private let motionMonitor = ScannerMotionMonitor()
     private let diagnostics = ScannerDiagnostics()
+    private let calibration = ScannerCalibrationRecorder.current
     private var captureDevice: AVCaptureDevice?
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
     private var previewRotationObservation: NSKeyValueObservation?
@@ -397,6 +399,23 @@ final class LocalDocumentScannerViewController: UIViewController {
         setupInterface()
         observeCaptureSession()
         diagnostics.logEnvironment()
+        if let calibration {
+            let settings = AppSettingsStore.shared
+            calibration.event("settings", ["analysisFPS": configuration.analysisFramesPerSecond,
+                "inputSize": configuration.liveAnalysisLongEdgePixels, "stableFrames": configuration.stableFrameCount,
+                "cornerStdPx": configuration.cornerStandardDeviationPixels, "gatePasses": configuration.consecutiveGatePassCount,
+                "accelVarianceThreshold": configuration.accelerationVarianceThreshold,
+                "sharpnessThreshold": configuration.laplacianSharpnessThreshold,
+                "captureSharpnessRatio": configuration.capturedToPreviewSharpnessRatio,
+                "forcedTimeoutSeconds": configuration.forcedCaptureTimeoutSeconds,
+                "captureCornerDeviationPercent": configuration.captureCornerMaximumDeviationPercent,
+                "automaticCapture": automaticCaptureEnabled, "uvdocEnabled": curvedPageCorrectionEnabled,
+                "colorEnabled": settings.documentScanColorEnhancementEnabled,
+                "ocrCorrectionEnabled": settings.ocrAutoCorrectionEnabled, "outputLongEdge": configuration.outputLongEdgePixels,
+                "heatmapThreshold": LCNetHeatmapDecoder.threshold,
+                "lcnetSha256": ScannerModelDescriptor.documentAligner.sha256,
+                "uvdocSha256": ScannerModelDescriptor.curvedPageDewarper.sha256])
+        }
         prepareModels()
         send(.start)
     }
@@ -720,10 +739,12 @@ final class LocalDocumentScannerViewController: UIViewController {
     }
 
     private func send(_ event: DocumentScanEvent) {
+        calibration?.event("state_event", ["state": String(describing: stateMachine.state), "input": String(describing: event)])
         let effects = stateMachine.handle(event)
         for effect in effects {
             apply(effect)
         }
+        calibration?.event("state", ["state": String(describing: stateMachine.state)])
         updateControls()
     }
 
@@ -1283,6 +1304,22 @@ final class LocalDocumentScannerViewController: UIViewController {
                 focusReady: sensorGates.focusReady
             )
 
+            if let calibration {
+                calibration.event("frame", ["detected": detection != nil, "confidence": detection?.confidence ?? 0,
+                    "corners": detection?.quad.points.map { [$0.x, $0.y] } ?? [], "coordinateSpace": "normalized sensor ROI, top-left origin",
+                    "width": payload.transform.rawCropRect.width, "height": payload.transform.rawCropRect.height,
+                    "cameraTimestampSeconds": payload.cameraTimestamp, "rawWidth": payload.transform.rawWidth, "rawHeight": payload.transform.rawHeight,
+                    "crop": [payload.transform.rawCropRect.x,payload.transform.rawCropRect.y,payload.transform.rawCropRect.width,payload.transform.rawCropRect.height],
+                    "rotation": payload.transform.rotationDegrees, "sharpness": payload.sharpness, "meanLuma": payload.meanLuminance,
+                    "accelVariance": motionMonitor.variance() as Any? ?? NSNull(),
+                    "framingOk": gates.framingGuidance == nil, "guidance": gates.framingGuidance.map { String(describing: $0) } ?? "",
+                    "cornersStable": gates.cornersStable, "still": gates.deviceStill, "sharp": gates.sharpEnough, "focus": gates.focusReady,
+                    "preprocessMs": payload.preprocessingMilliseconds, "inferenceMs": ScannerDiagnostics.milliseconds(since: inferenceStartedAt),
+                    "preprocessBackend": payload.preprocessingBackend.rawValue,
+                    "iso": captureDevice?.iso ?? 0, "exposureSeconds": captureDevice?.exposureDuration.seconds ?? 0,
+                    "lensPosition": captureDevice?.lensPosition ?? 0])
+                calibration.preview(payload.modelInput)
+            }
             if let detection {
                 latestLiveDetection = LiveDetection(
                     detection: detection,
@@ -1780,6 +1817,7 @@ final class LocalDocumentScannerViewController: UIViewController {
         SoundEffectManager.shared.play(
             .cameraShot2
         )
+        calibration?.beginCapture("ticket=\(ticket) forced=\(forced)")
         photoOutput.capturePhoto(with: settings, delegate: self)
     }
 
@@ -1807,6 +1845,7 @@ final class LocalDocumentScannerViewController: UIViewController {
         let scannerConfiguration = configuration
         let stillMetalSampler = liveMetalSampler
         let scannerDiagnostics = diagnostics
+        let calibrationLog = calibration
         let resourceSampler = diagnostics.beginProcessing(ticket: ticket)
         let processingTrace = diagnostics.trace(ticket: ticket)
         let enhanceColors =
@@ -1859,6 +1898,8 @@ final class LocalDocumentScannerViewController: UIViewController {
                     "stillPrepared",
                     ticket: ticket
                 )
+                calibrationLog?.savePixels(prepared.image, name: "source-crop")
+                calibrationLog?.event("capture_quality", ["previewSharpness": capture.previewSharpness, "captureSharpness": prepared.sharpness, "forced": capture.isForced])
                 try Task.checkCancellation()
                 if capture.previewSharpness > 0,
                    prepared.sharpness
@@ -1952,6 +1993,10 @@ final class LocalDocumentScannerViewController: UIViewController {
                 } else {
                     detection = stillDetection ?? capture.previewDetection
                 }
+                calibrationLog?.event("capture_corners", ["detected": stillDetection?.quad.points.map { [$0.x,$0.y] } ?? [],
+                    "selected": detection?.quad.points.map { [$0.x,$0.y] } ?? [], "preview": capture.previewDetection?.quad.points.map { [$0.x,$0.y] } ?? [],
+                    "width": prepared.image.width, "height": prepared.image.height, "rotation": capture.captureRotationDegrees,
+                    "coordinateSpace": "normalized sensor ROI, top-left origin"])
                 let output: CIImage
                 stageStartedAt = ProcessInfo.processInfo.systemUptime
                 if let detection {
@@ -2008,7 +2053,7 @@ final class LocalDocumentScannerViewController: UIViewController {
                     orientation: .up
                 )
                 stageStartedAt = ProcessInfo.processInfo.systemUptime
-                let upright = await OCRService.shared.uprightDocument(image)
+                let upright = await OCRService.shared.uprightDocument(image, calibration: calibrationLog)
                 scannerDiagnostics.logDuration(
                     "textOrientation",
                     milliseconds: ScannerDiagnostics.milliseconds(since: stageStartedAt),
@@ -2028,6 +2073,8 @@ final class LocalDocumentScannerViewController: UIViewController {
                         pageID: pageID
                     )
                 )
+                calibrationLog?.saveImage(upright, name: "result")
+                calibrationLog?.event("review_visible")
                 onScanCompleted?(upright)
             } catch is CancellationError {
                 return
@@ -2203,6 +2250,7 @@ final class LocalDocumentScannerViewController: UIViewController {
         announce: Bool = false
     ) {
         let changed = statusLabel.text != text
+        if changed { calibration?.event("guidance", ["text": text, "announce": announce]) }
         statusLabel.text = text
         guard announce, changed else {
             return
@@ -2568,6 +2616,7 @@ extension LocalDocumentScannerViewController:
             )
             let payload = ScannerAnalysisPayload(
                 modelInput: modelInput,
+                cameraTimestamp: timestamp,
                 transform: transform,
                 sharpness: sharpness,
                 meanLuminance: AndroidScannerFrameQuality.meanLuminance(

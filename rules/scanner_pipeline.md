@@ -1,6 +1,6 @@
 # 문서 스캔 파이프라인 (자체 스캐너, Android 패리티)
 
-점검일 2026-10-29 · 기준 코드 `c2f1d72d` + 작업 트리 (이번 변경 범위)
+점검일 2026-10-30 · 기준 코드 `b4aa7cf7` + 작업 트리 (탐지·촬영 게이트·방향 판별·진단 코드 대조, 실기기 재측정 없음) · 문서스캔 실측보정 대조: 2026-10-30 `b4aa7cf7`+작업 트리
 
 VisionKit `VNDocumentCameraViewController` 를 쓰지 않고 Android VisionCraft 와 **같은 모델·같은 수치** 로 동작하는 자체 스캐너. 코드는 `shortcuts_example/DocumentScan/CustomScanner/`. 목표는 Android 문서 [scanner_pipeline.md](../../../AndroidProject/VisionCraft/rules/scanner_pipeline.md) 의 Step 0-5 결과를 iPad 에서 재현하는 것 (`Tools/ScannerParity/` 로 결과 비교).
 
@@ -8,13 +8,14 @@ VisionKit `VNDocumentCameraViewController` 를 쓰지 않고 Android VisionCraft
 
 ```
 AVCaptureSession(.photo, builtInWideAngleCamera, continuousAutoFocus)      LocalDocumentScannerViewController
-  → 분석 프레임 10 fps, 긴 변 256 px
+  → 분석 상한 10 fps, ROI에서 256×256 letterbox 텐서 생성
   → LCNetDocumentDetector (lcnet100_doc_aligner.onnx, CPU parity)  → DocumentDetection(quad, confidence)
   → DocumentCaptureGateEvaluator (프레이밍·모서리 안정·정지·선명도·초점)
   → DocumentScannerStateMachine (searching → guiding → stabilizing → lockingFocus → capturing → processing → reviewing)
   → AVCapturePhotoSettings(flash off, .speed)
   → AndroidParityDocumentProcessor (actor)
         perspectiveCorrect (1.5% inset) → PaperEdgeRefiner → rotate → [UVDoc dewarp] → normalize 2400 px → [color enhance]
+  → OCRService.uprightDocument (1200 px 이하, 4방향 OCR)
   → DocumentScanSessionStore (Caches/DocumentScanSessions) → 리뷰 화면
   → OCRService (ML Kit Korean) → [GeminiOCRCorrectionService] → OCRResultView / 문서 열기
 ```
@@ -27,7 +28,7 @@ AVCaptureSession(.photo, builtInWideAngleCamera, continuousAutoFocus)      Local
 |---|---|---|
 | `analysisFramesPerSecond` | 10 | 분석 프레임 속도 |
 | `liveAnalysisLongEdgePixels` | 256 | 분석용 다운스케일 (LCNet 입력 256) |
-| `stableFrameCount` / `cornerStandardDeviationPixels` | 7 / 30.0 | 최근 7프레임 모서리 표준편차 < 30 px 이면 안정 (Android 15 px, 좌표계 차이) |
+| `stableFrameCount` / `cornerStandardDeviationPixels` | 7 / 30.0 | 최근 7프레임 모서리 표준편차 ≤ 30 px 이면 안정 (Android도 30 px이나 실제 ROI 해상도에 따라 상대 허용폭은 다름) |
 | `consecutiveGatePassCount` | 3 | 전 게이트 연속 통과 프레임 수 → `lockingFocus` |
 | `motionSampleWindowSeconds` / `accelerationVarianceThreshold` | 0.32 / 0.5 | `ScannerMotionMonitor` (CoreMotion userAcceleration, m/s² 환산) 분산 < 0.5 |
 | `laplacianSampleWidth×Height` / `laplacianSharpnessThreshold` | 96×64 / 100.0 | `AndroidScannerFrameQuality.laplacianVariance` |
@@ -53,7 +54,7 @@ AVCaptureSession(.photo, builtInWideAngleCamera, continuousAutoFocus)      Local
 
 - 입력 `img` `[1,3,256,256]` (letterbox, `AndroidScannerImageMath.letterboxedRGBTensor`), 출력 `heatmap` `[1,4,128,128]`.
 - `LCNetHeatmapDecoder.threshold = 0.15`, `refinementRadius = 3` — 히트맵 peak 주변 3px 가중 평균으로 서브픽셀 모서리.
-- 라이브 검출 백엔드는 `.cpuParity` (Android 와 같은 결과를 위한 결정적 CPU 모드, `LocalDocumentScannerViewController` `detectorBackend`). 촬영본 재검출·UVDoc 은 `.coreML` (Core ML EP: `enableOnSubgraphs`, `onlyAllowStaticInputShapes`, `createMLProgram`) → 실패 시 CPU 폴백 (`ScannerONNXSession`).
+- 라이브 검출 백엔드는 `.cpuParity` (Android 와 같은 결과를 위한 결정적 CPU 모드, `LocalDocumentScannerViewController` `detectorBackend`). 촬영본 재검출도 같은 `.cpuParity` 검출기 재사용. UVDoc은 `.coreML` (Core ML EP: `enableOnSubgraphs`, `onlyAllowStaticInputShapes`, `createMLProgram`) → 실패 시 CPU 폴백 (`ScannerONNXSession`).
 - 로드 시 `ScannerModelStore.verify` 가 파일 크기·SHA-256·입출력 이름 검증 ([dependencies.md](dependencies.md)).
 
 ## 촬영 후 처리 — `AndroidParityDocumentProcessor.process`
@@ -91,3 +92,21 @@ AVCaptureSession(.photo, builtInWideAngleCamera, continuousAutoFocus)      Local
 스캔 결과를 표시·저장하기 전에 긴 변 1200px 이하 OCR 입력으로 0/90/180/270도 방향을 비교한다. 정방향 가로 텍스트의 글자 수가 가장 많은 방향으로 원본을 회전한다. 동점·인식 실패·텍스트 없음은 카메라 방향을 유지한다. 클라우드 호출은 하지 않는다.
 
 텍스트 방향 판별은 각 OCR 패스 사이에 취소 상태를 확인하며 스캐너의 `textOrientation` 진단 단계로 소요 시간을 기록한다.
+
+## 탐지 품질·성능 계측 범위
+
+- `ScannerDiagnostics.recordLiveInference`는 opt-in 상태에서 30프레임마다 추론·전처리·합계 p50/p95와 검출 프레임 비율을 기록한다. 검출 프레임 비율은 정답과 비교한 정확도가 아니다. 촬영 후에는 `stillPrepare`, `stillLCNet`, `documentProcess`, `renderCGImage`, `textOrientation` 등을 별도로 기록한다.
+- `OCRService.uprightDocument`는 긴 변 1200px 이하의 이미지에서 네 방향을 순차 OCR하고, 결과 표시 전에 텍스트 방향을 결정한다. 이후 `DocumentScanRootView.recognizeReviewText`에서 본문 OCR을 별도로 실행한다. 텍스트 방향 판별은 UVDoc 뒤이므로 카메라 방향과 종이 글자 방향이 다른 장면은 보정 품질을 확인해야 한다.
+- 라이브 안정성은 시간 대신 7프레임을 기준으로 하며 분석 상한이 10 fps다. Android는 고정 분석 FPS를 지정하지 않아 동일 프레임 수라도 대기 시간은 다르다. 촬영까지의 시간과 게이트별 차단 시간은 추론 p50/p95와 별도로 평가해야 한다.
+- iPad의 면적 0.12~0.92 게이트는 Android에 없고, iPad 강제 촬영은 `cornersStable`도 요구하지만 Android 강제 촬영 분기는 이력 개수만 요구한다. 따라서 같은 모델·상수만으로 촬영 동작까지 같다고 볼 수 없다.
+- `Tools/ScannerParity`의 모델 계약·test-card 및 합성 픽셀 검사는 실제 문서의 정밀도/재현율·잘림률·문자 오류율을 대신하지 않는다. 대표 실사 문서의 정답 모서리·텍스트, 문서 없는 배경, 회전·그림자·반사·손떨림 장면을 포함한 정량 평가가 필요하다. 기존 M4 기록과 미검증 범위는 `Tools/ScannerParity/BACKLOG.md`에 있으며 최신 실기기 측정은 별도 수행해야 한다.
+
+## Debug 문서스캔 실측보정
+
+- 개발 화면의 `문서스캔 실측보정`에서 조건 메모(바닥·그림자·종이)를 입력하고 테스트를 시작한다. 기존 스캐너와 같은 촬영 판단값을 사용하며 자동 임계값 변경은 하지 않는다. 한 테스트에 한 환경을 사용하고 결과 또는 촬영 실패를 확인한 뒤 기록 화면으로 돌아와 최근 테스트의 정상/잘림/오탐/촬영 안 됨/흐림 및 자유 메모를 저장한다.
+- 테스트별 디렉터리에 `metadata.json`, `events.jsonl`, `status.json`, `assessment.json`과 이미지가 저장된다. 이벤트는 schemaVersion 1, seq, 세션 시작 후 elapsedMs, captureId를 포함한다. 카메라 원래 프레임 timestamp는 별도 필드이며 elapsedMs와 직접 빼지 않는다. 정답 모서리나 문자 정확도는 자동 산출하지 않는다.
+- 프레임별 탐지 여부·heatmap peak·confidence·모서리·좌표계·ROI·회전·휘도·선명도, 안정/정지/초점/프레이밍 게이트, 촬영·초점·강제 촬영·재시도, 촬영본 모서리 선택·후처리 단계·사용 백엔드·오류/폴백, 4방향 OCR 점수·선택, 본문 OCR 원문/영역과 교정 결과/상태를 기록한다. 설정·모델 해시·앱/OS/기기 정보와 메모리·열 상태도 남긴다. iPad의 기존 진단 문자열은 구조화된 단계 이벤트와 함께 보관한다.
+- 장면 샘플은 2초 간격 최대 30장이다(Android는 긴 변 640px 이하 ROI, iPad는 256px letterbox 모델 입력). 촬영 시 원근 보정 전 ROI 원본과 최종 결과를 JPEG 95로 저장한다. Android는 원근 보정 중간 결과·보정된 OCR 입력도 저장한다. 이미지 저장은 무손실 golden fixture가 아니며 미세한 픽셀 비교와 구분한다.
+- 이미지 복사/인코딩 시간이 계측에 영향을 준다. `artifact_queued`의 copyMs/encodeMs와 세션 전체 시간을 함께 보고, 단계별 durationMs와 혼동하지 않는다. 라이브 frame 이벤트는 20,000개까지 기록하며 장면 샘플 상한 이후에도 촬영 이벤트는 계속 남는다.
+- 정상 종료는 session_end와 status.json으로 확인한다. 앱 강제 종료 등으로 종료 표식이 없으면 중단된 테스트로 분류하고 미완료 시간을 성공 통계에 넣지 않는다. 내보내기는 대기 중인 저장이 끝난 뒤 모든 테스트를 ZIP으로 만든다. 저장 오류는 기록 목록에 표시한다.
+- 일반 스캔에서는 실측 레코더를 만들지 않는다. Debug UI에서 시작한 테스트만 장면·문서·OCR 내용을 기기에 보관하며 자동 업로드하지 않는다. 기존 Remote Config/사용자 설정에 따라 OCR 교정 등 스캔 기능의 클라우드 호출은 그대로다. ZIP 내보내기와 확인 후 전체 삭제를 제공한다. 저장 기록 1GB 이상이면 새 테스트 시작을 막는다.

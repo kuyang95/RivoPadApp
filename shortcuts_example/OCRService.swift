@@ -25,7 +25,7 @@ actor OCRService {
         )
 
     /// Compare quarter turns on a bounded thumbnail; keep the camera direction on ties.
-    func uprightDocument(_ image: UIImage) -> UIImage {
+    func uprightDocument(_ image: UIImage, calibration: ScannerCalibrationRecorder? = nil) -> UIImage {
         let scale = min(1, 1200 / max(image.size.width, image.size.height))
         let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
         let format = UIGraphicsImageRendererFormat()
@@ -34,19 +34,22 @@ actor OCRService {
         var best = 0
         var bestScore = 0
         for turn in 0..<4 {
-            if Task.isCancelled { return image }
+            if Task.isCancelled { calibration?.event("orientation_cancelled"); return image }
+            let orientationStart = ProcessInfo.processInfo.systemUptime
             let candidate = rotatedDocument(thumbnail, turns: turn)
             let input = VisionImage(image: candidate)
             input.orientation = .up
-            guard let result = try? recognizer.results(in: input) else { continue }
+            guard let result = try? recognizer.results(in: input) else { calibration?.event("orientation_error", ["degrees": turn * 90]); continue }
             let score = result.blocks.flatMap(\.lines).reduce(0) { total, line in
                 let points = line.cornerPoints.map { $0.cgPointValue }
                 guard points.count >= 2, points[1].x > points[0].x,
                       abs(points[1].y - points[0].y) < points[1].x - points[0].x else { return total }
                 return total + line.text.filter { !$0.isWhitespace }.count
             }
+            calibration?.event("orientation_candidate", ["degrees": turn * 90, "score": score, "durationMs": (ProcessInfo.processInfo.systemUptime-orientationStart)*1000])
             if score > bestScore { bestScore = score; best = turn }
         }
+        calibration?.event("orientation_selected", ["degrees": best*90, "score": bestScore])
         return rotatedDocument(image, turns: best)
     }
 

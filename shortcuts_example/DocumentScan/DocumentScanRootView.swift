@@ -86,9 +86,9 @@ struct DocumentScanRootView: View {
     @ScaledMetric(relativeTo: .title) private var reviewIconSize: CGFloat = 24
     @ScaledMetric(relativeTo: .title) private var reviewIconCircleSize: CGFloat = 36
 
-    init() {
+    init(calibrationTrial: Bool = false) {
         let session =
-            DocumentScanSessionModel()
+            DocumentScanSessionModel(store: calibrationTrial ? DocumentScanSessionStore(baseDirectory: FileManager.default.temporaryDirectory.appendingPathComponent("ScannerCalibrationReview")) : .restoringLatest())
         _session = StateObject(
             wrappedValue: session
         )
@@ -1286,8 +1286,11 @@ struct DocumentScanRootView: View {
             )
         )
 
+        let calibration = ScannerCalibrationRecorder.current
         recognitionTask = Task {
             do {
+                let ocrStarted = ProcessInfo.processInfo.systemUptime
+                calibration?.event("ocr_start")
                 let lines = try await OCRService
                     .shared
                     .recognizeLines(
@@ -1296,6 +1299,10 @@ struct DocumentScanRootView: View {
                 guard pendingImage === image else {
                     return
                 }
+                calibration?.event("ocr_result", ["durationMs": (ProcessInfo.processInfo.systemUptime-ocrStarted)*1000,
+                    "text": lines.map(\.text).joined(separator: "\n"), "width": image.size.width, "height": image.size.height,
+                    "coordinateSpace": "normalized bottom-left origin",
+                    "lines": lines.map { ["text": $0.text, "box": [$0.boundingBox.minX,$0.boundingBox.minY,$0.boundingBox.width,$0.boundingBox.height]] as [String: Any] }])
                 isRecognizingText = false
                 let originalText = lines
                     .map(\.text)
@@ -1322,6 +1329,7 @@ struct DocumentScanRootView: View {
                 recognizedLines = lines
                 guard settings
                     .ocrAutoCorrectionEnabled else {
+                    calibration?.event("correction_skipped", ["reason": "user_disabled"])
                     let message =
                         AppLocalization.string(
                             "글자 인식을 완료했습니다"
@@ -1340,6 +1348,8 @@ struct DocumentScanRootView: View {
                         "글자 인식을 완료했습니다. 오타 교정 중입니다. 원문은 지금 사용할 수 있습니다."
                     )
                 )
+                let correctionStarted = ProcessInfo.processInfo.systemUptime
+                calibration?.event("correction_start")
                 let correctionResult = await
                     GeminiOCRCorrectionService
                     .shared
@@ -1352,6 +1362,7 @@ struct DocumentScanRootView: View {
                 guard pendingImage === image else {
                     return
                 }
+                calibration?.event("correction_result", ["durationMs": (ProcessInfo.processInfo.systemUptime-correctionStarted)*1000, "text": correctionResult.text, "status": String(describing: correctionResult.status)])
                 isCorrectingText = false
                 recognizedText =
                     correctionResult.text
@@ -1399,6 +1410,7 @@ struct DocumentScanRootView: View {
                     )
                 }
             } catch {
+                calibration?.event("error", ["stage": "ocr", "message": error.localizedDescription])
                 guard pendingImage === image else {
                     return
                 }
