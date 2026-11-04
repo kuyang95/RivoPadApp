@@ -680,7 +680,7 @@ struct RatioLauncherView: View {
     }
     private func replaceWidgetTarget(with entry: RatioEntry) {
         guard let id = targetWidgetID, let source = widgets.first(where: { $0.id == id }),
-              entry.id == id || !widgets.contains(where: { $0.id == entry.id }) else { return }
+              entry.id != id, !widgets.contains(where: { $0.id == entry.id }) else { return }
         var replacement = source
         replacement.id = entry.id; replacement.name = entry.name
         replacement.iconText = source.iconText == true && entry.isApp && apps.first(where: { $0.id == entry.id })?.iconData != nil
@@ -811,7 +811,7 @@ struct RatioLauncherView: View {
                     .foregroundStyle(added || current ? RatioStyle.text : RatioStyle.accent).accessibilityHidden(true)
             }.frame(maxWidth: .infinity, minHeight: 64, alignment: .leading).padding(12)
                 .background(RatioStyle.surface, in: RoundedRectangle(cornerRadius: 8))
-        }.buttonStyle(.plain).foregroundStyle(RatioStyle.text).disabled(added).accessibilityAddTraits(current ? [.isSelected] : [])
+        }.buttonStyle(.plain).foregroundStyle(RatioStyle.text).disabled(added || current).accessibilityAddTraits(current ? [.isSelected] : [])
     }
     private func setWidgetKind(_ widget: RatioHomeItem, _ kind: String) {
         let current = widget.textOnly ? "text" : widget.iconOnly == true ? "icon" : "tile"
