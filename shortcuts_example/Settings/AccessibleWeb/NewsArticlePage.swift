@@ -80,7 +80,7 @@ enum NewsArticlePage {
     footer{margin:40px 0 0;padding-top:20px;border-top:1px solid #536176;font-size:18px;line-height:1.6}
     @media(max-width:480px){main{padding:24px}h1{font-size:34px}}
   `;
-  const url = value => {try{const u=new URL(value,location.href);return /^https?:$/.test(u.protocol)?u.href:null}catch{return null}};
+  const url = value => {if(!value?.trim())return null;try{const u=new URL(value,location.href);return /^https?:$/.test(u.protocol)?u.href:null}catch{return null}};
   const visible = e => e.getClientRects().length && e.getBoundingClientRect().bottom>0 && e.getBoundingClientRect().top<innerHeight && getComputedStyle(e).opacity!=='0' && !(e.tagName==='IFRAME'&&/[?&]size=invisible(?:&|$)/.test(e.getAttribute('src')||'')) && getComputedStyle(e).display!=='none' && getComputedStyle(e).visibility!=='hidden';
   const gate = () => [...document.querySelectorAll('dialog[open],[role="dialog"],[aria-modal="true"],[class*="paywall"],[id*="paywall"],iframe[src*="recaptcha"]')].some(visible);
   const allowed = new Set('P DIV SECTION ARTICLE H2 H3 H4 UL OL LI BLOCKQUOTE STRONG EM B I U S A BR HR FIGURE FIGCAPTION PICTURE IMG VIDEO SOURCE TABLE THEAD TBODY TR TD TH PRE CODE SUP SUB SPAN IFRAME'.split(' '));
@@ -103,9 +103,13 @@ enum NewsArticlePage {
     }
     if(tag==='A'){const href=url(node.getAttribute('href'));if(href)e.href=href;}
     if(tag==='VIDEO'){const src=url(node.getAttribute('src'));if(src)e.src=src;e.controls=true;e.preload='metadata';}
-    if(tag==='SOURCE'){const src=url(node.getAttribute('src'));if(src)e.src=src;else return null;}
+    if(tag==='SOURCE'){
+      const src=url(node.getAttribute('src'));if(!src)return null;
+      e.src=src;const type=node.getAttribute('type');if(type)e.type=type;return e;
+    }
     for(const child of node.childNodes){const c=clean(child,doc);if(c)e.appendChild(c);}
-    if(!e.textContent.trim()&&!e.querySelector('img,video,iframe')&&!['BR','HR','SOURCE'].includes(tag))return null;
+    if(tag==='VIDEO')return e.hasAttribute('src')||e.querySelector('source')?e:null;
+    if(!e.textContent.trim()&&!e.querySelector('img,video,iframe')&&!['BR','HR'].includes(tag))return null;
     return e;
   };
   const restore = () => {if(readerViewport){readerViewport.remove();readerViewport=null;}if(originalViewports){for(const [meta,content] of originalViewports)meta.setAttribute('content',content);originalViewports=null;}document.documentElement.removeAttribute('data-rivo-news-unified');if(host)host.remove();host=null;mounted=false;reveal();};
