@@ -108,8 +108,8 @@ struct RatioLauncherView: View {
             RatioEntry(id: "photos", name: "사진 분석", icon: "photo", route: .imageAnalysisPhoto),
             RatioEntry(id: "text", name: "텍스트 보기", icon: "text.alignleft", route: .textEditorText(title: "텍스트", text: "")),
             RatioEntry(id: "history", name: "대화 기록", icon: "clock.arrow.circlepath", route: .chatHistory),
-            RatioEntry(id: "browser", name: "쉬운 브라우저", icon: "globe"),
-            RatioEntry(id: "youtube", name: "쉬운 유튜브", icon: "play.rectangle", route: .easyYouTube),
+            RatioEntry(id: "browser", name: RatioHomeItem.webName, icon: "globe"),
+            RatioEntry(id: "youtube", name: RatioHomeItem.youTubeName, icon: "play.rectangle", route: .easyYouTube),
             RatioEntry(id: "app-settings", name: "앱 설정", icon: "gearshape", route: .allSettings),
             RatioEntry(id: "standard-home", name: "기존 홈", icon: "house", route: .standardHome)
         ] + apps.map { RatioEntry(id: $0.id, name: $0.name, icon: "app", address: $0.address) }
@@ -281,7 +281,7 @@ struct RatioLauncherView: View {
             if fullPageWidgetsVersion < 1 { saveWidgets(installFullPageWidgets(widgets)); fullPageWidgetsVersion = 1 }
             else if widgetsData.isEmpty { saveWidgets(widgets) }
             if !newsWidgetInstalled {
-                if !widgets.contains(where: \.isNews) { saveWidgets(widgets + [RatioHomeItem(id: "widget:news", name: "뉴스", columns: 4, rows: 10)]) }
+                if !widgets.contains(where: \.isNews) { saveWidgets(widgets + [RatioHomeItem(id: "widget:news", name: RatioHomeItem.newsName, columns: 4, rows: 10)]) }
                 newsWidgetInstalled = true
             }
             LauncherNewsRefresh.setEnabled(widgets.contains(where: \.isNews))
@@ -734,12 +734,12 @@ struct RatioLauncherView: View {
         }
     }
     private var widgetAddChoices: [RatioHomeItem] {
-        [RatioHomeItem(id: "widget:news", name: "뉴스", columns: 4, rows: 10),
+        [RatioHomeItem(id: "widget:news", name: RatioHomeItem.newsName, columns: 4, rows: 10),
          RatioHomeItem(id: "widget:weather", name: "날씨", columns: 2, rows: 2),
          RatioHomeItem(id: "widget:timer", name: "타이머 · 알람", columns: 2, rows: 2),
          RatioHomeItem(id: "widget:search", name: "통합 검색", columns: 4, rows: 1),
-         RatioHomeItem(id: "widget:youtube", name: "쉬운 유튜브", columns: 4, rows: 10),
-         RatioHomeItem(id: "widget:browser", name: "쉬운 브라우저", columns: 4, rows: 8),
+         RatioHomeItem(id: "widget:youtube", name: RatioHomeItem.youTubeName, columns: 4, rows: 10),
+         RatioHomeItem(id: "widget:browser", name: RatioHomeItem.webName, columns: 4, rows: 8),
          RatioHomeItem(id: "widget:daisy", name: "데이지 플레이어", columns: 4, rows: 6)]
     }
     @ViewBuilder private var widgetCatalogTabs: some View {

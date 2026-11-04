@@ -675,7 +675,7 @@ html[data-rivo-google-verification] main > .JYXaTc .XjS9D > div {width:100%!impo
   const emptySubscriptions=()=>sectionForURL()==='subscriptions' && [...document.querySelectorAll('ytm-background-promo-renderer,ytd-background-promo-renderer,ytm-message-renderer,ytd-message-renderer,ytm-item-section-renderer')].some(e=>!e.querySelector('ytm-video-with-context-renderer,ytm-rich-item-renderer,ytd-video-renderer,ytd-rich-item-renderer')&&/마음에 드는 채널을 구독|구독.*영상.*없|아직 구독한 채널|subscribe to.*channels|haven.t subscribed|no (?:new )?(?:videos|subscriptions)|チャンネルに登録して|登録チャンネル.*(?:ありません|ない)/i.test(e.textContent));
   const nativeShortButton=next=>[...document.querySelectorAll('button[aria-label]')].find(b=>new RegExp(next?'다음 동영상|Next video':'이전 동영상|Previous video','i').test(b.getAttribute('aria-label')));
   const setSection=(next,{focus=false}={})=>{
-    section=next;root.querySelector('main').setAttribute('aria-label',`쉬운 유튜브 ${labels[next]}`);
+    section=next;root.querySelector('main').setAttribute('aria-label',`${window.__rivoLauncherEmbedded ? '리보 유튜브' : '쉬운 유튜브'} ${labels[next]}`);
     for(const b of root.querySelectorAll('[data-section]')){if(b.dataset.section===next)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');}
     $('heading').textContent=labels[next];
     // Keep the outgoing shell in place until the official Shorts frame is ready.

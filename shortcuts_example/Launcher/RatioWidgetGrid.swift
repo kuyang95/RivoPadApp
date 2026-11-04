@@ -18,11 +18,24 @@ struct RatioHomeItem: Identifiable, Codable {
     var isFullPage: Bool { isYouTube || isBrowser || isDaisy || isNews }
     var isDaisy: Bool { id == "widget:daisy" }
     var isBrowser: Bool { id == "widget:browser" }
+    static let webName = String(localized: "리보 웹")
+    static let youTubeName = String(localized: "리보 유튜브")
+    static let newsName = String(localized: "리보 뉴스")
+
     var normalized: RatioHomeItem {
         if isUtility { var item = self; item.columns = columns < 4 ? 2 : 4; item.rows = min(5, max(2, rows)); item.textOnly = false; item.iconOnly = false; return item }
-        if isYouTube || isNews { var item = self; item.columns = 4; item.rows = 10; item.textOnly = false; item.iconOnly = false; return item }
+        if isYouTube || isNews {
+            var item = self
+            item.name = isYouTube ? Self.youTubeName : Self.newsName
+            item.columns = 4
+            item.rows = 10
+            item.textOnly = false
+            item.iconOnly = false
+            return item
+        }
         guard isBrowser || isDaisy else { return self }
         var item = self; item.columns = 4; item.rows = min(10, max(isDaisy ? 6 : 8, rows)); item.textOnly = false; item.iconOnly = false
+        if isBrowser { item.name = Self.webName }
         return item
     }
     var isSearch: Bool { id == "widget:search" }
@@ -178,9 +191,8 @@ func ratioWidgetInsertionIndex(_ items: [RatioHomeItem], widget: RatioHomeItem, 
 
 func installFullPageWidgets(_ items: [RatioHomeItem]) -> [RatioHomeItem] {
     let ordinary = items.filter { !$0.isFullPage }
-    let youtube = items.first(where: \.isYouTube) ?? RatioHomeItem(id: "widget:youtube", name: "쉬운 유튜브", columns: 4, rows: 10)
-    var browser = items.first(where: \.isBrowser) ?? RatioHomeItem(id: "widget:browser", name: "쉬운 브라우저", columns: 4, rows: 8)
-    browser.name = "쉬운 브라우저"
+    let youtube = items.first(where: \.isYouTube) ?? RatioHomeItem(id: "widget:youtube", name: RatioHomeItem.youTubeName, columns: 4, rows: 10)
+    let browser = items.first(where: \.isBrowser) ?? RatioHomeItem(id: "widget:browser", name: RatioHomeItem.webName, columns: 4, rows: 8)
     let daisy = items.first(where: \.isDaisy) ?? RatioHomeItem(id: "widget:daisy", name: "데이지 플레이어", columns: 4, rows: 6)
     return ordinary + [youtube, browser, daisy] + items.filter(\.isNews)
 }
