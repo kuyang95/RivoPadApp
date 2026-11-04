@@ -60,6 +60,7 @@ struct RatioLauncherView: View {
     @State private var appIconData: Data?
     @State private var page = "home"
     @State private var editingWidget: String?
+    @State private var targetWidgetID: String?
     @State private var editorSelection: RatioEditorSelection?
     @State private var fullEditorFromHome = false
     @State private var widgetPage = 0
@@ -175,7 +176,7 @@ struct RatioLauncherView: View {
                 if page != "home" {
                     HStack {
                         icon("chevron.left", "뒤로") { goBack() }
-                        Text(page == "apps" ? "전체 앱·기능" : page == "edit" ? "위젯 편집" : page == "widget_add" ? "위젯 추가" : page == "widget_apps" ? "앱 바로가기" : "런처 설정")
+                        Text(page == "apps" ? "전체 앱·기능" : page == "edit" ? "위젯 편집" : page == "widget_add" ? "위젯 추가" : page == "widget_apps" ? "앱 바로가기" : page == "widget_target" ? "실행할 앱·기능" : "런처 설정")
                             .font(.title2).accessibilityAddTraits(.isHeader)
                     }
                 }
@@ -191,6 +192,7 @@ struct RatioLauncherView: View {
                         switch page {
                         case "widget_add": widgetAddCatalog
                         case "widget_apps": widgetAppShortcuts
+                        case "widget_target": widgetTargetPicker
                         case "apps": catalog
                         case "settings": settings
                         case "edit": editor
@@ -251,7 +253,7 @@ struct RatioLauncherView: View {
         .accessibilityAction(.escape) { goBack() }
         .sheet(item: $editorSelection) { selection in widgetOptions(selection) }
         .onChange(of: router.launcherHomeRequestID) { _, _ in
-            editorSelection = nil; editingWidget = nil; widgetPage = 0; addedWidgetID = nil; showsBrowser = false
+            editorSelection = nil; editingWidget = nil; targetWidgetID = nil; widgetPage = 0; addedWidgetID = nil; showsBrowser = false
             browserWidgetSession.pause(); youTubeWidgetSession.pause(); navigate("home")
         }
         .onAppear {
@@ -581,37 +583,111 @@ struct RatioLauncherView: View {
     }
 
     private var editor: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 24) {
+            Text("무엇을 열지, 어떻게 보일지 편하게 바꿔보세요.")
+                .visionCraftAndroidText(18).foregroundStyle(RatioStyle.text.opacity(0.8))
             if editingWidget == nil { action("위젯 추가", fullWidth: true) { navigate("widget_add") } }
             ForEach(widgets.filter { editingWidget == nil || $0.id == editingWidget }) { widget in
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(entries.first { $0.id == widget.id }?.name ?? widget.name).font(.title2).accessibilityAddTraits(.isHeader)
-                    if !widget.isUtility && !widget.isSearch && !widget.isFullPage {
-                        editorRow("형태", value: widget.textOnly ? "텍스트 바로가기" : widget.iconOnly == true ? "아이콘 바로가기" : "타일 바로가기", widget: widget, option: "shape")
-                    }
-                    if widget.isFullPage { Text("페이지 전체를 사용하는 위젯").foregroundStyle(.secondary) }
-                    else if !widget.textOnly { editorRow("크기", value: "\(widget.columns) × \(widget.rows)", widget: widget, option: "size") }
-                    if !widget.isFullPage {
-                        editorRow(widget.textOnly ? "글자 색상" : "위젯 색상", value: widget.iconText == true ? "앱 아이콘 색" : ratioPalette.first(where: { $0.id == widget.colorKey })?.name ?? "기본 색상", widget: widget, option: "color")
-                    }
-                    HStack {
-                        icon("arrow.up", "\(widget.name) 위로") { moveWidget(widget.id, -1) }.disabled(widgets.first?.id == widget.id)
-                        icon("arrow.down", "\(widget.name) 아래로") { moveWidget(widget.id, 1) }.disabled(widgets.last?.id == widget.id)
-                        icon("minus.circle", "\(widget.name) 홈에서 제거") { saveWidgets(widgets.filter { $0.id != widget.id }); if editingWidget != nil { navigate("home") } }
-                    }
-                }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(RatioStyle.text.opacity(0.6)))
+                widgetEditorCard(widget)
+            }
+            action("완료", fullWidth: true) { navigate("home") }
+        }
+    }
+    private func widgetEditorCard(_ widget: RatioHomeItem) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            widgetEditorPreview(widget)
+            VStack(spacing: 0) {
+                if !widget.isUtility && !widget.isSearch && !widget.isFullPage {
+                    editorRow("실행할 앱·기능", value: entries.first { $0.id == widget.id }?.name ?? widget.name, widget: widget, option: "target")
+                    editorRow("형태", value: widget.textOnly ? "텍스트 바로가기" : widget.iconOnly == true ? "아이콘 바로가기" : "타일 바로가기", widget: widget, option: "shape")
+                }
+                if widget.isFullPage { Text("페이지 전체를 사용하는 위젯").visionCraftAndroidText(18).padding(16) }
+                else if !widget.textOnly { editorRow("크기", value: "\(widget.columns) × \(widget.rows)", widget: widget, option: "size") }
+                if !widget.isFullPage {
+                    editorRow(widget.textOnly ? "글자 색상" : "위젯 색상", value: widget.iconText == true ? "앱 아이콘 색" : ratioPalette.first(where: { $0.id == widget.colorKey })?.name ?? "기본 색상", widget: widget, option: "color")
+                }
+            }.padding(4).background(RatioStyle.surface, in: RoundedRectangle(cornerRadius: 12))
+            Text("홈 배치").visionCraftAndroidText(22, weight: .semibold).accessibilityAddTraits(.isHeader)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { widgetArrangementButtons(widget) }
+                VStack(alignment: .leading, spacing: 8) { widgetArrangementButtons(widget) }
+            }
+            Rectangle().fill(RatioStyle.text.opacity(0.25)).frame(height: 1).padding(.top, 16).accessibilityHidden(true)
+        }
+    }
+    @ViewBuilder private func widgetArrangementButtons(_ widget: RatioHomeItem) -> some View {
+        action("위로") { moveWidget(widget.id, -1) }.disabled(widgets.first?.id == widget.id).accessibilityLabel("\(widget.name) 위로")
+        action("아래로") { moveWidget(widget.id, 1) }.disabled(widgets.last?.id == widget.id).accessibilityLabel("\(widget.name) 아래로")
+        action("홈에서 제거") { saveWidgets(widgets.filter { $0.id != widget.id }); if editingWidget != nil { navigate("home") } }
+            .accessibilityLabel("\(widget.name) 홈에서 제거")
+    }
+    private func widgetEditorPreview(_ widget: RatioHomeItem) -> some View {
+        let entry = entries.first { $0.id == widget.id }
+        let swatch = ratioPalette.first { $0.id == widget.colorKey }?.color
+        let ink = widget.textOnly ? swatch ?? RatioStyle.text : swatch == nil ? RatioStyle.text : RatioStyle.background
+        return VStack(alignment: .leading, spacing: 12) {
+            Text("미리보기").visionCraftAndroidText(16).foregroundStyle(RatioStyle.text.opacity(0.8))
+            HStack(spacing: 16) {
+                if !widget.textOnly {
+                    if let data = apps.first(where: { $0.id == widget.id })?.iconData, let image = UIImage(data: data) {
+                        Image(uiImage: image).resizable().scaledToFit().frame(width: 40, height: 40).accessibilityHidden(true)
+                    } else { Image(systemName: entry?.icon ?? "square.grid.2x2").font(.title).accessibilityHidden(true) }
+                }
+                Text(entry?.name ?? widget.name).visionCraftAndroidText(24, weight: .bold).accessibilityAddTraits(.isHeader)
+            }.foregroundStyle(ink).padding(20).frame(maxWidth: .infinity, alignment: .leading)
+                .background(widget.textOnly ? Color.clear : swatch ?? RatioStyle.surface, in: RoundedRectangle(cornerRadius: 8))
+            if !widget.isFullPage && !widget.isSearch && !widget.isUtility {
+                Text(widget.textOnly ? "텍스트 바로가기" : widget.iconOnly == true ? "아이콘 바로가기" : "타일 바로가기")
+                    .visionCraftAndroidText(16).foregroundStyle(RatioStyle.text.opacity(0.8))
             }
         }
     }
     private func editorRow(_ title: String, value: String, widget: RatioHomeItem, option: String) -> some View {
-        Button { editorSelection = RatioEditorSelection(widgetID: widget.id, option: option) } label: {
-            HStack {
-                Text(title); Spacer(); Text(value).multilineTextAlignment(.trailing)
+        Button {
+            if option == "target" { targetWidgetID = widget.id; navigate("widget_target") }
+            else { editorSelection = RatioEditorSelection(widgetID: widget.id, option: option) }
+        } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).visionCraftAndroidText(16).foregroundStyle(RatioStyle.text.opacity(0.8))
+                    Text(value).visionCraftAndroidText(20, weight: .semibold)
+                }.frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.right").accessibilityHidden(true)
-            }.padding(16).frame(maxWidth: .infinity, minHeight: 56)
-                .background(RatioStyle.surface, in: RoundedRectangle(cornerRadius: 8))
+            }.padding(12).frame(maxWidth: .infinity, minHeight: 72, alignment: .leading).contentShape(Rectangle())
+        }.buttonStyle(.plain)
+    }
+    private var widgetTargetPicker: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("바로가기에서 열 앱이나 기능을 선택하세요. 모양·크기·색·순서는 그대로 유지됩니다.")
+                .visionCraftAndroidText(18).foregroundStyle(RatioStyle.text.opacity(0.8))
+            TextField("앱·기능 검색", text: $query).visionCraftAndroidText(20)
+                .padding(16).background(RatioStyle.surface, in: RoundedRectangle(cornerRadius: 12))
+            let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            let shown = entries.filter { needle.isEmpty || $0.name.localizedStandardContains(needle) }
+            ForEach(shown) { entry in
+                let current = entry.id == targetWidgetID
+                let added = !current && widgets.contains { $0.id == entry.id }
+                widgetAddRow(entry.name, image: entry.icon, added: added,
+                    detail: current ? "현재 사용 중" : entry.isApp ? nil : "누르면 기능 실행", current: current, navigation: true,
+                    iconData: apps.first { $0.id == entry.id }?.iconData) {
+                    replaceWidgetTarget(with: entry)
+                }
+            }
+            if shown.isEmpty { Text("검색 결과가 없습니다.").visionCraftAndroidText(18) }
+            if apps.isEmpty { Text("앱은 런처 설정에서 앱 링크를 등록하면 여기에 표시됩니다.").visionCraftAndroidText(16) }
+            action("닫기", fullWidth: true) { targetWidgetID = nil; navigate("edit") }
         }
+    }
+    private func replaceWidgetTarget(with entry: RatioEntry) {
+        guard let id = targetWidgetID, let source = widgets.first(where: { $0.id == id }),
+              entry.id == id || !widgets.contains(where: { $0.id == entry.id }) else { return }
+        var replacement = source
+        replacement.id = entry.id; replacement.name = entry.name
+        replacement.iconText = source.iconText == true && entry.isApp && apps.first(where: { $0.id == entry.id })?.iconData != nil
+        saveWidgets(widgets.map { $0.id == id ? replacement : $0 })
+        if editingWidget == id { editingWidget = entry.id }
+        if addedWidgetID == id { addedWidgetID = entry.id }
+        targetWidgetID = nil; navigate("edit"); status = "\(entry.name) 바로가기로 변경했습니다."
     }
     @ViewBuilder private func widgetOptions(_ selection: RatioEditorSelection) -> some View {
         if let widget = widgets.first(where: { $0.id == selection.widgetID }) {
@@ -634,13 +710,14 @@ struct RatioLauncherView: View {
                             if widget.textOnly, let data = apps.first(where: { $0.id == widget.id })?.iconData, UIImage(data: data) != nil {
                                 tab("앱 아이콘 색", selected: widget.iconText == true) { var w = widget; w.iconText = true; changeWidget(w); editorSelection = nil }
                             }
-                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 128), spacing: 8)], spacing: 8) {
                                 ForEach(ratioPalette) { swatch in
                                     Button { var w = widget; w.colorKey = swatch.id; w.iconText = false; changeWidget(w); editorSelection = nil } label: {
-                                        ZStack {
-                                            RoundedRectangle(cornerRadius: 14).fill(swatch.color)
-                                            if widget.colorKey == swatch.id && widget.iconText != true { Image(systemName: "checkmark").foregroundStyle(RatioStyle.background) }
-                                        }.frame(height: 56)
+                                        HStack(spacing: 8) {
+                                            Text(swatch.name).visionCraftAndroidText(16)
+                                            if widget.colorKey == swatch.id && widget.iconText != true { Image(systemName: "checkmark") }
+                                        }.foregroundStyle(RatioStyle.background).padding(12).frame(maxWidth: .infinity, minHeight: 56)
+                                            .background(swatch.color, in: RoundedRectangle(cornerRadius: 12))
                                     }.accessibilityLabel(swatch.name).accessibilityAddTraits(widget.colorKey == swatch.id && widget.iconText != true ? [.isSelected] : [])
                                 }
                             }
@@ -648,8 +725,11 @@ struct RatioLauncherView: View {
                     }.padding().frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .navigationTitle(selection.option == "shape" ? "형태" : selection.option == "size" ? "크기" : "색상")
-                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("닫기") { editorSelection = nil } } }
-            }.presentationDetents([.medium, .large]).preferredColorScheme(.dark)
+                .background(RatioStyle.background)
+                .toolbarBackground(RatioStyle.background, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("닫기") { editorSelection = nil }.frame(minHeight: 48) } }
+            }.foregroundStyle(RatioStyle.text).tint(RatioStyle.accent).presentationDetents([.medium, .large]).preferredColorScheme(.dark)
         }
     }
     private var widgetAddChoices: [RatioHomeItem] {
@@ -661,12 +741,17 @@ struct RatioLauncherView: View {
          RatioHomeItem(id: "widget:browser", name: "쉬운 브라우저", columns: 4, rows: 8),
          RatioHomeItem(id: "widget:daisy", name: "데이지 플레이어", columns: 4, rows: 6)]
     }
+    @ViewBuilder private var widgetCatalogTabs: some View {
+        tab("VisionCraft 위젯", selected: widgetAddTab == 0) { widgetAddTab = 0; query = "" }
+        tab("모든앱", selected: widgetAddTab == 1) { widgetAddTab = 1; query = "" }
+    }
     private var widgetAddCatalog: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                tab("VisionCraft 위젯", selected: widgetAddTab == 0) { widgetAddTab = 0; query = "" }
-                tab("모든앱", selected: widgetAddTab == 1) { widgetAddTab = 1; query = "" }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { widgetCatalogTabs }
+                VStack(alignment: .leading, spacing: 8) { widgetCatalogTabs }
             }
+            Text("홈에서 바로 쓸 위젯이나 바로가기를 골라보세요.").visionCraftAndroidText(18).foregroundStyle(RatioStyle.text.opacity(0.8))
             if widgetAddTab == 1 {
                 Text("iPadOS에서는 다른 앱의 위젯을 이 홈 안에 추가할 수 없습니다. iPad 홈 화면에서 해당 앱의 위젯을 추가해 주세요.")
                     .visionCraftAndroidText(18).padding(.vertical, 16)
@@ -675,17 +760,19 @@ struct RatioLauncherView: View {
                     .padding(16).background(RatioStyle.surface, in: RoundedRectangle(cornerRadius: 16))
                 let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
                 if needle.isEmpty || "앱 바로가기".localizedStandardContains(needle) {
-                    widgetAddRow("앱 바로가기", image: "app", added: false) { navigate("widget_apps") }
+                    widgetAddRow("앱 바로가기", image: "app", added: false, detail: "등록한 앱으로 바로 이동", navigation: true) { navigate("widget_apps") }
                 }
                 let choices = widgetAddChoices.filter { needle.isEmpty || $0.name.localizedStandardContains(needle) }
                 let features = entries.filter { !$0.isApp && (needle.isEmpty || $0.name.localizedStandardContains(needle)) }
+                if !choices.isEmpty { Text("생활·미디어 위젯").visionCraftAndroidText(22, weight: .semibold).padding(.top, 16).accessibilityAddTraits(.isHeader) }
                 ForEach(choices) { widget in
-                    widgetAddRow(widget.name, image: widget.isWeather ? "cloud.sun" : widget.isTimer ? "timer" : "square.grid.2x2", added: widgets.contains { $0.id == widget.id }) {
+                    widgetAddRow(widget.name, image: widget.isWeather ? "cloud.sun" : widget.isTimer ? "timer" : "square.grid.2x2", added: widgets.contains { $0.id == widget.id }, detail: widget.isFullPage ? "페이지 전체를 사용하는 위젯" : "\(widget.columns) × \(widget.rows)") {
                         addWidget(widget)
                     }
                 }
+                if !features.isEmpty { Text("기능 바로가기").visionCraftAndroidText(22, weight: .semibold).padding(.top, 16).accessibilityAddTraits(.isHeader) }
                 ForEach(features) { entry in
-                    widgetAddRow(entry.name, image: entry.icon, added: widgets.contains { $0.id == entry.id }) {
+                    widgetAddRow(entry.name, image: entry.icon, added: widgets.contains { $0.id == entry.id }, detail: "누르면 기능 실행") {
                         addWidget(RatioHomeItem(id: entry.id, name: entry.name))
                     }
                 }
@@ -700,7 +787,7 @@ struct RatioLauncherView: View {
                 .padding(16).background(RatioStyle.surface, in: RoundedRectangle(cornerRadius: 16))
             let shown = entries.filter { $0.isApp && (query.isEmpty || $0.name.localizedStandardContains(query)) }
             ForEach(shown) { entry in
-                widgetAddRow(entry.name, image: "app", added: widgets.contains { $0.id == entry.id }, detail: "아이콘 바로가기") {
+                widgetAddRow(entry.name, image: "app", added: widgets.contains { $0.id == entry.id }, detail: "아이콘 바로가기", iconData: apps.first { $0.id == entry.id }?.iconData) {
                     addWidget(RatioHomeItem(id: entry.id, name: entry.name, columns: 1, rows: 1, iconOnly: true))
                 }
             }
@@ -708,20 +795,23 @@ struct RatioLauncherView: View {
             action("완료") { navigate("widget_add") }
         }
     }
-    private func widgetAddRow(_ title: String, image: String, added: Bool, detail: String? = nil, perform: @escaping () -> Void) -> some View {
+    private func widgetAddRow(_ title: String, image: String, added: Bool, detail: String? = nil, current: Bool = false, navigation: Bool = false, iconData: Data? = nil, perform: @escaping () -> Void) -> some View {
         Button(action: perform) {
             HStack(spacing: 16) {
-                Image(systemName: image).font(.title2).accessibilityHidden(true)
+                if let iconData, let iconImage = UIImage(data: iconData) {
+                    Image(uiImage: iconImage).resizable().scaledToFit().frame(width: 36, height: 36).accessibilityHidden(true)
+                } else { Image(systemName: image).font(.title2).frame(width: 36).accessibilityHidden(true) }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title).visionCraftAndroidText(CGFloat(textSize))
+                    Text(title).visionCraftAndroidText(CGFloat(textSize), weight: .semibold)
                     if added { Text("추가됨").visionCraftAndroidText(16) }
                     else if let detail { Text(detail).visionCraftAndroidText(16) }
                 }
                 Spacer(minLength: 0)
-                if added { Image(systemName: "checkmark").accessibilityHidden(true) }
+                Image(systemName: added || current ? "checkmark" : navigation ? "chevron.right" : "plus")
+                    .foregroundStyle(added || current ? RatioStyle.text : RatioStyle.accent).accessibilityHidden(true)
             }.frame(maxWidth: .infinity, minHeight: 64, alignment: .leading).padding(12)
                 .background(RatioStyle.surface, in: RoundedRectangle(cornerRadius: 8))
-        }.buttonStyle(.plain).disabled(added)
+        }.buttonStyle(.plain).foregroundStyle(RatioStyle.text).disabled(added).accessibilityAddTraits(current ? [.isSelected] : [])
     }
     private func setWidgetKind(_ widget: RatioHomeItem, _ kind: String) {
         let current = widget.textOnly ? "text" : widget.iconOnly == true ? "icon" : "tile"
@@ -870,7 +960,7 @@ struct RatioLauncherView: View {
         }.accessibilityAddTraits(selected ? [.isSelected] : [])
     }
     private func navigate(_ target: String) {
-        if !["edit", "widget_add", "widget_apps"].contains(target) { fullEditorFromHome = false }
+        if !["edit", "widget_add", "widget_apps", "widget_target"].contains(target) { fullEditorFromHome = false }
         if target == "widget_add" { widgetAddTab = 0 }
         cancelOperation(); searchFocused = false; query = ""; status = ""; searchMode = false
         withAnimation(reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.36, dampingFraction: 0.92)) { page = target }
@@ -886,6 +976,7 @@ struct RatioLauncherView: View {
             } else if widgetPage > 0 { widgetPage = 0 }
             else { dismiss() }
         }
+        else if page == "widget_target" { targetWidgetID = nil; navigate("edit") }
         else if page == "widget_apps" { navigate("widget_add") }
         else if page == "widget_add" { navigate("edit") }
         else { navigate(page == "edit" && editingWidget == nil && !fullEditorFromHome ? "settings" : "home") }
