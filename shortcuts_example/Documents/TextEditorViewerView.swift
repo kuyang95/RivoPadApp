@@ -831,6 +831,9 @@ private struct TextEditorCanvas: View {
     let scrollTargetIndex: Int
     let scrollRevision: UInt64
 
+    @State private var gestureZoom: CGFloat = 1
+    @State private var lastMagnification: CGFloat = 1
+
     var body: some View {
         GeometryReader { geometry in
             let usesHorizontal = LocalDocumentLayoutPolicy.usesSingleLine(
@@ -842,12 +845,13 @@ private struct TextEditorCanvas: View {
                 level: appearance.fontLevel,
                 availableWidth: geometry.size.width
             )
-            let fontSize = usesHorizontal
+            let baseFontSize = usesHorizontal
                 ? min(
                     rawFontSize,
                     max((geometry.size.height - 12) / 1.14, 58)
                 )
                 : rawFontSize
+            let fontSize = baseFontSize * gestureZoom
             let lineSpacing = usesHorizontal
                 ? fontSize * 0.14
                 : TextEditorLayoutPolicy.lineSpacing(
@@ -869,6 +873,15 @@ private struct TextEditorCanvas: View {
             }
         }
         .background(background)
+        .simultaneousGesture(
+            MagnificationGesture()
+                .onChanged { value in
+                    guard value.isFinite, value > 0 else { return }
+                    gestureZoom = min(max(gestureZoom * value / lastMagnification, 1), 4)
+                    lastMagnification = value
+                }
+                .onEnded { _ in lastMagnification = 1 }
+        )
     }
 
     @ViewBuilder
