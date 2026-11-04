@@ -902,24 +902,24 @@ struct RatioLauncherView: View {
 
             }
             .padding(widget.textOnly || compact ? 8 : min(28, max(12, 16 * scale)))
-            .frame(maxWidth: .infinity, alignment: compact ? .center : .leading)
-            .frame(height: height, alignment: compact ? .center : .leading)
-            .frame(minHeight: height == nil ? CGFloat(widget.rows * 88 + (widget.rows - 1) * 12) : 0)
             .foregroundStyle(widget.textOnly ? (fill ?? style.text) : filled ? style.ink : style.text)
-            .background(widget.textOnly ? Color.clear : fill ?? (compact ? Color.clear : style.surface))
-            .clipShape(RoundedRectangle(cornerRadius: style.corner, style: .continuous))
         if widget.textOnly {
-            content.allowsHitTesting(false).accessibilityHidden(true)
-                .overlay {
-                    GeometryReader { geometry in
-                        let cell = max(0, (geometry.size.width - 12 * CGFloat(widget.columns - 1)) / CGFloat(widget.columns))
-                        widgetControl(widget, entry: entry) { Color.clear.contentShape(Rectangle()) }
-                            .frame(width: cell, height: min(88, geometry.size.height))
-                            .position(x: cell / 2, y: geometry.size.height / 2)
-                    }
-                }
+            widgetControl(widget, entry: entry) {
+                content.frame(minWidth: 48, minHeight: 88, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: height)
+            .frame(minHeight: height == nil ? heightForWidget(widget) : 0)
         } else {
-            widgetControl(widget, entry: entry) { content.contentShape(Rectangle()) }
+            widgetControl(widget, entry: entry) {
+                content.frame(maxWidth: .infinity, alignment: compact ? .center : .leading)
+                    .frame(height: height, alignment: compact ? .center : .leading)
+                    .frame(minHeight: height == nil ? heightForWidget(widget) : 0)
+                    .background(fill ?? (compact ? Color.clear : style.surface))
+                    .clipShape(RoundedRectangle(cornerRadius: style.corner, style: .continuous))
+                    .contentShape(Rectangle())
+            }
         }
     }
     private func widgetControl<Label: View>(_ widget: RatioHomeItem, entry: RatioEntry?, @ViewBuilder label: () -> Label) -> some View {
