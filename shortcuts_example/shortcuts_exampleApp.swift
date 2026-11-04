@@ -733,7 +733,7 @@ struct shortcuts_exampleApp: App {
           //  .onAppear { router.consumeLastIfNeeded() }
             .onChange(of: scenePhase) { _, phase in
                 LauncherNewsRefresh.applicationActive(phase == .active)
-                if phase == .background { LauncherNewsRefresh.endReadingSession(); LauncherNewsBackgroundTasks.schedule() }
+                if phase == .background { LauncherNewsBackgroundTasks.schedule() }
                 visionLinkManager
                     .setApplicationActive(
                         phase == .active

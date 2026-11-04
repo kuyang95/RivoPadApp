@@ -44,6 +44,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     @Published private(set) var canGoBack = false
     @Published private(set) var canGoForward = false
     @Published private(set) var isLoading = false
+    @Published private(set) var newsAwaitingDocument = false
     @Published private(set) var progress = 0.0
     @Published private(set) var hasPopup = false
     @Published private(set) var adBlockEnabled = UserDefaults.standard.object(forKey: "browser.adBlock.enabled") as? Bool ?? true
@@ -111,7 +112,9 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
 
     override convenience init() { self.init(easyYouTube: false) }
 
-    init(easyYouTube: Bool, embedded: Bool = false) {
+    let newsArticle: Bool
+    init(easyYouTube: Bool, embedded: Bool = false, newsArticle: Bool = false) {
+        self.newsArticle = newsArticle
         self.easyYouTube = easyYouTube
         self.embedded = embedded
         let preferredScale = UIFontMetrics(forTextStyle: .body).scaledValue(for: 17) / 17
@@ -127,6 +130,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
         webView = WKWebView(frame: .zero, configuration: configuration)
         super.init()
+        self.newsAwaitingDocument = newsArticle
         configure(webView)
         windows = [webView]
         observeActiveWindow()
@@ -179,7 +183,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
                                              forMainFrameOnly: false, in: .page))
         applyAdBlockRules(to: view)
         controller.addUserScript(WKUserScript(
-            source: AccessibleWebAppearance.bootstrap(enabled: appearanceEnabled, palette: palette) + "\n" + AccessibleGooglePage.bootstrap(enabled: simpleGoogleEnabled, appearanceEnabled: appearanceEnabled, palette: palette),
+            source: AccessibleWebAppearance.bootstrap(enabled: appearanceEnabled, palette: palette) + "\n" + (newsArticle ? NewsArticlePage.source + "\nwindow.__rivoNewsArticle?.set(\(appearanceEnabled));\n" : "") + AccessibleGooglePage.bootstrap(enabled: simpleGoogleEnabled, appearanceEnabled: appearanceEnabled, palette: palette),
             injectionTime: .atDocumentStart,
             forMainFrameOnly: false,
             in: Self.world
@@ -192,7 +196,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
             window.overrideUserInterfaceStyle = palette == .dark ? .dark : .light
             installScript(in: window)
             window.evaluateJavaScript(
-                "window.__rivoAccessibleWeb?.set(\(AccessibleWebAppearance.configuration(enabled: appearanceEnabled, palette: palette)));" + AccessibleGooglePage.bootstrap(enabled: simpleGoogleEnabled, appearanceEnabled: appearanceEnabled, palette: palette),
+                "window.__rivoAccessibleWeb?.set(\(AccessibleWebAppearance.configuration(enabled: appearanceEnabled, palette: palette)));window.__rivoNewsArticle?.set(\(appearanceEnabled));" + AccessibleGooglePage.bootstrap(enabled: simpleGoogleEnabled, appearanceEnabled: appearanceEnabled, palette: palette),
                 in: nil, in: Self.world
             ) { _ in }
         }
@@ -238,6 +242,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
             return
         }
         errorMessage = nil
+        if newsArticle { newsAwaitingDocument = true }
         webView.load(URLRequest(url: url))
     }
 
@@ -377,10 +382,11 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-        if webView === self.webView { errorMessage = nil }
+        if webView === self.webView { errorMessage = nil; newsAwaitingDocument = newsArticle }
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        if webView === self.webView { newsAwaitingDocument = false }
         applyZoom(to: webView)
     }
 
@@ -402,6 +408,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
 
     private func report(_ error: Error, from view: WKWebView) {
         guard view === webView, (error as NSError).code != NSURLErrorCancelled else { return }
+        newsAwaitingDocument = false
         errorMessage = "페이지를 열지 못했습니다. \(error.localizedDescription)"
     }
 

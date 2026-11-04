@@ -27,15 +27,23 @@ window.__rivoLauncherEmbedded = true;
       }`;
     document.documentElement.appendChild(style);
   };
-  apply();
-  if (!document.documentElement) document.addEventListener('DOMContentLoaded', apply, {once:true});
+  if (document.documentElement) apply();
+  else {
+    const rootObserver = new MutationObserver(() => {
+      if (!document.documentElement) return;
+      rootObserver.disconnect();
+      apply();
+    });
+    rootObserver.observe(document, {childList:true});
+  }
 })();
 
 // Only hit geometry is returned to the native recognizer; page content stays in the WebView.
 (() => {
   if(window!==window.top)return;
   window.__rivoLauncherCanPageAt=(fractionX,fractionY)=>{
-    if(!window.__rivoLauncherBrowser && !document.querySelector('[data-rivo-you-tube-home],[data-rivo-official-player]'))return false;
+    const loginPage = location.hostname === 'accounts.google.com' && document.documentElement.hasAttribute('data-rivo-google-login');
+    if(!window.__rivoLauncherBrowser && !loginPage && !document.querySelector('[data-rivo-you-tube-home],[data-rivo-official-player]'))return false;
     const viewport=window.visualViewport;
     const x=(viewport?.offsetLeft||0)+fractionX*(viewport?.width||innerWidth);
     const y=(viewport?.offsetTop||0)+fractionY*(viewport?.height||innerHeight);
@@ -44,9 +52,9 @@ window.__rivoLauncherEmbedded = true;
     const simpleHome=window.__rivoLauncherBrowser && document.documentElement.getAttribute('data-rivo-google-simple')==='home';
     // The authored Google home has no horizontal content scrollers. Its favorite
     // grid and the empty viewport below it belong to launcher paging as well.
-    if(!target)return simpleHome;
+    if(!target)return simpleHome || loginPage;
     if(target.closest('input,select,textarea,[contenteditable]:not([contenteditable="false"])'))return false;
-    if(simpleHome)return true;
+    if(simpleHome || loginPage)return true;
     if (window.__rivoLauncherBrowser) {
       // Navigation controls own their gestures even before async site code has
       // measured a tab track. Home paging remains available on the body/dots.
@@ -84,7 +92,7 @@ window.__rivoLauncherEmbedded = true;
     drag = null;
     if (event.touches.length !== 1) return;
     const path = event.composedPath();
-    if (!window.__rivoLauncherBrowser && !path.some(node => node.matches?.('[data-rivo-you-tube-home],[data-rivo-official-player]'))) return;
+    if (!window.__rivoLauncherBrowser && !(location.hostname === 'accounts.google.com' && document.documentElement.hasAttribute('data-rivo-google-login')) && !path.some(node => node.matches?.('[data-rivo-you-tube-home],[data-rivo-official-player]'))) return;
     if (path.some(node => node.matches?.('input,select,textarea,iframe,[contenteditable="true"]'))) return;
     const point = event.touches[0];
     if (window.__rivoLauncherBrowser && !window.__rivoLauncherCanPageAt?.(point.clientX / innerWidth, point.clientY / innerHeight)) return;

@@ -471,24 +471,17 @@ private final class LauncherNewsStore: ObservableObject {
     func selectTopics(_ values: Set<NewsCategory>) {
         topics = values.subtracting([.latest])
         UserDefaults.standard.set(topicList.map(\.rawValue), forKey: "ratio.news.selected.topics.v1")
-        snapshots[.latest] = nil; pending[.latest] = nil; errors.remove(.latest)
-        Task { await rebuildLatest(force: true) }
+        snapshots[.latest] = nil; errors.remove(.latest)
+        Task { await rebuildLatest() }
         LauncherNewsRefresh.topicsChanged()
     }
     @Published var snapshots: [NewsCategory: NewsSnapshot] = [:]
-    @Published var pending: [NewsCategory: NewsSnapshot] = [:]
     @Published var loading: Set<NewsCategory> = []
     @Published var errors: Set<NewsCategory> = []
     private var fetched: [NewsCategory: Date] = [:]
     private var retries: [NewsCategory: Date] = [:]
     private var intervals: [NewsCategory: TimeInterval] = [:]
-    private var readers: Set<NewsCategory> = []
     private var aggregateRevision = 0
-    func beginReading(_ category: NewsCategory) { readers.insert(category) }
-    func endReadingSession() {
-        readers.removeAll()
-        for category in NewsCategory.allCases { apply(category) }
-    }
     private func usable(_ value: NewsSnapshot?) -> NewsSnapshot? {
         guard let old = value, (0..<Self.maxAge).contains(Date.now.timeIntervalSince(old.fetched)) else { return nil }
         let times = old.sourceFetched.filter { (0..<Self.maxAge).contains(Date.now.timeIntervalSince($0.value)) }
@@ -496,7 +489,6 @@ private final class LauncherNewsStore: ObservableObject {
         return items.isEmpty ? nil : NewsSnapshot(items: items, fetched: old.fetched,
             sourceFetched: times, partial: old.partial || times.count < old.sourceFetched.count)
     }
-    func apply(_ category: NewsCategory) { if let next = pending.removeValue(forKey: category) { snapshots[category] = usable(next) } }
     func delay(_ category: NewsCategory) -> TimeInterval {
         if category == .latest { return topicList.map { delay($0) }.min() ?? Self.interval }
         if loading.contains(category) { return 1 }
@@ -507,14 +499,14 @@ private final class LauncherNewsStore: ObservableObject {
     init() {
         UserDefaults.standard.removeObject(forKey: "ratio.news.cache.sokbo.v4")
         for category in topicList { restore(category) }
-        Task { await rebuildLatest(force: true) }
+        Task { await rebuildLatest() }
     }
-    private func rebuildLatest(force: Bool = false) async {
+    private func rebuildLatest() async {
         aggregateRevision += 1
         let revision = aggregateRevision
         let selected = topics
-        let values = topicList.compactMap { usable(pending[$0] ?? snapshots[$0]) }
-        guard !values.isEmpty else { snapshots[.latest] = nil; pending[.latest] = nil; return }
+        let values = topicList.compactMap { usable(snapshots[$0]) }
+        guard !values.isEmpty else { snapshots[.latest] = nil; return }
         let payload = values.flatMap(\.items)
         let articles = await Task.detached(priority: .utility) { NewsRSSParser.merge(payload) }.value
         guard !Task.isCancelled, topics == selected, revision == aggregateRevision else { return }
@@ -522,9 +514,7 @@ private final class LauncherNewsStore: ObservableObject {
         for value in values { for (source, date) in value.sourceFetched { times[source] = max(times[source] ?? .distantPast, date) } }
         let next = NewsSnapshot(items: articles, fetched: values.map(\.fetched).min() ?? .now,
             sourceFetched: times, partial: values.count < selected.count || values.contains { $0.partial })
-        if force || snapshots[.latest] == nil || !readers.contains(.latest) { snapshots[.latest] = next; pending[.latest] = nil }
-        else if snapshots[.latest]?.items != articles { pending[.latest] = next }
-        else { snapshots[.latest] = next; pending[.latest] = nil }
+        snapshots[.latest] = next
         fetched[.latest] = next.fetched; intervals[.latest] = next.partial ? Self.retry : Self.interval
     }
     private func restore(_ category: NewsCategory) {
@@ -533,7 +523,7 @@ private final class LauncherNewsStore: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "ratio.news.cache.\(category.rawValue).v3")
         UserDefaults.standard.removeObject(forKey: "ratio.news.cache.\(category.rawValue).v2")
         UserDefaults.standard.removeObject(forKey: "ratio.news.cache.\(category.rawValue).v1")
-        if let old = snapshots[category], !(0..<Self.maxAge).contains(Date.now.timeIntervalSince(old.fetched)) { snapshots[category] = nil; pending[category] = nil; fetched[category] = nil }
+        if let old = snapshots[category], !(0..<Self.maxAge).contains(Date.now.timeIntervalSince(old.fetched)) { snapshots[category] = nil; fetched[category] = nil }
         if snapshots[category] == nil, let data = UserDefaults.standard.data(forKey: key) ?? UserDefaults.standard.data(forKey: "ratio.news.cache.\(category.rawValue).v4"),
            let cache = try? JSONDecoder().decode(NewsSnapshot.self, from: data), cache.items.count <= NewsRSSParser.maxItems,
            cache.items.allSatisfy({ $0.source.accepts($0.url) }), (0..<Self.maxAge).contains(Date.now.timeIntervalSince(cache.fetched)) {
@@ -548,10 +538,9 @@ private final class LauncherNewsStore: ObservableObject {
             snapshots[category] = cleaned; fetched[category] = cleaned.fetched; intervals[category] = cleaned.partial ? Self.retry : Self.interval
         }
         snapshots[category] = usable(snapshots[category])
-        pending[category] = usable(pending[category])
     }
     private func checkpoint(_ category: NewsCategory, feeds: [(NewsSource, [NewsArticle]?, Date?)],
-        cache: NewsSnapshot?, expected: Int, force: Bool, final: Bool) async -> NewsSnapshot? {
+        cache: NewsSnapshot?, expected: Int) async -> NewsSnapshot? {
         guard topics.contains(category) else { return nil }
         let successes = feeds.filter { $0.1 != nil }
         guard !successes.isEmpty else { return nil }
@@ -567,9 +556,7 @@ private final class LauncherNewsStore: ObservableObject {
         guard let data = try? JSONEncoder().encode(next) else { return nil }
         UserDefaults.standard.set(data, forKey: "ratio.news.cache.\(category.rawValue).v5")
         UserDefaults.standard.removeObject(forKey: "ratio.news.cache.\(category.rawValue).v4")
-        if snapshots[category] == nil || !readers.contains(category) || (force && final) { snapshots[category] = next; pending[category] = nil }
-        else if snapshots[category]?.items != articles { pending[category] = next }
-        else { snapshots[category] = next; pending[category] = nil }
+        snapshots[category] = next
         fetched[category] = next.fetched; intervals[category] = next.partial ? Self.retry : Self.interval
         await rebuildLatest()
         return next
@@ -580,7 +567,7 @@ private final class LauncherNewsStore: ObservableObject {
                 guard !Task.isCancelled else { return }
                 if topics.contains(topic) { await refresh(topic, force: force, revalidate: revalidate) }
             }
-            await rebuildLatest(force: force)
+            await rebuildLatest()
             if snapshots[.latest] == nil && !topics.isEmpty { errors.insert(.latest) } else { errors.remove(.latest) }
             return
         }
@@ -599,7 +586,7 @@ private final class LauncherNewsStore: ObservableObject {
         loading.insert(category); errors.remove(category)
         defer { loading.remove(category) }
         do {
-            let cache = usable(pending[category] ?? snapshots[category])
+            let cache = usable(snapshots[category])
             let available = NewsSource.available(category).sorted {
                 (cache?.sourceFetched[$0.rawValue] ?? .distantPast) < (cache?.sourceFetched[$1.rawValue] ?? .distantPast)
             }
@@ -622,14 +609,14 @@ private final class LauncherNewsStore: ObservableObject {
                 while let feed = await group.next() {
                     result.append(feed)
                     if (!published && cache == nil && result.contains(where: { $0.1 != nil })) || result.count.isMultiple(of: 12) {
-                        if await checkpoint(category, feeds: result, cache: cache, expected: available.count, force: force, final: false) != nil { published = true }
+                        if await checkpoint(category, feeds: result, cache: cache, expected: available.count) != nil { published = true }
                     }
                     if !Task.isCancelled, topics.contains(category), let source = sources.next() { group.addTask { await fetch(source) } }
                 }
                 return result
             }
             try Task.checkCancellation()
-            guard await checkpoint(category, feeds: feeds, cache: cache, expected: available.count, force: force, final: true) != nil else { throw URLError(.cannotLoadFromNetwork) }
+            guard await checkpoint(category, feeds: feeds, cache: cache, expected: available.count) != nil else { throw URLError(.cannotLoadFromNetwork) }
             retries[category] = nil
 
         } catch {
@@ -664,9 +651,6 @@ enum LauncherNewsRefresh {
     static func topicsChanged() {
         applicationActive(false)
         applicationActive(UIApplication.shared.applicationState == .active)
-    }
-    static func endReadingSession() {
-        if UserDefaults.standard.bool(forKey: LauncherNewsBackgroundTasks.enabledKey) { LauncherNewsStore.shared.endReadingSession() }
     }
     static func applicationActive(_ active: Bool) {
         guard active, UserDefaults.standard.bool(forKey: LauncherNewsBackgroundTasks.enabledKey) else {
@@ -727,10 +711,6 @@ struct RatioNewsWidget: View {
                     Text("\(snapshot.fetched.formatted(date: .omitted, time: .shortened)) 갱신").visionCraftAndroidText(16)
                 }
             }
-            if store.pending[category] != nil {
-                Button("새 뉴스가 있어요 · 보기") { store.apply(category); scrollRequest += 1 }
-                    .visionCraftAndroidText(20).foregroundStyle(style.accent).frame(minHeight: 56)
-            }
             if store.errors.contains(category) {
                 Text(store.snapshots[category] == nil ? "뉴스를 불러오지 못했어요. 새로고침으로 다시 시도해 주세요." : "갱신하지 못했어요. 이전 뉴스와 갱신 시각을 표시합니다.")
                     .visionCraftAndroidText(18).fixedSize(horizontal: false, vertical: true)
@@ -763,7 +743,6 @@ struct RatioNewsWidget: View {
         }.padding(20).foregroundStyle(style.text).buttonStyle(.plain).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .task(id: "\(enabled):\(category.rawValue):\(request):\(store.topicList.map(\.rawValue).joined(separator: ","))") {
                 guard enabled, !store.topics.isEmpty else { return }
-                store.beginReading(category)
                 var force = request != handled; handled = request
                 while !Task.isCancelled {
                     await store.refresh(category, force: force)
@@ -799,11 +778,17 @@ struct RatioNewsWidget: View {
     }
     private func articleRow(_ article: NewsArticle) -> some View {
         let relative = article.published.map { RelativeDateTimeFormatter().localizedString(for: min($0, now), relativeTo: now) } ?? "발행 시각 미제공"
+        let summary = article.summary.count > 80 ? String(article.summary.prefix(80)).trimmingCharacters(in: .whitespacesAndNewlines) + "…" : article.summary
         return Button { onArticle(article.url) } label: {
             VStack(alignment: .leading, spacing: 12) {
                 Text(article.title).visionCraftAndroidText(23, weight: .semibold).foregroundStyle(style.text)
-                if !article.summary.isEmpty { Text(article.summary).visionCraftAndroidText(18).foregroundStyle(style.text.opacity(0.92)) }
+                    .lineLimit(2, reservesSpace: true).truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                Text(summary.isEmpty ? " " : summary).visionCraftAndroidText(18).foregroundStyle(style.text.opacity(0.92))
+                    .lineLimit(3, reservesSpace: true).truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 Text("\(article.source.title) · \(relative)").visionCraftAndroidText(16).foregroundStyle(style.text.opacity(0.75))
+                    .lineLimit(1, reservesSpace: true).truncationMode(.tail)
             }.fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 2).padding(.top, 22).padding(.bottom, 24).contentShape(Rectangle())
         }.accessibilityElement(children: .ignore)

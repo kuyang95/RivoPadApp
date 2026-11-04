@@ -12,52 +12,128 @@ enum EasyYouTubePage {
   'use strict';
   if (window.top !== window || location.hostname !== 'accounts.google.com' || window.__rivoGoogleLoginInstalled) return;
   window.__rivoGoogleLoginInstalled = true;
+  const loginTheme = window.__rivoWebTheme || {bg:'#101C2D',surface:'#1C2D43',text:'#F5F3E9',edge:'#7F93AB',link:'#E6EF87'};
   const css = `
     html[data-rivo-google-login-preparing] body { visibility:hidden!important }
-    html[data-rivo-google-login] [role="progressbar"] { position:fixed!important;left:50%!important;top:calc(var(--rivo-google-login-height,100vh) / 2)!important;right:auto!important;bottom:auto!important;transform:translate(-50%,-50%)!important;width:240px!important;max-width:70vw!important;margin:0!important;z-index:2147483600!important;pointer-events:none!important }
-    html[data-rivo-google-login] body { display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;min-height:var(--rivo-google-login-height,100vh)!important;margin:0!important;box-sizing:border-box!important }
-    html[data-rivo-google-login] body > iframe[width="0"][height="0"] { border:0!important }
-    html[data-rivo-google-login] .X9monf { flex:0 0 auto!important;width:100%!important;max-width:624px!important }
-    html[data-rivo-google-login] main > .zIgDIc { text-align:center!important }
-    html[data-rivo-google-login] main > .zIgDIc > c-wiz { display:flex!important;justify-content:center!important }
-    html[data-rivo-google-login] #headingText,
-    html[data-rivo-google-login] #headingSubtext { text-align:center!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) [role="progressbar"] { position:fixed!important;left:50%!important;top:calc(var(--rivo-google-login-height,100vh) / 2)!important;right:auto!important;bottom:auto!important;transform:translate(-50%,-50%)!important;width:240px!important;max-width:70vw!important;margin:0!important;z-index:2147483600!important;pointer-events:none!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) body { display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;min-height:var(--rivo-google-login-height,100vh)!important;margin:0!important;box-sizing:border-box!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) body > iframe[width="0"][height="0"] { border:0!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) .X9monf { flex:0 0 auto!important;width:100%!important;max-width:624px!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) main > .zIgDIc { text-align:center!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) main > .zIgDIc > c-wiz { display:flex!important;justify-content:center!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) #headingText,
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) #headingSubtext { text-align:center!important }
     html[data-rivo-google-login] [data-rivo-login-secondary],
     html[data-rivo-google-login] footer,
     html[data-rivo-google-login] button[jsname="Cuz2Ue"],
     html[data-rivo-google-login] .RDsYTb,
     html[data-rivo-google-login] [jsname="FIbd0b"] { display:none!important }
-    html[data-rivo-google-login] main { display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:28px!important;width:100%!important;max-width:560px!important;margin:0 auto!important;box-sizing:border-box!important }
-    html[data-rivo-google-login] main > .zIgDIc,
-    html[data-rivo-google-login] main > .UXFQgc { width:100%!important;flex-basis:auto!important;max-width:none!important;padding:0!important;margin:0!important }
-    html[data-rivo-google-login] .qWK5J,
-    html[data-rivo-google-login] .xKcayf { width:100%!important;min-width:0!important }
-    html[data-rivo-google-login] .O1Slxf { width:100%!important;min-width:0!important;justify-content:flex-end!important;margin-top:0!important }
-    html[data-rivo-google-login] .TcuCfd { padding:32px 24px!important }
-    html[data-rivo-google-login] main > .JYXaTc { width:100%!important;margin:0!important;padding:0!important;align-self:stretch!important }
-    html[data-rivo-google-login] .O1Slxf { flex-direction:row!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) main { display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:28px!important;width:100%!important;max-width:560px!important;margin:0 auto!important;box-sizing:border-box!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) main > .zIgDIc,
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) main > .UXFQgc { width:100%!important;flex-basis:auto!important;max-width:none!important;padding:0!important;margin:0!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) .qWK5J,
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) .xKcayf { width:100%!important;min-width:0!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) .O1Slxf { width:100%!important;min-width:0!important;justify-content:flex-end!important;margin-top:0!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) .TcuCfd { padding:32px 24px!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) main > .JYXaTc { width:100%!important;margin:0!important;padding:0!important;align-self:stretch!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) .O1Slxf { flex-direction:row!important }
     html[data-rivo-google-login] .FO2vFd:has([jsname="FIbd0b"]) { display:none!important }
-    html[data-rivo-google-login] .TNTaPb,
-    html[data-rivo-google-login] #identifierNext,
-    html[data-rivo-google-login] #passwordNext { width:100%!important;margin:0!important;padding:0!important }
-    html[data-rivo-google-login] #identifierNext > div,
-    html[data-rivo-google-login] #passwordNext > div,
-    html[data-rivo-google-login] #identifierNext button,
-    html[data-rivo-google-login] #passwordNext button { width:100%!important }
-    html[data-rivo-google-login] #headingText { font-size:32px!important;line-height:1.3!important }
-    html[data-rivo-google-login] #identifierId,
-    html[data-rivo-google-login] input[name="Passwd"] { font-size:22px!important }
-    html[data-rivo-google-login] #identifierNext button,
-    html[data-rivo-google-login] #passwordNext button { min-height:64px!important;min-width:144px!important;font-size:22px!important }
-    html[data-rivo-google-login] :is(input,button):focus-visible { outline:3px solid #0b57d0!important;outline-offset:4px!important }
-    html[data-rivo-google-login] {height:auto!important;min-height:0!important;}
-    html[data-rivo-google-login] body {width:var(--rivo-google-login-width,100%)!important;height:auto!important;padding:16px!important;}
-    html[data-rivo-google-login] [data-rivo-login-container] {width:100%!important;max-width:624px!important;min-width:0!important;height:auto!important;min-height:0!important;box-sizing:border-box!important;padding:0!important;margin:0!important;}
-    html[data-rivo-google-login] main {max-width:560px!important;min-width:0!important;}
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) .TNTaPb,
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) #identifierNext,
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) #passwordNext { width:100%!important;margin:0!important;padding:0!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) #identifierNext > div,
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) #passwordNext > div,
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) #identifierNext button,
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) #passwordNext button { width:100%!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) #headingText { font-size:32px!important;line-height:1.3!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) #identifierId,
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) input[name="Passwd"] { font-size:22px!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) #identifierNext button,
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) #passwordNext button { min-height:64px!important;min-width:144px!important;font-size:22px!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) :is(input,button):focus-visible { outline:3px solid #0b57d0!important;outline-offset:4px!important }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) {height:auto!important;min-height:0!important;}
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) body {width:var(--rivo-google-login-width,100%)!important;height:auto!important;padding:16px!important;}
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) [data-rivo-login-container] {width:100%!important;max-width:624px!important;min-width:0!important;height:auto!important;min-height:0!important;box-sizing:border-box!important;padding:0!important;margin:0!important;}
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) main {max-width:560px!important;min-width:0!important;padding:24px!important;}
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) {
+      color-scheme:dark!important;
+      --gm3-sys-color-on-surface:${loginTheme.text};--gm3-sys-color-on-surface-variant:${loginTheme.text};
+      --gm3-sys-color-primary:${loginTheme.link};--gm3-sys-color-on-primary:${loginTheme.bg};
+      --gm3-sys-color-surface:transparent;--gm3-sys-color-surface-container:transparent;--gm3-sys-color-outline:${loginTheme.edge};
+    }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]),html:is([data-rivo-google-login],[data-rivo-google-verification]) body,
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) [data-rivo-login-container],html:is([data-rivo-google-login],[data-rivo-google-verification]) main,
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) main > :is(.zIgDIc,.UXFQgc,.JYXaTc) {
+      background:transparent!important;border:0!important;box-shadow:none!important;
+    }
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) main {font-family:system-ui,-apple-system,sans-serif!important;color:${loginTheme.text}!important;}
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) :is(#headingText,#headingSubtext,#headingSubtext *,label,.AxOyFc,.i9lrp) {color:${loginTheme.text}!important;-webkit-text-fill-color:${loginTheme.text}!important;}
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) input {background:transparent!important;color:${loginTheme.text}!important;-webkit-text-fill-color:${loginTheme.text}!important;caret-color:${loginTheme.link}!important;}
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) input::placeholder {color:${loginTheme.edge}!important;opacity:1!important;}
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) :is(#identifierNext,#passwordNext) button {background:${loginTheme.link}!important;color:${loginTheme.bg}!important;border:0!important;border-radius:16px!important;}
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) :is(#identifierNext,#passwordNext) button * {color:inherit!important;-webkit-text-fill-color:inherit!important;}
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) :is(input,button):focus-visible {outline-color:${loginTheme.link}!important;}
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) .rFrNMe {background:${loginTheme.surface}!important;border-radius:16px!important;}
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) .AxOyFc {background:${loginTheme.surface}!important;border-radius:4px!important;}
+    /* Google's own focus outline remains; avoid a second outline on the inner input. */
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) input:focus-visible {outline:none!important;}
+    html[data-rivo-google-login="password"] .Ahygpe {background:${loginTheme.surface}!important;color:${loginTheme.text}!important;border-color:${loginTheme.edge}!important;max-width:100%!important;}
+    html[data-rivo-google-login="password"] .qdOxv-fmcmS-yrriRe {background:${loginTheme.surface}!important;border-radius:16px!important;}
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) {--gm3-sys-color-error:#FFB4AB;}
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) .o6cuMc {color:#FFB4AB!important;}
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) :is(.r7fnGb,[data-rivo-login-scroll-cue]) {display:none!important;}
+    /* Keep Google's busy hit shield, but remove its white translucent paint. */
+    html:is([data-rivo-google-login],[data-rivo-google-verification]) .ZQxJQe {background:transparent!important;}
+    html[data-rivo-google-login="password"] .FO2vFd button {color:${loginTheme.text}!important;background:${loginTheme.surface}!important;border:1px solid ${loginTheme.edge}!important;border-radius:16px!important;min-height:56px!important;padding:12px 20px!important;}
+    html[data-rivo-google-login="password"] .FO2vFd button * {color:inherit!important;-webkit-text-fill-color:inherit!important;}
+    html[data-rivo-google-verification] .O1Slxf {flex-direction:column!important;gap:12px!important;align-items:stretch!important;}
+    html[data-rivo-google-verification] :is(.FO2vFd,.TNTaPb),
+    html[data-rivo-google-verification] :is(.FO2vFd,.TNTaPb) button {width:100%!important;}
+    html[data-rivo-google-verification] .Ahygpe {background:${loginTheme.surface}!important;color:${loginTheme.text}!important;border-color:${loginTheme.edge}!important;max-width:100%!important;}
+    html[data-rivo-google-verification] main :is(div,span,p,li,label,a) {color:inherit!important;}
+    html[data-rivo-google-verification] main a {color:${loginTheme.link}!important;}
+    html[data-rivo-google-verification] main :is(button,[role="button"]):not(.Ahygpe) {background:${loginTheme.surface}!important;color:${loginTheme.text}!important;border:1px solid ${loginTheme.edge}!important;border-radius:16px!important;min-height:56px!important;padding:12px 20px!important;box-sizing:border-box!important;max-width:100%!important;white-space:normal!important;}
+    html[data-rivo-google-verification] .TNTaPb button {background:${loginTheme.link}!important;color:${loginTheme.bg}!important;border:0!important;}
+    html[data-rivo-google-verification] main :is(button,[role="button"]) * {color:inherit!important;-webkit-text-fill-color:inherit!important;}
+    html[data-rivo-google-verification] input:not([type="checkbox"]):not([type="radio"]),
+    html[data-rivo-google-verification] .qdOxv-fmcmS-yrriRe {background:${loginTheme.surface}!important;border-radius:16px!important;font-size:22px!important;}
+    html[data-rivo-google-verification] main :is([role="alert"],.o6cuMc),
+    html[data-rivo-google-verification] main :is([role="alert"],.o6cuMc) * {color:#FFB4AB!important;}
+    html[data-rivo-google-verification] footer {color:${loginTheme.text}!important;}
+    html[data-rivo-google-verification] footer :is(a,button,select) {color:${loginTheme.text}!important;background:${loginTheme.surface}!important;}
+html[data-rivo-google-verification] footer,
+html[data-rivo-google-verification] [data-rivo-verification-secondary] {display:none!important;}
+html[data-rivo-google-verification] main {gap:14px!important;padding:16px!important;}
+html[data-rivo-google-verification] main > .zIgDIc {display:flex!important;flex-direction:column!important;gap:8px!important;}
+html[data-rivo-google-verification] .zIgDIc :is(.ObDc3,#headingText,#headingSubtext,.SOeSgb) {margin:0!important;padding:0!important;}
+html[data-rivo-google-verification] .zIgDIc .a19L2 {width:28px!important;height:28px!important;}
+html[data-rivo-google-verification] #headingText {font-size:26px!important;line-height:1.25!important;}
+html[data-rivo-google-verification] #headingSubtext {font-size:14px!important;line-height:1.4!important;}
+html[data-rivo-google-verification] .Ahygpe {min-height:36px!important;font-size:16px!important;padding:2px 8px!important;}
+html[data-rivo-google-verification] .Ahygpe svg {width:24px!important;height:24px!important;}
+html[data-rivo-google-verification] .Ahygpe .IxcUte {line-height:1.5!important;}
+html[data-rivo-google-verification] main .UXFQgc {font-size:16px!important;line-height:1.45!important;}
+html[data-rivo-google-verification] main :is(.S1zJGd,.FO2vFd,.O1Slxf,.yTaH4c,.Em2Ord,.vYeFie,.dMNVAe) {margin:0!important;padding:0!important;min-height:0!important;}
+html[data-rivo-google-verification] .dMNVAe > .dMNVAe {margin-top:8px!important;}
+html[data-rivo-google-verification] .x9zgF {font-size:20px!important;line-height:1.35!important;margin:0 0 8px!important;}
+html[data-rivo-google-verification] .gyrWGe {margin-top:8px!important;}
+html[data-rivo-google-verification] main > .JYXaTc {display:flex!important;flex-direction:column!important;gap:10px!important;}
+html[data-rivo-google-verification] main :is(.S1zJGd,.XjS9D,.FO2vFd,.TNTaPb),
+html[data-rivo-google-verification] .JYXaTc [data-is-touch-wrapper] {width:100%!important;}
+html[data-rivo-google-verification] .JYXaTc [data-is-touch-wrapper] {display:block!important;height:auto!important;min-height:0!important;}
+html[data-rivo-google-verification] main :is(button,[role="button"]):not(.Ahygpe) {min-height:44px!important;padding:8px 12px!important;font-size:16px!important;line-height:1.4!important;margin:0!important;}
+html[data-rivo-google-verification] .JYXaTc button {width:100%!important;}
+html[data-rivo-google-verification="dp"] .UFQPDd {display:none!important;}
+html[data-rivo-google-verification] body {padding:12px!important;}
+html[data-rivo-google-verification] main {gap:10px!important;padding:12px!important;}
+html[data-rivo-google-verification="dp"] figure:has(.UFQPDd) {display:none!important;}
+html[data-rivo-google-verification] main > .JYXaTc button {display:flex!important;justify-content:center!important;width:100%!important;}
+html[data-rivo-google-verification] main > .JYXaTc .XjS9D > div {width:100%!important;min-width:0!important;flex:1!important;}
   `;
   let waitingForDOM = document.readyState === 'loading';
   const pathMode = () => /\/(?:v3\/signin|signin\/v2)\/identifier\/?$/.test(location.pathname) ? 'identifier'
     : /\/(?:v3\/signin|signin\/v2)\/challenge\/pwd\/?$/.test(location.pathname) ? 'password' : null;
+  const verificationPath = () => /^\/(?:v3\/signin|signin\/v2)\/challenge\/(?!pwd(?:\/|$))[^/]+\/?$/.test(location.pathname);
   const sizeViewport = () => {
     const zoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
     const viewport = window.visualViewport;
@@ -84,41 +160,75 @@ enum EasyYouTubePage {
       return;
     }
     document.documentElement.removeAttribute('data-rivo-google-login-preparing');
-    const identifier = pathMode() === 'identifier' && visible(document.getElementById('identifierId')) && document.getElementById('identifierNext');
-    const password = pathMode() === 'password' && visible(document.querySelector('input[name="Passwd"]')) && document.getElementById('passwordNext');
+    const identifier = pathMode() === 'identifier' && document.getElementById('identifierId') && document.getElementById('identifierNext');
+    const password = pathMode() === 'password' && document.querySelector('input[name="Passwd"]') && document.getElementById('passwordNext');
     const extraCheck = [...document.querySelectorAll('[role="dialog"],[role="alertdialog"],#ca,iframe[src*="recaptcha"]')].some(visible);
-    const mode = !extraCheck && document.querySelector('main #headingText') ? (identifier ? 'identifier' : password ? 'password' : null) : null;
+    const basicForm = document.querySelector('main #headingText') && (identifier ? 'identifier' : password ? 'password' : null);
+    // Google temporarily hides/swaps its fields while submitting a basic step.
+    const busyMode = document.documentElement.hasAttribute('data-rivo-google-login') && document.querySelector('[aria-busy="true"]') ? pathMode() : null;
+    const mode = !extraCheck ? (basicForm || busyMode) : null;
+    // Challenge pages keep every instruction, method choice, input and original handler.
+    const verification = !extraCheck && verificationPath() && !!document.querySelector('main #headingText');
+    if (verification) document.documentElement.setAttribute('data-rivo-google-verification', location.pathname.split('/').filter(Boolean).at(-1));
+    else document.documentElement.removeAttribute('data-rivo-google-verification');
+    if (verification) {
+      for (const button of document.querySelectorAll('main button')) {
+        if (/^(Google 메시지 자세히 알아보기|Learn more about Google prompts|Google からのメッセージの詳細)$/i.test(button.textContent.trim())) {
+          button.setAttribute('data-rivo-verification-secondary', '');
+          for (const node of [...button.parentElement.childNodes]) {
+            if (node.nodeType === Node.TEXT_NODE && /도움이 필요하세요|Need help|ヘルプ/i.test(node.textContent)) {
+              const span = document.createElement('span');
+              span.setAttribute('data-rivo-verification-secondary', '');
+              node.replaceWith(span);span.appendChild(node);
+            }
+          }
+        }
+      }
+    }
     document.querySelectorAll('[data-rivo-login-container]').forEach(element => element.removeAttribute('data-rivo-login-container'));
-    if (mode) {
+    if (mode || verification) {
       for (let container = document.querySelector('main')?.parentElement; container && container !== document.body; container = container.parentElement)
         container.setAttribute('data-rivo-login-container', '');
-      for (const link of document.querySelectorAll('button,a,[role="button"]')) {
+      for (const button of document.querySelectorAll('button[aria-label]')) {
+        if (/^(아래로 스크롤|Scroll down|下にスクロール)$/i.test(button.getAttribute('aria-label').trim()))
+          button.closest('.r7fnGb')?.setAttribute('data-rivo-login-scroll-cue', '');
+      }
+      if (mode) for (const link of document.querySelectorAll('button,a,[role="button"]')) {
         if (/^(비밀번호를 잊으셨나요\??|Forgot password\??|パスワードをお忘れの場合)$/i.test(link.textContent.trim()))
           link.setAttribute('data-rivo-login-secondary', '');
       }
       sizeViewport();
-      document.documentElement.setAttribute('data-rivo-google-login', mode);
     }
+    if (mode) document.documentElement.setAttribute('data-rivo-google-login', mode);
     else document.documentElement.removeAttribute('data-rivo-google-login');
   };
   let scheduled = false;
   const schedule = () => { if (!scheduled) { scheduled = true;queueMicrotask(() => { scheduled = false;update(); }); } };
+  let started = false;
+  let rootObserver;
   const start = () => {
-    if (!document.documentElement) { document.addEventListener('readystatechange', start, {once:true});return; }
+    if (started || !document.documentElement) return;
+    started = true;
+    rootObserver?.disconnect();
     update();
     if (waitingForDOM) {
       const finish = () => { waitingForDOM = false;clearTimeout(timeout);update(); };
       const timeout = setTimeout(finish, 10000);
       document.addEventListener('DOMContentLoaded', finish, {once:true});
     }
-    new MutationObserver(schedule).observe(document.documentElement, {subtree:true,childList:true,attributes:true,attributeFilter:['hidden','aria-hidden','type','class','style']});
+    new MutationObserver(schedule).observe(document.documentElement, {subtree:true,childList:true,attributes:true,attributeFilter:['hidden','aria-hidden','aria-busy','type','class','style']});
     window.addEventListener('popstate', schedule);
     window.addEventListener('hashchange', schedule);
     window.addEventListener('resize', schedule);
     window.visualViewport?.addEventListener('resize', schedule);
     window.addEventListener('rivo-page-zoom', schedule);
   };
-  start();
+  // Document-start scripts can run before <html> exists. Apply before its first paint.
+  if (document.documentElement) start();
+  else {
+    rootObserver = new MutationObserver(start);
+    rootObserver.observe(document, {childList:true});
+  }
 })();
 (() => {
   'use strict';

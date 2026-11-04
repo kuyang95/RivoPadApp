@@ -18,8 +18,8 @@ struct AccessibleWebBrowserView: View {
     private var onExpand: (() -> Void)?
     private var onClose: (() -> Void)?
 
-    init(initialQuery: String? = nil, easyYouTube: Bool = false) {
-        let model = AccessibleWebBrowserModel(easyYouTube: easyYouTube)
+    init(initialQuery: String? = nil, easyYouTube: Bool = false, newsArticle: Bool = false) {
+        let model = AccessibleWebBrowserModel(easyYouTube: easyYouTube, newsArticle: newsArticle)
         if let initialQuery { model.navigate(initialQuery) }
         _browser = StateObject(wrappedValue: model)
         _address = State(initialValue: initialQuery ?? "https://www.google.com")
@@ -35,7 +35,7 @@ struct AccessibleWebBrowserView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !browser.easyYouTube && !isBrowserHome {
+            if !browser.easyYouTube && !isBrowserHome && !browser.newsArticle {
             HStack(spacing: 0) {
                 if !embedded {
                     VisionCraftIconButton(systemImage: "chevron.left", label: "접근성 웹 닫기", tint: chromeAccent) { close() }
@@ -146,11 +146,14 @@ struct AccessibleWebBrowserView: View {
             AccessibleWebSurface(webView: browser.webView)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay(alignment: .top) {
-                    if !browser.easyYouTube && browser.isLoading {
+                    if !browser.easyYouTube && !browser.newsArticle && browser.isLoading {
                         ProgressView(value: browser.progress).tint(chromeAccent).accessibilityLabel("웹페이지 로딩")
                     }
                 }
                 .overlay {
+                    if browser.newsArticle && browser.newsAwaitingDocument && browser.errorMessage == nil {
+                        NewsArticleLoadingSurface()
+                    }
                     if browser.easyYouTube && browser.isLoading && !["m.youtube.com","www.youtube.com","youtube.com"].contains(browser.webView.url?.host ?? "") {
                         ProgressView()
                             .progressViewStyle(.circular)
@@ -165,7 +168,7 @@ struct AccessibleWebBrowserView: View {
 
         }
         .overlay(alignment: .topLeading) {
-            if !embedded && (isBrowserHome || (browser.easyYouTube && (browser.isLoading || browser.errorMessage != nil || !["m.youtube.com", "www.youtube.com", "youtube.com"].contains(browser.webView.url?.host ?? "")))) {
+            if !embedded && !browser.newsArticle && (isBrowserHome || (browser.easyYouTube && (browser.isLoading || browser.errorMessage != nil || !["m.youtube.com", "www.youtube.com", "youtube.com"].contains(browser.webView.url?.host ?? "")))) {
                 VisionCraftIconButton(systemImage: "chevron.left", label: browser.easyYouTube ? "쉬운 유튜브 닫기" : "접근성 웹 닫기", tint: chromeAccent) { close() }
                     .background(chromeSurface, in: RoundedRectangle(cornerRadius: 12))
                     .padding(8)
@@ -280,4 +283,18 @@ private struct AccessibleWebSurface: UIViewRepresentable {
             webView.trailingAnchor.constraint(equalTo: container.trailingAnchor)
         ])
     }
+}
+
+private struct NewsArticleLoadingSurface: UIViewRepresentable {
+    func makeUIView(context: Context) -> WKWebView {
+        let view = WKWebView()
+        view.isOpaque = false
+        view.backgroundColor = UIColor(hex: 0x202124)
+        view.scrollView.backgroundColor = UIColor(hex: 0x202124)
+        view.scrollView.isScrollEnabled = false
+        view.loadHTMLString(NewsArticlePage.loadingHTML, baseURL: nil)
+        return view
+    }
+    func updateUIView(_ uiView: WKWebView, context: Context) {}
+    static func dismantleUIView(_ uiView: WKWebView, coordinator: ()) { uiView.stopLoading() }
 }

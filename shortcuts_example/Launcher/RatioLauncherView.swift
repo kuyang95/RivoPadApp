@@ -84,6 +84,7 @@ struct RatioLauncherView: View {
     @State private var operation: Task<Void, Never>?
     @State private var operationID = UUID()
     @State private var browserQuery = ""
+    @State private var browserNewsArticle = false
     @State private var showsBrowser = false
     @State private var appName = ""
     @State private var appAddress = ""
@@ -249,7 +250,7 @@ struct RatioLauncherView: View {
         .buttonStyle(.plain)
         .toolbar(.hidden, for: .navigationBar)
         .visionCraftHandlesBackNavigation()
-        .navigationDestination(isPresented: $showsBrowser) { AccessibleWebBrowserView(initialQuery: browserQuery) }
+        .navigationDestination(isPresented: $showsBrowser) { AccessibleWebBrowserView(initialQuery: browserQuery, newsArticle: browserNewsArticle) }
         .accessibilityAction(.escape) { goBack() }
         .sheet(item: $editorSelection) { selection in widgetOptions(selection) }
         .onChange(of: router.launcherHomeRequestID) { _, _ in
@@ -824,7 +825,7 @@ struct RatioLauncherView: View {
         let style = experience ?? RatioExperience()
 
         if widget.isNews {
-            if let height { RatioNewsWidget(active: active, onArticle: openBrowser).frame(height: height) }
+            if let height { RatioNewsWidget(active: active, onArticle: { openBrowser($0, newsArticle: true) }).frame(height: height) }
             else { Color.clear.frame(height: 88) }
         } else if widget.isYouTube {
             if let height {
@@ -990,8 +991,8 @@ struct RatioLauncherView: View {
         } else if let route = entry.route { router.route = route }
         else if entry.id == "browser" { openBrowser("https://www.google.com") }
     }
-    private func openBrowser(_ text: String) {
-        cancelOperation(); searchFocused = false; browserQuery = text; showsBrowser = true
+    private func openBrowser(_ text: String, newsArticle: Bool = false) {
+        cancelOperation(); searchFocused = false; browserQuery = text; browserNewsArticle = newsArticle; showsBrowser = true
     }
     private func startChat(_ text: String) {
         cancelOperation(); searchFocused = false; router.route = .launcherQuestion(question: text)

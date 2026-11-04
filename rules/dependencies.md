@@ -1,6 +1,6 @@
 # 의존성 / 라이브러리 버전
 
-점검일: 2026-10-23 · 기준 코드: `a0e8981d`+작업 트리 (쉬운 유튜브·접근성 웹 실기기 검증 범위) · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리
+점검일: 2026-10-23 · 기준 코드: `a0e8981d`+작업 트리 (쉬운 유튜브·접근성 웹 실기기 검증 범위) · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리 · 뉴스 읽기 추출기: 2026-10-30 `b4aa7cf7`+작업 트리
 
 `Podfile.lock`, `shortcuts_example.xcworkspace/xcshareddata/swiftpm/Package.resolved`, Xcode 프로젝트의 로컬 패키지 참조, GitHub `kuyang95/VisionCraftDocumentEngine`의 `Package.swift` 출처.
 
@@ -106,3 +106,7 @@ Apple 시스템 BackgroundTasks 프레임워크의 BGProcessingTask/BGTaskSchedu
 ## 릴리즈 런처와 쉬운 브라우저
 
 Launcher와 AccessibleWeb 소스는 DEBUG 조건 없이 본 앱에 포함한다. 기존 WebKit·BackgroundTasks·CoreLocation·UserNotifications만 사용하며 새 패키지는 없다. 개발 도구·라이브 AI 실험의 조건부 컴파일은 유지한다.
+
+## 뉴스 본문 추출 JavaScript
+
+Mozilla `@mozilla/readability` 0.6.0(Apache-2.0)을 앱에 고정 포함한다. Android는 `assets/news-readability.js`, iPad는 `NewsReadability`가 같은 원본 소스를 포함하며 네트워크로 실행 코드를 받지 않는다. 라이선스는 Android `assets/news-readability-LICENSE.txt`, iPad `ThirdParty/Readability-LICENSE.txt`와 앱 리소스 `Settings/AccessibleWeb/Readability-LICENSE.txt`에 보존한다. 뉴스 읽기 세션에서만 로컬 DOM 복제본에 실행하며 JSON-LD 기사 본문을 사용하지 않는다.
