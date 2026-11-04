@@ -700,7 +700,7 @@ struct RatioLauncherView: View {
                 .padding(16).background(RatioStyle.surface, in: RoundedRectangle(cornerRadius: 16))
             let shown = entries.filter { $0.isApp && (query.isEmpty || $0.name.localizedStandardContains(query)) }
             ForEach(shown) { entry in
-                widgetAddRow(entry.name, image: "app", added: widgets.contains { $0.id == entry.id }, detail: entry.address) {
+                widgetAddRow(entry.name, image: "app", added: widgets.contains { $0.id == entry.id }, detail: "아이콘 바로가기") {
                     addWidget(RatioHomeItem(id: entry.id, name: entry.name, columns: 1, rows: 1, iconOnly: true))
                 }
             }
