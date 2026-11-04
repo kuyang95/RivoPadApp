@@ -1338,9 +1338,6 @@ struct shortcuts_exampleApp: App {
     private func openHelpGuideAction(_ action: HelpGuideAction) {
         let route: AppRoute
         switch action {
-        case .home:
-            path = NavigationPath()
-            return
         case .textSource:
             path = NavigationPath()
             Task { @MainActor in

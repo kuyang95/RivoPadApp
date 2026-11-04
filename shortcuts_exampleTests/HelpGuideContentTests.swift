@@ -8,7 +8,8 @@ final class HelpGuideContentTests: XCTestCase {
         let korean = try HelpGuideContent.load(language: .korean)
         XCTAssertFalse(korean.filter { $0.group == .feature }.isEmpty)
         XCTAssertFalse(korean.filter { $0.group == .problem }.isEmpty)
-        XCTAssertEqual(Set(korean.map(\.action)), Set(HelpGuideAction.allCases))
+        XCTAssertEqual(Set(korean.compactMap(\.action)), Set(HelpGuideAction.allCases))
+        XCTAssertEqual(Set(korean.filter { $0.action == nil }.map(\.id)), ["start", "widgets", "accessibility"])
 
         for language in [AppLanguage.english, .japanese] {
             let translated = try HelpGuideContent.load(language: language)

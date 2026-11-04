@@ -1,13 +1,12 @@
 import Foundation
 
 nonisolated enum HelpGuideAction: String, Codable, CaseIterable, Sendable {
-    case home, camera, scan, liveText, image, chat, history, textSource
+    case camera, scan, liveText, image, chat, history, textSource
     case documents, books, translation, webSearch, voice, remote, visionLink
     case settings, permissions
 
     var title: String {
         switch self {
-        case .home: "홈으로 이동"
         case .camera: "확대 보기 열기"
         case .scan: "문서 스캔 열기"
         case .liveText: "실시간 읽기 열기"
@@ -37,7 +36,7 @@ nonisolated struct HelpGuideTopic: Codable, Hashable, Identifiable, Sendable {
     let icon: String
     let steps: [String]
     let tip: String
-    let action: HelpGuideAction
+    let action: HelpGuideAction?
 
     func matches(_ query: String) -> Bool {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -5,7 +5,6 @@
     "feature": "Getting started",
     "situation": "Which feature should I try first?",
     "icon": "hand.wave",
-    "action": "home",
     "steps": [
       "Choose Magnifier to magnify small objects, Scan Document to read a paper document, or Live Reading to hear text in front of you.",
       "Open your files in Document Workspace. Use the Book Reader for EPUB and DAISY books.",
@@ -257,7 +256,6 @@
     "feature": "Home screen widgets",
     "situation": "I want faster access to my favorite features",
     "icon": "square.grid.2x2",
-    "action": "home",
     "steps": [
       "Touch and hold an empty area of the iPad Home Screen, then choose Add Widget from the edit menu.",
       "Add a VisionCraft Quick Launch widget. Edit the widget to choose Camera, Scan Document, Voice Command, or another feature.",
@@ -285,7 +283,6 @@
     "feature": "iPad Accessibility",
     "situation": "I want to magnify other apps or use VoiceOver",
     "icon": "accessibility",
-    "action": "home",
     "steps": [
       "Open the iPad Settings app and go to Accessibility.",
       "Configure Zoom to magnify the screen, or VoiceOver to navigate screen items by speech.",

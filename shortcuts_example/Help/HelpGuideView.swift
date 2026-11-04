@@ -283,16 +283,18 @@ struct HelpGuideDetailView: View {
                     .accessibilityIdentifier("guide.remote-manual")
                 }
 
-                Button {
-                    onAction(topic.action)
-                } label: {
-                    Label(localized(topic.action.title), systemImage: "arrow.up.right")
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity, minHeight: 28)
+                if let action = topic.action {
+                    Button {
+                        onAction(action)
+                    } label: {
+                        Label(localized(action.title), systemImage: "arrow.up.right")
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity, minHeight: 28)
+                    }
+                    .buttonStyle(VisionCraftAndroidButtonStyle(filled: true))
+                    .padding(.top, 4)
+                    .accessibilityIdentifier("guide.open-feature")
                 }
-                .buttonStyle(VisionCraftAndroidButtonStyle(filled: true))
-                .padding(.top, 4)
-                .accessibilityIdentifier("guide.open-feature")
             }
             .padding(24)
             .frame(maxWidth: .infinity)

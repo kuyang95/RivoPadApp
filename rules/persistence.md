@@ -1,6 +1,6 @@
 # 영속 데이터 (UserDefaults / App Group / 파일 / Keychain / Assets)
 
-점검일: 2026-10-29 · 기준 코드: `c5865248`+작업 트리 (쉬운 유튜브 재생 의도·기존 저장소 범위) · 런처 유틸리티 대조: 2026-10-22 `514e00f5`+작업 트리 · 현재 위치 날씨 대조: 2026-10-22 `f56b06f0`+작업 트리 · 타이머 시각 설정 대조: 2026-10-22 `f56b06f0`+작업 트리 · 브라우저 즐겨찾기 대조: 2026-10-22 `f56b06f0`+작업 트리 · 데이지 본문 유지·자원 수명 대조: 2026-10-22 `f56b06f0`+작업 트리 · 즐겨찾기 아이콘 저장 대조: 2026-10-22 `f56b06f0`+작업 트리 · 유튜브 탭 목록 캐시 대조: 2026-10-22 `f56b06f0`+작업 트리 · 현재 페이지 빈자리 우선 추가 대조: 2026-10-23 `f56b06f0`+작업 트리 · 브라우저 광고 차단 설정 대조: 2026-10-23 `f56b06f0`+작업 트리 · 날씨 30분 갱신·큰 글자·원형 새로고침 대조: 2026-10-23 `f56b06f0`+작업 트리 · 전체 페이지 뉴스 위젯 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 다중 언론사 뉴스 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 출처·표본 확대 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 74개 매체 목록 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 선택 분야 수신·HTML 정리 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리 · 뉴스 표시 순서·상단 대조: 2026-10-29 `c2f1d72d`+작업 트리
+점검일: 2026-10-29 · 기준 코드: `c5865248`+작업 트리 (쉬운 유튜브 재생 의도·기존 저장소 범위) · 런처 유틸리티 대조: 2026-10-22 `514e00f5`+작업 트리 · 현재 위치 날씨 대조: 2026-10-22 `f56b06f0`+작업 트리 · 타이머 시각 설정 대조: 2026-10-22 `f56b06f0`+작업 트리 · 브라우저 즐겨찾기 대조: 2026-10-22 `f56b06f0`+작업 트리 · 데이지 본문 유지·자원 수명 대조: 2026-10-22 `f56b06f0`+작업 트리 · 즐겨찾기 아이콘 저장 대조: 2026-10-22 `f56b06f0`+작업 트리 · 유튜브 탭 목록 캐시 대조: 2026-10-22 `f56b06f0`+작업 트리 · 현재 페이지 빈자리 우선 추가 대조: 2026-10-23 `f56b06f0`+작업 트리 · 브라우저 광고 차단 설정 대조: 2026-10-23 `f56b06f0`+작업 트리 · 날씨 30분 갱신·큰 글자·원형 새로고침 대조: 2026-10-23 `f56b06f0`+작업 트리 · 전체 페이지 뉴스 위젯 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 다중 언론사 뉴스 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 출처·표본 확대 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 74개 매체 목록 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 선택 분야 수신·HTML 정리 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리 · 뉴스 표시 순서·상단 대조: 2026-10-29 `c2f1d72d`+작업 트리 · 2026-11-04 `b4aa7cf7`+작업 트리 (사용 설명서 번들 스키마)
 
 Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 데이터는 전부 **JSON 파일** 또는 **UserDefaults(Codable 인코딩)**.
 
@@ -92,7 +92,7 @@ Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 �
 | 파일 | 용도 |
 |---|---|
 | `DocumentScan/CustomScanner/Models/lcnet100_doc_aligner.onnx`, `uvdoc.onnx` | 스캐너 모델 ([scanner_pipeline.md](scanner_pipeline.md)) |
-| `Help/VisionCraftGuide.json` (+ `en.lproj`/`ja.lproj` 사본) | 사용 설명서 항목 (`id`, `group` feature/situation, `feature`, `situation`, `icon`, `action`, `steps[]`, `tip`) — `Help/HelpGuideContent.swift`, `HelpGuideView` |
+| `Help/VisionCraftGuide.json` (+ `en.lproj`/`ja.lproj` 사본) | 사용 설명서 항목 (`id`, `group` feature/problem, `feature`, `situation`, `icon`, `steps[]`, `tip`, 선택 항목 `action`) — `Help/HelpGuideContent.swift`, `HelpGuideView` |
 | `Help/RivoPadManual.txt`, `Help/RivoPadChangelog.txt` (+ 언어별) | `@title/@version/@date/@chapter/@section/@text` 마크업 — `Help/HelpDocument.swift` · `HelpContentLibrary` 가 언어 lproj 우선, 없으면 루트 파일 |
 | `*.mp3`, `*.wav` 16개 | `SoundEffectManager` ([gemini_ai.md](gemini_ai.md) 효과음 표) |
 | `*.ttf`/`*.otf` 15개 | `UIAppFonts` |
