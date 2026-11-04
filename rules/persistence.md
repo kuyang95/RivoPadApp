@@ -168,3 +168,7 @@ UserDefaults `browser.favorites.v1`은 `{name,url,icon?}` 배열 JSON Data다. `
 ## 앱 시작 홈과 미디어 탐색 표시
 
 iPad UserDefaults `home.launcher.v1` 문자열은 `standard`(기본) / `widgets`, `home.media.visible.v1` Boolean은 기본 true다. `AppHomeRoot`와 기존 홈·설정은 같은 AppStorage 키를 사용한다. `standardHome` 경로는 저장된 위젯 런처 선택과 관계없이 기존 홈을 연다. 기존 목록형/카테고리형·위젯 배치·로그인·즐겨찾기 값은 유지한다.
+
+## Debug 쇼핑 상품 연동
+
+검색어·상품 목록·검색 조건·최대 3개 비교 선택·화면 색상·글자 단계는 열린 쇼핑 화면의 메모리에만 유지한다. API 키를 요구하거나 저장하지 않고 응답을 영속 캐시하지 않는다. 기존 이지 브라우저 로그인 쿠키와 검색 작업 저장소를 공유하지 않는다. Android는 화면별 WebView 프로필을 제거하고 iPad는 비영속 저장소·임시 자산 폴더를 사용한다. 원본 상품을 이지 브라우저에서 보고 돌아오면 기존 쇼핑 화면을 유지한다. 명시적인 쇼핑 기기 테스트에서만 `shopping-validation`에 공개 검색 상태 요약과 화면 캡처를 저장한다. 상세는 [shopping_products.md](shopping_products.md) 참조.

@@ -27,6 +27,11 @@ struct DebugDevelopmentView: View {
 
                 Section {
                     NavigationLink {
+                        ShoppingSearchView()
+                    } label: {
+                        Label("쇼핑 상품 연동", systemImage: "cart")
+                    }
+                    NavigationLink {
                         HWPReferenceComparisonView()
                             .visionCraftRouteBackButton()
                             .toolbar(.visible, for: .navigationBar)

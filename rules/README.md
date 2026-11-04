@@ -25,6 +25,8 @@
 | [scanner_pipeline.md](scanner_pipeline.md) | 자체 문서 스캐너: LCNet 모서리 검출, 자동 셔터 게이트, PaperEdgeRefiner, 원근/색상 보정, UVDoc 평탄화, ML Kit OCR + Gemini 교정 |
 | [visionlink.md](visionlink.md) | VisionLink 수신기: 페어링 REST/WebSocket, WebRTC 영상·데이터 채널, 원격 기능(이미지 분석·AI 채팅·실시간 읽기), Keychain 자격 증명 |
 | [visionlink_compatibility.md](visionlink_compatibility.md) | VisionLink 규격 1, 기능 ID·앱 버전·공통 지원 협상, 기능 추가 절차 |
+| [shopping_products.md](shopping_products.md) | Debug 판매처 직접 검색·후기 정렬·가격/배송/혜택 조건·검증 한계 |
+| [shopping_source_research.md](shopping_source_research.md) | 다나와·에누리 공개 요청·공급 규격·원판매처 추적·비공개 경계 조사 |
 
 ## 점검 기록
 
@@ -32,6 +34,8 @@
 
 | 문서 | 점검일 | 기준 코드 |
 |---|---|---|
+| `shopping_products.md` | 2026-11-04 | `fa08e353`+작업 트리 (판매처 직접 검색과 결과 화면) |
+| `shopping_source_research.md` | 2026-11-04 | `fa08e353`+작업 트리 (판매처와 공식 연동 경로 조사) |
 | `app_metadata.md` | 2026-10-23 | `c5865248`+작업 트리 (런처 웹 내부 탐색 URL 범위)  · 런처 유틸리티 `514e00f5`+작업 트리(2026-10-22) · 현재 위치 날씨 `f56b06f0`+작업 트리(2026-10-22) · 브라우저 즐겨찾기 `f56b06f0`+작업 트리(2026-10-22) · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리 |
 | `server_endpoints.md` | 2026-10-29 | `c25bf291` (이번 기능 변경 범위)  · 런처 유틸리티 `514e00f5`+작업 트리(2026-10-22) · 현재 위치 날씨 `f56b06f0`+작업 트리(2026-10-22) · 날씨 30분 갱신·큰 글자·원형 새로고침 대조: 2026-10-23 `f56b06f0`+작업 트리 · 전체 페이지 뉴스 위젯 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 다중 언론사 뉴스 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 출처·표본 확대 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 74개 매체 목록 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 선택 분야 수신·HTML 정리 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 표시 순서·상단 `c2f1d72d`+작업 트리 |
 | firebase_services.md | 2026-09-29 | `babc3875` |
