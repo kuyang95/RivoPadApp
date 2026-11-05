@@ -10,6 +10,8 @@ struct RatioHomeItem: Identifiable, Codable {
     var iconOnly: Bool?
     var colorKey: String?
     var iconText: Bool?
+    var wideShortcut: Bool?
+    var isWideShortcut: Bool { wideShortcut == true }
     var isWeather: Bool { id == "widget:weather" }
     var isTimer: Bool { id == "widget:timer" }
     var isUtility: Bool { isWeather || isTimer }
@@ -21,8 +23,16 @@ struct RatioHomeItem: Identifiable, Codable {
     static let webName = String(localized: "리보 웹")
     static let youTubeName = String(localized: "리보 유튜브")
     static let newsName = String(localized: "리보 뉴스")
+    static let wideShortcutName = String(localized: "가로 타일")
+
+    var shortcutShapeName: String {
+        if isWideShortcut { return Self.wideShortcutName }
+        if textOnly { return "텍스트 바로가기" }
+        return iconOnly == true ? "아이콘 바로가기" : "타일 바로가기"
+    }
 
     var normalized: RatioHomeItem {
+        if isWeek { return Self.week }
         if isUtility { var item = self; item.columns = columns < 4 ? 2 : 4; item.rows = min(5, max(2, rows)); item.textOnly = false; item.iconOnly = false; return item }
         if isYouTube || isNews {
             var item = self
@@ -33,12 +43,22 @@ struct RatioHomeItem: Identifiable, Codable {
             item.iconOnly = false
             return item
         }
+        if isWideShortcut {
+            var item = self
+            item.columns = 4
+            item.rows = 1
+            item.textOnly = false
+            item.iconOnly = false
+            return item
+        }
         guard isBrowser || isDaisy else { return self }
         var item = self; item.columns = 4; item.rows = min(10, max(isDaisy ? 6 : 8, rows)); item.textOnly = false; item.iconOnly = false
         if isBrowser { item.name = Self.webName }
         return item
     }
     var isSearch: Bool { id == "widget:search" }
+    var isWeek: Bool { id == "widget:week" }
+    static let week = RatioHomeItem(id: "widget:week", name: String(localized: "주간 날짜"), columns: 4, rows: 1)
 }
 struct RatioSwatch: Identifiable {
     var id: String

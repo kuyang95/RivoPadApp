@@ -103,7 +103,7 @@ Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 �
 
 `Launcher/RatioLauncherView.swift`의 UserDefaults: `ratio.home.favorites.v1`는 ID 쉼표 목록(기본 magnifier,live,chat,books), `ratio.home.apps.v1`는 앱 이름·URL·UUID 배열의 JSON Data(기본 빈 배열), `ratio.home.textSize.v1`는 Double 28(24~40), `ratio.home.clock.v1`는 Bool false, `ratio.home.icons.v1`는 Bool true. `Assets.xcassets/RatioBlueMist.imageset`는 Android와 같은 Unsplash 사진이며 라이선스는 `Launcher/wallpaper-license.txt`다.
 
-`ratio.home.widgets.v2`는 `{id,name,textOnly,columns,rows,textSize,iconOnly?,colorKey?}` 배열 JSON Data다. `widget:search` ID는 검색 위젯이다. v2가 없으면 v1을 디코딩해 기존 검색 크기의 검색 항목을 맨 앞에 추가하고 이전 첫 사각형은 lemon으로 보존한다. 기존 즐겨찾기 마이그레이션도 검색 항목을 포함한다. v2 빈 배열·검색 삭제를 보존한다. `ratio.home.searchColumns.v1`·`ratio.home.searchRows.v1`는 이전 검색 크기 이관용이다. `ratio.home.apps.v1` 항목에는 선택적 `iconData`(128×128 PNG Data)를 저장하며 기존 아이콘 없는 항목도 디코딩된다. PhotosPicker로 선택한 이미지에만 접근한다.
+`ratio.home.widgets.v2`는 `{id,name,textOnly,columns,rows,textSize,iconOnly?,colorKey?,wideShortcut?}` 배열 JSON Data다. `wideShortcut`이 true이면 가로 타일로 표시하고 4열·1행으로 제한한다. 필드가 없으면 기존 형태를 유지한다. `widget:search` ID는 검색 위젯이다. 주간 날짜 위젯은 같은 배열에 `widget:week` ID와 고정 4열·1행으로 저장한다. v2가 없으면 v1을 디코딩해 기존 검색 크기의 검색 항목을 맨 앞에 추가하고 이전 첫 사각형은 lemon으로 보존한다. 기존 즐겨찾기 마이그레이션도 검색 항목을 포함한다. v2 빈 배열·검색 삭제를 보존한다. `ratio.home.searchColumns.v1`·`ratio.home.searchRows.v1`는 이전 검색 크기 이관용이다. `ratio.home.apps.v1` 항목에는 선택적 `iconData`(128×128 PNG Data)를 저장하며 기존 아이콘 없는 항목도 디코딩된다. PhotosPicker로 선택한 이미지에만 접근한다.
 
 Ratio v2 위젯은 선택적인 `iconText`를 추가 저장한다(기본 false, 이전 데이터 누락 시 false). Android는 Boolean, iPad는 하위 호환 Codable Bool?이다. 앱 TEXT에서만 앱 아이콘 색을 표시하고 `colorKey`는 단색 및 이미지 실패 시 대체색이다. 색상 선택은 iconText를 false로 바꾸며 크기·순서·유형 변경은 보존한다. 아이콘 이미지 자체를 위젯 데이터에 복사하지 않는다.
 

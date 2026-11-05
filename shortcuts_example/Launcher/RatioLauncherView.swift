@@ -37,6 +37,7 @@ struct RatioLauncherView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @EnvironmentObject private var router: AppRouter
     @ObservedObject private var localAI = LLMService.shared
     @ScaledMetric(relativeTo: .body) private var layoutScale = 1.0
@@ -530,6 +531,11 @@ struct RatioLauncherView: View {
                 VStack(spacing: 12) {
                     settingsAction("위젯 편집") { editingWidget = nil; navigate("edit") }
                     VisionCraftSettingSwitchTile(label: "시계·날짜 위젯", hint: "홈에 시간과 날짜 표시", isOn: $showClock)
+                    VisionCraftSettingSwitchTile(label: RatioHomeItem.week.name, hint: String(localized: "오늘이 포함된 한 주 표시"),
+                        isOn: Binding(get: { widgets.contains(where: \.isWeek) }, set: { enabled in
+                            let otherWidgets = widgets.filter { !$0.isWeek }
+                            saveWidgets(enabled ? [.week] + otherWidgets : otherWidgets)
+                        }))
                     VisionCraftSettingSwitchTile(label: "아이콘 표시", hint: "기능 이름과 함께 아이콘 표시", isOn: $showIcons)
                 }
             }
@@ -598,13 +604,13 @@ struct RatioLauncherView: View {
         VStack(alignment: .leading, spacing: 16) {
             widgetEditorPreview(widget)
             VStack(spacing: 0) {
-                if !widget.isUtility && !widget.isSearch && !widget.isFullPage {
+                if !widget.isUtility && !widget.isSearch && !widget.isFullPage && !widget.isWeek {
                     editorRow("실행할 앱·기능", value: entries.first { $0.id == widget.id }?.name ?? widget.name, widget: widget, option: "target")
-                    editorRow("형태", value: widget.textOnly ? "텍스트 바로가기" : widget.iconOnly == true ? "아이콘 바로가기" : "타일 바로가기", widget: widget, option: "shape")
+                    editorRow("형태", value: widget.shortcutShapeName, widget: widget, option: "shape")
                 }
                 if widget.isFullPage { Text("페이지 전체를 사용하는 위젯").visionCraftAndroidText(18).padding(16) }
-                else if !widget.textOnly { editorRow("크기", value: "\(widget.columns) × \(widget.rows)", widget: widget, option: "size") }
-                if !widget.isFullPage {
+                else if !widget.textOnly && !widget.isWideShortcut && !widget.isWeek { editorRow("크기", value: "\(widget.columns) × \(widget.rows)", widget: widget, option: "size") }
+                if !widget.isFullPage && !widget.isWeek {
                     editorRow(widget.textOnly ? "글자 색상" : "위젯 색상", value: widget.iconText == true ? "앱 아이콘 색" : ratioPalette.first(where: { $0.id == widget.colorKey })?.name ?? "기본 색상", widget: widget, option: "color")
                 }
             }.padding(4).background(RatioStyle.surface, in: RoundedRectangle(cornerRadius: 12))
@@ -626,19 +632,23 @@ struct RatioLauncherView: View {
         let entry = entries.first { $0.id == widget.id }
         let swatch = ratioPalette.first { $0.id == widget.colorKey }?.color
         let ink = widget.textOnly ? swatch ?? RatioStyle.text : swatch == nil ? RatioStyle.text : RatioStyle.background
+        let frosted = !widget.isFullPage && !widget.isSearch && !widget.isUtility && !widget.isWeek && !widget.textOnly && widget.iconOnly != true
         return VStack(alignment: .leading, spacing: 12) {
             Text("미리보기").visionCraftAndroidText(16).foregroundStyle(RatioStyle.text.opacity(0.8))
             HStack(spacing: 16) {
                 if !widget.textOnly {
                     if let data = apps.first(where: { $0.id == widget.id })?.iconData, let image = UIImage(data: data) {
                         Image(uiImage: image).resizable().scaledToFit().frame(width: 40, height: 40).accessibilityHidden(true)
-                    } else { Image(systemName: entry?.icon ?? "square.grid.2x2").font(.title).accessibilityHidden(true) }
+                    } else { Image(systemName: entry?.icon ?? (widget.isWeek ? "calendar" : "square.grid.2x2")).font(.title).accessibilityHidden(true) }
                 }
                 Text(entry?.name ?? widget.name).visionCraftAndroidText(24, weight: .bold).accessibilityAddTraits(.isHeader)
             }.foregroundStyle(ink).padding(20).frame(maxWidth: .infinity, alignment: .leading)
-                .background(widget.textOnly ? Color.clear : swatch ?? RatioStyle.surface, in: RoundedRectangle(cornerRadius: 8))
-            if !widget.isFullPage && !widget.isSearch && !widget.isUtility {
-                Text(widget.textOnly ? "텍스트 바로가기" : widget.iconOnly == true ? "아이콘 바로가기" : "타일 바로가기")
+                .background {
+                    if frosted { frostedTileBackground(fill: swatch) }
+                    else { RoundedRectangle(cornerRadius: 8).fill(widget.textOnly ? Color.clear : swatch ?? RatioStyle.surface) }
+                }
+            if !widget.isFullPage && !widget.isSearch && !widget.isUtility && !widget.isWeek {
+                Text(widget.shortcutShapeName)
                     .visionCraftAndroidText(16).foregroundStyle(RatioStyle.text.opacity(0.8))
             }
         }
@@ -696,7 +706,8 @@ struct RatioLauncherView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
                         if selection.option == "shape" {
-                            tab("타일 바로가기", selected: !widget.textOnly && widget.iconOnly != true) { setWidgetKind(widget, "tile"); editorSelection = nil }
+                            tab("타일 바로가기", selected: !widget.isWideShortcut && !widget.textOnly && widget.iconOnly != true) { setWidgetKind(widget, "tile"); editorSelection = nil }
+                            tab(RatioHomeItem.wideShortcutName, selected: widget.isWideShortcut) { setWidgetKind(widget, "wide"); editorSelection = nil }
                             tab("텍스트 바로가기", selected: widget.textOnly) { setWidgetKind(widget, "text"); editorSelection = nil }
                             tab("아이콘 바로가기", selected: widget.iconOnly == true) { setWidgetKind(widget, "icon"); editorSelection = nil }
                         } else if selection.option == "size" {
@@ -738,6 +749,7 @@ struct RatioLauncherView: View {
          RatioHomeItem(id: "widget:weather", name: "날씨", columns: 2, rows: 2),
          RatioHomeItem(id: "widget:timer", name: "타이머 · 알람", columns: 2, rows: 2),
          RatioHomeItem(id: "widget:search", name: "통합 검색", columns: 4, rows: 1),
+         .week,
          RatioHomeItem(id: "widget:youtube", name: RatioHomeItem.youTubeName, columns: 4, rows: 10),
          RatioHomeItem(id: "widget:browser", name: RatioHomeItem.webName, columns: 4, rows: 8),
          RatioHomeItem(id: "widget:daisy", name: "데이지 플레이어", columns: 4, rows: 6)]
@@ -815,10 +827,12 @@ struct RatioLauncherView: View {
         }.buttonStyle(.plain).foregroundStyle(RatioStyle.text).disabled(added || current).accessibilityAddTraits(current ? [.isSelected] : [])
     }
     private func setWidgetKind(_ widget: RatioHomeItem, _ kind: String) {
-        let current = widget.textOnly ? "text" : widget.iconOnly == true ? "icon" : "tile"
+        let current = widget.isWideShortcut ? "wide" : widget.textOnly ? "text" : widget.iconOnly == true ? "icon" : "tile"
         guard current != kind else { return }
         var w = widget; w.textOnly = kind == "text"; w.iconOnly = kind == "icon"
-        w.columns = kind == "text" ? 4 : kind == "icon" ? 1 : 2; w.rows = kind == "tile" ? 2 : 1
+        w.wideShortcut = kind == "wide" ? true : nil
+        w.columns = kind == "wide" || kind == "text" ? 4 : kind == "icon" ? 1 : 2
+        w.rows = kind == "tile" ? 2 : 1
         changeWidget(w)
     }
     @ViewBuilder private func homeWidget(_ widget: RatioHomeItem, height: CGFloat? = nil, active: Bool = true, preview: Bool = false, experience: RatioExperience? = nil) -> some View {
@@ -851,6 +865,11 @@ struct RatioLauncherView: View {
         } else if widget.isUtility {
             if let height { RatioUtilityWidget(widget: widget, active: active, height: height) { editWidget(widget.id) }.frame(height: height) }
             else { Color.clear.frame(height: CGFloat(widget.rows * 100 - 12)) }
+        } else if widget.isWeek {
+            RatioWeekWidget()
+                .contentShape(Rectangle())
+                .onLongPressGesture { editWidget(widget.id) }
+                .accessibilityAction(named: "위젯 설정") { editWidget(widget.id) }
         } else if widget.isSearch {
             let fill = ratioPalette.first(where: { $0.id == widget.colorKey })?.color
             let ink = fill == nil ? style.text : style.ink
@@ -911,16 +930,61 @@ struct RatioLauncherView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: height)
             .frame(minHeight: height == nil ? heightForWidget(widget) : 0)
+        } else if widget.isWideShortcut {
+            widgetControl(widget, entry: entry) {
+                HStack(spacing: 16) {
+                    if let data = apps.first(where: { $0.id == widget.id })?.iconData, let image = UIImage(data: data) {
+                        Image(uiImage: image).resizable().scaledToFit().frame(width: 56, height: 56).accessibilityHidden(true)
+                    } else if showIcons || entry?.isApp == true {
+                        Image(systemName: entry?.icon ?? "app")
+                            .font(.system(size: 36))
+                            .frame(width: 56, height: 56)
+                            .background((filled ? style.ink : style.text).opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+                            .accessibilityHidden(true)
+                    }
+                    Text(entry?.name ?? widget.name)
+                        .visionCraftAndroidText(32, weight: .bold)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .foregroundStyle(filled ? style.ink : style.text)
+                .padding(12)
+                .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+                .frame(height: height, alignment: .leading)
+                .background { frostedTileBackground(fill: fill) }
+                .contentShape(Rectangle())
+            }
         } else {
             widgetControl(widget, entry: entry) {
                 content.frame(maxWidth: .infinity, alignment: compact ? .center : .leading)
                     .frame(height: height, alignment: compact ? .center : .leading)
                     .frame(minHeight: height == nil ? heightForWidget(widget) : 0)
-                    .background(fill ?? (compact ? Color.clear : style.surface))
-                    .clipShape(RoundedRectangle(cornerRadius: style.corner, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: compact ? style.corner : 20))
+                    .background {
+                        if compact { RoundedRectangle(cornerRadius: style.corner).fill(fill ?? Color.clear) }
+                        else { frostedTileBackground(fill: fill) }
+                    }
                     .contentShape(Rectangle())
             }
         }
+    }
+    private func frostedTileBackground(fill: Color?) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 20)
+        let base = [VisionCraftUI.fixedColor(0x23374C).opacity(reduceTransparency ? 1 : 0.75),
+                    VisionCraftUI.fixedColor(0x142239).opacity(reduceTransparency ? 1 : 0.89)]
+        return shape.fill(LinearGradient(colors: base, startPoint: .topLeading, endPoint: .bottomTrailing))
+            .overlay {
+                if let fill {
+                    shape.fill(fill)
+                        .overlay {
+                            shape.fill(LinearGradient(colors: [.white.opacity(0.2), .clear], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        }
+                }
+            }
+            .overlay {
+                shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.48), .white.opacity(0.18)],
+                                                   startPoint: .top, endPoint: .bottom))
+            }
+            .allowsHitTesting(false)
     }
     private func widgetControl<Label: View>(_ widget: RatioHomeItem, entry: RatioEntry?, @ViewBuilder label: () -> Label) -> some View {
         Button {
