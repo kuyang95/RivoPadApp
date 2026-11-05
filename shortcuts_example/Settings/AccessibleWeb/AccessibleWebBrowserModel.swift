@@ -134,7 +134,9 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
         configure(webView)
         windows = [webView]
         observeActiveWindow()
-        navigate(easyYouTube ? EasyYouTubePage.home : "https://www.google.com")
+        if !newsArticle {
+            navigate(easyYouTube ? EasyYouTubePage.home : "https://www.google.com")
+        }
     }
 
     private func configure(_ view: WKWebView) {
