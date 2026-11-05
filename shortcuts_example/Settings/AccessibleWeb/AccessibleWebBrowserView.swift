@@ -193,6 +193,19 @@ struct AccessibleWebBrowserView: View {
         .statusBarHidden(!embedded)
         .persistentSystemOverlays(embedded ? .automatic : .hidden)
         .ignoresSafeArea(.container, edges: embedded ? [] : .bottom)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !embedded && browser.newsArticle {
+                HStack {
+                    VisionCraftIconButton(systemImage: "chevron.left", label: "뒤로 가기", tint: chromeAccent) {
+                        browser.handleBack(onExhausted: close)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(chromeBackground)
+            }
+        }
         .visionCraftHandlesBackNavigation()
         .accessibilityAction(.escape) { browser.handleBack(onExhausted: close) }
         .onChange(of: browser.currentAddress) { _, value in
