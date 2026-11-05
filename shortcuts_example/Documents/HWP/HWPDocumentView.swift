@@ -145,13 +145,15 @@ final class HWPDocumentViewModel: ObservableObject {
         canEditSelectedBlock && selectedBlock?.text != editorText
     }
 
+    private func isReadable(_ block: HWPDocumentBlock) -> Bool {
+        block.tableLocation != nil
+            || !block.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !block.images.isEmpty
+            || !block.canvasObjects.isEmpty
+    }
+
     var accessibleBlocks: [HWPDocumentBlock] {
-        blocks.filter { block in
-            block.tableLocation != nil
-                || !block.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                || !block.images.isEmpty
-                || !block.canvasObjects.isEmpty
-        }
+        blocks.filter(isReadable)
     }
 
     var isEditableDocument: Bool {
@@ -162,13 +164,13 @@ final class HWPDocumentViewModel: ObservableObject {
     /// body paragraph when nothing in the document is read yet (Android `blankParagraph`).
     var blankParagraphID: String? {
         guard !isLoading, isEditableDocument,
-              HWPAccessibleDocument.make(blocks: blocks).entries.isEmpty else { return nil }
+              !blocks.contains(where: isReadable) else { return nil }
         return blocks.first {
             $0.isEditable && $0.tableLocation == nil && $0.region.kind == .body
         }?.id
     }
 
-    func load() async {
+    func load(navigation: HWPDocumentNavigation? = nil) async {
         guard !didLoad else { return }
         didLoad = true
         isLoading = true
@@ -176,17 +178,19 @@ final class HWPDocumentViewModel: ObservableObject {
         status = AppLocalization.string("한글 문서를 여는 중…")
         do {
             let url = fileURL
-            let loaded = try await Task.detached(priority: .userInitiated) {
+            let preparesPages = navigation != nil
+            let (loaded, originalPages) = try await Task.detached(priority: .userInitiated) {
                 let data = try CoordinatedDocumentFileAccess.readData(from: url)
                 if data.starts(with: [0x50, 0x4B]) {
-                    return HWPLoadedDocument.editable(
-                        try HWPXDocumentPackage.load(from: data)
-                    )
+                    let package = try HWPXDocumentPackage.load(from: data)
+                    let pages = preparesPages
+                        ? HWPOriginalCanvasPageBuilder.makePages(blocks: package.blocks, layouts: package.pageLayouts) : nil
+                    return (HWPLoadedDocument.editable(package), pages)
                 }
-                return HWPLoadedDocument.legacy(
-                    try HWP5StructuredDocumentParser.parse(from: data),
-                    data
-                )
+                let document = try HWP5StructuredDocumentParser.parse(from: data)
+                let pages = preparesPages
+                    ? HWPOriginalCanvasPageBuilder.makePages(blocks: document.blocks, layouts: document.pageLayouts) : nil
+                return (HWPLoadedDocument.legacy(document, data), pages)
             }.value
             switch loaded {
             case .editable(let package):
@@ -202,6 +206,7 @@ final class HWPDocumentViewModel: ObservableObject {
                 requiresSaveAs = false
                 status = legacyDocumentStatus(document)
             }
+            navigation?.update(blocks: blocks, layouts: pageLayouts, preparedPages: originalPages)
         } catch {
             errorDescription = error.localizedDescription
             status = AppLocalization.string("한글 문서를 열지 못했습니다.")
@@ -1650,7 +1655,7 @@ struct HWPDocumentView: View {
             // Autosave reads the 원본 editor's open draft without ending it.
             viewModel.inlineDraft = { [weak originalEditor] in originalEditor?.autosaveDraft() ?? .none }
             originalEditor.onDraftChange = { [weak viewModel] in viewModel?.inlineDraftChanged() }
-            await viewModel.load()
+            await viewModel.load(navigation: documentNavigation)
         }
         .fullScreenCover(
             isPresented: $showsMoreActions,

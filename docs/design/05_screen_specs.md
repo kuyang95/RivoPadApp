@@ -219,6 +219,8 @@
 
 ## 스프레드시트
 
+엑셀을 여는 동안에는 기존 로딩 화면을 표시한다. 첫 시트의 읽기 영역과 지원되지 않는 수식 개수는 통합 문서를 화면에 표시하기 전에 백그라운드에서 구한다. 격자와 간편 보기는 통합 문서가 바뀔 때까지 준비된 읽기 영역을 재사용한다.
+
 파일: `Documents/ExcelWorkbookView.swift`(`ExcelWorkbookView`·`ExcelWorkbookViewModel`·`ExcelGridView`·`ExcelAddRowView`·`ExcelSheetImageManagerView`), `Documents/ExcelZoomScrollView.swift`(`ExcelGridZoom`), `Documents/ExcelEditRowView.swift`, `Documents/ExcelSheetManagerView.swift`, `Documents/ExcelDrawingInspector.swift` (Android `document/SpreadsheetActivity.kt`·`SpreadsheetGrid.kt`·`SpreadsheetTools.kt`·`SpreadsheetViewModel.kt`).
 
 - 표 배율: 원본 셀 격자 왼쪽 위 모서리(`tablecells` 표시)는 스크롤해도 제자리에 있는 메뉴 버튼(`ExcelGridView.zoomCorner`)이다. VoiceOver는 "표 배율"과 값 "표 배율 N%"로 읽는다. 메뉴 머리에 현재 배율, `표 확대`·`표 축소`(끝에서는 비활성)·`표 원래 크기`(100%일 때 체크)가 있다. 단계는 50·75·100·125·150·200·250·300%(`ExcelGridZoom.steps`, 범위 0.5–3배)이고 메뉴는 고른 뒤에도 열려 있어 이어서 바꿀 수 있다. 바뀐 배율은 상태 줄 문구 "표 배율 N%"가 되어 안내로 읽는다(`ExcelWorkbookViewModel.reportGridZoom`). 두 손가락 확대·축소의 대안이다. 모서리 크기는 현재 배율의 머리글 크기를 따르되 44pt보다 작아지지 않는다.
@@ -234,6 +236,8 @@
 - 원본 파일에 쓸 수 없을 때 Android는 `Documents/VisionCraft`에 복사본을 만들어 "원본에 쓸 수 없어 복사본을 저장했습니다: 경로"를 알리고 그다음 저장은 그 파일에 한다(한글 문서와 같다). iPadOS에는 이 동작이 없다(자동 저장 실패로 알린다).
 
 ## 한글 문서
+
+한글 문서를 여는 동안에는 기존 로딩 화면을 표시한다. 파일을 읽는 백그라운드 작업에서 원본 쪽도 배치해 첫 화면이 준비된 쪽을 사용한다.
 
 파일: `Documents/HWP/HWPDocumentView.swift`(`HWPDocumentView`·`HWPDocumentViewModel`, 간편 보기 `documentList`·`blockView`·`editorPanel`), `Documents/HWP/HWPAccessibleEditingSheets.swift`(간편 보기 편집 시트), `Documents/HWP/HWPAccessibleTableView.swift`(`HWPAccessibleRowButton`·`HWPAccessibleRowEditor`), 리본 `Documents/HWP/HWPFormattingToolbar.swift` (Android `document/HwpActivity.kt`·`document/HwpViewModel.kt`).
 

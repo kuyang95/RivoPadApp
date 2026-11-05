@@ -144,7 +144,10 @@ final class ExcelWorkbookViewModel: ObservableObject {
         let undoStackIndex: Int
     }
 
-    @Published private(set) var workbook: ExcelWorkbook?
+    @Published private(set) var workbook: ExcelWorkbook? {
+        didSet { cachedRegions = nil }
+    }
+    private var cachedRegions: (sheetPath: String, regions: [ExcelAccessibleRegion])?
     @Published var selectedSheetIndex = 0
     @Published var findText = ""
     @Published var navigationRevealAddress: ExcelCellAddress?
@@ -399,6 +402,20 @@ final class ExcelWorkbookViewModel: ObservableObject {
         return workbook.sheets[selectedSheetIndex]
     }
 
+    var selectedSheetRegions: [ExcelAccessibleRegion] {
+        guard let sheet = selectedSheet else { return [] }
+        return regions(in: sheet)
+    }
+
+    private func regions(in sheet: ExcelWorksheet) -> [ExcelAccessibleRegion] {
+        if let cachedRegions, cachedRegions.sheetPath == sheet.partPath {
+            return cachedRegions.regions
+        }
+        let regions = ExcelAccessibilityAnalyzer.regions(in: sheet)
+        cachedRegions = (sheet.partPath, regions)
+        return regions
+    }
+
     var selectedCell: ExcelCell? {
         guard let sheet = selectedSheet,
               let selectedAddress else {
@@ -560,9 +577,8 @@ final class ExcelWorkbookViewModel: ObservableObject {
     }
 
     var canApplyNumberFormatToCurrentColumn: Bool {
-        guard let sheet = selectedSheet,
-              let selectedAddress,
-              ExcelAccessibilityAnalyzer.regions(in: sheet).contains(
+        guard let selectedAddress,
+              selectedSheetRegions.contains(
                   where: {
                       $0.contains(selectedAddress)
                           && $0.columns.contains(where: {
@@ -658,11 +674,18 @@ final class ExcelWorkbookViewModel: ObservableObject {
                     // Finish it here before publishing the workbook to the UI.
                     _ = Self.refreshDerivedFormulaValues(in: &workbook, edits: [:])
                 }
+                let first = workbook.sheets.first
+                let regions = first.map { ExcelAccessibilityAnalyzer.regions(in: $0) } ?? []
+                let unsupported = preflight.requiresLargeMode ? 0 : first.map {
+                    Self.formulaSupportCount(in: $0, workbook: workbook)
+                } ?? 0
                 return (
                     data,
                     preflight,
                     workbook,
-                    cache
+                    cache,
+                    regions,
+                    unsupported
                 )
             }.value
             sourceData = result.0
@@ -676,10 +699,11 @@ final class ExcelWorkbookViewModel: ObservableObject {
             configureInitialLargeWindows(using: result.1)
             selectedSheetIndex = 0
             if let first = loadedWorkbook.sheets.first {
-                selectedAddress = initialAddress(in: first)
+                cachedRegions = (first.partPath, result.4)
+                selectedAddress = Self.initialAddress(in: result.4)
                 syncEditorText(using: first)
                 updateValidationWarning(in: first)
-                updateFormulaSupportSummary(in: first)
+                unsupportedFormulaCount = result.5
             }
             status = workbookStatus(result.2)
         } catch {
@@ -704,7 +728,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
         largeSearchRows = []
         largeSearchResultIndex = nil
         let sheet = workbook.sheets[index]
-        selectedAddress = initialAddress(in: sheet)
+        selectedAddress = Self.initialAddress(in: regions(in: sheet))
         syncEditorText(using: sheet)
         updateValidationWarning(in: sheet)
         updateFormulaSupportSummary(in: sheet)
@@ -1819,7 +1843,9 @@ final class ExcelWorkbookViewModel: ObservableObject {
             installEditingBase(result.0.data, workbook: result.1)
             workbook = result.1
             selectedSheetIndex = result.1.sheets.firstIndex { $0.partPath == result.0.selectedSheetPath } ?? 0
-            if result.0.selectedSheetPath != active { selectedAddress = selectedSheet.flatMap { initialAddress(in: $0) } }
+            if result.0.selectedSheetPath != active {
+                selectedAddress = selectedSheet.map { Self.initialAddress(in: regions(in: $0)) }
+            }
             selectionEnd = nil; navigationRevealAddress = selectedAddress
             aiReferences = nil; findText = ""; rangeClipboard = nil
             let next = captureEditingState(result.1)
@@ -2457,7 +2483,11 @@ final class ExcelWorkbookViewModel: ObservableObject {
             unsupportedFormulaCount = 0
             return
         }
-        unsupportedFormulaCount = ExcelFormulaCalculator.recalculate(
+        unsupportedFormulaCount = Self.formulaSupportCount(in: sheet, workbook: workbook)
+    }
+
+    private nonisolated static func formulaSupportCount(in sheet: ExcelWorksheet, workbook: ExcelWorkbook) -> Int {
+        ExcelFormulaCalculator.recalculate(
             cells: sheet.cells,
             styles: workbook.styles,
             uses1904DateSystem: workbook.uses1904DateSystem,
@@ -2734,11 +2764,10 @@ final class ExcelWorkbookViewModel: ObservableObject {
         sheet.cells.keys.map(\.row).min() ?? 1
     }
 
-    private func initialAddress(
-        in sheet: ExcelWorksheet
+    private static func initialAddress(
+        in regions: [ExcelAccessibleRegion]
     ) -> ExcelCellAddress {
-        guard let region = ExcelAccessibilityAnalyzer
-            .regions(in: sheet).first else {
+        guard let region = regions.first else {
             return ExcelCellAddress(row: 1, column: 1)
         }
         return ExcelCellAddress(
@@ -2753,7 +2782,7 @@ final class ExcelWorkbookViewModel: ObservableObject {
     private func accessibilitySummary(
         for sheet: ExcelWorksheet
     ) -> String {
-        let regions = ExcelAccessibilityAnalyzer.regions(in: sheet)
+        let regions = self.regions(in: sheet)
         let rowCount = regions.reduce(0) {
             $0 + $1.rowNumbers.count
         }
@@ -3251,9 +3280,7 @@ struct ExcelWorkbookView: View {
                     ExcelGridView(
                         sheet: sheet,
                         workbook: workbook,
-                        regions: ExcelAccessibilityAnalyzer.regions(
-                            in: sheet
-                        ),
+                        regions: viewModel.selectedSheetRegions,
                         visibleRows: viewModel.isLargeWorkbook
                             ? viewModel.selectedLargeWindowRows
                             : nil,
@@ -3498,7 +3525,7 @@ struct ExcelWorkbookView: View {
     private func accessibleRows(
         sheet: ExcelWorksheet
     ) -> some View {
-        let regions = ExcelAccessibilityAnalyzer.regions(in: sheet)
+        let regions = viewModel.selectedSheetRegions
         let region = selectedAccessibleRegion(
             from: regions
         )
@@ -3885,10 +3912,7 @@ struct ExcelWorkbookView: View {
     }
 
     private var accessibleRegions: [ExcelAccessibleRegion] {
-        guard let sheet = viewModel.selectedSheet else {
-            return []
-        }
-        return ExcelAccessibilityAnalyzer.regions(in: sheet)
+        viewModel.selectedSheetRegions
     }
 
     private func selectedAccessibleRegion(
@@ -6452,7 +6476,7 @@ extension ExcelWorkbookViewModel {
                 selectedAddress = range.start
                 selectionEnd = range.cellCount > 1 ? range.end : nil
             } else if transaction.sheetIndex != sheetIndex {
-                selectedAddress = selectedSheet.flatMap { initialAddress(in: $0) }
+                selectedAddress = selectedSheet.map { Self.initialAddress(in: regions(in: $0)) }
                 selectionEnd = nil
             }
             selectedDrawingID = transaction.drawingID

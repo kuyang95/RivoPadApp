@@ -73,6 +73,7 @@ final class HWPDocumentNavigation: ObservableObject {
     @Published var replacementMessage: String?
     @Published private(set) var exceedsSearchLimit = false
     private var sourceBlocks: [HWPDocumentBlock] = []
+    private var sourceLayouts: [HWPDocumentPageLayout]?
     @Published private(set) var results: [HWPDocumentSearchResult] = []
     @Published private(set) var selectedResultIndex = 0
     @Published private(set) var searchSelectionID = UUID()
@@ -82,9 +83,11 @@ final class HWPDocumentNavigation: ObservableObject {
         results.indices.contains(selectedResultIndex) ? results[selectedResultIndex] : nil
     }
 
-    func update(blocks: [HWPDocumentBlock], layouts: [HWPDocumentPageLayout]) {
+    func update(blocks: [HWPDocumentBlock], layouts: [HWPDocumentPageLayout], preparedPages: [HWPOriginalCanvasPage]? = nil) {
+        guard sourceBlocks != blocks || sourceLayouts != layouts else { return }
         sourceBlocks = blocks
-        pages = HWPOriginalCanvasPageBuilder.makePages(blocks: blocks, layouts: layouts)
+        sourceLayouts = layouts
+        pages = preparedPages ?? HWPOriginalCanvasPageBuilder.makePages(blocks: blocks, layouts: layouts)
         viewport = HWPDocumentViewportLayout(pages: pages)
         currentPageIndex = min(currentPageIndex, max(0, pages.count - 1))
         search(preservingSelection: true)
@@ -162,6 +165,7 @@ final class HWPDocumentNavigation: ObservableObject {
     /// without a page, so it is counted and replaced like the others (Android `revealInPages`).
     static func results(for matches: [HWPTextMatch], blocks: [HWPDocumentBlock],
                         pages: [HWPOriginalCanvasPage]) -> [HWPDocumentSearchResult] {
+        guard !matches.isEmpty else { return [] }
         struct Surface {
             let page: Int
             let block: HWPDocumentBlock
