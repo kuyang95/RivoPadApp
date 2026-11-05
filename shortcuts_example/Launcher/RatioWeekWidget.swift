@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RatioWeekWidget: View {
+    let onEdit: () -> Void
     @Environment(\.calendar) private var calendar
     @Environment(\.locale) private var locale
     @ScaledMetric(relativeTo: .body) private var dayWidth = 40.0
@@ -45,6 +46,7 @@ struct RatioWeekWidget: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(date.formatted(.dateTime.weekday(.wide).month(.wide).day().year().locale(locale)))
                 .accessibilityAddTraits(current ? .isSelected : [])
+                .accessibilityAction(named: "위젯 설정") { onEdit() }
             }
             ForEach(dates.count..<columns, id: \.self) { _ in
                 Color.clear.frame(minWidth: dayWidth, maxWidth: .infinity, maxHeight: 0)

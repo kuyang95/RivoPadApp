@@ -866,7 +866,7 @@ struct RatioLauncherView: View {
             if let height { RatioUtilityWidget(widget: widget, active: active, height: height) { editWidget(widget.id) }.frame(height: height) }
             else { Color.clear.frame(height: CGFloat(widget.rows * 100 - 12)) }
         } else if widget.isWeek {
-            RatioWeekWidget()
+            RatioWeekWidget { editWidget(widget.id) }
                 .contentShape(Rectangle())
                 .onLongPressGesture { editWidget(widget.id) }
                 .accessibilityAction(named: "위젯 설정") { editWidget(widget.id) }
