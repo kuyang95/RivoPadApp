@@ -7,6 +7,14 @@ import UIKit
 private nonisolated enum NewsCategory: String, CaseIterable, Sendable {
     case latest = "sokbo", society, economy, culture, politics, world, technology, health, sports, entertainment
     static var topics: [Self] { allCases.filter { $0 != .latest } }
+    static func favorites(_ values: [Self]) -> [Self] {
+        var result: [Self] = []
+        for value in values where value != .latest && !result.contains(value) { result.append(value) }
+        return Array(result.suffix(3))
+    }
+    static func toggling(_ topic: Self, checked: Bool, in values: [Self]) -> [Self] {
+        favorites(checked ? (values.contains(topic) ? values : values + [topic]) : values.filter { $0 != topic })
+    }
     var title: String { switch self {
         case .latest: "최신"; case .society: "사회"; case .economy: "경제"; case .culture: "문화"
         case .politics: "정치"; case .world: "국제"; case .technology: "IT·과학"; case .health: "건강"
@@ -463,14 +471,24 @@ private final class LauncherNewsStore: ObservableObject {
     static let interval: TimeInterval = 2 * 60 * 60
     static let retry: TimeInterval = 5 * 60
     static let maxAge: TimeInterval = 24 * 60 * 60
-    @Published var topics: Set<NewsCategory> = {
-        guard let saved = UserDefaults.standard.stringArray(forKey: "ratio.news.selected.topics.v1") else { return [.society, .economy, .culture] }
-        return Set(NewsCategory.topics.filter { saved.contains($0.rawValue) })
+    @Published var favorites: [NewsCategory] = {
+        let defaults = UserDefaults.standard
+        if let saved = defaults.stringArray(forKey: "ratio.news.favorite.topics.v2") {
+            return NewsCategory.favorites(saved.compactMap(NewsCategory.init(rawValue:)))
+        }
+        let migrated = defaults.stringArray(forKey: "ratio.news.selected.topics.v1").map { saved in
+            Array(NewsCategory.topics.filter { saved.contains($0.rawValue) }.prefix(3))
+        } ?? [.society, .economy, .culture]
+        defaults.set(migrated.map(\.rawValue), forKey: "ratio.news.favorite.topics.v2")
+        return migrated
     }()
-    var topicList: [NewsCategory] { NewsCategory.topics.filter { topics.contains($0) } }
-    func selectTopics(_ values: Set<NewsCategory>) {
-        topics = values.subtracting([.latest])
-        UserDefaults.standard.set(topicList.map(\.rawValue), forKey: "ratio.news.selected.topics.v1")
+    var topicList: [NewsCategory] { favorites.isEmpty ? NewsCategory.topics : favorites }
+    var topics: Set<NewsCategory> { Set(topicList) }
+    func selectTopics(_ values: [NewsCategory]) {
+        favorites = NewsCategory.favorites(values)
+        UserDefaults.standard.set(favorites.map(\.rawValue), forKey: "ratio.news.favorite.topics.v2")
+        UserDefaults.standard.removeObject(forKey: "ratio.news.selected.topics.v1")
+        for category in topicList { restore(category) }
         snapshots[.latest] = nil; errors.remove(.latest)
         Task { await rebuildLatest() }
         LauncherNewsRefresh.topicsChanged()
@@ -675,7 +693,7 @@ struct RatioNewsWidget: View {
     @ObservedObject private var store = LauncherNewsStore.shared
     @State private var category = NewsCategory.latest
     @State private var settings = false
-    @State private var draft: Set<NewsCategory> = []
+    @State private var draft: [NewsCategory] = []
     @State private var request = 0
     @State private var handled = 0
     @State private var scrollRequest = 0
@@ -684,32 +702,60 @@ struct RatioNewsWidget: View {
     private let style = RatioExperience()
     private var busy: Bool { store.loading.contains(category) || (category == .latest && !store.loading.intersection(store.topics).isEmpty) }
     private var controls: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 88), spacing: 8)], spacing: 8) {
-            ForEach([NewsCategory.latest] + store.topicList, id: \.self) { value in
-                Button { category = value; scrollRequest += 1 } label: {
-                    Text(value.title).visionCraftAndroidText(20, weight: .semibold)
-                        .frame(maxWidth: .infinity, minHeight: 56)
-                        .foregroundStyle(category == value ? style.background : style.text)
-                        .background(category == value ? style.accent : style.surface.opacity(0.7), in: RoundedRectangle(cornerRadius: 16))
-                }.accessibilityAddTraits(category == value ? [.isSelected] : [])
-            }
-            Button { draft = store.topics; settings = true } label: {
-                Image(systemName: "slider.horizontal.3").font(.system(size: 28)).frame(width: 56, height: 56)
-                    .background(style.surface.opacity(0.7), in: Circle())
-            }.accessibilityLabel("뉴스 분야 설정")
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .firstTextBaseline, spacing: 16) {
+                ForEach([NewsCategory.latest] + store.favorites, id: \.self) { value in
+                    Button { category = value; scrollRequest += 1 } label: {
+                        Text(value.title).visionCraftAndroidText(24, weight: .semibold)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 6).padding(.vertical, 14)
+                            .frame(minWidth: 56, minHeight: 56)
+                            .foregroundStyle(category == value ? style.accent : style.text)
+                            .overlay(alignment: .bottom) {
+                                if category == value { Capsule().fill(style.accent).frame(height: 3).accessibilityHidden(true) }
+                            }
+                    }.buttonStyle(.plain).accessibilityAddTraits(category == value ? [.isSelected] : [])
+                }
+                Button { draft = store.favorites; settings = true } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "pencil").font(.system(size: 20)).accessibilityHidden(true)
+                        Text("즐겨찾기 편집").visionCraftAndroidText(18, weight: .medium).fixedSize()
+                    }.padding(.horizontal, 16).padding(.vertical, 12).frame(minHeight: 56)
+                        .contentShape(Capsule())
+                        .overlay { Capsule().strokeBorder(style.text.opacity(0.65), lineWidth: 1).accessibilityHidden(true) }
+                }.buttonStyle(.plain).accessibilityLabel("뉴스 즐겨찾기 편집").padding(.leading, 8)
+            }.foregroundStyle(style.text).accessibilityElement(children: .contain)
+        }.fixedSize(horizontal: false, vertical: true)
+    }
+    @ViewBuilder private var updatedTime: some View {
+        if let snapshot = store.snapshots[category] {
+            Text("\(snapshot.fetched.formatted(date: .omitted, time: .shortened)) 갱신")
+                .visionCraftAndroidText(16).foregroundStyle(style.text.opacity(0.8))
         }
+    }
+    private var refreshButton: some View {
+        Button { request += 1 } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.clockwise").font(.system(size: 22)).accessibilityHidden(true)
+                Text("새로고침").visionCraftAndroidText(18)
+            }.padding(.horizontal, 8).padding(.vertical, 14).frame(minHeight: 56)
+        }
+        .buttonStyle(.plain).foregroundStyle(style.text)
+        .accessibilityLabel("뉴스 새로고침")
+        .accessibilityValue(busy ? Text("갱신 중") : Text(""))
+        .disabled(!enabled || busy)
+        .opacity(!enabled || busy ? 0.45 : 1)
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             controls
-            HStack(spacing: 12) {
-                Button { request += 1 } label: {
-                    Image(systemName: "arrow.clockwise").font(.system(size: 28)).frame(width: 56, height: 56)
-                        .background(style.surface.opacity(0.7), in: Circle())
-                }.accessibilityLabel("뉴스 새로고침").disabled(!enabled || store.topics.isEmpty || busy)
-                if let snapshot = store.snapshots[category] {
-                    Text("\(snapshot.fetched.formatted(date: .omitted, time: .shortened)) 갱신").visionCraftAndroidText(16)
+            VStack(spacing: 4) {
+                sectionDivider
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) { updatedTime.fixedSize(); Spacer(minLength: 12); refreshButton.fixedSize() }
+                    VStack(alignment: .leading, spacing: 8) { updatedTime; refreshButton }
                 }
+                sectionDivider
             }
             if store.errors.contains(category) {
                 Text(store.snapshots[category] == nil ? "뉴스를 불러오지 못했어요. 새로고침으로 다시 시도해 주세요." : "갱신하지 못했어요. 이전 뉴스와 갱신 시각을 표시합니다.")
@@ -736,13 +782,13 @@ struct RatioNewsWidget: View {
                 }
             } else {
                 VStack(spacing: 10) {
-                    if enabled && !store.topics.isEmpty && !store.errors.contains(category) { NewsLoadingWave() }
-                    Text(store.topics.isEmpty ? "관심 있는 뉴스 분야를 선택해 주세요." : !store.errors.contains(category) ? "뉴스를 불러오는 중이에요" : "새로고침을 눌러 뉴스를 받아보세요").visionCraftAndroidText(20)
+                    if enabled && !store.errors.contains(category) { NewsLoadingWave() }
+                    Text(!store.errors.contains(category) ? "뉴스를 불러오는 중이에요" : "새로고침을 눌러 뉴스를 받아보세요").visionCraftAndroidText(20)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }.padding(20).foregroundStyle(style.text).buttonStyle(.plain).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .task(id: "\(enabled):\(category.rawValue):\(request):\(store.topicList.map(\.rawValue).joined(separator: ","))") {
-                guard enabled, !store.topics.isEmpty else { return }
+                guard enabled else { return }
                 var force = request != handled; handled = request
                 while !Task.isCancelled {
                     await store.refresh(category, force: force)
@@ -757,17 +803,20 @@ struct RatioNewsWidget: View {
             }
             .sheet(isPresented: $settings) { topicSettings }
     }
+    private var sectionDivider: some View {
+        Rectangle().fill(style.text.opacity(0.48)).frame(height: 1).accessibilityHidden(true)
+    }
     private var topicSettings: some View {
         NavigationStack {
             List {
                 Section {
                     ForEach(NewsCategory.topics, id: \.self) { topic in
                         Toggle(topic.title, isOn: Binding(get: { draft.contains(topic) }, set: { checked in
-                            if checked { draft.insert(topic) } else { draft.remove(topic) }
+                            draft = NewsCategory.toggling(topic, checked: checked, in: draft)
                         })).visionCraftAndroidText(20).frame(minHeight: 56)
                     }
-                } header: { Text("선택한 분야만 최신 뉴스와 자동 업데이트에 포함해요.") }
-            }.navigationTitle("뉴스 분야 설정")
+                } header: { Text("최대 3개까지 선택할 수 있어요. 새 분야를 고르면 가장 먼저 선택한 분야가 빠져요. 아무것도 선택하지 않으면 최신에서 전체 뉴스를 보여줘요.") }
+            }.navigationTitle("즐겨찾기 편집")
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("취소") { settings = false } }
                     ToolbarItem(placement: .confirmationAction) { Button("저장") {

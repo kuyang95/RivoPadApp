@@ -64,11 +64,27 @@ struct ReaderLibraryView: View {
     }
 
     var body: some View {
-        ScrollView {
+        GeometryReader { geometry in
+            ScrollView {
             VStack(
                 alignment: .leading,
                 spacing: 16
             ) {
+                if embedded {
+                    VStack(spacing: 20) {
+                        Image(systemName: "book")
+                            .font(.system(size: 64))
+                            .foregroundStyle(VisionCraftUI.accent)
+                            .accessibilityHidden(true)
+                        Text("도서 읽기")
+                            .visionCraftAndroidText(32, weight: .bold, relativeTo: .largeTitle)
+                            .foregroundStyle(VisionCraftUI.primaryText)
+                            .accessibilityAddTraits(.isHeader)
+                    }
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 8)
+                }
                 Text("EPUB 또는 DAISY ZIP 파일을 선택하세요")
                     .visionCraftAndroidText(16)
                     .foregroundStyle(
@@ -78,6 +94,8 @@ struct ReaderLibraryView: View {
                         horizontal: false,
                         vertical: true
                     )
+                    .multilineTextAlignment(embedded ? .center : .leading)
+                    .frame(maxWidth: .infinity, alignment: embedded ? .center : .leading)
 
                 VisionCraftHomeActionList(
                     items: actionItems
@@ -101,7 +119,11 @@ struct ReaderLibraryView: View {
 
                 librarySection
             }
+            .frame(maxWidth: embedded ? 592 : .infinity)
             .visionCraftScreenPadding()
+            .frame(minHeight: embedded ? geometry.size.height : 0)
+            .frame(maxWidth: .infinity)
+            }
         }
         .visionCraftListScreen(background: embedded ? .clear : VisionCraftUI.background)
         .navigationTitle(

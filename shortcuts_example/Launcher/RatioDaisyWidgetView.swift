@@ -12,15 +12,15 @@ struct RatioDaisyWidgetView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                if bookURL != nil {
+            if bookURL != nil {
+                HStack {
                     VisionCraftIconButton(systemImage: "chevron.left", label: "서재로 돌아가기", tint: VisionCraftUI.primaryText) {
                         bookURL = nil
                     }
-                }
-                Text("데이지 플레이어").font(.headline).accessibilityAddTraits(.isHeader)
-                Spacer()
-            }.padding(.horizontal, 8)
+                    Text("데이지 플레이어").font(.headline).accessibilityAddTraits(.isHeader)
+                    Spacer()
+                }.padding(.horizontal, 8)
+            }
             if let bookURL, !readerReleased || (active && scenePhase == .active) {
                 EPUBReaderView(fileURL: bookURL, embedded: true, active: active, allowAutoplay: !resumeWithoutAutoplay,
                                onPlaybackStateChanged: { playing = $0 })
