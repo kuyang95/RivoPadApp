@@ -261,12 +261,24 @@ enum EasyMailPage {
   if (window.__rivoEasyMailInstalled) return;
   window.__rivoEasyMailInstalled = true;
   let style, enabled = true;
-  const opensReader = naverInbox && theme && /^\/v2\/read\/\d+\/\d+\/?$/.test(location.pathname);
+  const naverReader = naverInbox && /^\/v2\/read\/\d+\/\d+\/?$/.test(location.pathname);
+  const gmailReader = (() => {
+    if (host !== 'mail.google.com' || location.port || location.hash || !/^\/mail\/u\/\d+\/$/.test(location.pathname)) return false;
+    const query = new URLSearchParams(location.search);
+    return query.get('ui') === '2' && query.get('view') === 'pt' && query.get('search') === 'all' &&
+      /^[\da-f]{10,32}$/i.test(query.get('th') || '');
+  })();
+  const opensReader = !!theme && (naverReader || gmailReader);
   const preparingReader = 'data-rivo-mail-reader-preparing';
   let readerDeadline;
   const showReader = () => {
     clearTimeout(readerDeadline);
     document.documentElement?.removeAttribute(preparingReader);
+  };
+  const showStyledReader = () => {
+    if (!document.documentElement.hasAttribute(preparingReader)) return;
+    window.__rivoAccessibleWeb?.flushPending?.();
+    showReader();
   };
   const layoutSurface = 'data-rivo-mail-layout-surface';
   const neutralBackground = value => {
@@ -435,6 +447,10 @@ enum EasyMailPage {
       ` : ''}
     `;
     (document.head || document.documentElement).append(style);
+    if (gmailReader && document.documentElement.hasAttribute(preparingReader)) {
+      // Gmail's read-only route delivers the message in the document itself.
+      document.addEventListener('DOMContentLoaded', () => requestAnimationFrame(showStyledReader), {once:true});
+    }
     if (naverInbox && theme) {
       const syncReader = () => {
         syncReadActions();
@@ -443,10 +459,7 @@ enum EasyMailPage {
         const page = document.querySelector(detailLayout);
         const title = page?.querySelector('.mail_view_header .mail_title');
         const contents = page?.querySelector('.mail_view_contents_inner');
-        if (title && contents?.hasChildNodes()) {
-          window.__rivoAccessibleWeb?.flushPending?.();
-          showReader();
-        }
+        if (title && contents?.hasChildNodes()) showStyledReader();
       };
       let frame;
       new MutationObserver(records => {
