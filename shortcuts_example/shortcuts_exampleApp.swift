@@ -78,6 +78,8 @@ struct shortcuts_exampleApp: App {
                             HomeView()
                         case .easyBrowser:
                             AccessibleWebBrowserView()
+                        case .listening:
+                            ListeningView()
                         case .easyYouTube:
                             AccessibleWebBrowserView(easyYouTube: true)
                         case .releaseNotes:

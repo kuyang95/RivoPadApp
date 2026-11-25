@@ -16,8 +16,10 @@ struct RatioHomeItem: Identifiable, Codable {
     var isTimer: Bool { id == "widget:timer" }
     var isUtility: Bool { isWeather || isTimer }
     var isNews: Bool { id == "widget:news" }
+    var isListening: Bool { id == "widget:listening" }
+    static var listeningName: String { AppLocalization.string("listen.title") }
     var isYouTube: Bool { id == "widget:youtube" }
-    var isFullPage: Bool { isYouTube || isBrowser || isDaisy || isNews }
+    var isFullPage: Bool { isListening || isYouTube || isBrowser || isDaisy || isNews }
     var isDaisy: Bool { id == "widget:daisy" }
     var isBrowser: Bool { id == "widget:browser" }
     static let webName = String(localized: "리보 웹")
@@ -32,11 +34,12 @@ struct RatioHomeItem: Identifiable, Codable {
     }
 
     var normalized: RatioHomeItem {
+        if id == "listening", name != Self.listeningName { var item = self; item.name = Self.listeningName; return item.normalized }
         if isWeek { return Self.week }
         if isUtility { var item = self; item.columns = columns < 4 ? 2 : 4; item.rows = min(5, max(2, rows)); item.textOnly = false; item.iconOnly = false; return item }
-        if isYouTube || isNews {
+        if isListening || isYouTube || isNews {
             var item = self
-            item.name = isYouTube ? Self.youTubeName : Self.newsName
+            item.name = isListening ? Self.listeningName : isYouTube ? Self.youTubeName : Self.newsName
             item.columns = 4
             item.rows = 10
             item.textOnly = false
@@ -214,7 +217,7 @@ func installFullPageWidgets(_ items: [RatioHomeItem]) -> [RatioHomeItem] {
     let youtube = items.first(where: \.isYouTube) ?? RatioHomeItem(id: "widget:youtube", name: RatioHomeItem.youTubeName, columns: 4, rows: 10)
     let browser = items.first(where: \.isBrowser) ?? RatioHomeItem(id: "widget:browser", name: RatioHomeItem.webName, columns: 4, rows: 8)
     let daisy = items.first(where: \.isDaisy) ?? RatioHomeItem(id: "widget:daisy", name: "데이지 플레이어", columns: 4, rows: 6)
-    return ordinary + [youtube, browser, daisy] + items.filter(\.isNews)
+    return ordinary + [youtube, browser, daisy] + items.filter { $0.isNews || $0.isListening }
 }
 
 /// Match Android's 4-bit RGB histogram; cache by image data rather than recomputing during layout.

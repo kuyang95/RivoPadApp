@@ -1,6 +1,6 @@
 # 앱 메타데이터 / 빌드 정보
 
-점검일: 2026-10-23 · 기준 코드: `c5865248`+작업 트리 (런처 웹 내부 탐색 URL 범위) · 런처 유틸리티 대조: 2026-10-22 `514e00f5`+작업 트리 · 현재 위치 날씨 대조: 2026-10-22 `f56b06f0`+작업 트리 · 브라우저 즐겨찾기 대조: 2026-10-22 `f56b06f0`+작업 트리 · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리
+점검일: 2026-11-25 · 기준 코드: `c5865248`+작업 트리 (런처 웹 내부 탐색 URL 범위) · 런처 유틸리티 대조: 2026-10-22 `514e00f5`+작업 트리 · 현재 위치 날씨 대조: 2026-10-22 `f56b06f0`+작업 트리 · 브라우저 즐겨찾기 대조: 2026-10-22 `f56b06f0`+작업 트리 · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리 · 라디오·팟캐스트 대조: 2026-11-25 `a4f028e3`+작업 트리
 
 `shortcuts_example.xcodeproj/project.pbxproj`, `shortcuts-example-Info.plist`, `*.entitlements` 출처. 코드 안 봐도 한눈에 알 수 있는 정보만.
 
@@ -132,3 +132,7 @@ Tools/  docs/  backend/      # 도구 스크립트·설계 문서·Cloudflare wo
 ## 릴리즈 진입과 런처 선택
 
 `AppHomeRoot`가 저장된 시작 홈에 따라 기존 `HomeView` 또는 `RatioLauncherView`를 표시한다. 음성 동작의 파일 열기(`AppRouter.requestFileImport`)와 리모컨·사용법 안내의 텍스트 원본 선택(`AppRouter.requestTextSource`)은 두 홈 공통으로 `AppHomeRoot`에 붙은 `HomeImportRequestPresenter`가 받아 파일 선택기·`텍스트 가져오기` 선택창을 띄운다. 앱 설정·미디어 탐색은 일반 AppRoute로 진입하고 명시적인 기존 홈 경로는 시작 홈 선택을 바꾸지 않는다. `LauncherNewsBackgroundTasks`는 모든 빌드에서 같은 뉴스 사전 수신 핸들러를 실행한다.
+
+## 라디오 음원 네트워크 설정
+
+`shortcuts-example-Info.plist`의 `NSAppTransportSecurity.NSAllowsArbitraryLoadsForMedia=true`로 AVFoundation의 지역 라디오 HTTP 음원을 허용한다. `RadioStations.playbackURL`은 번들 목록의 HTTP 호스트만 허용하며 메타데이터와 팟캐스트는 HTTPS만 사용한다. 일반 `NSAllowsArbitraryLoads`는 설정하지 않는다. 배경 오디오 모드는 추가하지 않는다.

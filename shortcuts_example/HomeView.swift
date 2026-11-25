@@ -182,6 +182,7 @@ struct HomeView: View {
         case "text-view": "HomeActionText"
         case "files": "HomeActionDocument"
         case "reader": "HomeActionBookReader"
+        case "listening": "HomeActionListeningNoOutline"
         default: nil
         }
     }
@@ -311,7 +312,9 @@ struct HomeView: View {
     // MARK: - 항목 목록 (두 구성이 같이 쓴다)
 
     private var mediaActions: [VisionCraftActionItem] {
-        [VisionCraftActionItem(id: "easy-browser", icon: "globe", title: "쉬운 브라우저",
+        [VisionCraftActionItem(id: "listening", icon: "headphones", title: "listen.title",
+            description: "listen.description", action: { appRouter.route = .listening }),
+         VisionCraftActionItem(id: "easy-browser", icon: "globe", title: "쉬운 브라우저",
             description: "검색과 즐겨찾기로 웹을 둘러봅니다.", action: { appRouter.route = .easyBrowser }),
          VisionCraftActionItem(id: "easy-youtube", icon: "play.rectangle", title: "쉬운 유튜브",
             description: "큰 글자와 간단한 조작으로 영상을 봅니다.", action: { appRouter.route = .easyYouTube })]

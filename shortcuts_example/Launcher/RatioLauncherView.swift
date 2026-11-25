@@ -110,6 +110,7 @@ struct RatioLauncherView: View {
             RatioEntry(id: "text", name: "텍스트 보기", icon: "text.alignleft", route: .textEditorText(title: "텍스트", text: "")),
             RatioEntry(id: "history", name: "대화 기록", icon: "clock.arrow.circlepath", route: .chatHistory),
             RatioEntry(id: "browser", name: RatioHomeItem.webName, icon: "globe"),
+            RatioEntry(id: "listening", name: AppLocalization.string("listen.title"), icon: "headphones", route: .listening),
             RatioEntry(id: "youtube", name: RatioHomeItem.youTubeName, icon: "play.rectangle", route: .easyYouTube),
             RatioEntry(id: "app-settings", name: "앱 설정", icon: "gearshape", route: .allSettings),
             RatioEntry(id: "standard-home", name: "기존 홈", icon: "house", route: .standardHome)
@@ -158,7 +159,7 @@ struct RatioLauncherView: View {
 
     var body: some View {
         let visibleWebWidget = widgets.first(where: { $0.id == visibleWebWidgetID })
-        let darkWebWallpaper = !searchMode && ((homePageIDs.indices.contains(widgetPage) && homePageIDs[widgetPage].contains("widget:news")) || visibleWebWidget?.isYouTube == true ||
+        let darkWebWallpaper = !searchMode && ((homePageIDs.indices.contains(widgetPage) && (homePageIDs[widgetPage].contains("widget:news") || homePageIDs[widgetPage].contains("widget:listening"))) || visibleWebWidget?.isYouTube == true ||
             (visibleWebWidget?.isBrowser == true && (browserWidgetSession.browser?.palette ?? .dark) == .dark))
         ZStack {
             (page == "settings" ? VisionCraftHomeUI.background : page == "home" ? homeExperience.background : RatioStyle.background).ignoresSafeArea()
@@ -750,6 +751,7 @@ struct RatioLauncherView: View {
          RatioHomeItem(id: "widget:timer", name: "타이머 · 알람", columns: 2, rows: 2),
          RatioHomeItem(id: "widget:search", name: "통합 검색", columns: 4, rows: 1),
          .week,
+         RatioHomeItem(id: "widget:listening", name: RatioHomeItem.listeningName, columns: 4, rows: 10),
          RatioHomeItem(id: "widget:youtube", name: RatioHomeItem.youTubeName, columns: 4, rows: 10),
          RatioHomeItem(id: "widget:browser", name: RatioHomeItem.webName, columns: 4, rows: 8),
          RatioHomeItem(id: "widget:daisy", name: "데이지 플레이어", columns: 4, rows: 6)]
@@ -841,6 +843,10 @@ struct RatioLauncherView: View {
         if widget.isNews {
             if let height { RatioNewsWidget(active: active, onArticle: { openBrowser($0, newsArticle: true) }).frame(height: height) }
             else { Color.clear.frame(height: 88) }
+        } else if widget.isListening {
+            if let height {
+                RatioListeningWidgetView(active: active) { addedWidgetID = nil; widgetPage = 0 }.frame(height: height)
+            } else { Color.clear.frame(height: 88) }
         } else if widget.isYouTube {
             if let height {
                 RatioBrowserWidgetView(session: youTubeWidgetSession, active: active, preview: preview,

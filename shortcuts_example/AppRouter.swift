@@ -43,6 +43,7 @@ enum AppRoute: Hashable {
     case allSettings
     case standardHome
     case easyBrowser
+    case listening
     case easyYouTube
     /// 홈 업데이트 기록 카드의 "이전 업데이트 기록보기"(Android `FullChangeLogsScreen`).
     case releaseNotes

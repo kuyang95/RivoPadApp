@@ -1,0 +1,4326 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-11-20",
+  "provenance": [
+    "https://radio.bsod.kr/",
+    "https://github.com/BSofDeath/radio.bsod.kr",
+    "https://radio.kbs.co.kr/",
+    "https://m.imbc.com/radiomain",
+    "https://www.sbs.co.kr/radio/",
+    "https://www.ebs.co.kr/onair?channelCodeString=radio",
+    "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/21",
+    "https://www.ebs.co.kr/",
+    "https://www.cbs.co.kr/"
+  ],
+  "stations": [
+    {
+      "id": "kr-radio:kbs:national:1radio",
+      "title": "KBS 1라디오",
+      "subtitle": "수도권 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/21",
+      "alternates": [],
+      "aliases": [
+        "KBS 1라디오",
+        "kbs",
+        "1radio",
+        "수도권",
+        "KBS_kor",
+        "KBS 1RADIO",
+        "서울",
+        "seoul"
+      ],
+      "legacyNames": [
+        "KBS 1라디오",
+        "KBS 1라디오",
+        "KBS_kor",
+        "KBS 1RADIO"
+      ],
+      "frequencies": [
+        "97.3",
+        "711"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:kbs:national:2radio",
+      "title": "KBS 2라디오 · 해피FM",
+      "subtitle": "수도권 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/22",
+      "alternates": [],
+      "aliases": [
+        "KBS 2라디오",
+        "kbs",
+        "2radio",
+        "수도권",
+        "kbs해피fm",
+        "KBS HappyFM",
+        "서울",
+        "seoul"
+      ],
+      "legacyNames": [
+        "KBS 2라디오 · 해피FM",
+        "KBS 2라디오",
+        "kbs해피fm",
+        "KBS HappyFM"
+      ],
+      "frequencies": [
+        "106.1",
+        "603"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004070_443799.png"
+    },
+    {
+      "id": "kr-radio:kbs:national:3radio",
+      "title": "KBS 3라디오 · 사랑의 소리",
+      "subtitle": "수도권 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/23",
+      "alternates": [],
+      "aliases": [
+        "KBS 3라디오",
+        "kbs",
+        "3radio",
+        "수도권",
+        "서울",
+        "seoul",
+        "사랑의소리",
+        "사랑의 소리",
+        "장애인방송"
+      ],
+      "legacyNames": [
+        "KBS 3라디오 · 사랑의 소리",
+        "KBS 3라디오"
+      ],
+      "frequencies": [
+        "104.9",
+        "1134"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004143_443802.png"
+    },
+    {
+      "id": "kr-radio:kbs:national:1fm",
+      "title": "KBS 클래식FM",
+      "subtitle": "수도권 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/24",
+      "alternates": [],
+      "aliases": [
+        "KBS 1FM",
+        "kbs",
+        "1fm",
+        "수도권",
+        "KBS Classic FM",
+        "kbs classic fm",
+        "서울",
+        "seoul"
+      ],
+      "legacyNames": [
+        "KBS 클래식FM",
+        "KBS 1FM",
+        "KBS Classic FM",
+        "kbs classic fm"
+      ],
+      "frequencies": [
+        "93.1"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004216_443813.png"
+    },
+    {
+      "id": "kr-radio:kbs:national:2fm",
+      "title": "KBS 쿨FM",
+      "subtitle": "수도권 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/25",
+      "alternates": [],
+      "aliases": [
+        "KBS 2FM",
+        "kbs",
+        "2fm",
+        "수도권",
+        "KBS Cool FM",
+        "서울",
+        "seoul"
+      ],
+      "legacyNames": [
+        "KBS 쿨FM",
+        "KBS 2FM",
+        "KBS Cool FM"
+      ],
+      "frequencies": [
+        "89.1"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004290_443824.png"
+    },
+    {
+      "id": "kr-radio:kbs:national:hanminjok",
+      "title": "KBS 한민족방송",
+      "subtitle": "수도권 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/26",
+      "alternates": [],
+      "aliases": [
+        "KBS 한민족방송",
+        "kbs",
+        "hanminjok",
+        "수도권",
+        "서울",
+        "seoul"
+      ],
+      "legacyNames": [
+        "KBS 한민족방송",
+        "KBS 한민족방송"
+      ],
+      "frequencies": [
+        "972",
+        "1170"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004397_443835.png"
+    },
+    {
+      "id": "kr-radio:mbc:national:sfm",
+      "title": "MBC 표준FM",
+      "subtitle": "수도권 · MBC",
+      "resolver": "plain",
+      "url": "https://sminiplay.imbc.com/aacplay.ashx?agent=webapp&channel=sfm",
+      "alternates": [],
+      "aliases": [
+        "MBC 표준FM",
+        "mbc",
+        "sfm",
+        "수도권",
+        "MBC FM"
+      ],
+      "legacyNames": [
+        "MBC 표준FM",
+        "MBC 표준FM",
+        "MBC FM"
+      ],
+      "frequencies": [
+        "95.9"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:national:fm4u",
+      "title": "MBC FM4U",
+      "subtitle": "수도권 · MBC",
+      "resolver": "plain",
+      "url": "https://sminiplay.imbc.com/aacplay.ashx?agent=webapp&channel=mfm",
+      "alternates": [],
+      "aliases": [
+        "MBC FM4U",
+        "mbc",
+        "fm4u",
+        "수도권",
+        "MBC FM for you"
+      ],
+      "legacyNames": [
+        "MBC FM4U",
+        "MBC FM4U",
+        "MBC FM for you"
+      ],
+      "frequencies": [
+        "91.9"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:national:chm",
+      "title": "MBC mini 올댓뮤직",
+      "subtitle": "수도권 · MBC",
+      "resolver": "plain",
+      "url": "https://sminiplay.imbc.com/aacplay.ashx?agent=webapp&channel=chm",
+      "alternates": [],
+      "aliases": [
+        "MBC mini 올댓뮤직",
+        "mbc",
+        "chm",
+        "수도권"
+      ],
+      "legacyNames": [
+        "MBC mini 올댓뮤직",
+        "MBC mini 올댓뮤직"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:sbs:national:lovefm",
+      "title": "SBS 러브FM",
+      "subtitle": "수도권 · SBS",
+      "resolver": "plain",
+      "url": "https://apis.sbs.co.kr/play-api/1.0/livestream/lovepc/lovefm?protocol=hls&ssl=Y",
+      "alternates": [],
+      "aliases": [
+        "SBS 러브FM",
+        "sbs",
+        "lovefm",
+        "수도권",
+        "SBS Love FM"
+      ],
+      "legacyNames": [
+        "SBS 러브FM",
+        "SBS 러브FM",
+        "SBS Love FM"
+      ],
+      "frequencies": [
+        "103.5",
+        "98.3"
+      ],
+      "artworkURL": "https://www.sbs.co.kr/radio/img/sbs_radio.jpg"
+    },
+    {
+      "id": "kr-radio:sbs:national:powerfm",
+      "title": "SBS 파워FM",
+      "subtitle": "수도권 · SBS",
+      "resolver": "plain",
+      "url": "https://apis.sbs.co.kr/play-api/1.0/livestream/powerpc/powerfm?protocol=hls&ssl=Y",
+      "alternates": [],
+      "aliases": [
+        "SBS 파워FM",
+        "sbs",
+        "powerfm",
+        "수도권",
+        "SBS Power FM"
+      ],
+      "legacyNames": [
+        "SBS 파워FM",
+        "SBS 파워FM",
+        "SBS Power FM"
+      ],
+      "frequencies": [
+        "107.7"
+      ],
+      "artworkURL": "https://www.sbs.co.kr/radio/img/sbs_radio.jpg"
+    },
+    {
+      "id": "kr-radio:sbs:national:dmb",
+      "title": "SBS 고릴라디오M",
+      "subtitle": "수도권 · SBS",
+      "resolver": "plain",
+      "url": "https://apis.sbs.co.kr/play-api/1.0/livestream/sbsdmbpc/sbsdmb?protocol=hls&ssl=Y",
+      "alternates": [],
+      "aliases": [
+        "SBS 고릴라디오M",
+        "sbs",
+        "dmb",
+        "수도권"
+      ],
+      "legacyNames": [
+        "SBS 고릴라디오M",
+        "SBS 고릴라디오M"
+      ],
+      "artworkURL": "https://www.sbs.co.kr/radio/img/sbs_radio.jpg"
+    },
+    {
+      "id": "kr-radio:ebs:national:fm",
+      "title": "EBS FM",
+      "subtitle": "수도권 · EBS",
+      "resolver": "ebs",
+      "url": "https://www.ebs.co.kr/onair?channelCodeString=radio",
+      "alternates": [
+        "https://ebsonair.ebs.co.kr/fmradiofamilypc/familypc1m/playlist.m3u8"
+      ],
+      "aliases": [
+        "EBS FM",
+        "ebs",
+        "fm",
+        "수도권",
+        "ebs tune in",
+        "EBS FM 104.5"
+      ],
+      "legacyNames": [
+        "EBS FM",
+        "EBS FM",
+        "ebs tune in",
+        "EBS FM 104.5"
+      ],
+      "frequencies": [
+        "104.5"
+      ],
+      "artworkURL": "https://static.ebs.co.kr/www/favicon/favicon_144.png"
+    },
+    {
+      "id": "kr-radio:ebs:national:bandi",
+      "title": "EBS 반디 외국어 전문",
+      "subtitle": "수도권 · EBS",
+      "resolver": "direct",
+      "url": "https://ebsonair.ebs.co.kr/cloud1/iradio/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "EBS 반디 외국어 전문",
+        "ebs",
+        "bandi",
+        "수도권"
+      ],
+      "legacyNames": [
+        "EBS 반디 외국어 전문",
+        "EBS 반디 외국어 전문"
+      ],
+      "artworkURL": "https://static.ebs.co.kr/www/favicon/favicon_144.png"
+    },
+    {
+      "id": "kr-radio:obs:national:live",
+      "title": "OBS 라디오",
+      "subtitle": "수도권 · OBS",
+      "resolver": "direct",
+      "url": "https://vod3.obs.co.kr:444/live/obsstream1/radio.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "OBS 라디오",
+        "obs",
+        "수도권"
+      ],
+      "legacyNames": [
+        "OBS 라디오",
+        "OBS 라디오"
+      ],
+      "frequencies": [
+        "99.9"
+      ]
+    },
+    {
+      "id": "kr-radio:ifm:national:live",
+      "title": "iFM 경인방송",
+      "subtitle": "수도권 · IFM",
+      "resolver": "direct",
+      "url": "https://stream.ifm.kr/live/aod1/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "iFM 경인방송",
+        "ifm",
+        "수도권"
+      ],
+      "legacyNames": [
+        "iFM 경인방송",
+        "iFM 경인방송"
+      ],
+      "frequencies": [
+        "90.7"
+      ]
+    },
+    {
+      "id": "kr-radio:ytn:national:live",
+      "title": "YTN 라디오",
+      "subtitle": "수도권 · YTN",
+      "resolver": "direct",
+      "url": "https://radiolive.ytn.co.kr/radio/_definst_/20211118_fmlive/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "YTN 라디오",
+        "ytn",
+        "수도권"
+      ],
+      "legacyNames": [
+        "YTN 라디오",
+        "YTN 라디오"
+      ],
+      "frequencies": [
+        "94.5"
+      ]
+    },
+    {
+      "id": "kr-radio:tbs:national:fm",
+      "title": "TBS FM",
+      "subtitle": "수도권 · TBS",
+      "resolver": "direct",
+      "url": "https://cdnfm.tbs.seoul.kr/tbs/_definst_/tbs_fm_web_360.smil/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "TBS FM",
+        "tbs",
+        "fm",
+        "수도권"
+      ],
+      "legacyNames": [
+        "TBS FM",
+        "TBS FM"
+      ],
+      "frequencies": [
+        "95.1"
+      ]
+    },
+    {
+      "id": "kr-radio:tbs:national:efm",
+      "title": "TBS eFM",
+      "subtitle": "수도권 · TBS",
+      "resolver": "direct",
+      "url": "https://cdnefm.tbs.seoul.kr/tbs/_definst_/tbs_efm_web_360.smil/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "TBS eFM",
+        "tbs",
+        "efm",
+        "수도권"
+      ],
+      "legacyNames": [
+        "TBS eFM",
+        "TBS eFM"
+      ],
+      "frequencies": [
+        "101.3"
+      ]
+    },
+    {
+      "id": "kr-radio:tbn:national:live",
+      "title": "TBN 경인교통방송",
+      "subtitle": "수도권 · TBN",
+      "resolver": "direct",
+      "url": "https://www.tbn.it.kr/gyeongin/myStream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "TBN 경인교통방송",
+        "tbn",
+        "수도권"
+      ],
+      "legacyNames": [
+        "TBN 경인교통방송",
+        "TBN 경인교통방송"
+      ],
+      "frequencies": [
+        "100.5",
+        "105.5"
+      ]
+    },
+    {
+      "id": "kr-radio:cbs:national:sfm",
+      "title": "CBS 표준FM",
+      "subtitle": "수도권 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/mweb_cbs981/_definst_/cbs981.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "CBS 표준FM",
+        "cbs",
+        "sfm",
+        "수도권",
+        "CBS 표준FM 98.1",
+        "CBS Std FM"
+      ],
+      "legacyNames": [
+        "CBS 표준FM",
+        "CBS 표준FM",
+        "CBS 표준FM 98.1",
+        "CBS Std FM"
+      ],
+      "frequencies": [
+        "98.1"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:cbs:national:mfm",
+      "title": "CBS 음악FM",
+      "subtitle": "수도권 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/mweb_cbs939/_definst_/cbs939.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "CBS 음악FM",
+        "cbs",
+        "mfm",
+        "수도권",
+        "CBS 음악 FM",
+        "CBS 파워라디오 [Music FM]"
+      ],
+      "legacyNames": [
+        "CBS 음악FM",
+        "CBS 음악FM",
+        "CBS 음악 FM",
+        "CBS 파워라디오 [Music FM]"
+      ],
+      "frequencies": [
+        "93.9"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:cbs:national:joy4u",
+      "title": "CBS JOY4U",
+      "subtitle": "수도권 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/mweb_cbscmc/_definst_/cbscmc.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "CBS JOY4U",
+        "cbs",
+        "joy4u",
+        "수도권"
+      ],
+      "legacyNames": [
+        "CBS JOY4U",
+        "CBS JOY4U"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:febc:national:live",
+      "title": "FEBC 서울극동방송",
+      "subtitle": "수도권 · FEBC",
+      "resolver": "direct",
+      "url": "https://mlive3.febc.net/live5/seoulfm/playlist.m3u8",
+      "alternates": [
+        "http://mlive2.febc.net:1935/live/seoulfm/playlist.m3u8"
+      ],
+      "aliases": [
+        "FEBC 서울극동방송",
+        "febc",
+        "수도권"
+      ],
+      "legacyNames": [
+        "FEBC 서울극동방송",
+        "FEBC 서울극동방송"
+      ],
+      "frequencies": [
+        "106.9",
+        "1188"
+      ]
+    },
+    {
+      "id": "kr-radio:bbs:national:live",
+      "title": "BBS 서울불교방송",
+      "subtitle": "수도권 · BBS",
+      "resolver": "direct",
+      "url": "https://bbslive.clouducs.com/bbsradio-mlive/radio.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "BBS 서울불교방송",
+        "bbs",
+        "수도권"
+      ],
+      "legacyNames": [
+        "BBS 서울불교방송",
+        "BBS 서울불교방송"
+      ]
+    },
+    {
+      "id": "kr-radio:cpbc:national:live",
+      "title": "CPBC 가톨릭평화방송",
+      "subtitle": "수도권 · CPBC",
+      "resolver": "direct",
+      "url": "http://onair1.cpbc.co.kr:1935/live/_definst_/Instreamer.stream_aac/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "CPBC 가톨릭평화방송",
+        "cpbc",
+        "수도권",
+        "CPBC"
+      ],
+      "legacyNames": [
+        "CPBC 가톨릭평화방송",
+        "CPBC 가톨릭평화방송",
+        "CPBC"
+      ],
+      "frequencies": [
+        "105.3"
+      ]
+    },
+    {
+      "id": "kr-radio:wbs:national:live",
+      "title": "WBS 서울원음방송",
+      "subtitle": "수도권 · WBS",
+      "resolver": "direct",
+      "url": "https://wbsradio.kr/wbs-seoul",
+      "alternates": [],
+      "aliases": [
+        "WBS 서울원음방송",
+        "wbs",
+        "수도권"
+      ],
+      "legacyNames": [
+        "WBS 서울원음방송",
+        "WBS 서울원음방송"
+      ]
+    },
+    {
+      "id": "kr-radio:kookbang:national:live",
+      "title": "국방FM",
+      "subtitle": "수도권 · KOOKBANG",
+      "resolver": "direct",
+      "url": "https://mediaworks.dema.mil.kr/live_edge/audio.sdp/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "국방FM",
+        "kookbang",
+        "수도권"
+      ],
+      "legacyNames": [
+        "국방FM",
+        "국방FM"
+      ]
+    },
+    {
+      "id": "kr-radio:kugak:national:live",
+      "title": "국악방송",
+      "subtitle": "수도권 · KUGAK",
+      "resolver": "direct",
+      "url": "https://mgugaklive.nowcdn.co.kr/gugakradio/gugakradio.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "국악방송",
+        "kugak",
+        "수도권",
+        "GugakFM",
+        "Gugak FM"
+      ],
+      "legacyNames": [
+        "국악방송",
+        "국악방송",
+        "GugakFM",
+        "Gugak FM"
+      ],
+      "frequencies": [
+        "99.1"
+      ]
+    },
+    {
+      "id": "kr-radio:afn:humphreys:live",
+      "title": "AFN FM Humphreys",
+      "subtitle": "수도권 · AFN",
+      "resolver": "afn",
+      "url": "https://playerservices.streamtheworld.com/api/livestream?station=AFNP_OSN&transports=http%2Chls&version=1.10",
+      "alternates": [
+        "https://playerservices.streamtheworld.com/api/livestream-redirect/AFNP_OSNAAC.aac"
+      ],
+      "aliases": [
+        "AFN FM Humphreys",
+        "afn",
+        "humphreys",
+        "수도권"
+      ],
+      "legacyNames": [
+        "AFN FM Humphreys",
+        "AFN FM Humphreys"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:gwanakfm",
+      "title": "관악FM",
+      "subtitle": "수도권 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://icecast.radios.kr:8000/gwanakfm",
+      "alternates": [],
+      "aliases": [
+        "관악FM",
+        "community",
+        "gwanakfm",
+        "수도권"
+      ],
+      "legacyNames": [
+        "관악FM",
+        "관악FM"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:mapofm",
+      "title": "마포FM",
+      "subtitle": "수도권 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://onair.mapofm.net/mapofm",
+      "alternates": [],
+      "aliases": [
+        "마포FM",
+        "community",
+        "mapofm",
+        "수도권"
+      ],
+      "legacyNames": [
+        "마포FM",
+        "마포FM"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:seongnamfm",
+      "title": "성남FM",
+      "subtitle": "수도권 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://onair.mapofm.net/seongnamfm",
+      "alternates": [],
+      "aliases": [
+        "성남FM",
+        "community",
+        "seongnamfm",
+        "수도권"
+      ],
+      "legacyNames": [
+        "성남FM",
+        "성남FM"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:sdmfm",
+      "title": "서대문FM",
+      "subtitle": "수도권 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://icecast.radios.kr:8000/sdmfm",
+      "alternates": [],
+      "aliases": [
+        "서대문FM",
+        "community",
+        "sdmfm",
+        "수도권"
+      ],
+      "legacyNames": [
+        "서대문FM",
+        "서대문FM"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:sonefm",
+      "title": "수원FM",
+      "subtitle": "수도권 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://onair.mapofm.net/sonefm",
+      "alternates": [],
+      "aliases": [
+        "수원FM",
+        "community",
+        "sonefm",
+        "수도권"
+      ],
+      "legacyNames": [
+        "수원FM",
+        "수원FM"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:gurifm",
+      "title": "GO구리FM",
+      "subtitle": "수도권 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://icecast.radios.kr:8000/gurifm",
+      "alternates": [],
+      "aliases": [
+        "GO구리FM",
+        "community",
+        "gurifm",
+        "수도권"
+      ],
+      "legacyNames": [
+        "GO구리FM",
+        "GO구리FM"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:dwfm",
+      "title": "단원FM",
+      "subtitle": "수도권 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://radiostream.communityradio.kr/dwfm1",
+      "alternates": [],
+      "aliases": [
+        "단원FM",
+        "community",
+        "dwfm",
+        "수도권"
+      ],
+      "legacyNames": [
+        "단원FM",
+        "단원FM"
+      ]
+    },
+    {
+      "id": "kr-radio:kbs:busan:1radio",
+      "title": "KBS 부산 1라디오",
+      "subtitle": "부산·울산·경남 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/10_21",
+      "alternates": [],
+      "aliases": [
+        "KBS부산 1라디오",
+        "kbs",
+        "busan",
+        "1radio",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "KBS 부산 1라디오",
+        "KBS부산 1라디오"
+      ],
+      "frequencies": [
+        "103.7",
+        "891"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:kbs:busan:2radio",
+      "title": "KBS 부산 2라디오",
+      "subtitle": "부산·울산·경남 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/10_22",
+      "alternates": [],
+      "aliases": [
+        "KBS부산 2라디오",
+        "kbs",
+        "busan",
+        "2radio",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "KBS 부산 2라디오",
+        "KBS부산 2라디오"
+      ],
+      "frequencies": [
+        "97.1"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004070_443799.png"
+    },
+    {
+      "id": "kr-radio:kbs:busan:1fm",
+      "title": "KBS 부산 음악FM",
+      "subtitle": "부산·울산·경남 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/10_24",
+      "alternates": [],
+      "aliases": [
+        "KBS부산 음악FM",
+        "kbs",
+        "busan",
+        "1fm",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "KBS 부산 음악FM",
+        "KBS부산 음악FM"
+      ],
+      "frequencies": [
+        "92.7"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004216_443813.png"
+    },
+    {
+      "id": "kr-radio:kbs:ulsan:1radio",
+      "title": "KBS 울산 1라디오",
+      "subtitle": "부산·울산·경남 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/11_21",
+      "alternates": [],
+      "aliases": [
+        "KBS울산 1라디오",
+        "kbs",
+        "ulsan",
+        "1radio",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "KBS 울산 1라디오",
+        "KBS울산 1라디오"
+      ],
+      "frequencies": [
+        "90.7",
+        "1449"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:kbs:changwon:1radio",
+      "title": "KBS 창원 1라디오",
+      "subtitle": "부산·울산·경남 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/20_21",
+      "alternates": [],
+      "aliases": [
+        "KBS창원 1라디오",
+        "kbs",
+        "changwon",
+        "1radio",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "KBS 창원 1라디오",
+        "KBS창원 1라디오"
+      ],
+      "frequencies": [
+        "91.7"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:kbs:changwon:2radio",
+      "title": "KBS 창원 2라디오",
+      "subtitle": "부산·울산·경남 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/20_22",
+      "alternates": [],
+      "aliases": [
+        "KBS창원 2라디오",
+        "kbs",
+        "changwon",
+        "2radio",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "KBS 창원 2라디오",
+        "KBS창원 2라디오"
+      ],
+      "frequencies": [
+        "106.1"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004070_443799.png"
+    },
+    {
+      "id": "kr-radio:kbs:changwon:1fm",
+      "title": "KBS 창원 음악FM",
+      "subtitle": "부산·울산·경남 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/20_24",
+      "alternates": [],
+      "aliases": [
+        "KBS창원 음악FM",
+        "kbs",
+        "changwon",
+        "1fm",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "KBS 창원 음악FM",
+        "KBS창원 음악FM"
+      ],
+      "frequencies": [
+        "93.9"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004216_443813.png"
+    },
+    {
+      "id": "kr-radio:kbs:jinju:1radio",
+      "title": "KBS 진주 1라디오",
+      "subtitle": "부산·울산·경남 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/21_21",
+      "alternates": [],
+      "aliases": [
+        "KBS진주 1라디오",
+        "kbs",
+        "jinju",
+        "1radio",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "KBS 진주 1라디오",
+        "KBS진주 1라디오"
+      ],
+      "frequencies": [
+        "90.3",
+        "1098"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:mbc:busan:sfm",
+      "title": "부산MBC 표준FM",
+      "subtitle": "부산·울산·경남 · MBC",
+      "resolver": "busan",
+      "url": "https://brook.bsmbc.com/live/BusanMBC_AM_onairstream.{date}/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "부산MBC 표준FM",
+        "mbc",
+        "busan",
+        "sfm",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "부산MBC 표준FM",
+        "부산MBC 표준FM"
+      ],
+      "frequencies": [
+        "95.9",
+        "106.5"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:busan:fm4u",
+      "title": "부산MBC FM4U",
+      "subtitle": "부산·울산·경남 · MBC",
+      "resolver": "busan",
+      "url": "https://brook.bsmbc.com/live/BusanMBC_FM_onairstream.{date}/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "부산MBC FM4U",
+        "mbc",
+        "busan",
+        "fm4u",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "부산MBC FM4U",
+        "부산MBC FM4U"
+      ],
+      "frequencies": [
+        "88.9"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:ulsan:sfm",
+      "title": "울산MBC 표준FM",
+      "subtitle": "부산·울산·경남 · MBC",
+      "resolver": "direct",
+      "url": "https://5ddfd163bd00d.streamlock.net/STDFM/STDFM/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "울산MBC 표준FM",
+        "mbc",
+        "ulsan",
+        "sfm",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "울산MBC 표준FM",
+        "울산MBC 표준FM"
+      ],
+      "frequencies": [
+        "97.5"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:ulsan:fm4u",
+      "title": "울산MBC FM4U",
+      "subtitle": "부산·울산·경남 · MBC",
+      "resolver": "direct",
+      "url": "https://5ddfd163bd00d.streamlock.net/FM4U/FM4U/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "울산MBC FM4U",
+        "mbc",
+        "ulsan",
+        "fm4u",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "울산MBC FM4U",
+        "울산MBC FM4U"
+      ],
+      "frequencies": [
+        "98.7"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:changwon:sfm",
+      "title": "MBC경남 표준FM",
+      "subtitle": "부산·울산·경남 · MBC",
+      "resolver": "direct",
+      "url": "https://wowza.mbcgn.kr/MBCFM/TV2.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "MBC경남 표준FM",
+        "mbc",
+        "changwon",
+        "sfm",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "MBC경남 표준FM",
+        "MBC경남 표준FM"
+      ],
+      "frequencies": [
+        "98.9"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:changwon:fm4u",
+      "title": "MBC경남 FM4U",
+      "subtitle": "부산·울산·경남 · MBC",
+      "resolver": "direct",
+      "url": "https://wowza.mbcgn.kr/MBCFM4U/TV3.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "MBC경남 FM4U",
+        "mbc",
+        "changwon",
+        "fm4u",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "MBC경남 FM4U",
+        "MBC경남 FM4U"
+      ],
+      "frequencies": [
+        "100.5"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:sbs:busan:lovefm",
+      "title": "KNN 러브FM",
+      "subtitle": "부산·울산·경남 · SBS",
+      "resolver": "direct",
+      "url": "https://stream1.knn.co.kr/hls/b3y26uu6471k8tes9w7h_lfm/index.m3u8",
+      "alternates": [],
+      "aliases": [
+        "KNN 러브FM",
+        "sbs",
+        "busan",
+        "lovefm",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "KNN 러브FM",
+        "KNN 러브FM"
+      ],
+      "frequencies": [
+        "105.7",
+        "88.5",
+        "89.3",
+        "90.9",
+        "98.7"
+      ]
+    },
+    {
+      "id": "kr-radio:sbs:busan:powerfm",
+      "title": "KNN 파워FM",
+      "subtitle": "부산·울산·경남 · SBS",
+      "resolver": "direct",
+      "url": "https://stream1.knn.co.kr/hls/lb9ezl87d37uu0vy65bb_pfm/index.m3u8",
+      "alternates": [],
+      "aliases": [
+        "KNN 파워FM",
+        "sbs",
+        "busan",
+        "powerfm",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "KNN 파워FM",
+        "KNN 파워FM"
+      ],
+      "frequencies": [
+        "99.9",
+        "102.5",
+        "105.5",
+        "96.3",
+        "106.7"
+      ]
+    },
+    {
+      "id": "kr-radio:sbs:ulsan:powerfm",
+      "title": "UBC 그린FM",
+      "subtitle": "부산·울산·경남 · SBS",
+      "resolver": "direct",
+      "url": "https://stream.ubc.co.kr/hls/ubcfmstream/index.m3u8",
+      "alternates": [],
+      "aliases": [
+        "UBC 그린FM",
+        "sbs",
+        "ulsan",
+        "powerfm",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "UBC 그린FM",
+        "UBC 그린FM"
+      ],
+      "frequencies": [
+        "92.3"
+      ]
+    },
+    {
+      "id": "kr-radio:tbn:busan:live",
+      "title": "TBN 부산교통방송",
+      "subtitle": "부산·울산·경남 · TBN",
+      "resolver": "direct",
+      "url": "https://www.tbn.it.kr/busan/myStream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "TBN 부산교통방송",
+        "tbn",
+        "busan",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "TBN 부산교통방송",
+        "TBN 부산교통방송"
+      ],
+      "frequencies": [
+        "94.9"
+      ]
+    },
+    {
+      "id": "kr-radio:tbn:ulsan:live",
+      "title": "TBN 울산교통방송",
+      "subtitle": "부산·울산·경남 · TBN",
+      "resolver": "direct",
+      "url": "https://www.tbn.it.kr/ulsan/myStream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "TBN 울산교통방송",
+        "tbn",
+        "ulsan",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "TBN 울산교통방송",
+        "TBN 울산교통방송"
+      ],
+      "frequencies": [
+        "104.1"
+      ]
+    },
+    {
+      "id": "kr-radio:tbn:gyeongnam:live",
+      "title": "TBN 경남교통방송",
+      "subtitle": "부산·울산·경남 · TBN",
+      "resolver": "direct",
+      "url": "https://www.tbn.it.kr/gyeongnam/myStream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "TBN 경남교통방송",
+        "tbn",
+        "gyeongnam",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "TBN 경남교통방송",
+        "TBN 경남교통방송"
+      ],
+      "frequencies": [
+        "95.5",
+        "100.1",
+        "107.3"
+      ]
+    },
+    {
+      "id": "kr-radio:cbs:busan:sfm",
+      "title": "부산CBS 표준FM",
+      "subtitle": "부산·울산·경남 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/busan939/_definst_/busan939.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "부산CBS 표준FM",
+        "cbs",
+        "busan",
+        "sfm",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "부산CBS 표준FM",
+        "부산CBS 표준FM"
+      ],
+      "frequencies": [
+        "102.9"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:cbs:busan:mfm",
+      "title": "부산CBS 음악FM",
+      "subtitle": "부산·울산·경남 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/busan981/_definst_/busan981.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "부산CBS 음악FM",
+        "cbs",
+        "busan",
+        "mfm",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "부산CBS 음악FM",
+        "부산CBS 음악FM"
+      ],
+      "frequencies": [
+        "102.1",
+        "105.3"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:cbs:ulsan:sfm",
+      "title": "울산CBS 표준FM",
+      "subtitle": "부산·울산·경남 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/ulsan/_definst_/ulsan.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "울산CBS 표준FM",
+        "cbs",
+        "ulsan",
+        "sfm",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "울산CBS 표준FM",
+        "울산CBS 표준FM"
+      ],
+      "frequencies": [
+        "100.3"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:cbs:gyeongnam:sfm",
+      "title": "경남CBS 표준FM",
+      "subtitle": "부산·울산·경남 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/gyeongnam/_definst_/gyeongnam.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "경남CBS 표준FM",
+        "cbs",
+        "gyeongnam",
+        "sfm",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "경남CBS 표준FM",
+        "경남CBS 표준FM"
+      ],
+      "frequencies": [
+        "106.9",
+        "94.1"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:febc:busan:live",
+      "title": "FEBC 부산극동방송",
+      "subtitle": "부산·울산·경남 · FEBC",
+      "resolver": "direct",
+      "url": "https://mlive3.febc.net/live5/bsfebc/playlist.m3u8",
+      "alternates": [
+        "http://mlive2.febc.net:1935/live/bsfebc/playlist.m3u8"
+      ],
+      "aliases": [
+        "FEBC 부산극동방송",
+        "febc",
+        "busan",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "FEBC 부산극동방송",
+        "FEBC 부산극동방송"
+      ],
+      "frequencies": [
+        "93.3",
+        "96.7"
+      ]
+    },
+    {
+      "id": "kr-radio:febc:ulsan:live",
+      "title": "FEBC 울산극동방송",
+      "subtitle": "부산·울산·경남 · FEBC",
+      "resolver": "direct",
+      "url": "https://mlive3.febc.net/live5/uslive/playlist.m3u8",
+      "alternates": [
+        "http://mlive2.febc.net:1935/live/uslive/playlist.m3u8"
+      ],
+      "aliases": [
+        "FEBC 울산극동방송",
+        "febc",
+        "ulsan",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "FEBC 울산극동방송",
+        "FEBC 울산극동방송"
+      ],
+      "frequencies": [
+        "107.3"
+      ]
+    },
+    {
+      "id": "kr-radio:febc:changwon:live",
+      "title": "FEBC 창원극동방송",
+      "subtitle": "부산·울산·경남 · FEBC",
+      "resolver": "direct",
+      "url": "https://mlive3.febc.net/live5/cwlive/playlist.m3u8",
+      "alternates": [
+        "http://mlive2.febc.net:1935/live/cwlive/playlist.m3u8"
+      ],
+      "aliases": [
+        "FEBC 창원극동방송",
+        "febc",
+        "changwon",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "FEBC 창원극동방송",
+        "FEBC 창원극동방송"
+      ],
+      "frequencies": [
+        "98.1",
+        "92.5"
+      ]
+    },
+    {
+      "id": "kr-radio:bbs:busan:live",
+      "title": "BBS 부산불교방송",
+      "subtitle": "부산·울산·경남 · BBS",
+      "resolver": "direct",
+      "url": "http://live.cdn.smilecdn.com:1935/bbsfm_live/live.sdp/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "BBS 부산불교방송",
+        "bbs",
+        "busan",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "BBS 부산불교방송",
+        "BBS 부산불교방송"
+      ]
+    },
+    {
+      "id": "kr-radio:cpbc:busan:live",
+      "title": "CPBC 부산가톨릭평화방송",
+      "subtitle": "부산·울산·경남 · CPBC",
+      "resolver": "direct",
+      "url": "http://pbcradio.dynamicsmart.com:1935/radio/bscpbc-radio/index.m3u8",
+      "alternates": [],
+      "aliases": [
+        "CPBC 부산가톨릭평화방송",
+        "cpbc",
+        "busan",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "CPBC 부산가톨릭평화방송",
+        "CPBC 부산가톨릭평화방송"
+      ],
+      "frequencies": [
+        "101.1",
+        "101.5",
+        "93.7",
+        "101.7"
+      ]
+    },
+    {
+      "id": "kr-radio:wbs:busan:live",
+      "title": "WBS 부산원음방송",
+      "subtitle": "부산·울산·경남 · WBS",
+      "resolver": "direct",
+      "url": "https://wbsradio2.kr/wbs-b",
+      "alternates": [],
+      "aliases": [
+        "WBS 부산원음방송",
+        "wbs",
+        "busan",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "WBS 부산원음방송",
+        "WBS 부산원음방송"
+      ]
+    },
+    {
+      "id": "kr-radio:befm:national:live",
+      "title": "부산영어방송",
+      "subtitle": "부산·울산·경남 · BEFM",
+      "resolver": "direct",
+      "url": "https://live.cdn.smilecdn.com/befm905_live/live/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "부산영어방송",
+        "befm",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "부산영어방송",
+        "부산영어방송"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:yeonjefm",
+      "title": "연제공동체라디오",
+      "subtitle": "부산·울산·경남 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://icecast.radios.kr:8000/yeonjefm",
+      "alternates": [],
+      "aliases": [
+        "연제공동체라디오",
+        "community",
+        "yeonjefm",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "연제공동체라디오",
+        "연제공동체라디오"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:namhaefm",
+      "title": "남해FM",
+      "subtitle": "부산·울산·경남 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://icecast.radios.kr:8000/namhaefm",
+      "alternates": [],
+      "aliases": [
+        "남해FM",
+        "community",
+        "namhaefm",
+        "부산·울산·경남"
+      ],
+      "legacyNames": [
+        "남해FM",
+        "남해FM"
+      ]
+    },
+    {
+      "id": "kr-radio:kbs:daegu:1radio",
+      "title": "KBS 대구 1라디오",
+      "subtitle": "대구·경북 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/30_21",
+      "alternates": [],
+      "aliases": [
+        "KBS대구 1라디오",
+        "kbs",
+        "daegu",
+        "1radio",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "KBS 대구 1라디오",
+        "KBS대구 1라디오"
+      ],
+      "frequencies": [
+        "101.3",
+        "738"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:kbs:daegu:2radio",
+      "title": "KBS 대구 2라디오",
+      "subtitle": "대구·경북 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/30_22",
+      "alternates": [],
+      "aliases": [
+        "KBS대구 2라디오",
+        "kbs",
+        "daegu",
+        "2radio",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "KBS 대구 2라디오",
+        "KBS대구 2라디오"
+      ],
+      "frequencies": [
+        "102.3",
+        "558"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004070_443799.png"
+    },
+    {
+      "id": "kr-radio:kbs:daegu:1fm",
+      "title": "KBS 대구 음악FM",
+      "subtitle": "대구·경북 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/30_24",
+      "alternates": [],
+      "aliases": [
+        "KBS대구 음악FM",
+        "kbs",
+        "daegu",
+        "1fm",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "KBS 대구 음악FM",
+        "KBS대구 음악FM"
+      ],
+      "frequencies": [
+        "89.7"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004216_443813.png"
+    },
+    {
+      "id": "kr-radio:kbs:andong:1radio",
+      "title": "KBS 안동 1라디오",
+      "subtitle": "대구·경북 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/31_21",
+      "alternates": [],
+      "aliases": [
+        "KBS안동 1라디오",
+        "kbs",
+        "andong",
+        "1radio",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "KBS 안동 1라디오",
+        "KBS안동 1라디오"
+      ],
+      "frequencies": [
+        "90.5",
+        "963"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:kbs:pohang:1radio",
+      "title": "KBS 포항 1라디오",
+      "subtitle": "대구·경북 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/32_21",
+      "alternates": [],
+      "aliases": [
+        "KBS포항 1라디오",
+        "kbs",
+        "pohang",
+        "1radio",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "KBS 포항 1라디오",
+        "KBS포항 1라디오"
+      ],
+      "frequencies": [
+        "95.9",
+        "1035"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:mbc:daegu:sfm",
+      "title": "대구MBC 표준FM",
+      "subtitle": "대구·경북 · MBC",
+      "resolver": "direct",
+      "url": "https://5ee1ec6f32118.streamlock.net/amradio/am/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "대구MBC 표준FM",
+        "mbc",
+        "daegu",
+        "sfm",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "대구MBC 표준FM",
+        "대구MBC 표준FM"
+      ],
+      "frequencies": [
+        "96.5"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:daegu:fm4u",
+      "title": "대구MBC FM4U",
+      "subtitle": "대구·경북 · MBC",
+      "resolver": "direct",
+      "url": "https://5ee1ec6f32118.streamlock.net/fmradio/fm/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "대구MBC FM4U",
+        "mbc",
+        "daegu",
+        "fm4u",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "대구MBC FM4U",
+        "대구MBC FM4U"
+      ],
+      "frequencies": [
+        "95.3"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:andong:sfm",
+      "title": "안동MBC 표준FM",
+      "subtitle": "대구·경북 · MBC",
+      "resolver": "direct",
+      "url": "https://live.andongmbc.co.kr/live/amlive/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "안동MBC 표준FM",
+        "mbc",
+        "andong",
+        "sfm",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "안동MBC 표준FM",
+        "안동MBC 표준FM"
+      ],
+      "frequencies": [
+        "100.1"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:andong:fm4u",
+      "title": "안동MBC FM4U",
+      "subtitle": "대구·경북 · MBC",
+      "resolver": "direct",
+      "url": "https://live.andongmbc.co.kr/live/fmlive/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "안동MBC FM4U",
+        "mbc",
+        "andong",
+        "fm4u",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "안동MBC FM4U",
+        "안동MBC FM4U"
+      ],
+      "frequencies": [
+        "91.3"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:pohang:sfm",
+      "title": "포항MBC 표준FM",
+      "subtitle": "대구·경북 · MBC",
+      "resolver": "direct",
+      "url": "http://stream.yubinet.com:1935/live/_definst_/Radio_Am/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "포항MBC 표준FM",
+        "mbc",
+        "pohang",
+        "sfm",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "포항MBC 표준FM",
+        "포항MBC 표준FM"
+      ],
+      "frequencies": [
+        "100.7"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:pohang:fm4u",
+      "title": "포항MBC FM4U",
+      "subtitle": "대구·경북 · MBC",
+      "resolver": "direct",
+      "url": "http://stream.yubinet.com:1935/live/_definst_/Radio_Fm/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "포항MBC FM4U",
+        "mbc",
+        "pohang",
+        "fm4u",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "포항MBC FM4U",
+        "포항MBC FM4U"
+      ],
+      "frequencies": [
+        "97.9"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:sbs:daegu:powerfm",
+      "title": "TBC 드림FM",
+      "subtitle": "대구·경북 · SBS",
+      "resolver": "direct",
+      "url": "http://203.251.91.122:1935/on-air-Backup/fm/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "TBC 드림FM",
+        "sbs",
+        "daegu",
+        "powerfm",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "TBC 드림FM",
+        "TBC 드림FM"
+      ],
+      "frequencies": [
+        "99.3",
+        "99.7",
+        "106.5"
+      ]
+    },
+    {
+      "id": "kr-radio:tbn:daegu:live",
+      "title": "TBN 대구교통방송",
+      "subtitle": "대구·경북 · TBN",
+      "resolver": "direct",
+      "url": "https://www.tbn.it.kr/daegu/myStream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "TBN 대구교통방송",
+        "tbn",
+        "daegu",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "TBN 대구교통방송",
+        "TBN 대구교통방송"
+      ],
+      "frequencies": [
+        "103.9",
+        "95.9"
+      ]
+    },
+    {
+      "id": "kr-radio:tbn:gyeongbuk:live",
+      "title": "TBN 경북교통방송",
+      "subtitle": "대구·경북 · TBN",
+      "resolver": "direct",
+      "url": "https://www.tbn.it.kr/kyungbuk/myStream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "TBN 경북교통방송",
+        "tbn",
+        "gyeongbuk",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "TBN 경북교통방송",
+        "TBN 경북교통방송"
+      ],
+      "frequencies": [
+        "103.5",
+        "103.7"
+      ]
+    },
+    {
+      "id": "kr-radio:cbs:daegu:sfm",
+      "title": "대구CBS 표준FM",
+      "subtitle": "대구·경북 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/daegu/_definst_/daegu.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "대구CBS 표준FM",
+        "cbs",
+        "daegu",
+        "sfm",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "대구CBS 표준FM",
+        "대구CBS 표준FM"
+      ],
+      "frequencies": [
+        "103.1"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:cbs:daegu:mfm",
+      "title": "대구CBS 음악FM",
+      "subtitle": "대구·경북 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/daegu939/_definst_/daegu939.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "대구CBS 음악FM",
+        "cbs",
+        "daegu",
+        "mfm",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "대구CBS 음악FM",
+        "대구CBS 음악FM"
+      ],
+      "frequencies": [
+        "97.1"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:cbs:pohang:sfm",
+      "title": "포항CBS 표준FM",
+      "subtitle": "대구·경북 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/pohang/_definst_/pohang.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "포항CBS 표준FM",
+        "cbs",
+        "pohang",
+        "sfm",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "포항CBS 표준FM",
+        "포항CBS 표준FM"
+      ],
+      "frequencies": [
+        "91.5"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:febc:daegu:live",
+      "title": "FEBC 대구극동방송",
+      "subtitle": "대구·경북 · FEBC",
+      "resolver": "direct",
+      "url": "https://mlive3.febc.net/live5/daegulive/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "FEBC 대구극동방송",
+        "febc",
+        "daegu",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "FEBC 대구극동방송",
+        "FEBC 대구극동방송"
+      ],
+      "frequencies": [
+        "91.9",
+        "105.9"
+      ]
+    },
+    {
+      "id": "kr-radio:febc:pohang:live",
+      "title": "FEBC 포항극동방송",
+      "subtitle": "대구·경북 · FEBC",
+      "resolver": "direct",
+      "url": "https://mlive3.febc.net/live5/phlive/playlist.m3u8",
+      "alternates": [
+        "http://mlive2.febc.net:1935/live/phlive/playlist.m3u8"
+      ],
+      "aliases": [
+        "FEBC 포항극동방송",
+        "febc",
+        "pohang",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "FEBC 포항극동방송",
+        "FEBC 포항극동방송"
+      ],
+      "frequencies": [
+        "90.3"
+      ]
+    },
+    {
+      "id": "kr-radio:bbs:daegu:live",
+      "title": "BBS 대구불교방송",
+      "subtitle": "대구·경북 · BBS",
+      "resolver": "direct",
+      "url": "https://bbslive.goldenday.kr:446/hls/dgbbs.m3u8",
+      "alternates": [],
+      "aliases": [
+        "BBS 대구불교방송",
+        "bbs",
+        "daegu",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "BBS 대구불교방송",
+        "BBS 대구불교방송"
+      ]
+    },
+    {
+      "id": "kr-radio:cpbc:daegu:live",
+      "title": "CPBC 대구가톨릭평화방송",
+      "subtitle": "대구·경북 · CPBC",
+      "resolver": "direct",
+      "url": "http://live.dgcpbc.co.kr/dgcpbclive/livestream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "CPBC 대구가톨릭평화방송",
+        "cpbc",
+        "daegu",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "CPBC 대구가톨릭평화방송",
+        "CPBC 대구가톨릭평화방송"
+      ],
+      "frequencies": [
+        "93.1",
+        "96.9",
+        "100.7",
+        "100.5"
+      ]
+    },
+    {
+      "id": "kr-radio:wbs:daegu:live",
+      "title": "WBS 대구원음방송",
+      "subtitle": "대구·경북 · WBS",
+      "resolver": "direct",
+      "url": "https://wbsradio2.kr/wbs-d",
+      "alternates": [],
+      "aliases": [
+        "WBS 대구원음방송",
+        "wbs",
+        "daegu",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "WBS 대구원음방송",
+        "WBS 대구원음방송"
+      ]
+    },
+    {
+      "id": "kr-radio:afn:daegu:live",
+      "title": "AFN FM Daegu",
+      "subtitle": "대구·경북 · AFN",
+      "resolver": "afn",
+      "url": "https://playerservices.streamtheworld.com/api/livestream?station=AFNP_DGU&transports=http%2Chls&version=1.10",
+      "alternates": [
+        "https://playerservices.streamtheworld.com/api/livestream-redirect/AFNP_DGUAAC.aac"
+      ],
+      "aliases": [
+        "AFN FM Daegu",
+        "afn",
+        "daegu",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "AFN FM Daegu",
+        "AFN FM Daegu"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:scnfm",
+      "title": "성서공동체FM",
+      "subtitle": "대구·경북 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://onair.mapofm.net/scnfm",
+      "alternates": [],
+      "aliases": [
+        "성서공동체FM",
+        "community",
+        "scnfm",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "성서공동체FM",
+        "성서공동체FM"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:daegufm",
+      "title": "대구동구FM",
+      "subtitle": "대구·경북 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://icecast.radios.kr:8000/daegufm",
+      "alternates": [],
+      "aliases": [
+        "대구동구FM",
+        "community",
+        "daegufm",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "대구동구FM",
+        "대구동구FM"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:yeongjufm",
+      "title": "영주FM",
+      "subtitle": "대구·경북 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://icecast.radios.kr:8000/yeongjufm",
+      "alternates": [],
+      "aliases": [
+        "영주FM",
+        "community",
+        "yeongjufm",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "영주FM",
+        "영주FM"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:sjfm",
+      "title": "성주FM",
+      "subtitle": "대구·경북 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://icecast.radios.kr:8000/sjfm",
+      "alternates": [],
+      "aliases": [
+        "성주FM",
+        "community",
+        "sjfm",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "성주FM",
+        "성주FM"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:sangjufm",
+      "title": "상주FM",
+      "subtitle": "대구·경북 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://icecast.radios.kr:8000/sangjufm",
+      "alternates": [],
+      "aliases": [
+        "상주FM",
+        "community",
+        "sangjufm",
+        "대구·경북"
+      ],
+      "legacyNames": [
+        "상주FM",
+        "상주FM"
+      ]
+    },
+    {
+      "id": "kr-radio:kbs:gwangju:1radio",
+      "title": "KBS 광주 1라디오",
+      "subtitle": "광주·전남 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/40_21",
+      "alternates": [],
+      "aliases": [
+        "KBS광주 1라디오",
+        "kbs",
+        "gwangju",
+        "1radio",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "KBS 광주 1라디오",
+        "KBS광주 1라디오"
+      ],
+      "frequencies": [
+        "90.5",
+        "747"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:kbs:gwangju:2radio",
+      "title": "KBS 광주 2라디오",
+      "subtitle": "광주·전남 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/40_22",
+      "alternates": [],
+      "aliases": [
+        "KBS광주 2라디오",
+        "kbs",
+        "gwangju",
+        "2radio",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "KBS 광주 2라디오",
+        "KBS광주 2라디오"
+      ],
+      "frequencies": [
+        "95.5"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004070_443799.png"
+    },
+    {
+      "id": "kr-radio:kbs:gwangju:1fm",
+      "title": "KBS 광주 음악FM",
+      "subtitle": "광주·전남 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/40_24",
+      "alternates": [],
+      "aliases": [
+        "KBS광주 음악FM",
+        "kbs",
+        "gwangju",
+        "1fm",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "KBS 광주 음악FM",
+        "KBS광주 음악FM"
+      ],
+      "frequencies": [
+        "92.3"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004216_443813.png"
+    },
+    {
+      "id": "kr-radio:kbs:mokpo:1radio",
+      "title": "KBS 목포 1라디오",
+      "subtitle": "광주·전남 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/41_21",
+      "alternates": [],
+      "aliases": [
+        "KBS목포 1라디오",
+        "kbs",
+        "mokpo",
+        "1radio",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "KBS 목포 1라디오",
+        "KBS목포 1라디오"
+      ],
+      "frequencies": [
+        "105.9",
+        "1467"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:kbs:mokpo:1fm",
+      "title": "KBS 목포 음악FM",
+      "subtitle": "광주·전남 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/41_24",
+      "alternates": [],
+      "aliases": [
+        "KBS목포 음악FM",
+        "kbs",
+        "mokpo",
+        "1fm",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "KBS 목포 음악FM",
+        "KBS목포 음악FM"
+      ],
+      "frequencies": [
+        "98.3"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004216_443813.png"
+    },
+    {
+      "id": "kr-radio:kbs:suncheon:1radio",
+      "title": "KBS 순천 1라디오",
+      "subtitle": "광주·전남 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/43_21",
+      "alternates": [],
+      "aliases": [
+        "KBS순천 1라디오",
+        "kbs",
+        "suncheon",
+        "1radio",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "KBS 순천 1라디오",
+        "KBS순천 1라디오"
+      ],
+      "frequencies": [
+        "95.7",
+        "630"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:mbc:gwangju:sfm",
+      "title": "광주MBC 표준FM",
+      "subtitle": "광주·전남 · MBC",
+      "resolver": "direct",
+      "url": "https://media.kjmbc.co.kr/hls/amlive/GWANGJU-MBC-AM/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "광주MBC 표준FM",
+        "mbc",
+        "gwangju",
+        "sfm",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "광주MBC 표준FM",
+        "광주MBC 표준FM"
+      ],
+      "frequencies": [
+        "93.9"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:gwangju:fm4u",
+      "title": "광주MBC FM4U",
+      "subtitle": "광주·전남 · MBC",
+      "resolver": "direct",
+      "url": "https://media.kjmbc.co.kr/hls/fmlive/GWANGJU-MBC-FM/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "광주MBC FM4U",
+        "mbc",
+        "gwangju",
+        "fm4u",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "광주MBC FM4U",
+        "광주MBC FM4U"
+      ],
+      "frequencies": [
+        "91.5",
+        "95.1"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:mokpo:sfm",
+      "title": "목포MBC 표준FM",
+      "subtitle": "광주·전남 · MBC",
+      "resolver": "direct",
+      "url": "https://vod.mpmbc.co.kr/live/encoder-am/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "목포MBC 표준FM",
+        "mbc",
+        "mokpo",
+        "sfm",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "목포MBC 표준FM",
+        "목포MBC 표준FM"
+      ],
+      "frequencies": [
+        "89.1"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:mokpo:fm4u",
+      "title": "목포MBC FM4U",
+      "subtitle": "광주·전남 · MBC",
+      "resolver": "direct",
+      "url": "https://vod.mpmbc.co.kr/live/encoder-fm/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "목포MBC FM4U",
+        "mbc",
+        "mokpo",
+        "fm4u",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "목포MBC FM4U",
+        "목포MBC FM4U"
+      ],
+      "frequencies": [
+        "102.3"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:yeosu:sfm",
+      "title": "여수MBC 표준FM",
+      "subtitle": "광주·전남 · MBC",
+      "resolver": "direct",
+      "url": "https://5c3639aa99149.streamlock.net/표준FM/표준FM/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "여수MBC 표준FM",
+        "mbc",
+        "yeosu",
+        "sfm",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "여수MBC 표준FM",
+        "여수MBC 표준FM"
+      ],
+      "frequencies": [
+        "100.3"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:yeosu:fm4u",
+      "title": "여수MBC FM4U",
+      "subtitle": "광주·전남 · MBC",
+      "resolver": "direct",
+      "url": "https://5c3639aa99149.streamlock.net/FM4U/FM4U/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "여수MBC FM4U",
+        "mbc",
+        "yeosu",
+        "fm4u",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "여수MBC FM4U",
+        "여수MBC FM4U"
+      ],
+      "frequencies": [
+        "98.3"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:sbs:gwangju:powerfm",
+      "title": "KBC 마이FM",
+      "subtitle": "광주·전남 · SBS",
+      "resolver": "direct",
+      "url": "https://vod.ikbc.co.kr/KBCFM/kbcra_aac/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "KBC 마이FM",
+        "sbs",
+        "gwangju",
+        "powerfm",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "KBC 마이FM",
+        "KBC 마이FM"
+      ],
+      "frequencies": [
+        "101.1",
+        "104.3",
+        "90.7",
+        "96.7"
+      ]
+    },
+    {
+      "id": "kr-radio:tbn:gwangju:live",
+      "title": "TBN 광주교통방송",
+      "subtitle": "광주·전남 · TBN",
+      "resolver": "direct",
+      "url": "https://www.tbn.it.kr/gwangju/myStream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "TBN 광주교통방송",
+        "tbn",
+        "gwangju",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "TBN 광주교통방송",
+        "TBN 광주교통방송"
+      ],
+      "frequencies": [
+        "97.3",
+        "103.5"
+      ]
+    },
+    {
+      "id": "kr-radio:cbs:gwangju:sfm",
+      "title": "광주CBS 표준FM",
+      "subtitle": "광주·전남 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/gwangju/_definst_/gwangju.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "광주CBS 표준FM",
+        "cbs",
+        "gwangju",
+        "sfm",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "광주CBS 표준FM",
+        "광주CBS 표준FM"
+      ],
+      "frequencies": [
+        "103.1"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:cbs:gwangju:mfm",
+      "title": "광주CBS 음악FM",
+      "subtitle": "광주·전남 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/gwangju939/_definst_/gwangju939.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "광주CBS 음악FM",
+        "cbs",
+        "gwangju",
+        "mfm",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "광주CBS 음악FM",
+        "광주CBS 음악FM"
+      ],
+      "frequencies": [
+        "98.1"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:cbs:jeonnam:sfm",
+      "title": "전남CBS 표준FM",
+      "subtitle": "광주·전남 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/jeonnam/_definst_/jeonnam.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "전남CBS 표준FM",
+        "cbs",
+        "jeonnam",
+        "sfm",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "전남CBS 표준FM",
+        "전남CBS 표준FM"
+      ],
+      "frequencies": [
+        "102.1",
+        "89.5"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:febc:gwangju:live",
+      "title": "FEBC 광주극동방송",
+      "subtitle": "광주·전남 · FEBC",
+      "resolver": "direct",
+      "url": "https://mlive3.febc.net/live5/gjlive/playlist.m3u8",
+      "alternates": [
+        "http://mlive2.febc.net:1935/live/gjlive/playlist.m3u8"
+      ],
+      "aliases": [
+        "FEBC 광주극동방송",
+        "febc",
+        "gwangju",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "FEBC 광주극동방송",
+        "FEBC 광주극동방송"
+      ],
+      "frequencies": [
+        "93.1"
+      ]
+    },
+    {
+      "id": "kr-radio:febc:mokpo:live",
+      "title": "FEBC 목포극동방송",
+      "subtitle": "광주·전남 · FEBC",
+      "resolver": "direct",
+      "url": "https://mlive3.febc.net/live5/mplive/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "FEBC 목포극동방송",
+        "febc",
+        "mokpo",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "FEBC 목포극동방송",
+        "FEBC 목포극동방송"
+      ],
+      "frequencies": [
+        "100.5"
+      ]
+    },
+    {
+      "id": "kr-radio:febc:jeonnam:live",
+      "title": "FEBC 전남동부극동방송",
+      "subtitle": "광주·전남 · FEBC",
+      "resolver": "direct",
+      "url": "https://mlive3.febc.net/live5/jndblive/playlist.m3u8",
+      "alternates": [
+        "http://mlive2.febc.net:1935/live/jndblive/playlist.m3u8"
+      ],
+      "aliases": [
+        "FEBC 전남동부극동방송",
+        "febc",
+        "jeonnam",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "FEBC 전남동부극동방송",
+        "FEBC 전남동부극동방송"
+      ],
+      "frequencies": [
+        "97.5"
+      ]
+    },
+    {
+      "id": "kr-radio:bbs:gwangju:live",
+      "title": "BBS 광주불교방송",
+      "subtitle": "광주·전남 · BBS",
+      "resolver": "direct",
+      "url": "http://live.cdn.smilecdn.com:1935/kjbbs1_live/live/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "BBS 광주불교방송",
+        "bbs",
+        "gwangju",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "BBS 광주불교방송",
+        "BBS 광주불교방송"
+      ]
+    },
+    {
+      "id": "kr-radio:cpbc:gwangju:live",
+      "title": "CPBC 광주가톨릭평화방송",
+      "subtitle": "광주·전남 · CPBC",
+      "resolver": "direct",
+      "url": "http://pbcradio.dynamicsmart.com:1935/radio/kjpbc2/index.m3u8",
+      "alternates": [],
+      "aliases": [
+        "CPBC 광주가톨릭평화방송",
+        "cpbc",
+        "gwangju",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "CPBC 광주가톨릭평화방송",
+        "CPBC 광주가톨릭평화방송"
+      ],
+      "frequencies": [
+        "99.9",
+        "99.5"
+      ]
+    },
+    {
+      "id": "kr-radio:wbs:gwangju:live",
+      "title": "WBS 광주원음방송",
+      "subtitle": "광주·전남 · WBS",
+      "resolver": "direct",
+      "url": "https://wbsradio2.kr/wbs-g",
+      "alternates": [],
+      "aliases": [
+        "WBS 광주원음방송",
+        "wbs",
+        "gwangju",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "WBS 광주원음방송",
+        "WBS 광주원음방송"
+      ]
+    },
+    {
+      "id": "kr-radio:ggn:national:live",
+      "title": "글로벌광주방송",
+      "subtitle": "광주·전남 · GGN",
+      "resolver": "direct",
+      "url": "http://media.ggn.or.kr:8080/live",
+      "alternates": [],
+      "aliases": [
+        "글로벌광주방송",
+        "ggn",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "글로벌광주방송",
+        "글로벌광주방송"
+      ]
+    },
+    {
+      "id": "kr-radio:kugak:gwangju:live",
+      "title": "광주국악방송",
+      "subtitle": "광주·전남 · KUGAK",
+      "resolver": "direct",
+      "url": "https://mgugaklive.nowcdn.co.kr/gugakgwangju/Glive.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "광주국악방송",
+        "kugak",
+        "gwangju",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "광주국악방송",
+        "광주국악방송"
+      ],
+      "frequencies": [
+        "99.3"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:kjfm",
+      "title": "광주FM",
+      "subtitle": "광주·전남 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://radiostream.communityradio.kr/live",
+      "alternates": [],
+      "aliases": [
+        "광주FM",
+        "community",
+        "kjfm",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "광주FM",
+        "광주FM"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:crfm",
+      "title": "GBS고려방송",
+      "subtitle": "광주·전남 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://icecast.radios.kr:8000/crfm",
+      "alternates": [],
+      "aliases": [
+        "GBS고려방송",
+        "community",
+        "crfm",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "GBS고려방송",
+        "GBS고려방송"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:suncheonfm",
+      "title": "순천미디어네트워크",
+      "subtitle": "광주·전남 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://icecast.radios.kr:8000/suncheonfm",
+      "alternates": [],
+      "aliases": [
+        "순천미디어네트워크",
+        "community",
+        "suncheonfm",
+        "광주·전남"
+      ],
+      "legacyNames": [
+        "순천미디어네트워크",
+        "순천미디어네트워크"
+      ]
+    },
+    {
+      "id": "kr-radio:kbs:jeonju:1radio",
+      "title": "KBS 전주 1라디오",
+      "subtitle": "전북 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/50_21",
+      "alternates": [],
+      "aliases": [
+        "KBS전주 1라디오",
+        "kbs",
+        "jeonju",
+        "1radio",
+        "전북"
+      ],
+      "legacyNames": [
+        "KBS 전주 1라디오",
+        "KBS전주 1라디오"
+      ],
+      "frequencies": [
+        "96.9",
+        "567"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:kbs:jeonju:2radio",
+      "title": "KBS 전주 2라디오",
+      "subtitle": "전북 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/50_22",
+      "alternates": [],
+      "aliases": [
+        "KBS전주 2라디오",
+        "kbs",
+        "jeonju",
+        "2radio",
+        "전북"
+      ],
+      "legacyNames": [
+        "KBS 전주 2라디오",
+        "KBS전주 2라디오"
+      ],
+      "frequencies": [
+        "92.9"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004070_443799.png"
+    },
+    {
+      "id": "kr-radio:kbs:jeonju:1fm",
+      "title": "KBS 전주 음악FM",
+      "subtitle": "전북 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/50_24",
+      "alternates": [],
+      "aliases": [
+        "KBS전주 음악FM",
+        "kbs",
+        "jeonju",
+        "1fm",
+        "전북"
+      ],
+      "legacyNames": [
+        "KBS 전주 음악FM",
+        "KBS전주 음악FM"
+      ],
+      "frequencies": [
+        "100.7"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004216_443813.png"
+    },
+    {
+      "id": "kr-radio:mbc:jeonju:sfm",
+      "title": "전주MBC 표준FM",
+      "subtitle": "전북 · MBC",
+      "resolver": "direct",
+      "url": "https://live.jmbc.co.kr/live/am_live.m3u8",
+      "alternates": [],
+      "aliases": [
+        "전주MBC 표준FM",
+        "mbc",
+        "jeonju",
+        "sfm",
+        "전북"
+      ],
+      "legacyNames": [
+        "전주MBC 표준FM",
+        "전주MBC 표준FM"
+      ],
+      "frequencies": [
+        "101.7",
+        "94.3"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:jeonju:fm4u",
+      "title": "전주MBC FM4U",
+      "subtitle": "전북 · MBC",
+      "resolver": "direct",
+      "url": "https://live.jmbc.co.kr/live/fm_live.m3u8",
+      "alternates": [],
+      "aliases": [
+        "전주MBC FM4U",
+        "mbc",
+        "jeonju",
+        "fm4u",
+        "전북"
+      ],
+      "legacyNames": [
+        "전주MBC FM4U",
+        "전주MBC FM4U"
+      ],
+      "frequencies": [
+        "99.1"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:sbs:jeonju:powerfm",
+      "title": "JTV 매직FM",
+      "subtitle": "전북 · SBS",
+      "resolver": "direct",
+      "url": "http://61.85.197.53:1935/jtv_radio/myStream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "JTV 매직FM",
+        "sbs",
+        "jeonju",
+        "powerfm",
+        "전북"
+      ],
+      "legacyNames": [
+        "JTV 매직FM",
+        "JTV 매직FM"
+      ],
+      "frequencies": [
+        "90.1"
+      ]
+    },
+    {
+      "id": "kr-radio:tbn:jeonbuk:live",
+      "title": "TBN 전북교통방송",
+      "subtitle": "전북 · TBN",
+      "resolver": "direct",
+      "url": "https://www.tbn.it.kr/jeonbuk/myStream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "TBN 전북교통방송",
+        "tbn",
+        "jeonbuk",
+        "전북"
+      ],
+      "legacyNames": [
+        "TBN 전북교통방송",
+        "TBN 전북교통방송"
+      ],
+      "frequencies": [
+        "102.5",
+        "106.1"
+      ]
+    },
+    {
+      "id": "kr-radio:cbs:jeonbuk:sfm",
+      "title": "전북CBS 표준FM",
+      "subtitle": "전북 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/jeonbuk/_definst_/jeonbuk.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "전북CBS 표준FM",
+        "cbs",
+        "jeonbuk",
+        "sfm",
+        "전북"
+      ],
+      "legacyNames": [
+        "전북CBS 표준FM",
+        "전북CBS 표준FM"
+      ],
+      "frequencies": [
+        "103.7",
+        "90.7",
+        "96.3"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:febc:jeonbuk:live",
+      "title": "FEBC 전북극동방송",
+      "subtitle": "전북 · FEBC",
+      "resolver": "direct",
+      "url": "https://mlive3.febc.net/live5/jblive/playlist.m3u8",
+      "alternates": [
+        "http://mlive2.febc.net:1935/live/jblive/playlist.m3u8"
+      ],
+      "aliases": [
+        "FEBC 전북극동방송",
+        "febc",
+        "jeonbuk",
+        "전북"
+      ],
+      "legacyNames": [
+        "FEBC 전북극동방송",
+        "FEBC 전북극동방송"
+      ],
+      "frequencies": [
+        "91.1"
+      ]
+    },
+    {
+      "id": "kr-radio:wbs:jeonbuk:live",
+      "title": "WBS 전북원음방송",
+      "subtitle": "전북 · WBS",
+      "resolver": "direct",
+      "url": "https://wbsradio2.kr/wbs-j",
+      "alternates": [],
+      "aliases": [
+        "WBS 전북원음방송",
+        "wbs",
+        "jeonbuk",
+        "전북"
+      ],
+      "legacyNames": [
+        "WBS 전북원음방송",
+        "WBS 전북원음방송"
+      ]
+    },
+    {
+      "id": "kr-radio:afn:kunsan:live",
+      "title": "AFN FM Kunsan",
+      "subtitle": "전북 · AFN",
+      "resolver": "afn",
+      "url": "https://playerservices.streamtheworld.com/api/livestream?station=AFNP_KSN&transports=http%2Chls&version=1.10",
+      "alternates": [
+        "https://playerservices.streamtheworld.com/api/livestream-redirect/AFNP_KSNAAC.aac"
+      ],
+      "aliases": [
+        "AFN FM Kunsan",
+        "afn",
+        "kunsan",
+        "전북"
+      ],
+      "legacyNames": [
+        "AFN FM Kunsan",
+        "AFN FM Kunsan"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:jcfm",
+      "title": "전주FM",
+      "subtitle": "전북 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://radiostream.communityradio.kr/jcfm1",
+      "alternates": [],
+      "aliases": [
+        "전주FM",
+        "community",
+        "jcfm",
+        "전북"
+      ],
+      "legacyNames": [
+        "전주FM",
+        "전주FM"
+      ]
+    },
+    {
+      "id": "kr-radio:kbs:daejeon:1radio",
+      "title": "KBS 대전 1라디오",
+      "subtitle": "대전·세종·충남 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/60_21",
+      "alternates": [],
+      "aliases": [
+        "KBS대전 1라디오",
+        "kbs",
+        "daejeon",
+        "1radio",
+        "대전·세종·충남"
+      ],
+      "legacyNames": [
+        "KBS 대전 1라디오",
+        "KBS대전 1라디오"
+      ],
+      "frequencies": [
+        "94.7",
+        "882"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:kbs:daejeon:2radio",
+      "title": "KBS 대전 2라디오",
+      "subtitle": "대전·세종·충남 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/60_22",
+      "alternates": [],
+      "aliases": [
+        "KBS대전 2라디오",
+        "kbs",
+        "daejeon",
+        "2radio",
+        "대전·세종·충남"
+      ],
+      "legacyNames": [
+        "KBS 대전 2라디오",
+        "KBS대전 2라디오"
+      ],
+      "frequencies": [
+        "100.9"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004070_443799.png"
+    },
+    {
+      "id": "kr-radio:kbs:daejeon:1fm",
+      "title": "KBS 대전 음악FM",
+      "subtitle": "대전·세종·충남 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/60_24",
+      "alternates": [],
+      "aliases": [
+        "KBS대전 음악FM",
+        "kbs",
+        "daejeon",
+        "1fm",
+        "대전·세종·충남"
+      ],
+      "legacyNames": [
+        "KBS 대전 음악FM",
+        "KBS대전 음악FM"
+      ],
+      "frequencies": [
+        "98.5"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004216_443813.png"
+    },
+    {
+      "id": "kr-radio:mbc:daejeon:sfm",
+      "title": "대전MBC 표준FM",
+      "subtitle": "대전·세종·충남 · MBC",
+      "resolver": "direct",
+      "url": "https://ns1.tjmbc.co.kr/live_am/live_am.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "대전MBC 표준FM",
+        "mbc",
+        "daejeon",
+        "sfm",
+        "대전·세종·충남"
+      ],
+      "legacyNames": [
+        "대전MBC 표준FM",
+        "대전MBC 표준FM"
+      ],
+      "frequencies": [
+        "92.5",
+        "91.3"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:daejeon:fm4u",
+      "title": "대전MBC FM4U",
+      "subtitle": "대전·세종·충남 · MBC",
+      "resolver": "direct",
+      "url": "https://ns1.tjmbc.co.kr/live_fm/live_fm.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "대전MBC FM4U",
+        "mbc",
+        "daejeon",
+        "fm4u",
+        "대전·세종·충남"
+      ],
+      "legacyNames": [
+        "대전MBC FM4U",
+        "대전MBC FM4U"
+      ],
+      "frequencies": [
+        "97.5"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:sbs:daejeon:powerfm",
+      "title": "TJB 파워FM",
+      "subtitle": "대전·세종·충남 · SBS",
+      "resolver": "direct",
+      "url": "https://vod.tjb.co.kr/radiolive/_definst_/radio_64k/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "TJB 파워FM",
+        "sbs",
+        "daejeon",
+        "powerfm",
+        "대전·세종·충남"
+      ],
+      "legacyNames": [
+        "TJB 파워FM",
+        "TJB 파워FM"
+      ],
+      "frequencies": [
+        "95.7",
+        "96.5"
+      ]
+    },
+    {
+      "id": "kr-radio:tbn:daejeon:live",
+      "title": "TBN 대전교통방송",
+      "subtitle": "대전·세종·충남 · TBN",
+      "resolver": "direct",
+      "url": "https://www.tbn.it.kr/daejeon/myStream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "TBN 대전교통방송",
+        "tbn",
+        "daejeon",
+        "대전·세종·충남"
+      ],
+      "legacyNames": [
+        "TBN 대전교통방송",
+        "TBN 대전교통방송"
+      ],
+      "frequencies": [
+        "102.9"
+      ]
+    },
+    {
+      "id": "kr-radio:tbn:chungnam:live",
+      "title": "TBN 충남교통방송",
+      "subtitle": "대전·세종·충남 · TBN",
+      "resolver": "direct",
+      "url": "https://www.tbn.it.kr/chungnam/myStream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "TBN 충남교통방송",
+        "tbn",
+        "chungnam",
+        "대전·세종·충남"
+      ],
+      "legacyNames": [
+        "TBN 충남교통방송",
+        "TBN 충남교통방송"
+      ],
+      "frequencies": [
+        "103.9",
+        "103.1"
+      ]
+    },
+    {
+      "id": "kr-radio:cbs:daejeon:sfm",
+      "title": "대전CBS 표준FM",
+      "subtitle": "대전·세종·충남 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/daejeon/_definst_/daejeon.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "대전CBS 표준FM",
+        "cbs",
+        "daejeon",
+        "sfm",
+        "대전·세종·충남"
+      ],
+      "legacyNames": [
+        "대전CBS 표준FM",
+        "대전CBS 표준FM"
+      ],
+      "frequencies": [
+        "91.7",
+        "99.3"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:febc:daejeon:live",
+      "title": "FEBC 대전극동방송",
+      "subtitle": "대전·세종·충남 · FEBC",
+      "resolver": "direct",
+      "url": "https://mlive3.febc.net/live5/djlive/playlist.m3u8",
+      "alternates": [
+        "http://mlive2.febc.net:1935/live/djlive/playlist.m3u8"
+      ],
+      "aliases": [
+        "FEBC 대전극동방송",
+        "febc",
+        "daejeon",
+        "대전·세종·충남"
+      ],
+      "legacyNames": [
+        "FEBC 대전극동방송",
+        "FEBC 대전극동방송"
+      ],
+      "frequencies": [
+        "93.3"
+      ]
+    },
+    {
+      "id": "kr-radio:kugak:daejeon:live",
+      "title": "대전국악방송",
+      "subtitle": "대전·세종·충남 · KUGAK",
+      "resolver": "direct",
+      "url": "https://mgugaklive.nowcdn.co.kr/gugakdaejeon/Daejeonradio.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "대전국악방송",
+        "kugak",
+        "daejeon",
+        "대전·세종·충남"
+      ],
+      "legacyNames": [
+        "대전국악방송",
+        "대전국악방송"
+      ],
+      "frequencies": [
+        "90.5"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:keumkangfm",
+      "title": "금강FM",
+      "subtitle": "대전·세종·충남 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://icecast.radios.kr:8000/keumkangfm",
+      "alternates": [],
+      "aliases": [
+        "금강FM",
+        "community",
+        "keumkangfm",
+        "대전·세종·충남"
+      ],
+      "legacyNames": [
+        "금강FM",
+        "금강FM"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:sejongfm",
+      "title": "세종FM",
+      "subtitle": "대전·세종·충남 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://icecast.radios.kr:8000/sejongfm",
+      "alternates": [],
+      "aliases": [
+        "세종FM",
+        "community",
+        "sejongfm",
+        "대전·세종·충남"
+      ],
+      "legacyNames": [
+        "세종FM",
+        "세종FM"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:hanbatfm",
+      "title": "한밭FM",
+      "subtitle": "대전·세종·충남 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://115.68.194.186:8000/hanbatfm",
+      "alternates": [],
+      "aliases": [
+        "한밭FM",
+        "community",
+        "hanbatfm",
+        "대전·세종·충남"
+      ],
+      "legacyNames": [
+        "한밭FM",
+        "한밭FM"
+      ]
+    },
+    {
+      "id": "kr-radio:kbs:cheongju:1radio",
+      "title": "KBS 청주 1라디오",
+      "subtitle": "충북 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/70_21",
+      "alternates": [],
+      "aliases": [
+        "KBS청주 1라디오",
+        "kbs",
+        "cheongju",
+        "1radio",
+        "충북"
+      ],
+      "legacyNames": [
+        "KBS 청주 1라디오",
+        "KBS청주 1라디오"
+      ],
+      "frequencies": [
+        "89.3",
+        "1062"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:kbs:cheongju:2radio",
+      "title": "KBS 청주 2라디오",
+      "subtitle": "충북 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/70_22",
+      "alternates": [],
+      "aliases": [
+        "KBS청주 2라디오",
+        "kbs",
+        "cheongju",
+        "2radio",
+        "충북"
+      ],
+      "legacyNames": [
+        "KBS 청주 2라디오",
+        "KBS청주 2라디오"
+      ],
+      "frequencies": [
+        "90.9"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004070_443799.png"
+    },
+    {
+      "id": "kr-radio:kbs:cheongju:1fm",
+      "title": "KBS 청주 음악FM",
+      "subtitle": "충북 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/70_24",
+      "alternates": [],
+      "aliases": [
+        "KBS청주 음악FM",
+        "kbs",
+        "cheongju",
+        "1fm",
+        "충북"
+      ],
+      "legacyNames": [
+        "KBS 청주 음악FM",
+        "KBS청주 음악FM"
+      ],
+      "frequencies": [
+        "102.1",
+        "94.1"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004216_443813.png"
+    },
+    {
+      "id": "kr-radio:kbs:chungju:1radio",
+      "title": "KBS 충주 1라디오",
+      "subtitle": "충북 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/71_21",
+      "alternates": [],
+      "aliases": [
+        "KBS충주 1라디오",
+        "kbs",
+        "chungju",
+        "1radio",
+        "충북"
+      ],
+      "legacyNames": [
+        "KBS 충주 1라디오",
+        "KBS충주 1라디오"
+      ],
+      "frequencies": [
+        "92.1",
+        "1044"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:kbs:chungju:1fm",
+      "title": "KBS 충주 음악FM",
+      "subtitle": "충북 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/71_24",
+      "alternates": [],
+      "aliases": [
+        "KBS충주 음악FM",
+        "kbs",
+        "chungju",
+        "1fm",
+        "충북"
+      ],
+      "legacyNames": [
+        "KBS 충주 음악FM",
+        "KBS충주 음악FM"
+      ],
+      "frequencies": [
+        "100.3"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004216_443813.png"
+    },
+    {
+      "id": "kr-radio:mbc:cheongju:sfm",
+      "title": "MBC충북 표준FM",
+      "subtitle": "충북 · MBC",
+      "resolver": "direct",
+      "url": "https://mbccbp.coreit.co.kr/radio_stfm/myStream.sdp/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "MBC충북 표준FM",
+        "mbc",
+        "cheongju",
+        "sfm",
+        "충북"
+      ],
+      "legacyNames": [
+        "MBC충북 표준FM",
+        "MBC충북 표준FM"
+      ],
+      "frequencies": [
+        "107.1"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:cheongju:fm4u",
+      "title": "MBC충북 FM4U",
+      "subtitle": "충북 · MBC",
+      "resolver": "direct",
+      "url": "https://mbccbp.coreit.co.kr/radio_fm/myStream.sdp/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "MBC충북 FM4U",
+        "mbc",
+        "cheongju",
+        "fm4u",
+        "충북"
+      ],
+      "legacyNames": [
+        "MBC충북 FM4U",
+        "MBC충북 FM4U"
+      ],
+      "frequencies": [
+        "99.7"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:sbs:cheongju:powerfm",
+      "title": "CJB 조이FM",
+      "subtitle": "충북 · SBS",
+      "resolver": "direct",
+      "url": "https://wowza1.cjb.co.kr/live/cjbradio/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "CJB 조이FM",
+        "sbs",
+        "cheongju",
+        "powerfm",
+        "충북"
+      ],
+      "legacyNames": [
+        "CJB 조이FM",
+        "CJB 조이FM"
+      ],
+      "frequencies": [
+        "101.5",
+        "97.9",
+        "102.7"
+      ]
+    },
+    {
+      "id": "kr-radio:tbn:chungbuk:live",
+      "title": "TBN 충북교통방송",
+      "subtitle": "충북 · TBN",
+      "resolver": "direct",
+      "url": "https://www.tbn.it.kr/chungbuk/myStream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "TBN 충북교통방송",
+        "tbn",
+        "chungbuk",
+        "충북"
+      ],
+      "legacyNames": [
+        "TBN 충북교통방송",
+        "TBN 충북교통방송"
+      ],
+      "frequencies": [
+        "103.3",
+        "93.5"
+      ]
+    },
+    {
+      "id": "kr-radio:cbs:cheongju:sfm",
+      "title": "충북CBS 표준FM",
+      "subtitle": "충북 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/cheongju/_definst_/cheongju.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "충북CBS 표준FM",
+        "cbs",
+        "cheongju",
+        "sfm",
+        "충북"
+      ],
+      "legacyNames": [
+        "충북CBS 표준FM",
+        "충북CBS 표준FM"
+      ],
+      "frequencies": [
+        "91.5"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:community:national:obn",
+      "title": "옥천FM",
+      "subtitle": "충북 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://icecast.radios.kr:8000/obn",
+      "alternates": [],
+      "aliases": [
+        "옥천FM",
+        "community",
+        "obn",
+        "충북"
+      ],
+      "legacyNames": [
+        "옥천FM",
+        "옥천FM"
+      ]
+    },
+    {
+      "id": "kr-radio:kbs:chuncheon:1radio",
+      "title": "KBS 춘천 1라디오",
+      "subtitle": "강원 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/80_21",
+      "alternates": [],
+      "aliases": [
+        "KBS춘천 1라디오",
+        "kbs",
+        "chuncheon",
+        "1radio",
+        "강원"
+      ],
+      "legacyNames": [
+        "KBS 춘천 1라디오",
+        "KBS춘천 1라디오"
+      ],
+      "frequencies": [
+        "99.5",
+        "657"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:kbs:chuncheon:2radio",
+      "title": "KBS 춘천 2라디오",
+      "subtitle": "강원 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/80_22",
+      "alternates": [],
+      "aliases": [
+        "KBS춘천 2라디오",
+        "kbs",
+        "chuncheon",
+        "2radio",
+        "강원"
+      ],
+      "legacyNames": [
+        "KBS 춘천 2라디오",
+        "KBS춘천 2라디오"
+      ],
+      "frequencies": [
+        "98.7"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004070_443799.png"
+    },
+    {
+      "id": "kr-radio:kbs:chuncheon:1fm",
+      "title": "KBS 춘천 음악FM",
+      "subtitle": "강원 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/80_24",
+      "alternates": [],
+      "aliases": [
+        "KBS춘천 음악FM",
+        "kbs",
+        "chuncheon",
+        "1fm",
+        "강원"
+      ],
+      "legacyNames": [
+        "KBS 춘천 음악FM",
+        "KBS춘천 음악FM"
+      ],
+      "frequencies": [
+        "91.1"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004216_443813.png"
+    },
+    {
+      "id": "kr-radio:kbs:gangneung:1radio",
+      "title": "KBS 강릉 1라디오",
+      "subtitle": "강원 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/81_21",
+      "alternates": [],
+      "aliases": [
+        "KBS강릉 1라디오",
+        "kbs",
+        "gangneung",
+        "1radio",
+        "강원"
+      ],
+      "legacyNames": [
+        "KBS 강릉 1라디오",
+        "KBS강릉 1라디오"
+      ],
+      "frequencies": [
+        "98.9",
+        "864"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:kbs:gangneung:1fm",
+      "title": "KBS 강릉 음악FM",
+      "subtitle": "강원 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/81_24",
+      "alternates": [],
+      "aliases": [
+        "KBS강릉 음악FM",
+        "kbs",
+        "gangneung",
+        "1fm",
+        "강원"
+      ],
+      "legacyNames": [
+        "KBS 강릉 음악FM",
+        "KBS강릉 음악FM"
+      ],
+      "frequencies": [
+        "89.1"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004216_443813.png"
+    },
+    {
+      "id": "kr-radio:kbs:wonju:1radio",
+      "title": "KBS 원주 1라디오",
+      "subtitle": "강원 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/82_21",
+      "alternates": [],
+      "aliases": [
+        "KBS원주 1라디오",
+        "kbs",
+        "wonju",
+        "1radio",
+        "강원"
+      ],
+      "legacyNames": [
+        "KBS 원주 1라디오",
+        "KBS원주 1라디오"
+      ],
+      "frequencies": [
+        "97.1",
+        "95.5",
+        "1152"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:kbs:wonju:1fm",
+      "title": "KBS 원주 음악FM",
+      "subtitle": "강원 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/82_24",
+      "alternates": [],
+      "aliases": [
+        "KBS원주 음악FM",
+        "kbs",
+        "wonju",
+        "1fm",
+        "강원"
+      ],
+      "legacyNames": [
+        "KBS 원주 음악FM",
+        "KBS원주 음악FM"
+      ],
+      "frequencies": [
+        "89.5"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004216_443813.png"
+    },
+    {
+      "id": "kr-radio:mbc:chuncheon:sfm",
+      "title": "춘천MBC 표준FM",
+      "subtitle": "강원 · MBC",
+      "resolver": "direct",
+      "url": "https://stream.chmbc.co.kr/radio1/fm1_aac/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "춘천MBC 표준FM",
+        "mbc",
+        "chuncheon",
+        "sfm",
+        "강원"
+      ],
+      "legacyNames": [
+        "춘천MBC 표준FM",
+        "춘천MBC 표준FM"
+      ],
+      "frequencies": [
+        "92.3",
+        "88.9"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:chuncheon:fm4u",
+      "title": "춘천MBC FM4U",
+      "subtitle": "강원 · MBC",
+      "resolver": "direct",
+      "url": "https://stream.chmbc.co.kr/live_radio2/fm1/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "춘천MBC FM4U",
+        "mbc",
+        "chuncheon",
+        "fm4u",
+        "강원"
+      ],
+      "legacyNames": [
+        "춘천MBC FM4U",
+        "춘천MBC FM4U"
+      ],
+      "frequencies": [
+        "94.5",
+        "98.3"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:wonju:sfm",
+      "title": "원주MBC 표준FM",
+      "subtitle": "강원 · MBC",
+      "resolver": "direct",
+      "url": "http://live.wjmbc.co.kr:1935/fm2/fm2/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "원주MBC 표준FM",
+        "mbc",
+        "wonju",
+        "sfm",
+        "강원"
+      ],
+      "legacyNames": [
+        "원주MBC 표준FM",
+        "원주MBC 표준FM"
+      ],
+      "frequencies": [
+        "102.5",
+        "92.7"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:wonju:fm4u",
+      "title": "원주MBC FM4U",
+      "subtitle": "강원 · MBC",
+      "resolver": "direct",
+      "url": "http://live.wjmbc.co.kr:1935/fm989/fm989/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "원주MBC FM4U",
+        "mbc",
+        "wonju",
+        "fm4u",
+        "강원"
+      ],
+      "legacyNames": [
+        "원주MBC FM4U",
+        "원주MBC FM4U"
+      ],
+      "frequencies": [
+        "98.9"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:gangneung:sfm",
+      "title": "MBC강원영동 표준FM",
+      "subtitle": "강원 · MBC",
+      "resolver": "direct",
+      "url": "http://123.254.72.24:1935/amlive/livestream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "MBC강원영동 표준FM",
+        "mbc",
+        "gangneung",
+        "sfm",
+        "강원"
+      ],
+      "legacyNames": [
+        "MBC강원영동 표준FM",
+        "MBC강원영동 표준FM"
+      ],
+      "frequencies": [
+        "96.3",
+        "101.5",
+        "93.1"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:gangneung:fm4u",
+      "title": "MBC강원영동 FM4U",
+      "subtitle": "강원 · MBC",
+      "resolver": "direct",
+      "url": "http://123.254.72.24:1935/fmlive/livestream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "MBC강원영동 FM4U",
+        "mbc",
+        "gangneung",
+        "fm4u",
+        "강원"
+      ],
+      "legacyNames": [
+        "MBC강원영동 FM4U",
+        "MBC강원영동 FM4U"
+      ],
+      "frequencies": [
+        "94.3",
+        "98.1",
+        "99.9"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:sbs:chuncheon:powerfm",
+      "title": "G1 프레쉬FM",
+      "subtitle": "강원 · SBS",
+      "resolver": "direct",
+      "url": "http://61.82.49.4:1935/fm/_definst_/myStream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "G1 프레쉬FM",
+        "sbs",
+        "chuncheon",
+        "powerfm",
+        "강원"
+      ],
+      "legacyNames": [
+        "G1 프레쉬FM",
+        "G1 프레쉬FM"
+      ],
+      "frequencies": [
+        "105.1",
+        "103.1",
+        "106.1",
+        "99.3",
+        "88.3"
+      ]
+    },
+    {
+      "id": "kr-radio:tbn:gangwon:live",
+      "title": "TBN 강원교통방송",
+      "subtitle": "강원 · TBN",
+      "resolver": "direct",
+      "url": "https://www.tbn.it.kr/gangwon/myStream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "TBN 강원교통방송",
+        "tbn",
+        "gangwon",
+        "강원"
+      ],
+      "legacyNames": [
+        "TBN 강원교통방송",
+        "TBN 강원교통방송"
+      ],
+      "frequencies": [
+        "105.9",
+        "103.7",
+        "105.5",
+        "95.1",
+        "95.3",
+        "89.3"
+      ]
+    },
+    {
+      "id": "kr-radio:cbs:chuncheon:sfm",
+      "title": "춘천CBS 표준FM",
+      "subtitle": "강원 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/chuncheon/_definst_/chuncheon.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "춘천CBS 표준FM",
+        "cbs",
+        "chuncheon",
+        "sfm",
+        "강원"
+      ],
+      "legacyNames": [
+        "춘천CBS 표준FM",
+        "춘천CBS 표준FM"
+      ],
+      "frequencies": [
+        "93.7",
+        "94.9"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:cbs:youngdong:sfm",
+      "title": "강원영동CBS 표준FM",
+      "subtitle": "강원 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/youngdong/_definst_/youngdong.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "강원영동CBS 표준FM",
+        "cbs",
+        "youngdong",
+        "sfm",
+        "강원"
+      ],
+      "legacyNames": [
+        "강원영동CBS 표준FM",
+        "강원영동CBS 표준FM"
+      ],
+      "frequencies": [
+        "91.5"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:febc:gangwon:live",
+      "title": "FEBC 강원극동방송",
+      "subtitle": "강원 · FEBC",
+      "resolver": "direct",
+      "url": "https://mlive3.febc.net/live5/ydlive/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "FEBC 강원극동방송",
+        "febc",
+        "gangwon",
+        "강원"
+      ],
+      "legacyNames": [
+        "FEBC 강원극동방송",
+        "FEBC 강원극동방송"
+      ],
+      "frequencies": [
+        "90.1",
+        "102.9",
+        "100.9"
+      ]
+    },
+    {
+      "id": "kr-radio:community:national:taebaekfm",
+      "title": "태백FM",
+      "subtitle": "강원 · COMMUNITY",
+      "resolver": "direct",
+      "url": "http://icecast.radios.kr:8000/taebaekfm",
+      "alternates": [],
+      "aliases": [
+        "태백FM",
+        "community",
+        "taebaekfm",
+        "강원"
+      ],
+      "legacyNames": [
+        "태백FM",
+        "태백FM"
+      ]
+    },
+    {
+      "id": "kr-radio:kbs:jeju:1radio",
+      "title": "KBS 제주 1라디오",
+      "subtitle": "제주 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/90_21",
+      "alternates": [],
+      "aliases": [
+        "KBS제주 1라디오",
+        "kbs",
+        "jeju",
+        "1radio",
+        "제주"
+      ],
+      "legacyNames": [
+        "KBS 제주 1라디오",
+        "KBS제주 1라디오"
+      ],
+      "frequencies": [
+        "99.1",
+        "963",
+        "95.3"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/7/1741313100641_442721.png"
+    },
+    {
+      "id": "kr-radio:kbs:jeju:2radio",
+      "title": "KBS 제주 2라디오",
+      "subtitle": "제주 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/90_22",
+      "alternates": [],
+      "aliases": [
+        "KBS제주 2라디오",
+        "kbs",
+        "jeju",
+        "2radio",
+        "제주"
+      ],
+      "legacyNames": [
+        "KBS 제주 2라디오",
+        "KBS제주 2라디오"
+      ],
+      "frequencies": [
+        "91.9",
+        "89.7"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004070_443799.png"
+    },
+    {
+      "id": "kr-radio:kbs:jeju:1fm",
+      "title": "KBS 제주 음악FM",
+      "subtitle": "제주 · KBS",
+      "resolver": "kbs",
+      "url": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/90_24",
+      "alternates": [],
+      "aliases": [
+        "KBS제주 음악FM",
+        "kbs",
+        "jeju",
+        "1fm",
+        "제주"
+      ],
+      "legacyNames": [
+        "KBS 제주 음악FM",
+        "KBS제주 음악FM"
+      ],
+      "frequencies": [
+        "96.3",
+        "99.9"
+      ],
+      "artworkURL": "https://padmin.static.kbs.co.kr/live/2025/3/11/1741700004216_443813.png"
+    },
+    {
+      "id": "kr-radio:mbc:jeju:sfm",
+      "title": "제주MBC 표준FM",
+      "subtitle": "제주 · MBC",
+      "resolver": "direct",
+      "url": "https://onairfm.jejumbc.com/hls/onairfmjejumbc/index.m3u8",
+      "alternates": [],
+      "aliases": [
+        "제주MBC 표준FM",
+        "mbc",
+        "jeju",
+        "sfm",
+        "제주"
+      ],
+      "legacyNames": [
+        "제주MBC 표준FM",
+        "제주MBC 표준FM"
+      ],
+      "frequencies": [
+        "97.9",
+        "97.1"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:mbc:jeju:fm4u",
+      "title": "제주MBC FM4U",
+      "subtitle": "제주 · MBC",
+      "resolver": "direct",
+      "url": "https://onairsfm.jejumbc.com/hls/onairsfmjejumbc/1_2/index.m3u8",
+      "alternates": [],
+      "aliases": [
+        "제주MBC FM4U",
+        "mbc",
+        "jeju",
+        "fm4u",
+        "제주"
+      ],
+      "legacyNames": [
+        "제주MBC FM4U",
+        "제주MBC FM4U"
+      ],
+      "frequencies": [
+        "90.1",
+        "102.9"
+      ],
+      "artworkURL": "https://img.imbc.com/commons/2018/image/comm2018noti/meta_mbc.png"
+    },
+    {
+      "id": "kr-radio:sbs:jeju:powerfm",
+      "title": "JIBS 뉴파워FM",
+      "subtitle": "제주 · SBS",
+      "resolver": "direct",
+      "url": "http://123.140.197.22/stream/2/play.m3u8",
+      "alternates": [],
+      "aliases": [
+        "JIBS 뉴파워FM",
+        "sbs",
+        "jeju",
+        "powerfm",
+        "제주"
+      ],
+      "legacyNames": [
+        "JIBS 뉴파워FM",
+        "JIBS 뉴파워FM"
+      ],
+      "frequencies": [
+        "101.5",
+        "98.5"
+      ]
+    },
+    {
+      "id": "kr-radio:tbn:jeju:live",
+      "title": "TBN 제주교통방송",
+      "subtitle": "제주 · TBN",
+      "resolver": "direct",
+      "url": "https://www.tbn.it.kr/jeju/myStream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "TBN 제주교통방송",
+        "tbn",
+        "jeju",
+        "제주"
+      ],
+      "legacyNames": [
+        "TBN 제주교통방송",
+        "TBN 제주교통방송"
+      ],
+      "frequencies": [
+        "105.5",
+        "105.9"
+      ]
+    },
+    {
+      "id": "kr-radio:cbs:jeju:sfm",
+      "title": "제주CBS 표준FM",
+      "subtitle": "제주 · CBS",
+      "resolver": "direct",
+      "url": "https://m-aac.cbs.co.kr/jeju/_definst_/jeju.stream/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "제주CBS 표준FM",
+        "cbs",
+        "jeju",
+        "sfm",
+        "제주"
+      ],
+      "legacyNames": [
+        "제주CBS 표준FM",
+        "제주CBS 표준FM"
+      ],
+      "frequencies": [
+        "93.3",
+        "90.9"
+      ],
+      "artworkURL": "https://www.cbs.co.kr/data/cbs/upload/save/company/cbs16901960123237.png"
+    },
+    {
+      "id": "kr-radio:febc:jeju:live",
+      "title": "FEBC 제주극동방송",
+      "subtitle": "제주 · FEBC",
+      "resolver": "direct",
+      "url": "https://mlive3.febc.net/live5/jejufm/playlist.m3u8",
+      "alternates": [
+        "http://mlive2.febc.net:1935/live/jejufm/playlist.m3u8"
+      ],
+      "aliases": [
+        "FEBC 제주극동방송",
+        "febc",
+        "jeju",
+        "제주"
+      ],
+      "legacyNames": [
+        "FEBC 제주극동방송",
+        "FEBC 제주극동방송"
+      ],
+      "frequencies": [
+        "104.7",
+        "101.1",
+        "1566"
+      ]
+    },
+    {
+      "id": "kr-radio:bbs:jeju:live",
+      "title": "BBS 제주불교방송",
+      "subtitle": "제주 · BBS",
+      "resolver": "direct",
+      "url": "http://kdbmobile.clouducs.com:1935/jeju/jeju.stream_aac/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "BBS 제주불교방송",
+        "bbs",
+        "jeju",
+        "제주"
+      ],
+      "legacyNames": [
+        "BBS 제주불교방송",
+        "BBS 제주불교방송"
+      ]
+    },
+    {
+      "id": "kr-radio:arirang:national:live",
+      "title": "Arirang Radio",
+      "subtitle": "제주 · ARIRANG",
+      "resolver": "direct",
+      "url": "https://amdlive-ch03-ctnd-com.akamaized.net/arirang_3ch/smil:arirang_3ch.smil/playlist.m3u8",
+      "alternates": [],
+      "aliases": [
+        "Arirang Radio",
+        "arirang",
+        "제주"
+      ],
+      "legacyNames": [
+        "Arirang Radio",
+        "Arirang Radio"
+      ]
+    }
+  ],
+  "frequencySources": [
+    "https://radio.kbs.co.kr/frequency.html",
+    "https://www.imbc.com/broad/radio/frequency/",
+    "https://www.sbs.co.kr/radio/frequency.html",
+    "https://www.tbn.or.kr/intro/frequency.tbn?BOARD_ID=I006&area_code=1",
+    "https://www2.cbs.co.kr/bangsong/",
+    "https://web.cpbc.co.kr/company/page/page4.html",
+    "https://m.ytn.co.kr/news_view.php?key=202611101354391900&s_mcd=0103",
+    "https://about.ebs.co.kr/files/about/files/pr/magazine201203/2-3.pdf",
+    "https://jb.febc.net/branch/faq",
+    "https://www.igbf.kr/gugak_web/main/main.jsp",
+    "https://m.ifm.kr/",
+    "https://www.youtube.com/watch?v=oRoE7sGcEAc",
+    "https://tbs.seoul.kr/introduce/tbsethics.do"
+  ]
+}
