@@ -3,6 +3,8 @@ import SwiftUI
 /// Keep the reader inside the widget without nesting the app's navigation stack.
 struct RatioDaisyWidgetView: View {
     var active = true
+    var showsLibraryBackButton = false
+    var onExit: () -> Void = {}
     @Environment(\.scenePhase) private var scenePhase
     @State private var bookURL: URL?
     @State private var seen = false
@@ -14,12 +16,16 @@ struct RatioDaisyWidgetView: View {
         VStack(spacing: 0) {
             if bookURL != nil {
                 HStack {
-                    VisionCraftIconButton(systemImage: "chevron.left", label: "서재로 돌아가기", tint: VisionCraftUI.primaryText) {
+                    VisionCraftBackButton(tint: VisionCraftUI.primaryText) {
                         bookURL = nil
                     }
+                    .accessibilityLabel("서재로 돌아가기")
                     Text("데이지 플레이어").font(.headline).accessibilityAddTraits(.isHeader)
                     Spacer()
-                }.padding(.horizontal, 8)
+                }
+            } else if showsLibraryBackButton {
+                VisionCraftBackButton(tint: VisionCraftUI.primaryText, action: onExit)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             if let bookURL, !readerReleased || (active && scenePhase == .active) {
                 EPUBReaderView(fileURL: bookURL, embedded: true, active: active, allowAutoplay: !resumeWithoutAutoplay,

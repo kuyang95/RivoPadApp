@@ -13,7 +13,7 @@ window.__rivoLauncherEmbedded = true;
     style.id = 'rivo-launcher-canvas';
     // Original view restores the site's canvas as well as its foreground colours.
     // Simplified YouTube owns its own dark presentation and stays transparent.
-    const canvasMode = window.__rivoLauncherBrowser ? '[data-rivo-web-enabled][data-rivo-web-palette="dark"]' : '';
+    const canvasMode = (window.__rivoLauncherBrowser || window.__rivoLauncherMail) ? '[data-rivo-web-enabled][data-rivo-web-palette="dark"]' : '';
     style.textContent = `html[data-rivo-launcher-widget][data-rivo-launcher-widget][data-rivo-launcher-widget]${canvasMode},
       html[data-rivo-launcher-widget][data-rivo-launcher-widget][data-rivo-launcher-widget]${canvasMode} body,
       html[data-rivo-launcher-widget][data-rivo-launcher-widget][data-rivo-launcher-widget]${canvasMode} [data-rivo-web-canvas]:not([data-rivo-web-mask]) {
@@ -42,8 +42,9 @@ window.__rivoLauncherEmbedded = true;
 (() => {
   if(window!==window.top)return;
   window.__rivoLauncherCanPageAt=(fractionX,fractionY)=>{
-    const loginPage = location.hostname === 'accounts.google.com' && document.documentElement.hasAttribute('data-rivo-google-login');
-    if(!window.__rivoLauncherBrowser && !loginPage && !document.querySelector('[data-rivo-you-tube-home],[data-rivo-official-player]'))return false;
+    const mailPage = window.__rivoLauncherMail === true;
+    const loginPage = location.hostname === 'accounts.google.com' && document.documentElement.matches('[data-rivo-google-login],[data-rivo-google-account-chooser]');
+    if(!window.__rivoLauncherBrowser && !mailPage && !loginPage && !document.querySelector('[data-rivo-you-tube-home],[data-rivo-official-player]'))return false;
     const viewport=window.visualViewport;
     const x=(viewport?.offsetLeft||0)+fractionX*(viewport?.width||innerWidth);
     const y=(viewport?.offsetTop||0)+fractionY*(viewport?.height||innerHeight);
@@ -53,9 +54,10 @@ window.__rivoLauncherEmbedded = true;
     // The authored Google home has no horizontal content scrollers. Its favorite
     // grid and the empty viewport below it belong to launcher paging as well.
     if(!target)return simpleHome || loginPage;
+    if(mailPage && target.closest('iframe'))return false;
     if(target.closest('input,select,textarea,[contenteditable]:not([contenteditable="false"])'))return false;
     if(simpleHome || loginPage)return true;
-    if (window.__rivoLauncherBrowser) {
+    if (window.__rivoLauncherBrowser || mailPage) {
       // Navigation controls own their gestures even before async site code has
       // measured a tab track. Home paging remains available on the body/dots.
       if (target.closest('nav,header,[role="navigation"],[role="tablist"],[role="slider"]')) return false;
@@ -92,10 +94,10 @@ window.__rivoLauncherEmbedded = true;
     drag = null;
     if (event.touches.length !== 1) return;
     const path = event.composedPath();
-    if (!window.__rivoLauncherBrowser && !(location.hostname === 'accounts.google.com' && document.documentElement.hasAttribute('data-rivo-google-login')) && !path.some(node => node.matches?.('[data-rivo-you-tube-home],[data-rivo-official-player]'))) return;
+    if (!window.__rivoLauncherBrowser && !window.__rivoLauncherMail && !(location.hostname === 'accounts.google.com' && document.documentElement.matches('[data-rivo-google-login],[data-rivo-google-account-chooser]')) && !path.some(node => node.matches?.('[data-rivo-you-tube-home],[data-rivo-official-player]'))) return;
     if (path.some(node => node.matches?.('input,select,textarea,iframe,[contenteditable="true"]'))) return;
     const point = event.touches[0];
-    if (window.__rivoLauncherBrowser && !window.__rivoLauncherCanPageAt?.(point.clientX / innerWidth, point.clientY / innerHeight)) return;
+    if ((window.__rivoLauncherBrowser || window.__rivoLauncherMail) && !window.__rivoLauncherCanPageAt?.(point.clientX / innerWidth, point.clientY / innerHeight)) return;
     drag = {x:point.clientX,y:point.clientY,dx:0,axis:null};
   }, {passive:true});
   document.addEventListener('touchmove', event => {
@@ -129,11 +131,15 @@ window.__rivoLauncherEmbedded = true;
 // fixed control, so it must not trigger structural rewrites of arbitrary pages.
 // iPad uses this bridge for layout zoom; Android has its shared page-zoom script.
 (() => {
-  if (!window.__rivoLauncherBrowser || window.__rivoLauncherReflow) return;
+  if ((!window.__rivoLauncherBrowser && !window.__rivoLauncherMail) || window.__rivoLauncherReflow) return;
   let requestedZoom = null;
   const apply = () => {
     if (requestedZoom === null || !document.documentElement) return;
-    document.documentElement.style.setProperty('zoom', String(requestedZoom), 'important');
+    const next = String(requestedZoom);
+    if (document.documentElement.style.getPropertyValue('zoom') !== next) {
+      document.documentElement.style.setProperty('zoom', next, 'important');
+      window.dispatchEvent(new Event('rivo-page-zoom'));
+    }
   };
   window.__rivoLauncherReflow = {setZoom(scale) {
     if (!Number.isFinite(scale)) return;

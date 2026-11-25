@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B91873140000000000000003 /* SwiftMail in Frameworks */ = {isa = PBXBuildFile; productRef = B91873140000000000000002 /* SwiftMail */; };
 		19EE8F8DF28124644F3A4C2C /* Pods_shortcuts_exampleTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0FDFAF48F37F6D78DFFBB7F3 /* Pods_shortcuts_exampleTests.framework */; };
 		9E0351482F4BF88000D864AF /* MLXEmbedders in Frameworks */ = {isa = PBXBuildFile; productRef = 9E0351472F4BF88000D864AF /* MLXEmbedders */; };
 		9E03514A2F4BF88000D864AF /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = 9E0351492F4BF88000D864AF /* MLXLLM */; };
@@ -184,6 +185,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B91873140000000000000003 /* SwiftMail in Frameworks */,
 				9EA600022FA6000100000002 /* ZIPFoundation in Frameworks */,
 				A0DE00010000000000000001 /* RivoDocumentEngine in Frameworks */,
 				A93500010000000000000001 /* Tokenizers in Frameworks */,
@@ -359,6 +361,7 @@
 			);
 			name = shortcuts_example;
 			packageProductDependencies = (
+				B91873140000000000000002 /* SwiftMail */,
 				A0DE00010000000000000003 /* RivoDocumentEngine */,
 				9EA600032FA6000100000003 /* ZIPFoundation */,
 				9E0351472F4BF88000D864AF /* MLXEmbedders */,
@@ -414,6 +417,7 @@
 			mainGroup = 9E901E8E2F2C4D010028581D;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				B91873140000000000000001 /* XCRemoteSwiftPackageReference "SwiftMail" */,
 				A0DE00010000000000000004 /* XCRemoteSwiftPackageReference "VisionCraftDocumentEngine" */,
 				A93500010000000000000005 /* XCRemoteSwiftPackageReference "swift-transformers" */,
 				9EA600012FA6000100000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
@@ -1162,6 +1166,11 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+        B91873140000000000000001 /* XCRemoteSwiftPackageReference "SwiftMail" */ = {
+            isa = XCRemoteSwiftPackageReference;
+            repositoryURL = "https://github.com/Cocoanetics/SwiftMail";
+            requirement = { kind = exactVersion; version = 1.9.2; };
+        };
 		A0DE00010000000000000004 /* XCRemoteSwiftPackageReference "VisionCraftDocumentEngine" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/kuyang95/VisionCraftDocumentEngine";
@@ -1213,6 +1222,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+        B91873140000000000000002 /* SwiftMail */ = {
+            isa = XCSwiftPackageProductDependency;
+            package = B91873140000000000000001 /* XCRemoteSwiftPackageReference "SwiftMail" */;
+            productName = SwiftMail;
+        };
 		A0DE00010000000000000003 /* RivoDocumentEngine */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A0DE00010000000000000004 /* XCRemoteSwiftPackageReference "VisionCraftDocumentEngine" */;

@@ -322,6 +322,7 @@ struct VisionCraftSelectionOption: Identifiable {
     var swatch: VisionCraftSelectionSwatch? = nil
     /// 보이는 글자 대신 읽어 줄 이름(색 조합의 "가 나 다 라" 미리보기 등).
     var accessibilityLabel: String? = nil
+    var enabled: Bool = true
 
     init(
         id: String,
@@ -329,7 +330,8 @@ struct VisionCraftSelectionOption: Identifiable {
         supportingText: String? = nil,
         fontName: String? = nil,
         swatch: VisionCraftSelectionSwatch? = nil,
-        accessibilityLabel: String? = nil
+        accessibilityLabel: String? = nil,
+        enabled: Bool = true
     ) {
         self.id = id
         self.title = title
@@ -337,6 +339,7 @@ struct VisionCraftSelectionOption: Identifiable {
         self.fontName = fontName
         self.swatch = swatch
         self.accessibilityLabel = accessibilityLabel
+        self.enabled = enabled
     }
 }
 
@@ -360,10 +363,12 @@ struct VisionCraftSelectionNotice: Identifiable {
     let id = UUID()
     let text: String
     var isError = false
+    let textSize: CGFloat?
 
-    init(text: String, isError: Bool = false) {
+    init(text: String, isError: Bool = false, textSize: CGFloat? = nil) {
         self.text = text
         self.isError = isError
+        self.textSize = textSize
     }
 }
 
@@ -382,6 +387,7 @@ struct VisionCraftSelectionDialog: View {
     var markSelected = false
     var rowSpacing: CGFloat = 0
     var dismissTitle: String = "닫기"
+    var compactDismiss = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -427,7 +433,18 @@ struct VisionCraftSelectionDialog: View {
 
             HStack {
                 Spacer()
-                VisionCraftDialogCloseButton(title: dismissTitle, action: onDismiss)
+                if compactDismiss {
+                    Button(action: onDismiss) {
+                        Text(AppLocalization.string(dismissTitle))
+                            .visionCraftAndroidText(16, weight: .semibold)
+                            .foregroundStyle(VisionCraftHomeUI.text)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 48)
+                            .contentShape(Rectangle())
+                    }.buttonStyle(VisionCraftHomePressStyle())
+                } else {
+                    VisionCraftDialogCloseButton(title: dismissTitle, action: onDismiss)
+                }
             }
             .padding(.horizontal, 24)
             .padding(.top, 24)
@@ -439,7 +456,7 @@ struct VisionCraftSelectionDialog: View {
         VStack(spacing: rowSpacing) {
             ForEach(notices) { notice in
                 Text(notice.text)
-                    .visionCraftAndroidText(16)
+                    .visionCraftAndroidText(notice.textSize ?? 16)
                     .foregroundStyle(
                         notice.isError ? VisionCraftUI.error : VisionCraftHomeUI.secondaryText
                     )
@@ -508,6 +525,8 @@ struct VisionCraftSelectionDialog: View {
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(VisionCraftHomePressStyle())
+        .disabled(!option.enabled)
+        .opacity(option.enabled ? 1 : 0.38)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel(for: option))
         .accessibilityValue(AppLocalization.string(selected ? "선택됨" : ""))

@@ -1,6 +1,6 @@
 # 영속 데이터 (UserDefaults / App Group / 파일 / Keychain / Assets)
 
-점검일: 2026-11-25 · 기준 코드: `c5865248`+작업 트리 (쉬운 유튜브 재생 의도·기존 저장소 범위) · 런처 유틸리티 대조: 2026-10-22 `514e00f5`+작업 트리 · 현재 위치 날씨 대조: 2026-10-22 `f56b06f0`+작업 트리 · 타이머 시각 설정 대조: 2026-10-22 `f56b06f0`+작업 트리 · 브라우저 즐겨찾기 대조: 2026-10-22 `f56b06f0`+작업 트리 · 데이지 본문 유지·자원 수명 대조: 2026-10-22 `f56b06f0`+작업 트리 · 즐겨찾기 아이콘 저장 대조: 2026-10-22 `f56b06f0`+작업 트리 · 유튜브 탭 목록 캐시 대조: 2026-10-22 `f56b06f0`+작업 트리 · 현재 페이지 빈자리 우선 추가 대조: 2026-10-23 `f56b06f0`+작업 트리 · 브라우저 광고 차단 설정 대조: 2026-10-23 `f56b06f0`+작업 트리 · 날씨 30분 갱신·큰 글자·원형 새로고침 대조: 2026-10-23 `f56b06f0`+작업 트리 · 전체 페이지 뉴스 위젯 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 다중 언론사 뉴스 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 출처·표본 확대 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 74개 매체 목록 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 선택 분야 수신·HTML 정리 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리 · 뉴스 표시 순서·상단 대조: 2026-10-29 `c2f1d72d`+작업 트리 · 2026-11-04 `b4aa7cf7`+작업 트리 (사용 설명서 번들 스키마) · 위젯 실행 대상 교체 대조: 2026-11-03 `b4aa7cf7`+작업 트리 · 문서스캔 실측보정 대조: 2026-10-30 `b4aa7cf7`+작업 트리 · 뉴스 즐겨찾기 순서·전체 수신 대조: 2026-11-05 `197368df`+작업 트리 · 라디오·팟캐스트 대조: 2026-11-25 `a4f028e3`+작업 트리
+점검일: 2026-11-25 · 기준 코드: `2abc6bdf`+작업 트리 (런처·이메일 저장) · 이전 점검일: 2026-11-25 · 기준 코드: `a4f028e3`+작업 트리 (카테고리형 런처 앱 링크·위젯 저장) · 이전 점검일: 2026-11-25 · 기준 코드: `a4f028e3`+작업 트리 (메일 첫 진입·계정 유무) · 이전 점검일: 2026-11-25 · 기준 코드: `a4f028e3`+작업 트리 (메일 계정창·Google 로그인 상태 갱신 범위) · 이전 점검일: 2026-11-24 · 기준 코드: `a4f028e3`+작업 트리 (카테고리 즐겨찾기 7개·고정 전체 앱/편집 분리) · 이전 점검일: 2026-11-23 · 기준 코드: `a4f028e3`+작업 트리 (AI 별도 진입·기존 웹 저장소 재사용) · 점검일: 2026-11-20 · 기준 코드: `a4f028e3`+작업 트리 (Gmail 통합 목록·주소 없는 임시 계정 제외) · 이전 점검일: 2026-11-20 · 기준 코드: `a4f028e3`+작업 트리 (계정 팝업 Google 연결 자동 확인·빈 계정 추가 생략) · 이전 점검일: 2026-11-20 · 기준 코드: `a4f028e3`+작업 트리 (Gmail·유튜브 Google 로그인 공유) · 이전 점검일: 2026-11-20 · 기준 코드: `a4f028e3`+작업 트리 (카테고리형 즐겨찾기 앱 전용·기존 기능 제외) · 이전 점검일: 2026-11-19 · 기준 코드: `a4f028e3`+작업 트리 (데이지 미디어 분류·카테고리형 위젯 종류) · 이전 점검일: 2026-11-19 · 기준 코드: `a4f028e3`+작업 트리 (카테고리형 즐겨찾기 8개 상한·편집 칸 상시 표시·위젯 순서·즐겨찾기 정렬·교체·삭제) · 이전 대조 2026-11-17 · 기준 코드: `a4f028e3`+작업 트리 (카테고리형 즐겨찾기와 미디어 위젯) · 이전 대조 2026-11-17 · 기준 코드: `a4f028e3`+작업 트리 (기능 그림 에셋) · 이전 대조 2026-11-17 · 기준 코드: `a4f028e3`+작업 트리 (즐겨찾기 별 선택·리보 앱 추가) · 이전 대조 2026-11-16 · 기준 코드: `a4f028e3`+작업 트리 (카테고리형 런처 저장) · 이전 대조 2026-11-13 · 기준 코드: `a4f028e3`+작업 트리 (통합 받은편지함과 계정 저장) · 이전 대조 2026-11-13 · 기준 코드: `a4f028e3`+작업 트리 (네이버 공식 폼 재제출) · 이전 대조 2026-11-13 · 기준 코드: `a4f028e3`+작업 트리 (네이버 공식 폼 전경 제출) · 이전 대조 2026-11-13 · 기준 코드: `a4f028e3`+작업 트리 (네이버 공식 웹메일 로그인) · 이전 대조 2026-11-13 · 기준 코드: `a4f028e3`+작업 트리 (리보 이메일 지원 서비스 세션 복원) · 이전 대조 2026-11-12 기준 코드: `c5865248`+작업 트리 (쉬운 유튜브 재생 의도·기존 저장소 범위) · 런처 유틸리티 대조: 2026-10-22 `514e00f5`+작업 트리 · 현재 위치 날씨 대조: 2026-10-22 `f56b06f0`+작업 트리 · 타이머 시각 설정 대조: 2026-10-22 `f56b06f0`+작업 트리 · 브라우저 즐겨찾기 대조: 2026-10-22 `f56b06f0`+작업 트리 · 데이지 본문 유지·자원 수명 대조: 2026-10-22 `f56b06f0`+작업 트리 · 즐겨찾기 아이콘 저장 대조: 2026-10-22 `f56b06f0`+작업 트리 · 유튜브 탭 목록 캐시 대조: 2026-10-22 `f56b06f0`+작업 트리 · 현재 페이지 빈자리 우선 추가 대조: 2026-10-23 `f56b06f0`+작업 트리 · 브라우저 광고 차단 설정 대조: 2026-10-23 `f56b06f0`+작업 트리 · 날씨 30분 갱신·큰 글자·원형 새로고침 대조: 2026-10-23 `f56b06f0`+작업 트리 · 전체 페이지 뉴스 위젯 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 다중 언론사 뉴스 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 출처·표본 확대 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 74개 매체 목록 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 뉴스 선택 분야 수신·HTML 정리 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리 · 뉴스 표시 순서·상단 대조: 2026-10-29 `c2f1d72d`+작업 트리 · 문서스캔 실측보정 대조: 2026-10-30 `b4aa7cf7`+작업 트리 · 쇼핑 상품 연동 범위: `b4aa7cf7`+작업 트리 · 위젯 실행 대상 교체 대조: 2026-11-03 `b4aa7cf7`+작업 트리 · 2026-11-04 `b4aa7cf7`+작업 트리 (사용 설명서 번들 스키마) · 뉴스 즐겨찾기 순서·전체 수신 대조: 2026-11-05 `197368df`+작업 트리 · 99권 서재·도서 검색 대조: 2026-11-06 `a4f028e3`+작업 트리 · 로그인 영속 저장소·미완료 인증 만료 대조: 2026-11-09 `a4f028e3`+작업 트리 · 이메일 전용 저장소 대조: 2026-11-09 `a4f028e3`+작업 트리 · 네이티브 메일 인증 대조: 2026-11-09 `a4f028e3`+작업 트리 · 듣기 범위: `a4f028e3`+작업 트리 · 듣기 위젯 범위: `a4f028e3`+작업 트리 · 카테고리 타일 2×4 대조: 2026-11-09 `a4f028e3`+작업 트리 · 라디오 193개 목록·재생 주소 대조: 2026-11-09 `a4f028e3`+작업 트리 · 전용 재생 화면·편성 대조: 2026-11-09 `a4f028e3`+작업 트리 · 라디오 주파수 검색 대조: 2026-11-12 `a4f028e3`+작업 트리 · 로그인 유지 대조: 2026-11-12 `a4f028e3`+작업 트리 · 네이버 메일 직접 연결 대조: 2026-11-12 `a4f028e3`+작업 트리 · 듣기 이미지·직접 조작 대조: 2026-11-20 `a4f028e3`+작업 트리 · 듣기 초기 목록 지연·표지 로딩 비율 대조: 2026-11-23 `a4f028e3`+작업 트리 · 유튜브 공통 새로고침 행·갱신 시각 대조: 2026-11-23 `a4f028e3`+작업 트리 · AI 전용 화면 대조: 2026-11-23 `a4f028e3`+작업 트리
 
 Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 데이터는 전부 **JSON 파일** 또는 **UserDefaults(Codable 인코딩)**.
 
@@ -78,6 +78,8 @@ Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 �
 
 ## 쉬운 브라우저 세션
 
+AI 전용 화면은 일반 브라우저와 같은 영속 웹 저장소를 사용해 이전 ChatGPT 로그인을 이어 쓴다. 전용 화면은 Android `EasyAIScreen`·번들 `easy-ai.js`, iPad `EasyAIBrowserView`·`EasyAIPage`를 사용한다. DOM 구조 표시와 일시적 목록 열기 상태는 웹 문서 메모리에만 두고 메시지·입력값을 별도로 저장하지 않는다. 새 화면의 주소·페이지 기록·색상/확대 상태는 메모리에 두며 별도 영속 모드·즐겨찾기 키를 추가하지 않는다. AI 진입점은 Android `LauncherBrowser.aiIntent`·`AI_WEB`, iPad `AppRoute.aiWeb`다.
+
 `Settings/AccessibleWeb/AccessibleWebBrowserModel.swift`는 일반 브라우저 전용 `WKWebsiteDataStore(forIdentifier:)`(UUID `382B897A-44FB-49CB-9A93-FCDA0D815DB1`)를 사용한다. 웹 쿠키·로그인·localStorage는 위젯·단독 화면·팝업이 공유하고 화면 종료 후에도 유지한다. YouTube는 기존 별도 UUID를 유지한다. 주소·방문 내역·색상 통일 여부·팔레트는 화면 메모리에만 둔다. 사용자가 추가한 즐겨찾기와 광고 차단 설정은 별도 UserDefaults 키에 저장한다. 기존 문서용 WebView나 앱의 네이티브 데이터 브리지를 사용하지 않는다.
 
 ## Keychain
@@ -96,14 +98,14 @@ Room DB, EncryptedSharedPreferences 에 해당하는 것은 없다. 구조화 �
 | `Help/RivoPadManual.txt`, `Help/RivoPadChangelog.txt` (+ 언어별) | `@title/@version/@date/@chapter/@section/@text` 마크업 — `Help/HelpDocument.swift` · `HelpContentLibrary` 가 언어 lproj 우선, 없으면 루트 파일 |
 | `*.mp3`, `*.wav` 16개 | `SoundEffectManager` ([gemini_ai.md](gemini_ai.md) 효과음 표) |
 | `*.ttf`/`*.otf` 15개 | `UIAppFonts` |
-| `Assets.xcassets` | `AppIcon`, `AccentColor`, `LaunchBackground`, `LaunchLogo`, 홈 타일 4종 (`HomeTileAIChat/Camera/PhoneLink/Reading`), 카테고리 기능 타일 11종 (`HomeAction*`, 사용자 제공 투명 PNG), `TextOpenSourceIllustration` |
+| `Assets.xcassets` | `AppIcon`, `AccentColor`, `LaunchBackground`, `LaunchLogo`, 홈 타일 4종 (`HomeTileAIChat/Camera/PhoneLink/Reading`), 카테고리 기능 타일 22종 (`HomeAction*`, 투명 PNG, 표시 색은 `VisionCraftActionArtwork`), `TextOpenSourceIllustration` |
 | `AppShortcuts.xcstrings` | App Shortcut 문구 |
 
 ## Ratio 홈 설정
 
 `Launcher/RatioLauncherView.swift`의 UserDefaults: `ratio.home.favorites.v1`는 ID 쉼표 목록(기본 magnifier,live,chat,books), `ratio.home.apps.v1`는 앱 이름·URL·UUID 배열의 JSON Data(기본 빈 배열), `ratio.home.textSize.v1`는 Double 28(24~40), `ratio.home.clock.v1`는 Bool false, `ratio.home.icons.v1`는 Bool true. `Assets.xcassets/RatioBlueMist.imageset`는 Android와 같은 Unsplash 사진이며 라이선스는 `Launcher/wallpaper-license.txt`다.
 
-`ratio.home.widgets.v2`는 `{id,name,textOnly,columns,rows,textSize,iconOnly?,colorKey?,wideShortcut?}` 배열 JSON Data다. `wideShortcut`이 true이면 가로 타일로 표시하고 4열·1행으로 제한한다. 필드가 없으면 기존 형태를 유지한다. `widget:search` ID는 검색 위젯이다. 주간 날짜 위젯은 같은 배열에 `widget:week` ID와 고정 4열·1행으로 저장한다. v2가 없으면 v1을 디코딩해 기존 검색 크기의 검색 항목을 맨 앞에 추가하고 이전 첫 사각형은 lemon으로 보존한다. 기존 즐겨찾기 마이그레이션도 검색 항목을 포함한다. v2 빈 배열·검색 삭제를 보존한다. `ratio.home.searchColumns.v1`·`ratio.home.searchRows.v1`는 이전 검색 크기 이관용이다. `ratio.home.apps.v1` 항목에는 선택적 `iconData`(128×128 PNG Data)를 저장하며 기존 아이콘 없는 항목도 디코딩된다. PhotosPicker로 선택한 이미지에만 접근한다.
+`ratio.home.widgets.v2`는 `{id,name,textOnly,columns,rows,textSize,iconOnly?,colorKey?,wideShortcut?,categoryTile?}` 배열 JSON Data다. `wideShortcut`이 true이면 가로 타일로 표시하고 4열·1행으로 제한한다. categoryTile이 true이면 카테고리형 타일로 표시하고 정규화 시 2열·4행으로 제한한다. 선택적 Bool? 필드이며 누락된 이전 저장 데이터는 기존 형태를 유지한다. 자동 추가·배치 마이그레이션은 없다. 카테고리형 공통 스타일을 사용해 색상 편집은 숨기고 colorKey는 보존한다. `widget:search` ID는 검색 위젯이다. 주간 날짜 위젯은 같은 배열에 `widget:week` ID와 고정 4열·1행으로 저장한다. v2가 없으면 v1을 디코딩해 기존 검색 크기의 검색 항목을 맨 앞에 추가하고 이전 첫 사각형은 lemon으로 보존한다. 기존 즐겨찾기 마이그레이션도 검색 항목을 포함한다. v2 빈 배열·검색 삭제를 보존한다. `ratio.home.searchColumns.v1`·`ratio.home.searchRows.v1`는 이전 검색 크기 이관용이다. `ratio.home.apps.v1` 항목에는 선택적 `iconData`(128×128 PNG Data)를 저장하며 기존 아이콘 없는 항목도 디코딩된다. PhotosPicker로 선택한 이미지에만 접근한다.
 
 Ratio v2 위젯은 선택적인 `iconText`를 추가 저장한다(기본 false, 이전 데이터 누락 시 false). Android는 Boolean, iPad는 하위 호환 Codable Bool?이다. 앱 TEXT에서만 앱 아이콘 색을 표시하고 `colorKey`는 단색 및 이미지 실패 시 대체색이다. 색상 선택은 iconText를 false로 바꾸며 크기·순서·유형 변경은 보존한다. 아이콘 이미지 자체를 위젯 데이터에 복사하지 않는다.
 
@@ -117,9 +119,11 @@ Ratio 데이지 위젯 ID `widget:daisy`(Android kind DAISY)는 전체 페이지
 
 ## 쉬운 유튜브 저장소
 
-`AccessibleWebBrowserModel(easyYouTube: true)`는 `WKWebsiteDataStore(forIdentifier:)`와 고정 UUID `6492E698-D7FC-4721-9F45-A2EC60B94889`를 사용한다. YouTube 로그인·사이트 저장소를 다음 진입에도 유지하며 `.default()`·문서 웹뷰·일반 접근성 웹의 `.nonPersistent()` 저장소와 공유하지 않는다.
+`AccessibleWebBrowserModel(easyYouTube: true)`는 `WKWebsiteDataStore(forIdentifier:)`와 고정 UUID `6492E698-D7FC-4721-9F45-A2EC60B94889`를 사용한다. YouTube 로그인·사이트 저장소를 다음 진입에도 유지하며 `.default()`·문서 웹뷰·일반 접근성 웹의 별도 영속 저장소와 공유하지 않는다. Gmail은 같은 유튜브 저장소를 사용한다.
 
 비밀번호·쿠키를 네이티브 코드에서 읽거나 기존 임시 브라우저 로그인 정보를 복사하지 않는다. 로그아웃은 YouTube의 로그인 서비스에서 처리한다. 주소·추천 목록·별도 화면 모드 설정을 앱 저장소에 추가하지 않는다.
+
+Google `/info/sessionexpired`의 진행 중 인증 만료 안내만으로 완료된 YouTube 로그인 쿠키가 삭제됐다고 판단하지 않는다. 계정 선택·비밀번호 입력 단계는 로그인 완료 상태가 아니며, 실제 YouTube 페이지의 공개 `LOGGED_IN` 값으로 로그인 여부를 확인한다. 로그인 완료 후의 유지 여부와 미완료 로그인 절차의 시간 초과는 구분한다. 같은 문서에서 확인값이 잠시 없으면 마지막으로 확인한 상태를 유지한다. 명시적 false가 들어오면 로그인 안내를 표시한다. iPad는 앱 프로세스에서 유튜브와 이메일 각각의 고정 UUID 영속 저장소 인스턴스를 재사용한다. 인증 만료 시점은 해당 서비스가 결정한다.
 
 쉬운 유튜브 로그인 배경은 기본 이미지 생성 도구로 만든 투명 재생 타일이다. Android 번들 원본 `easy-youtube-login.webp`와 같은 바이트를 `easy-youtube.js`·iPad의 `EasyYouTubePage.source`에 data URL로 포함한다. 다운로드나 사용자 저장소 키를 추가하지 않으며 별도 이미지 파일을 Release 에셋에 추가하지 않는다. 배경을 바꾸면 두 스크립트의 내장 이미지도 함께 갱신한다. 생성 프롬프트는 `docs/design/easy-youtube-login-art.json`에 둔다.
 
@@ -147,7 +151,7 @@ UserDefaults `browser.favorites.v1`은 `{name,url,icon?}` 배열 JSON Data다. `
 
 즐겨찾기 `icon`은 사이트에서 읽은 이미지를 긴 변 96px 이하 PNG로 변환한 `data:image/png;base64,...` 문자열이다. 필드가 없는 기존 자료는 이전 첫 글자 아이콘으로 표시한다. 주소만 입력하면 사이트 이름을 자동 추출하고 실패 시 도메인을 저장한다. 원본 HTML·외부 이미지 URL·쿠키는 저장하지 않으며 기본 네 사이트 아이콘은 기존 로컬 기호를 사용한다.
 
-쉬운 유튜브 목록 복원은 YouTube 탭의 sessionStorage `rivo.youtube.feed.v1`에 저장한다. `{routes,lastSeen,needsRefresh?}`이며 routes는 최대 4개 경로의 `{route,section,scroll,items}`이고 items는 최대 120개 공개 영상 카드 정보다(영상 ID·제목·썸네일 URL·길이·보조 문구). 이미지 바이트·DOM·댓글·채널 본문·쿠키·계정 식별자를 저장하지 않는다. 현재 표시 목록만 DOM 카드로 만들고 나머지는 텍스트 메타데이터로 보관한다. 네이티브 페이지 활성·앱 생명주기와 웹 문서 가시성으로 30분 비활성을 판단하고, 영상을 보는 동안에는 사용 시각을 최대 15초 간격으로 갱신한다. 홈 목록 수동 새로고침·30분 비활성·로그아웃 확인 때 목록을 비우며, 영상에서 뒤로 돌아오는 동작은 기존 자료를 유지한다. 네이티브 앱 저장 키는 추가하지 않는다.
+쉬운 유튜브 목록 복원은 YouTube 탭의 sessionStorage `rivo.youtube.feed.v1`에 저장한다. `{routes,lastSeen,needsRefresh?}`이며 routes는 최대 4개 경로의 `{route,section,scroll,items,updatedAt?}`이고 items는 최대 120개 공개 영상 카드 정보다(영상 ID·제목·썸네일 URL·길이·보조 문구). `updatedAt`은 새 원본 목록을 처음 받은 시각(밀리초)이며 캐시 복원 때 유지해 새로고침 행에 표시한다. 누락되거나 유효하지 않은 기존 시각은 표시하지 않는다. 이미지 바이트·DOM·댓글·채널 본문·쿠키·계정 식별자를 저장하지 않는다. 현재 표시 목록만 DOM 카드로 만들고 나머지는 텍스트 메타데이터로 보관한다. 네이티브 페이지 활성·앱 생명주기와 웹 문서 가시성으로 30분 비활성을 판단하고, 영상을 보는 동안에는 사용 시각을 최대 15초 간격으로 갱신한다. 홈 목록 수동 새로고침·30분 비활성·로그아웃 확인 때 목록을 비우며, 영상에서 뒤로 돌아오는 동작은 기존 자료를 유지한다. 네이티브 앱 저장 키는 추가하지 않는다.
 
 일반 쉬운 브라우저 광고 차단 선택은 Android SharedPreferences `debug_browser_privacy/ad_block_enabled`, iPad UserDefaults `browser.adBlock.enabled` Bool이며 없으면 true다. 광고 URL·차단 이력·방문 페이지는 저장하거나 전송하지 않는다. 필터 목록과 CSS는 앱에 번들하며 WebView 기본 프로필·책 저장소·YouTube 로그인 프로필에는 적용하지 않는다. iPad는 WebKit 콘텐츠 규칙 저장소 식별자 `rivo-browser-ads-v1`의 컴파일된 규칙을 재사용한다. 기존 임시 웹 세션과 구분되는 앱 설정이다.
 
@@ -169,11 +173,7 @@ UserDefaults `browser.favorites.v1`은 `{name,url,icon?}` 배열 JSON Data다. `
 
 ## 앱 시작 홈과 미디어 탐색 표시
 
-iPad UserDefaults `home.launcher.v1` 문자열은 `standard`(기본) / `widgets`, `home.media.visible.v1` Boolean은 기본 true다. `AppHomeRoot`와 기존 홈·설정은 같은 AppStorage 키를 사용한다. `standardHome` 경로는 저장된 위젯 런처 선택과 관계없이 기존 홈을 연다. 기존 목록형/카테고리형·위젯 배치·로그인·즐겨찾기 값은 유지한다.
-
-## Debug 쇼핑 상품 연동
-
-검색어·상품 목록·검색 조건·최대 3개 비교 선택·화면 색상·글자 단계는 열린 쇼핑 화면의 메모리에만 유지한다. API 키를 요구하거나 저장하지 않고 응답을 영속 캐시하지 않는다. 기존 이지 브라우저 로그인 쿠키와 검색 작업 저장소를 공유하지 않는다. Android는 화면별 WebView 프로필을 제거하고 iPad는 비영속 저장소·임시 자산 폴더를 사용한다. 원본 상품을 이지 브라우저에서 보고 돌아오면 기존 쇼핑 화면을 유지한다. 명시적인 쇼핑 기기 테스트에서만 `shopping-validation`에 공개 검색 상태 요약과 화면 캡처를 저장한다. 상세는 [shopping_products.md](shopping_products.md) 참조.
+iPad UserDefaults `home.launcher.v1` 문자열은 `standard`(기본) / `widgets`(Ratio) / `list`(카테고리형), `home.media.visible.v1` Boolean은 기본 true다. `AppHomeRoot`와 기존 홈·설정은 같은 AppStorage 키를 사용한다. `standardHome` 경로는 저장된 위젯 런처 선택과 관계없이 기존 홈을 연다. 기존 목록형/카테고리형 선택·위젯 배치·로그인과 다른 테마의 즐겨찾기 값은 유지한다. `rivo-app`은 기존 앱 홈을 열며 등록한 앱 링크와 아이콘은 Ratio와 공유한다. `home.launcher.list.widgets.v1`은 도서 읽기(`daisy`)·라디오·팟캐스트·이메일·브라우저·유튜브·뉴스의 미디어 위젯 ID 쉼표 목록(기본 빈 배열)이다. 각 종류는 한 번만 배치하며 위젯 편집창의 위로·아래로 정렬 결과를 순서대로 저장한다. 새 위젯은 마지막에 추가하며 순서를 바꿔도 선택한 위젯 ID는 유지한다. 카테고리형 위젯 배치는 Ratio 홈 배치와 별도다.
 
 ## Debug 스캐너 실측 기록
 
@@ -181,6 +181,24 @@ iPad UserDefaults `home.launcher.v1` 문자열은 `standard`(기본) / `widgets`
 - `metadata.json`(조건·기기·앱·설정), `events.jsonl`(단조 시각·captureId 기반 단계/게이트/오류·OCR 원문), `status.json`(종료·저장 오류), `assessment.json`(사용자 평가), 샘플·촬영 ROI·결과 JPEG를 보관한다. 강제 종료되면 존재하는 이벤트와 이미지를 그대로 보존한다.
 - 자동 전송·자동 삭제는 하지 않는다. 사용자가 전체 ZIP 내보내기 또는 확인 후 전체 삭제를 실행한다. 앱 삭제 시 기기 기록은 지워진다. 개발 메뉴와 실측 시작은 Debug 전용이며 일반 촬영에는 저장하지 않는다.
 - 실측 화면의 `DocumentScanRootView(calibrationTrial:)`는 별도 `temporaryDirectory/ScannerCalibrationReview` 세션을 사용해 기존 스캔 복구 세션을 건드리지 않는다. ZIP은 임시 폴더에서 만든 뒤 시스템 공유 시트로 내보낸다.
+
+## Debug 쇼핑 상품 연동
+
+검색어·상품 목록·검색 조건·최대 3개 비교 선택·화면 색상·글자 단계는 열린 쇼핑 화면의 메모리에만 유지한다. API 키를 요구하거나 저장하지 않고 응답을 영속 캐시하지 않는다. 기존 이지 브라우저 로그인 쿠키와 검색 작업 저장소를 공유하지 않는다. Android는 화면별 WebView 프로필을 제거하고 iPad는 비영속 저장소·임시 자산 폴더를 사용한다. 원본 상품을 이지 브라우저에서 보고 돌아오면 기존 쇼핑 화면을 유지한다. 명시적인 쇼핑 기기 테스트에서만 `shopping-validation`에 공개 검색 상태 요약과 화면 캡처를 저장한다. 상세는 [shopping_products.md](shopping_products.md) 참조.
+
+## 리보 이메일
+
+iPad UserDefaults `easyMail.accounts`에 계정 ID·서비스·주소·웹메일 시작 주소를 저장한다. Gmail 외 이전 계정은 기존 메일 전용 웹 저장소를 계속 사용한다. Gmail은 기존 유튜브 저장소를 사용한다. Gmail 외 새 계정은 고유 ID로 구분된 영속 웹 저장소를 사용하며 위젯과 단독 화면이 같은 계정 저장소를 공유한다. 인증의 유효 기간과 로그아웃은 각 서비스가 결정한다.
+
+통합 목록의 제목·보낸 사람·표시 시각·안 읽음 상태는 열린 화면의 메모리에만 보관한다. 본문·웹메일 비밀번호·인증번호는 앱 설정이나 저장 상태에 저장하지 않는다. 주소와 메일 내용을 앱 로그·분석에 넣지 않는다.
+
+런처 `widget:mail`의 배치는 기존 위젯 배열에 저장한다. 별도 자동 추가 마이그레이션은 없으며, 기존 전체 페이지 위젯 마이그레이션도 사용자가 이미 추가한 이메일을 보존한다. 글자 확대·편하게 보기 설정은 열린 세션 메모리에만 둔다.
+
+iPad `NaverMailCredentialStore`는 앱 전용 Keychain `rivo.naver-mail-link.v1`의 기기 전용 잠금 해제 접근 항목에 주소와 앱 전용 비밀번호를 보관한다. 한 계정만 보관하며 받은편지함 접속이 성공한 뒤 저장한다. 위젯·단독 화면이 연결을 공유하고, ‘이 기기에서 연결 해제’로 항목을 제거한다. 메시지 목록·본문·실패한 비밀번호는 영속 저장하지 않는다.
+
+네이버·카카오계정·네이트의 로그인 유지 옵션은 해당 공식 로그인 사이트의 로컬 저장소에 사용자 선택을 보관한다. 위젯과 단독 화면은 저장된 계정이 있으면 통합 받은편지함을 열고, 없으면 이메일 주소 입력을 표시한다. 각 로그인 세션 유효성은 서비스 쿠키를 따른다. Gmail은 기존 유튜브 영속 저장소를 공유하며 공식 웹 로그인·웹메일을 앱 안에서 연다. 다른 메일 계정의 저장소는 분리한다. 계정 팝업은 저장된 계정을 즉시 표시하고 Gmail·유튜브에 추가 접속하지 않는다. 로그인 상태는 실제 열린 공식 서비스 화면과 정상 Gmail 받은편지함 조회에서만 메모리에 갱신하며, 통신·구조·시간 초과 오류로 로그인 상태를 초기화하지 않는다. 별도 계정 식별자·쿠키·메일 내용을 저장하지 않고 확인·열기만으로 빈 Gmail 계정 레코드를 추가하지 않는다. 공유 Google 세션의 임시 열기는 기존 서비스·주소 선택의 레거시 저장값도 덮어쓰지 않는다.
+
+네이버 웹메일 비밀번호는 리보 화면에서 입력하고 사용자 동작으로 화면에 띄운 공식 로그인 폼에 전달한다. 같은 시도 중 네이버가 보안문자를 요청하면 최대 120초 동안 비밀번호를 메모리에 두고, 공식 ‘다시 로그인해 주세요’ 폼에 한 번만 재사용한다. 재제출·만료·성공·추가 인증 전환·실패·취소·화면 이탈 시 참조를 지운다. 다른 서비스의 네이티브 웹메일 비밀번호는 공식 폼에 한 번만 제출한다. 웹메일 비밀번호를 앱 설정·로그·분석에 보관하지 않는다.
 
 ## 듣기 저장소
 
@@ -191,3 +209,11 @@ iPad UserDefaults `home.launcher.v1` 문자열은 `standard`(기본) / `widgets`
 라디오의 새 항목은 `kr-radio:<방송사>:<지역>:<채널>` 고정 ID와 안정적인 주소 발급 API/스트림 경로를 저장한다. 임시 서명 CDN 주소는 저장하지 않는다. 초기화 때 기존 즐겨찾기·마지막 항목을 ID 또는 명시된 기존 방송국 이름으로 새 목록에 맞추고 중복 ID를 원래 순서대로 합친다. 매칭되지 않은 항목은 보존한다. 주파수는 앱 번들 `radio_stations.json`의 선택적 `frequencies` 배열에 보관하고 기존 항목의 설명에 표시한다. 즐겨찾기·마지막 항목은 고정 ID로 새 설명을 가져온다.
 
 듣기 전체 페이지 위젯 배치는 기존 Ratio 위젯 배열의 `widget:listening`으로 저장한다. Android kind는 `LISTENING`, iPad는 동일 ID로 판별하며 정규화 크기는 4×10이다. 자동 추가하지 않고 기존 마이그레이션에서 보존한다. 위젯과 단독 화면은 같은 기기의 듣기 저장소를 사용한다.
+
+### Google 웹 로그인 공유
+
+Gmail 계정의 기존 계정 ID·주소는 유지한다. 로그인 저장소 선택만 기존 유튜브 저장소(Android `rivo-easy-youtube`, iPad UUID `6492E698-D7FC-4721-9F45-A2EC60B94889`)로 통일한다. 이전 Gmail 전용 저장소의 쿠키를 추출·복사하거나 저장소를 삭제하지 않는다. iPad에서는 `GoogleWebSession.store`의 같은 `WKWebsiteDataStore` 인스턴스를 재사용한다. 일반 브라우저·다른 메일·문서 저장소는 공유 대상이 아니다. 공유 로그인으로 Google 계정 추가·전환·로그아웃이 다른 Google 서비스에도 영향을 줄 수 있으며 실제 서비스 상태로 재확인한다.
+
+### Gmail 통합 목록의 계정 경계
+
+`MailInboxReader`는 Gmail도 기존 공유 Google 웹 저장소에서 읽는다. 현재 계정 컨트롤의 주소가 등록 주소와 일치하고 요청한 메일함과 공식 HTTPS 출처가 확인된 경우에만 최근 최대 30개의 제목·보낸 사람·시각·메일 링크를 통합 목록 메모리에 둔다. 본문과 OAuth 토큰은 읽거나 영속 저장하지 않으며 메일 상세는 공식 웹메일에서 연다. `MailAccounts.all`은 주소 없는 Gmail 레코드를 표시 대상에서 제외하며, 기존 실제 주소의 ID와 쿠키는 보존한다. 빈 주소의 Gmail 열기는 저장하지 않는 `google-session` 임시 계정으로 처리한다.

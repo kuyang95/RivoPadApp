@@ -1,6 +1,6 @@
 # 앱 메타데이터 / 빌드 정보
 
-점검일: 2026-11-25 · 기준 코드: `c5865248`+작업 트리 (런처 웹 내부 탐색 URL 범위) · 런처 유틸리티 대조: 2026-10-22 `514e00f5`+작업 트리 · 현재 위치 날씨 대조: 2026-10-22 `f56b06f0`+작업 트리 · 브라우저 즐겨찾기 대조: 2026-10-22 `f56b06f0`+작업 트리 · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리 · 라디오·팟캐스트 대조: 2026-11-25 `a4f028e3`+작업 트리
+점검일: 2026-11-25 · 기준 코드: `2abc6bdf`+작업 트리 (AI 웹 마이크) · 이전 점검일: 2026-11-25 · 기준 코드: `c5865248`+작업 트리 (런처 웹 내부 탐색 URL 범위) · 런처 유틸리티 대조: 2026-10-22 `514e00f5`+작업 트리 · 현재 위치 날씨 대조: 2026-10-22 `f56b06f0`+작업 트리 · 브라우저 즐겨찾기 대조: 2026-10-22 `f56b06f0`+작업 트리 · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리 · 라디오·팟캐스트 대조: 2026-11-25 `a4f028e3`+작업 트리
 
 `shortcuts_example.xcodeproj/project.pbxproj`, `shortcuts-example-Info.plist`, `*.entitlements` 출처. 코드 안 봐도 한눈에 알 수 있는 정보만.
 
@@ -136,3 +136,7 @@ Tools/  docs/  backend/      # 도구 스크립트·설계 문서·Cloudflare wo
 ## 라디오 음원 네트워크 설정
 
 `shortcuts-example-Info.plist`의 `NSAppTransportSecurity.NSAllowsArbitraryLoadsForMedia=true`로 AVFoundation의 지역 라디오 HTTP 음원을 허용한다. `RadioStations.playbackURL`은 번들 목록의 HTTP 호스트만 허용하며 메타데이터와 팟캐스트는 HTTPS만 사용한다. 일반 `NSAllowsArbitraryLoads`는 설정하지 않는다. 배경 오디오 모드는 추가하지 않는다.
+
+## AI 웹 마이크 권한
+
+`AccessibleWebBrowserModel`은 WKUIDelegate의 미디어 캡처 권한 결정을 덮어쓰지 않으며 WebKit의 사이트 사용 확인과 iPadOS 마이크 권한을 따른다. 본 앱 Debug·Release의 `INFOPLIST_KEY_NSMicrophoneUsageDescription`은 기존 `음성 입력을 위해 필요합니다.`를 유지한다. 자동 승인이나 새 권한 항목을 추가하지 않는다.

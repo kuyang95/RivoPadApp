@@ -160,7 +160,7 @@
     "icon": "book.closed",
     "action": "books",
     "steps": [
-      "Open the Book Reader from Home.",
+      "Open Media on Home, then choose Book Reader.",
       "Choose Select Book File and select an EPUB or DAISY ZIP file.",
       "Open the book and start playback. Choose a location in the table of contents and adjust viewing and reading settings."
     ],

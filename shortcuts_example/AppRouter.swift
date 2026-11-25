@@ -42,9 +42,12 @@ enum AppRoute: Hashable {
     /// 홈 제목 줄의 설정 아이콘 → 전체 설정 화면(Android `AllSettingsScreen`).
     case allSettings
     case standardHome
+    case aiWeb
     case easyBrowser
+    case easyMail
     case listening
     case easyYouTube
+    case mediaWidget(RatioMediaKind)
     /// 홈 업데이트 기록 카드의 "이전 업데이트 기록보기"(Android `FullChangeLogsScreen`).
     case releaseNotes
     case help

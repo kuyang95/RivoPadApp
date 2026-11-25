@@ -211,14 +211,18 @@ struct RatioUtilityWidget: View {
     @State private var draftMinutes = 5
     @State private var draftAlarm = false
     @State private var draftTime = Date()
-    private var ink: Color { widget.colorKey == nil ? RatioExperience().text : RatioExperience().ink }
+    private let style = RatioExperience()
+    private var selectedFill: Color? { ratioPalette.first { $0.id == widget.colorKey }?.color }
+    private var ink: Color { selectedFill == nil ? style.text : style.ink }
+    private var defaultTimer: Bool { widget.isTimer && selectedFill == nil }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 6) {
                 if widget.isWeather { weatherContent } else { timerContent }
             }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
         }.foregroundStyle(ink).tint(ink).buttonStyle(.plain)
-            .background(ratioPalette.first { $0.id == widget.colorKey }?.color ?? RatioExperience().surface, in: RoundedRectangle(cornerRadius: 8))
+            .background(selectedFill ?? (defaultTimer ? style.timer : style.surface), in: style.shape)
+            .overlay { style.shape.strokeBorder(ink.opacity(0.65), lineWidth: 1).allowsHitTesting(false) }
             .onLongPressGesture(perform: onEdit)
             .accessibilityAction(named: "위젯 설정") { onEdit() }
             .sheet(isPresented: $showsSettings) { timerSettings }
@@ -301,7 +305,7 @@ struct RatioUtilityWidget: View {
                 Spacer(minLength: 8)
                 HStack(spacing: 8) {
                     Spacer(minLength: 0)
-                    timerControl(running ? "pause.fill" : "play.fill", label: running ? "일시정지" : "재생") {
+                    timerControl(running ? "pause.fill" : "play.fill", label: running ? "일시정지" : "재생", prominent: defaultTimer) {
                         if running { store.cancelTimer(remaining: store.timer.alarm ? 0 : max(0, store.timer.deadline?.timeIntervalSinceNow ?? 0)) }
                         else if store.timer.alarm {
                             if let next = launcherNextAlarm(hour: hour, minute: minute, now: .now) { Task { await store.startTimer(until: next) } }
@@ -323,10 +327,15 @@ struct RatioUtilityWidget: View {
             }.frame(minHeight: max(0, (height ?? CGFloat(widget.rows * 88 + (widget.rows - 1) * 12)) - 24), alignment: .topLeading)
         }
     }
-    private func timerControl(_ image: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    private func timerControl(_ image: String, label: String, prominent: Bool = false, action: @escaping () -> Void) -> some View {
+        let fill = prominent ? style.timerButton : ink.opacity(0.12)
+        return Button(action: action) {
             Image(systemName: image).font(.system(size: 28)).frame(width: 56, height: 56)
-                .background(ink.opacity(0.12), in: Circle())
+                .foregroundStyle(prominent ? style.timerButtonInk : ink)
+                .background {
+                    if widget.isTimer { style.shape.fill(fill) }
+                    else { Circle().fill(fill) }
+                }
         }.accessibilityLabel(label)
     }
     private var timerSettings: some View {

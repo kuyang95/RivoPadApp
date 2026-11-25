@@ -4,6 +4,27 @@ import Foundation
 import UIKit
 import WebKit
 
+enum MailReaderAction: String, CaseIterable {
+    case reply, read, delete, more, favorite, unfavorite
+
+    var title: String {
+        switch self {
+        case .reply: AppLocalization.string("답장")
+        case .read: AppLocalization.string("읽음 상태 변경")
+        case .delete: AppLocalization.string("삭제")
+        case .more: AppLocalization.string("더보기")
+        case .favorite: AppLocalization.string("즐겨찾기 추가")
+        case .unfavorite: AppLocalization.string("즐겨찾기 해제")
+        }
+    }
+}
+
+struct MailReaderActions {
+    let address: URL
+    let ticket: String
+    let options: [MailReaderAction]
+}
+
 enum AccessibleWebAddress {
     static func isGoogleSearchPage(_ text: String) -> Bool {
         guard let url = URL(string: text), url.scheme == "https", let host = url.host?.lowercased(),
@@ -33,6 +54,7 @@ enum AccessibleWebAddress {
 
 @MainActor
 final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationDelegate, WKUIDelegate {
+    let easyMail: Bool
     let easyYouTube: Bool
     private let embedded: Bool
     var onLauncherPageTurn: ((Int) -> Void)?
@@ -44,12 +66,15 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     @Published private(set) var canGoBack = false
     @Published private(set) var canGoForward = false
     @Published private(set) var isLoading = false
+    private var youtubeNavigation = 0
+    @Published private(set) var youtubeReady = false
+    @Published private(set) var youtubePlaybackLoading = false
     @Published private(set) var newsAwaitingDocument = false
     @Published private(set) var progress = 0.0
     @Published private(set) var hasPopup = false
     @Published private(set) var adBlockEnabled = UserDefaults.standard.object(forKey: "browser.adBlock.enabled") as? Bool ?? true
     func setAdBlockEnabled(_ enabled: Bool) {
-        guard !easyYouTube else { return }
+        guard !easyYouTube && !easyMail else { return }
         adBlockEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: "browser.adBlock.enabled")
         windows.forEach { view in
@@ -59,7 +84,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
         webView.reload()
     }
     private func applyAdBlockRules(to view: WKWebView) {
-        guard !easyYouTube else { return }
+        guard !easyYouTube && !easyMail else { return }
         BrowserAdBlocker.prepare { [weak self, weak view] rules in
             guard let self, let view, let rules else { return }
             let controller = view.configuration.userContentController
@@ -106,25 +131,275 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     func launcherSwipe(for view: WKWebView) -> LauncherWebPageSwipe? { launcherSwipes[ObjectIdentifier(view)] }
     private var observations: [NSKeyValueObservation] = []
     private static let browserStoreIdentifier = UUID(uuidString: "382B897A-44FB-49CB-9A93-FCDA0D815DB1")!
+    private static var youtubeStore: WKWebsiteDataStore { GoogleWebSession.store }
     private static let world = WKContentWorld.world(name: "RivoAccessibleWeb")
     private var activeDialog: UIAlertController?
     private var cancelDialog: (() -> Void)?
 
     override convenience init() { self.init(easyYouTube: false) }
 
+    @Published private(set) var mailEnhanced = true
+    @Published private(set) var mailReaderActions: MailReaderActions?
+    private var mailActionsRequest = 0
+
+    private func resetMailReaderActions() {
+        mailActionsRequest += 1
+        mailReaderActions = nil
+    }
+
+    private func requestMailReaderActions(in view: WKWebView) {
+        guard easyMail, mailEnhanced, !mailStart, youtubeContentActive, view === webView,
+              mailReaderActions == nil, let address = view.url,
+              address.scheme == "https", address.port == nil, address.user == nil,
+              let host = address.host, ["mail.naver.com", "m.mail.naver.com"].contains(host),
+              address.path.hasPrefix("/v2/read/") else { return }
+        mailActionsRequest += 1
+        let request = mailActionsRequest
+        view.evaluateJavaScript("window.__rivoMailActions?.snapshot()") { [weak self, weak view] result, _ in
+            guard let self, let view, request == self.mailActionsRequest, view === self.webView,
+                  view.url == address, self.youtubeContentActive, let result = result as? [String: Any],
+                  let ticket = result["ticket"] as? String, UUID(uuidString: ticket) != nil,
+                  let ids = result["ids"] as? [String] else { return }
+            let options = MailReaderAction.allCases.filter { ids.contains($0.rawValue) }
+            if !options.isEmpty { self.mailReaderActions = MailReaderActions(address: address, ticket: ticket, options: options) }
+        }
+    }
+
+    func finishMailReaderActions(_ action: MailReaderAction? = nil) {
+        guard let dialog = mailReaderActions else { return }
+        resetMailReaderActions()
+        guard youtubeContentActive, webView.url == dialog.address,
+              action.map(dialog.options.contains) ?? true else { return }
+        webView.evaluateJavaScript("window.__rivoMailActions?.finish('\(dialog.ticket)','\(action?.rawValue ?? "")')",
+                                   completionHandler: nil)
+    }
+
+    func toggleMailAppearance() {
+        resetMailReaderActions()
+        mailEnhanced.toggle()
+        windows.forEach { $0.evaluateJavaScript(mailBootstrap, completionHandler: nil) }
+    }
+    private var mailBootstrap: String {
+        let signIn = GoogleSignInPage.source + "\n" + NaverMailLoginAppearance.source + "\n" + MailSecurityPage.source
+            + "\n" + EasyMailPage.officialForm
+            + "\nwindow.__rivoNaverMailLogin?.set(\(mailEnhanced));window.__rivoMailSecurity?.set(\(mailEnhanced));window.__rivoOfficialMailForm?.setEnhanced(\(mailEnhanced));"
+        let theme = AccessibleWebTheme.colors
+        let reader = EasyMailPage.source
+            .replacingOccurrences(of: "__RIVO_MAIL_ACTION_FILL__", with: AccessibleWebTheme.hex(theme.searchFill(colorKey: "lemon")))
+            .replacingOccurrences(of: "__RIVO_MAIL_ACTION_INK__", with: AccessibleWebTheme.hex(theme.ink))
+        return AccessibleWebTheme.script + signIn + "\n" + reader
+            + "\nif(window.__rivoMailHost){" + AccessibleWebAppearance.source
+            + "\nwindow.__rivoMailAppearance?.set(\(mailEnhanced));}"
+    }
+    var mailSignIn: Bool {
+        guard easyMail, !mailStart, let url = URL(string: currentAddress), url.scheme == "https", let host = url.host else { return false }
+        return mailProvider?.authHosts.contains(host) == true
+    }
+    @Published private(set) var mailDirectConnection = false
+    @Published private(set) var mailInbox = false
+    @Published private(set) var mailAccounts: [MailAccount] = []
+    @Published private(set) var mailInboxRevision = 0
+    private var mailStoreIdentifier = EasyMailPage.storeIdentifier
+    @Published var mailChoosingProvider = false
+    @Published var mailEntryEditing = false
+    @Published private(set) var mailStart = true
+    @Published private(set) var mailProvider: EasyMailProvider?
+    @Published private(set) var mailAddressHint = ""
+
+    @Published private(set) var mailPasswordRequired = false
+    @Published private(set) var mailAuthenticating = false
+    @Published private(set) var mailLoginError: String?
+    private var mailRestoring = false
+    @Published private(set) var naverMailBlocksInput = false
+    var mailLoginHidesWeb: Bool { mailAuthenticating && (mailRestoring || mailProvider?.id != "naver") }
+    private let mailLogin = MailNativeLogin()
+
+    func cancelMailLogin() {
+        mailLogin.cancel()
+        mailRestoring = false
+        mailAuthenticating = false
+        naverMailBlocksInput = false
+        mailPasswordRequired = mailProvider?.nativeIdentifier(mailAddressHint) != nil
+        mailStart = true
+        mailLoginError = nil
+        webView.stopLoading()
+        webView.loadHTMLString("", baseURL: nil)
+    }
+
+    func signInMail(password: String) {
+        guard mailPasswordRequired, let provider = mailProvider, let identifier = provider.nativeIdentifier(mailAddressHint),
+              !password.isEmpty, youtubeContentActive else { return }
+        mailLoginError = nil
+        mailPasswordRequired = false
+        naverMailBlocksInput = provider.id == "naver"
+        mailAuthenticating = true
+        mailStart = false
+        mailLogin.start(view: webView, provider: provider, identifier: identifier, password: password,
+                        navigate: { navigate(provider.home) },
+                        onForegroundBlocking: { [weak self] in self?.naverMailBlocksInput = $0 },
+                        done: { [weak self] in self?.finishMailLogin($0) })
+    }
+
+    private func finishMailLogin(_ result: MailLoginResult) {
+        let wasRestoring = mailRestoring
+        mailRestoring = false
+        mailAuthenticating = false
+        naverMailBlocksInput = false
+        if mailProvider?.id == "naver", !wasRestoring || mailAddressHint.isEmpty {
+            if case .failed = result, errorMessage == nil {
+                errorMessage = String(localized: "로그인을 완료하지 못했어요. 다시 시도해 주세요.")
+            }
+            return
+        }
+        switch result {
+        case .content: break
+        case .challenge: break
+        case .needsAddress, .rejected, .failed:
+            mailPasswordRequired = mailProvider?.nativeIdentifier(mailAddressHint) != nil
+            mailStart = true
+            switch result {
+            case .rejected:
+                mailLoginError = mailProvider?.id == "daum"
+                    ? String(localized: "다음 메일 주소와 카카오계정 주소가 다르면 카카오계정 주소로 다시 시도해 주세요.")
+                    : String(localized: "로그인하지 못했어요. 주소와 비밀번호를 확인해 주세요.")
+            case .failed: mailLoginError = String(localized: "로그인을 완료하지 못했어요. 다시 시도해 주세요.")
+            default: mailLoginError = nil
+            }
+            if wasRestoring { mailLoginError = nil }
+            if !mailPasswordRequired { mailAddressHint = "" }
+            webView.stopLoading()
+            webView.loadHTMLString("", baseURL: nil)
+        }
+    }
+
+    func showNaverConnection() {
+        guard mailProvider?.id == "naver" else { return }
+        mailPasswordRequired = false
+        webView.stopLoading()
+        mailDirectConnection = true
+        mailStart = true
+    }
+
+    func showNaverWebMail() {
+        guard let provider = mailProvider, provider.id == "naver" else { return }
+        openMail(provider, address: mailAddressHint)
+    }
+
+    func rememberNaverMailLink() {
+        UserDefaults.standard.set("naver", forKey: "easyMail.provider")
+    }
+
+    func openMail(_ provider: EasyMailProvider, address: String = "") {
+        openMailAccount(MailAccounts.account(provider, address: address.trimmingCharacters(in: .whitespacesAndNewlines)))
+    }
+
+    func openMailAccount(_ account: MailAccount, target: String? = nil, compose: Bool = false) {
+        resetMailReaderActions()
+        let provider = account.provider
+        let address = account.address
+        mailInbox = false
+        mailAccounts = MailAccounts.all()
+        mailLogin.cancel()
+        mailRestoring = false
+        mailAuthenticating = false
+        naverMailBlocksInput = false
+        mailPasswordRequired = false
+        mailLoginError = nil
+        while hasPopup { closePopup() }
+        if mailStoreIdentifier != account.storeIdentifier {
+            webView.stopLoading()
+            webView.navigationDelegate = nil
+            webView.uiDelegate = nil
+            launcherSwipes.removeValue(forKey: ObjectIdentifier(webView))
+            mailStoreIdentifier = account.storeIdentifier
+            webView = WKWebView(frame: .zero, configuration: Self.mailConfiguration(account.storeIdentifier))
+            configure(webView)
+            windows = [webView]
+            observeActiveWindow()
+        }
+        mailProvider = provider
+        mailAddressHint = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        mailChoosingProvider = false
+        mailDirectConnection = false
+        mailStart = false
+        errorMessage = nil
+        if account.id != "google-session" {
+            let defaults = UserDefaults.standard
+            defaults.set(provider.id == "custom" ? nil : provider.id, forKey: "easyMail.provider")
+            defaults.set(provider.nativeIdentifier(mailAddressHint) == nil ? nil : mailAddressHint, forKey: "easyMail.address")
+            defaults.removeObject(forKey: "easyMail.naverAddress")
+        }
+        if compose && provider.id == "naver" {
+            navigate("https://mail.naver.com/v2/new")
+        } else if let target {
+            navigate(target)
+        } else if provider.id == "gmail", !address.isEmpty {
+            var url = URLComponents(string: "https://mail.google.com/mail/")!
+            url.queryItems = [URLQueryItem(name: "authuser", value: address)]
+            if let url = url.url { navigate(url.absoluteString) }
+        } else if !provider.nativeInboxHosts.isEmpty, provider.id != "naver" || !mailAddressHint.isEmpty {
+            mailRestoring = true
+            mailAuthenticating = true
+            mailLogin.start(view: webView, provider: provider, identifier: nil, password: nil,
+                            navigate: { navigate(provider.home) }, done: { [weak self] in self?.finishMailLogin($0) })
+        } else {
+            navigate(provider.home)
+        }
+    }
+
+    func restoreMail() { mailAccounts = MailAccounts.all() }
+
+    func showMailInbox() {
+        showMailStart()
+        restoreMail()
+        mailInbox = !mailAccounts.isEmpty
+        mailInboxRevision += 1
+    }
+
+    private static func mailConfiguration(_ identifier: UUID) -> WKWebViewConfiguration {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = identifier == EasyYouTubePage.storeIdentifier
+            ? GoogleWebSession.store : WKWebsiteDataStore(forIdentifier: identifier)
+        configuration.defaultWebpagePreferences.preferredContentMode = .mobile
+        configuration.allowsInlineMediaPlayback = true
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
+        return configuration
+    }
+
+    func showMailStart() {
+        resetMailReaderActions()
+        mailInbox = false
+        mailLogin.cancel()
+        mailRestoring = false
+        mailAuthenticating = false
+        naverMailBlocksInput = false
+        mailPasswordRequired = false
+        mailLoginError = nil
+        mailDirectConnection = false
+        mailStart = true; mailChoosingProvider = false; mailAddressHint = ""; errorMessage = nil
+        while hasPopup { closePopup() }
+        webView.stopLoading(); webView.load(URLRequest(url: URL(string: "about:blank")!))
+    }
     let newsArticle: Bool
-    init(easyYouTube: Bool, embedded: Bool = false, newsArticle: Bool = false) {
+    let aiWeb: Bool
+    init(easyYouTube: Bool, embedded: Bool = false, newsArticle: Bool = false, easyMail: Bool = false, aiWeb: Bool = false) {
         self.newsArticle = newsArticle
+        self.aiWeb = aiWeb
         self.easyYouTube = easyYouTube
+        self.easyMail = easyMail
         self.embedded = embedded
         let preferredScale = UIFontMetrics(forTextStyle: .body).scaledValue(for: 17) / 17
         let preferredPercent = min(300, max(75, Int((preferredScale * 100).rounded())))
         defaultZoomPercent = preferredPercent
         zoomPercent = preferredPercent
-        let configuration = WKWebViewConfiguration()
+        let configuration = easyMail ? Self.mailConfiguration(EasyMailPage.storeIdentifier) : WKWebViewConfiguration()
         // Widgets and standalone screens share login; document viewers retain their own stores.
-        configuration.websiteDataStore = WKWebsiteDataStore(forIdentifier: easyYouTube ? EasyYouTubePage.storeIdentifier : Self.browserStoreIdentifier)
-        if easyYouTube || embedded { configuration.defaultWebpagePreferences.preferredContentMode = .mobile }
+        if easyYouTube {
+            configuration.websiteDataStore = Self.youtubeStore
+        } else if !easyMail {
+            configuration.websiteDataStore = WKWebsiteDataStore(forIdentifier: Self.browserStoreIdentifier)
+        }
+        if easyYouTube || easyMail || embedded || aiWeb { configuration.defaultWebpagePreferences.preferredContentMode = .mobile }
         configuration.allowsInlineMediaPlayback = true
         if easyYouTube { configuration.mediaTypesRequiringUserActionForPlayback = [] }
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
@@ -134,8 +409,11 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
         configure(webView)
         windows = [webView]
         observeActiveWindow()
-        if !newsArticle {
-            navigate(easyYouTube ? EasyYouTubePage.home : "https://www.google.com")
+        if easyMail {
+            restoreMail()
+            mailInbox = !mailAccounts.isEmpty
+        } else if !newsArticle {
+            navigate(aiWeb ? "https://chatgpt.com/" : easyYouTube ? EasyYouTubePage.home : "https://www.google.com")
         }
     }
 
@@ -165,6 +443,11 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
             view.backgroundColor = .clear
             view.scrollView.backgroundColor = .clear
         }
+        if aiWeb {
+            view.isOpaque = false
+            view.backgroundColor = .clear
+            view.scrollView.backgroundColor = .clear
+        }
         installScript(in: view)
         applyZoom(to: view)
     }
@@ -173,11 +456,16 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
         let controller = view.configuration.userContentController
         controller.removeAllUserScripts()
         if embedded {
-            controller.addUserScript(WKUserScript(source: AccessibleWebTheme.script + "window.__rivoLauncherBrowser = \(!easyYouTube);window.__rivoLauncherNativeSwipe = true;\n" + LauncherWebAppearance.source + "\nwindow.__rivoLauncherReflow?.setZoom?.(\(Double(zoomPercent)/100));", injectionTime: .atDocumentStart,
+            controller.addUserScript(WKUserScript(source: AccessibleWebTheme.script + "window.__rivoLauncherBrowser = \(!easyYouTube && !easyMail);window.__rivoLauncherNativeSwipe = true;window.__rivoLauncherMail = \(easyMail);\n" + LauncherWebAppearance.source + "\nwindow.__rivoLauncherReflow?.setZoom?.(\(Double(zoomPercent)/100));", injectionTime: .atDocumentStart,
                                                  forMainFrameOnly: false, in: .page))
         }
+        if easyMail {
+            controller.addUserScript(WKUserScript(source: mailBootstrap,
+                injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page))
+            return
+        }
         if easyYouTube {
-            controller.addUserScript(WKUserScript(source: AccessibleWebTheme.script + EasyYouTubePage.source, injectionTime: .atDocumentStart,
+            controller.addUserScript(WKUserScript(source: "window.__rivoYouTubeUIScale=\(Double(zoomPercent) / 100);" + AccessibleWebTheme.script + GoogleSignInPage.source + EasyYouTubePage.source, injectionTime: .atDocumentStart,
                                                  forMainFrameOnly: true, in: .page))
             return
         }
@@ -185,7 +473,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
                                              forMainFrameOnly: false, in: .page))
         applyAdBlockRules(to: view)
         controller.addUserScript(WKUserScript(
-            source: AccessibleWebAppearance.bootstrap(enabled: appearanceEnabled, palette: palette) + "\n" + (newsArticle ? NewsArticlePage.source + "\nwindow.__rivoNewsArticle?.set(\(appearanceEnabled));\n" : "") + AccessibleGooglePage.bootstrap(enabled: simpleGoogleEnabled, appearanceEnabled: appearanceEnabled, palette: palette),
+            source: AccessibleWebAppearance.bootstrap(enabled: appearanceEnabled, palette: palette, aiWeb: aiWeb) + "\n" + (newsArticle ? NewsArticlePage.source + "\nwindow.__rivoNewsArticle?.set(\(appearanceEnabled));\n" : "") + AccessibleGooglePage.bootstrap(enabled: simpleGoogleEnabled, appearanceEnabled: appearanceEnabled, palette: palette) + (aiWeb ? "\n" + EasyAIPage.bootstrap(enabled: appearanceEnabled, palette: palette) : ""),
             injectionTime: .atDocumentStart,
             forMainFrameOnly: false,
             in: Self.world
@@ -193,12 +481,12 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     }
 
     func applyAppearance() {
-        guard !easyYouTube else { return }
+        guard !easyYouTube && !easyMail else { return }
         for window in windows {
             window.overrideUserInterfaceStyle = palette == .dark ? .dark : .light
             installScript(in: window)
             window.evaluateJavaScript(
-                "window.__rivoAccessibleWeb?.set(\(AccessibleWebAppearance.configuration(enabled: appearanceEnabled, palette: palette)));window.__rivoNewsArticle?.set(\(appearanceEnabled));" + AccessibleGooglePage.bootstrap(enabled: simpleGoogleEnabled, appearanceEnabled: appearanceEnabled, palette: palette),
+                "window.__rivoAccessibleWeb?.set(\(AccessibleWebAppearance.configuration(enabled: appearanceEnabled, palette: palette)));window.__rivoNewsArticle?.set(\(appearanceEnabled));" + AccessibleGooglePage.bootstrap(enabled: simpleGoogleEnabled, appearanceEnabled: appearanceEnabled, palette: palette) + (aiWeb ? "\n" + EasyAIPage.bootstrap(enabled: appearanceEnabled, palette: palette) : ""),
                 in: nil, in: Self.world
             ) { _ in }
         }
@@ -218,6 +506,9 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
             if abs(view.pageZoom - 1) > 0.001 { view.pageZoom = 1 }
             view.evaluateJavaScript("window.__rivoLauncherReflow?.setZoom?.(\(scale))", completionHandler: nil)
         } else if abs(view.pageZoom - scale) > 0.001 { view.pageZoom = scale }
+        if easyYouTube {
+            view.evaluateJavaScript("window.__rivoYouTubeUIScale=\(scale);window.__rivoYouTubePrototype?.setUIScale?.(\(scale));", completionHandler: nil)
+        }
         if view === webView { zoomPercent = percent }
     }
 
@@ -249,17 +540,44 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     }
 
     @discardableResult func goBack() -> Bool {
+        if easyMail && webView.backForwardList.backItem?.url.absoluteString == "about:blank" { return false }
         if webView.canGoBack { webView.goBack(); return true }
         if hasPopup { closePopup(); return true }
         return false
     }
 
     func handleBack(onExhausted: @escaping () -> Void) {
+        if aiWeb {
+            let view = webView
+            view.evaluateJavaScript("window.__rivoEasyAI?.back?.() === true", in: nil, in: Self.world) { [weak self] result in
+                guard let self, self.webView === view else { return }
+                if case .success(let handled) = result, handled as? Bool == true { return }
+                if !self.goBack() { onExhausted() }
+            }
+            return
+        }
+        if easyMail {
+            if mailReaderActions != nil { finishMailReaderActions() }
+            else if mailInbox { onExhausted() }
+            else if mailAuthenticating { cancelMailLogin() }
+            else if mailStart && mailChoosingProvider { mailChoosingProvider = false }
+            else if mailStart && mailAccounts.isEmpty && !mailPasswordRequired && !mailDirectConnection { onExhausted() }
+            else { showMailInbox() }
+            return
+        }
         guard easyYouTube else { if !goBack() { onExhausted() }; return }
         let view = webView
         view.evaluateJavaScript("window.__rivoYouTubePrototype?.back?.() === true") { [weak self] result, _ in
             guard let self, self.webView === view else { return }
-            if result as? Bool != true && !self.goBack() { onExhausted() }
+            guard result as? Bool != true else { return }
+            let url = view.url
+            let atHome = url?.scheme == "https" &&
+                ["m.youtube.com", "www.youtube.com", "youtube.com"].contains(url?.host ?? "") &&
+                ["", "/"].contains(url?.path ?? "")
+            // Tab switches and sign-in redirects remain in WebKit history even at home.
+            if atHome {
+                if self.hasPopup { self.closePopup() } else { onExhausted() }
+            } else if !self.goBack() { onExhausted() }
         }
     }
 
@@ -277,15 +595,66 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
         closed.navigationDelegate = nil
         closed.uiDelegate = nil
         webView = windows.last!
+        youtubePlaybackLoading = false
         observeActiveWindow()
         errorMessage = nil
     }
 
     func resetExitRequest() { exitRequested = false }
 
-    private var youtubeContentActive = true
+    @Published private(set) var youtubeContentActive = true
+    private var googleStatusRequest = 0
+    private var googleSessionClosed = false
+
+    func connectSharedGoogleLogin() {
+        if easyYouTube { navigate(EasyYouTubePage.home + "signin") }
+        else if easyMail, let provider = EasyMailProvider.all.first(where: { $0.id == "gmail" }) {
+            openMailAccount(MailAccount(id: "google-session", provider: provider, address: ""))
+        }
+    }
+
+    private func refreshGoogleLoginStatus(reconnect: Bool = false) {
+        googleStatusRequest += 1
+        guard !googleSessionClosed, youtubeContentActive,
+              easyYouTube || (easyMail && !mailStart && !mailInbox && mailProvider?.id == "gmail") else { return }
+        pollGoogleLoginStatus(in: webView, request: googleStatusRequest, reconnect: reconnect)
+    }
+
+    private func pollGoogleLoginStatus(in view: WKWebView, request: Int, reconnect: Bool = false) {
+        let serviceHosts = easyYouTube ? ["m.youtube.com", "www.youtube.com", "youtube.com"] : ["mail.google.com"]
+        guard request == googleStatusRequest, !googleSessionClosed, youtubeContentActive, view === webView,
+              let url = view.url, url.scheme == "https", url.port == nil, url.user == nil,
+              let host = url.host, host == "accounts.google.com" || serviceHosts.contains(host) else { return }
+        view.evaluateJavaScript(GoogleWebSession.statusScript) { [weak self, weak view] result, _ in
+            guard let self, let view, request == self.googleStatusRequest, !self.googleSessionClosed,
+                  self.youtubeContentActive, view === self.webView, view.url == url else { return }
+            let value: Bool? = (result as? String) == "in" ? true : (result as? String) == "out" ? false : nil
+            if let value { GoogleWebSession.shared.update(youtube: self.easyYouTube, value: value) }
+            if reconnect, self.easyYouTube, value == false, GoogleWebSession.shared.gmailSignedIn == true,
+               ["m.youtube.com", "www.youtube.com", "youtube.com"].contains(host), ["", "/"].contains(url.path) {
+                self.navigate(EasyYouTubePage.home + "signin")
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self, weak view] in
+                guard let self, let view else { return }
+                self.pollGoogleLoginStatus(in: view, request: request)
+            }
+        }
+    }
+
     func setContentActive(_ active: Bool) {
+        let resuming = active && !youtubeContentActive
+        if easyMail && !active { resetMailReaderActions() }
+        if !active && mailAuthenticating && !mailRestoring {
+            if mailProvider?.id == "naver" && !naverMailBlocksInput {
+                mailLogin.cancel()
+                finishMailLogin(.challenge)
+            } else {
+                cancelMailLogin()
+            }
+        }
         youtubeContentActive = active
+        refreshGoogleLoginStatus(reconnect: resuming)
         if active && !easyYouTube { applyAppearance() }
         if easyYouTube { webView.evaluateJavaScript("window.__rivoYouTubeContentActive=\(active);window.__rivoYouTubePrototype?.setActive?.(\(active));", completionHandler: nil) }
     }
@@ -295,6 +664,10 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     }
 
     func shutdown() {
+        googleSessionClosed = true
+        googleStatusRequest += 1
+        youtubeNavigation += 1
+        mailLogin.cancel()
         dismissDialog()
         observations.removeAll()
         launcherSwipes.removeAll()
@@ -326,6 +699,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
 
     private func syncState() {
         currentAddress = webView.url?.absoluteString ?? (easyYouTube ? EasyYouTubePage.home : "https://www.google.com")
+        if let dialog = mailReaderActions, dialog.address != webView.url { resetMailReaderActions() }
         hasPopup = windows.count > 1
         canGoBack = webView.canGoBack || hasPopup
         canGoForward = webView.canGoForward
@@ -336,6 +710,13 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
+        if url.absoluteString == "rivo-browser://mail-actions" {
+            decisionHandler(.cancel)
+            if navigationAction.sourceFrame.isMainFrame, navigationAction.targetFrame?.isMainFrame == true {
+                requestMailReaderActions(in: webView)
+            }
+            return
+        }
         if url.absoluteString == "rivo-browser://add-favorite" {
             if !easyYouTube, simpleGoogleEnabled, navigationAction.targetFrame?.isMainFrame == true,
                navigationAction.sourceFrame.isMainFrame, webView === self.webView, AccessibleWebAddress.isGoogleHome(webView.url?.absoluteString ?? "") { favoriteAddRequested = true }
@@ -363,6 +744,9 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
         let localChildFrame = navigationAction.targetFrame?.isMainFrame == false &&
             (["data", "blob"].contains(url.scheme ?? "") || url.absoluteString == "about:srcdoc")
         if AccessibleWebAddress.isWebURL(url) || url.absoluteString == "about:blank" || localChildFrame {
+            if easyYouTube && webView === self.webView && navigationAction.targetFrame?.isMainFrame == true {
+                youtubePlaybackLoading = isYouTubePlaybackURL(url)
+            }
             decisionHandler(.allow)
         } else {
             if webView === self.webView, navigationAction.targetFrame?.isMainFrame != false {
@@ -384,20 +768,96 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        if easyYouTube && webView === self.webView {
+            youtubeNavigation += 1
+        }
+        if easyMail && webView === self.webView { resetMailReaderActions() }
         if webView === self.webView { errorMessage = nil; newsAwaitingDocument = newsArticle }
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        if easyYouTube && webView === self.webView { youtubePlaybackLoading = isYouTubePlaybackURL(webView.url) }
         if webView === self.webView { newsAwaitingDocument = false }
         applyZoom(to: webView)
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        if easyYouTube {
-            webView.evaluateJavaScript(AccessibleWebTheme.script + EasyYouTubePage.source, completionHandler: nil)
+        if easyMail && !mailStart {
+            webView.evaluateJavaScript(mailBootstrap, completionHandler: nil)
+            if !mailAuthenticating, let script = mailProvider?.hintScript(address: mailAddressHint, url: webView.url), !script.isEmpty {
+                webView.evaluateJavaScript(script, completionHandler: nil)
+            }
         }
-        if webView === self.webView { setContentActive(youtubeContentActive) }
+        if easyYouTube {
+            let script = AccessibleWebTheme.script + GoogleSignInPage.source + EasyYouTubePage.source
+            if (embedded && !youtubeReady) || youtubePlaybackLoading, webView === self.webView,
+               let url = webView.url, AccessibleWebAddress.isWebURL(url) {
+                let navigation = youtubeNavigation
+                webView.evaluateJavaScript(script) { [weak self, weak webView] _, _ in
+                    guard let self, let webView else { return }
+                    if self.embedded && !self.youtubeReady { self.awaitYouTubeReady(in: webView, url: url, navigation: navigation) }
+                    if self.youtubePlaybackLoading { self.awaitYouTubePlayback(in: webView, url: url, navigation: navigation) }
+                }
+            } else {
+                webView.evaluateJavaScript(script, completionHandler: nil)
+            }
+        }
+        if webView === self.webView {
+            setContentActive(youtubeContentActive)
+        }
         applyZoom(to: webView)
+    }
+
+    private func awaitYouTubeReady(in view: WKWebView, url: URL, navigation: Int, attempt: Int = 0) {
+        guard isWaitingForYouTubeReady(in: view, url: url, navigation: navigation) else { return }
+
+        // Official sign-in and consent pages do not have the simplified account gate.
+        if !["m.youtube.com", "www.youtube.com", "youtube.com"].contains(url.host ?? "") ||
+            url.path == "/signin" || url.path.hasPrefix("/embed/") {
+            youtubeReady = true
+            return
+        }
+        view.evaluateJavaScript("window.__rivoYouTubePrototype?.startupReady?.() === true") { [weak self, weak view] result, _ in
+            guard let self, let view, self.isWaitingForYouTubeReady(in: view, url: url, navigation: navigation) else { return }
+            if result as? Bool == true {
+                self.youtubeReady = true
+            } else if attempt < 96 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self, weak view] in
+                    guard let self, let view else { return }
+                    self.awaitYouTubeReady(in: view, url: url, navigation: navigation, attempt: attempt + 1)
+                }
+            } else {
+                self.errorMessage = AppLocalization.string("유튜브를 준비하지 못했어요. 다시 시도해 주세요.")
+            }
+        }
+    }
+
+    private func awaitYouTubePlayback(in view: WKWebView, url: URL, navigation: Int, attempt: Int = 0) {
+        guard isWaitingForYouTubePlayback(in: view, url: url, navigation: navigation) else { return }
+        view.evaluateJavaScript("window.__rivoYouTubePrototype?.playbackReady?.() === true") { [weak self, weak view] result, _ in
+            guard let self, let view, self.isWaitingForYouTubePlayback(in: view, url: url, navigation: navigation) else { return }
+            if result as? Bool == true || attempt >= 96 { self.youtubePlaybackLoading = false }
+            else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self, weak view] in
+                    guard let self, let view else { return }
+                    self.awaitYouTubePlayback(in: view, url: url, navigation: navigation, attempt: attempt + 1)
+                }
+            }
+        }
+    }
+
+    private func isYouTubePlaybackURL(_ url: URL?) -> Bool {
+        guard let url else { return false }
+        return url.scheme == "https" && ["m.youtube.com", "www.youtube.com", "youtube.com"].contains(url.host ?? "") && url.path == "/watch"
+    }
+
+    private func isWaitingForYouTubePlayback(in view: WKWebView, url: URL, navigation: Int) -> Bool {
+        youtubePlaybackLoading && errorMessage == nil && view === webView && view.url == url &&
+            youtubeNavigation == navigation && windows.contains { $0 === view }
+    }
+
+    private func isWaitingForYouTubeReady(in view: WKWebView, url: URL, navigation: Int) -> Bool {
+        !youtubeReady && errorMessage == nil && view === webView && view.url == url && youtubeNavigation == navigation
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
@@ -410,11 +870,15 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
 
     private func report(_ error: Error, from view: WKWebView) {
         guard view === webView, (error as NSError).code != NSURLErrorCancelled else { return }
+        youtubePlaybackLoading = false
         newsAwaitingDocument = false
+        if mailAuthenticating { mailLogin.fail(); return }
         errorMessage = "페이지를 열지 못했습니다. \(error.localizedDescription)"
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        if webView === self.webView { youtubePlaybackLoading = false }
+        if webView === self.webView && mailAuthenticating { mailLogin.fail(); return }
         if webView === self.webView { errorMessage = "웹페이지 실행이 중단되었습니다. 새로고침해 주세요." }
     }
 
@@ -436,6 +900,11 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+        if webView === self.webView && mailLoginHidesWeb && mailProvider?.id != "naver" {
+            completionHandler()
+            mailLogin.reject()
+            return
+        }
         let alert = dialog(message, frame: frame)
         alert.addAction(UIAlertAction(title: "확인", style: .default) { [weak self] _ in
             self?.cancelDialog = nil

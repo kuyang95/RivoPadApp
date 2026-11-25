@@ -21,9 +21,14 @@ enum VisionCraftHomeUI {
     static let guideSecondaryText = color(0x6F604F, 0xD4C4AF)
     static let guideArrow = color(0xFFE1C9, 0x483326)
     static let guideIcon = color(0xA67C00, 0xD4A72C)
-    /// Android `VcHomeTileArt`: 회색(Neutral)을 면에 14% 섞은 값, 다크는 회색 다크색을 흰색 쪽으로 50%.
-    static let tileArtBackground = color(0xE6E8EA, 0xDBE2EC)
+    /// Shared warm gray artwork plate, kept distinct from pale and gray illustration shapes.
+    static let tileArtBackground = color(0xB1B3AD, 0xA1A59D)
     static let tileArtIcon = Color(red: 0x28 / 255.0, green: 0x35 / 255.0, blue: 0x46 / 255.0)
+    static let launcherPosterCanvas = color(0xE8E9E2, 0x151B18)
+    static let launcherPosterTile = color(0xF7F7EF, 0x202A25)
+    static let launcherPosterText = color(0x183129, 0xF1F6ED)
+    static let launcherPosterOutline = color(0xC9D0C5, 0x54685D)
+    static let launcherPosterCorner = color(0xE0E1DB, 0x3A3D38)
     /// 잉크 버튼 글자 = 배경색(라이트 흰색, 다크 검정). Android `VcHomeSoftButton(ink = true)`.
     static let onPrimary = VisionCraftUI.background
     static let switchOn = color(0x34C759, 0x34C759)
@@ -82,6 +87,9 @@ struct VisionCraftHomeCategory: Identifiable {
     let artName: String?
     var systemImage: String? = nil
     var description: String? = nil
+    var customImage: UIImage? = nil
+    var showsArtwork = true
+    var posterAccentIndex: Int? = nil
     let items: [VisionCraftActionItem]
 }
 
@@ -132,6 +140,32 @@ struct VisionCraftHomeTilePageLayout: Layout {
     }
 }
 
+private struct PageFillingHomeCategoryGridLayout: Layout {
+    let columns: Int
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        proposal.replacingUnspecifiedDimensions()
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard !subviews.isEmpty else { return }
+        let rows = (subviews.count + columns - 1) / columns
+        let rowGap = min(16, bounds.height / CGFloat(rows))
+        let tileHeight = (bounds.height - rowGap * CGFloat(rows - 1)) / CGFloat(rows)
+        let columnGap = min(16, bounds.width / CGFloat(columns))
+        let tileWidth = (bounds.width - columnGap * CGFloat(columns - 1)) / CGFloat(columns)
+
+        for index in subviews.indices {
+            let row = index / columns
+            let column = index % columns
+            let point = CGPoint(x: bounds.minX + CGFloat(column) * (tileWidth + columnGap),
+                                y: bounds.minY + CGFloat(row) * (tileHeight + rowGap))
+            subviews[index].place(at: point, anchor: .topLeading,
+                proposal: ProposedViewSize(width: tileWidth, height: tileHeight))
+        }
+    }
+}
+
 /// Android `VcTile`(`VcHomeCategoryGrid`): 세로 2열, 가로 4열, 16pt 간격, 4:5 비율.
 /// 테두리 없이 큰 그림자와 위아래 밝기 기울기로 띄운다(`raised`).
 struct VisionCraftHomeCategoryGrid: View {
@@ -139,72 +173,228 @@ struct VisionCraftHomeCategoryGrid: View {
     let columns: Int
     var minimumTitleSize: CGFloat = 0
     var identifierPrefix = "home.category"
+    var fillsHeight = false
+    var onPosterLongPress: (() -> Void)? = nil
     let onOpen: (VisionCraftHomeCategory) -> Void
 
     var body: some View {
-        LazyVGrid(
-            columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: columns),
-            spacing: 16
-        ) {
-            ForEach(categories) { category in
-                Button {
-                    onOpen(category)
-                } label: {
-                    GeometryReader { geometry in
-                        VStack(spacing: 10) {
-                            GeometryReader { artGeometry in
-                                let side = max(0, min(artGeometry.size.width - 48, artGeometry.size.height - 8))
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: side * 0.225, style: .continuous)
-                                        .fill(VisionCraftHomeUI.tileArtBackground)
-                                        .frame(width: side, height: side)
-                                    if let artName = category.artName {
-                                        Image(artName)
-                                            .resizable()
-                                            .scaledToFit()
-                                            .frame(width: side * 0.7, height: side * 0.7)
-                                    } else if let systemImage = category.systemImage {
-                                        Image(systemName: systemImage)
-                                            .font(.system(size: side * 0.5, weight: .medium))
-                                            .foregroundStyle(VisionCraftHomeUI.tileArtIcon)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        if fillsHeight {
+            PageFillingHomeCategoryGridLayout(columns: columns) { tiles }
+        } else {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: columns),
+                spacing: 16) { tiles }
+        }
+    }
 
-                            VisionCraftHomeTileTitle(
-                                title: category.title,
-                                tileWidth: geometry.size.width,
-                                minimumTextSize: minimumTitleSize
-                            )
-                        }
-                        .padding(.top, 18)
-                        .padding(.bottom, 16)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                    .aspectRatio(4.0 / 5.0, contentMode: .fit)
-                    .visionCraftHomeSurface(outlined: false, raised: true)
-                    .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    private var tiles: some View {
+        ForEach(categories) { category in
+            Button {
+                onOpen(category)
+            } label: {
+                if fillsHeight {
+                    VisionCraftLauncherPosterTile(category: category)
+                } else {
+                    VisionCraftHomeCategoryTileContent(title: category.title, artName: category.artName,
+                        systemImage: category.systemImage, customImage: category.customImage,
+                        minimumTitleSize: minimumTitleSize, showsArtwork: category.showsArtwork)
+                        .aspectRatio(4.0 / 5.0, contentMode: .fit)
+                        .visionCraftHomeSurface(outlined: false, raised: true)
+                        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 }
-                .buttonStyle(VisionCraftHomePressStyle())
-                .accessibilityLabel(accessibilityLabel(for: category))
-                .accessibilityHint(category.description.map { AppLocalization.string($0) } ?? "")
-                .accessibilityIdentifier("\(identifierPrefix).\(category.id)")
             }
+            .modifier(LauncherPosterLongPress(onTap: { onOpen(category) }, onLongPress: onPosterLongPress))
+            .buttonStyle(VisionCraftHomePressStyle())
+            .accessibilityLabel(accessibilityLabel(for: category))
+            .accessibilityHint(category.description.map { AppLocalization.string($0) } ?? "")
+            .accessibilityIdentifier("\(identifierPrefix).\(category.id)")
         }
     }
 
     /// 항목이 하나면 타일이 곧 그 기능이므로 기능 설명을, 여럿이면 안에 든 항목 이름을 읽어 준다.
     private func accessibilityLabel(for category: VisionCraftHomeCategory) -> String {
         let title = AppLocalization.string(category.title)
+        if category.items.isEmpty { return title }
         if category.items.count == 1, let only = category.items.first {
-            return "\(title). \(AppLocalization.string(only.description))"
+            return only.description.isEmpty ? title : "\(title). \(AppLocalization.string(only.description))"
         }
         let names = category.items
             .map { AppLocalization.string($0.title) }
             .joined(separator: ", ")
         return "\(title). \(names)"
+    }
+}
+
+private struct VisionCraftLauncherPosterTile: View {
+    @Environment(\.visionCraftHomePressed) private var pressed
+    @Environment(\.colorScheme) private var colorScheme
+    let category: VisionCraftHomeCategory
+
+    private var posterArtworkName: String? {
+        switch category.id {
+        case "ai": "HomePosterAIChat"
+        case "camera": "HomePosterCamera"
+        case "reading": "HomePosterDocuments"
+        case "link": "HomePosterVisionLink"
+        case "media": "HomePosterMedia"
+        default: category.artName
+        }
+    }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        let iconTint = colorScheme == .dark ? VisionCraftHomeUI.launcherPosterText : VisionCraftHomeUI.tileArtIcon
+        GeometryReader { geometry in
+            let size = geometry.size
+            let inset = min(32, max(10, size.width * 0.07))
+            let titleSize = max(18, min(46, (size.width - inset * 2) * 0.14, size.height * 0.24))
+            VStack(alignment: .leading, spacing: 0) {
+                GeometryReader { art in
+                    if category.showsArtwork {
+                        let side = max(0, min(art.size.width * 0.52, art.size.height * 0.90))
+                        Group {
+                            if let artworkName = posterArtworkName {
+                                Image(artworkName).resizable()
+                            } else {
+                                Image(systemName: category.systemImage ?? "square.grid.3x3").resizable()
+                                    .foregroundStyle(iconTint)
+                            }
+                        }
+                        .scaledToFit()
+                        .frame(width: side, height: side)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                        .accessibilityHidden(true)
+                    }
+                }
+                Text(AppLocalization.string(category.title))
+                    .visionCraftAndroidText(titleSize, weight: .bold, relativeTo: .title)
+                    .foregroundStyle(VisionCraftHomeUI.launcherPosterText)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, inset)
+            .padding(.top, size.height * 0.07)
+            .padding(.bottom, size.height * 0.08)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .background {
+                VisionCraftHomeUI.launcherPosterTile
+                Path { path in
+                    path.move(to: CGPoint(x: size.width * 0.30, y: 0))
+                    path.addCurve(to: CGPoint(x: size.width, y: size.height * 0.74),
+                        control1: CGPoint(x: size.width * 0.30, y: size.height * 0.41),
+                        control2: CGPoint(x: size.width * 0.61, y: size.height * 0.74))
+                    path.addLine(to: CGPoint(x: size.width, y: 0))
+                    path.closeSubpath()
+                }.fill(VisionCraftHomeUI.launcherPosterCorner)
+            }
+        }
+        .overlay {
+            shape.fill(VisionCraftHomeUI.launcherPosterText.opacity(pressed ? 0.1 : 0))
+                .allowsHitTesting(false)
+        }
+        .clipShape(shape)
+        .overlay { shape.strokeBorder(VisionCraftHomeUI.launcherPosterOutline, lineWidth: 1) }
+        .modifier(VisionCraftLauncherTileDepth(pressed: pressed))
+        .contentShape(shape)
+    }
+}
+
+struct VisionCraftLauncherTileDepth: ViewModifier {
+    var pressed = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        let dark = colorScheme == .dark
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        content
+            .overlay {
+                shape.fill(LinearGradient(colors: [
+                    .white.opacity(dark ? 0.055 : 0.035),
+                    .clear,
+                    .black.opacity(dark ? 0.04 : 0.018)
+                ], startPoint: .top, endPoint: .bottom))
+                .allowsHitTesting(false)
+            }
+            .overlay {
+                shape.strokeBorder(LinearGradient(colors: [
+                    .white.opacity(dark ? 0.12 : 0.48), .clear
+                ], startPoint: .top, endPoint: .bottom), lineWidth: 0.5)
+                .padding(1)
+                .allowsHitTesting(false)
+            }
+            .shadow(color: .black.opacity(dark ? 0.24 : 0.08),
+                    radius: pressed ? 1 : 2, x: 0, y: pressed ? 0.5 : 1.5)
+    }
+}
+
+/// Displays borderless icons in their Rivo colors and applies the shared grade to other action art.
+struct VisionCraftActionArtwork: View {
+    let name: String
+
+    var body: some View {
+        let appliesTone = name.hasPrefix("HomeAction") && !name.hasSuffix("NoOutline")
+        Image(name)
+            .resizable()
+            .scaledToFit()
+            .saturation(appliesTone ? 0.70 : 1)
+            .colorMultiply(appliesTone ? VisionCraftUI.fixedColor(0xF8F5EC) : .white)
+    }
+}
+
+struct VisionCraftArtworkPlate: View {
+    let side: CGFloat
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: side * 0.225, style: .continuous)
+            .fill(VisionCraftHomeUI.tileArtBackground)
+            .frame(width: side, height: side)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Category home and Ratio share artwork, title sizing and spacing.
+struct VisionCraftHomeCategoryTileContent: View {
+    let title: String
+    var artName: String?
+    var systemImage: String?
+    var customImage: UIImage? = nil
+    var minimumTitleSize: CGFloat = 0
+    var showsArtwork = true
+
+    var body: some View {
+        GeometryReader { geometry in
+            VStack(spacing: 10) {
+                GeometryReader { artGeometry in
+                    let side = max(0, min(artGeometry.size.width - 48, artGeometry.size.height - 8))
+                    ZStack {
+                        if showsArtwork {
+                            VisionCraftArtworkPlate(side: side)
+                            if let image = customImage {
+                                Image(uiImage: image).resizable().scaledToFit()
+                                    .frame(width: side * 0.7, height: side * 0.7)
+                            } else if let artName = artName {
+                                VisionCraftActionArtwork(name: artName)
+                                    .frame(width: side * 0.7, height: side * 0.7)
+                            } else if let systemImage = systemImage {
+                                Image(systemName: systemImage)
+                                    .font(.system(size: side * 0.5, weight: .medium))
+                                    .foregroundStyle(VisionCraftHomeUI.tileArtIcon)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                VisionCraftHomeTileTitle(
+                    title: title,
+                    tileWidth: geometry.size.width,
+                    minimumTextSize: minimumTitleSize
+                )
+            }
+            .padding(.top, 18)
+            .padding(.bottom, 16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
     }
 }
 
@@ -287,19 +477,26 @@ struct VisionCraftHomeSectionHeader: View {
 struct VisionCraftHomeActionList: View {
     let items: [VisionCraftActionItem]
     var useLogoAccents = false
+    var appIcons: [String: UIImage] = [:]
+    var showsIcons = true
+    var titleSize: CGFloat = 18
 
     var body: some View {
         VStack(spacing: VisionCraftUI.actionRowSpacing) {
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                 Button(action: item.action) {
                     HStack(spacing: 16) {
-                        if useLogoAccents {
+                        if showsIcons, let appIcon = appIcons[item.id] {
+                            Image(uiImage: appIcon).resizable().scaledToFit()
+                                .frame(width: 28, height: 28)
+                                .accessibilityHidden(true)
+                        } else if showsIcons && useLogoAccents {
                             VisionCraftIconTile(
                                 systemImage: item.icon,
                                 tint: VisionCraftHomeUI.logoAccent(index),
                                 tileSize: .large
                             )
-                        } else {
+                        } else if showsIcons {
                             Image(systemName: item.icon)
                                 .font(.system(size: 28))
                                 .foregroundStyle(VisionCraftHomeUI.icon)
@@ -309,11 +506,13 @@ struct VisionCraftHomeActionList: View {
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(AppLocalization.string(item.title))
-                                .visionCraftAndroidText(18, weight: .semibold, relativeTo: .headline)
+                                .visionCraftAndroidText(titleSize, weight: .semibold, relativeTo: .headline)
                                 .foregroundStyle(VisionCraftHomeUI.text)
-                            Text(AppLocalization.string(item.description))
-                                .visionCraftAndroidText(16)
-                                .foregroundStyle(VisionCraftHomeUI.secondaryText)
+                            if !item.description.isEmpty {
+                                Text(AppLocalization.string(item.description))
+                                    .visionCraftAndroidText(16)
+                                    .foregroundStyle(VisionCraftHomeUI.secondaryText)
+                            }
                         }
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
@@ -346,10 +545,8 @@ struct VisionCraftHomeActionList: View {
     private func accessibilityLabel(for item: VisionCraftActionItem) -> String {
         let title = AppLocalization.string(item.title)
         let description = AppLocalization.string(item.description)
-        if let badge = item.badge {
-            return "\(title), \(AppLocalization.string(badge)). \(description)"
-        }
-        return "\(title). \(description)"
+        let label = item.badge.map { "\(title), \(AppLocalization.string($0))" } ?? title
+        return description.isEmpty ? label : "\(label). \(description)"
     }
 }
 
@@ -431,18 +628,20 @@ private struct VisionCraftHomeSurfaceModifier: ViewModifier {
     let outlined: Bool
     let outlineColor: Color?
     let raised: Bool
+    let shadowScale: CGFloat
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         let surface = fill ?? VisionCraftHomeUI.surface
-        let blur: CGFloat = pressed ? 2 : (raised ? 10 : 5)
-        let offset: CGFloat = pressed ? 0.75 : (raised ? 5 : 2)
+        let strength = min(1, max(0, shadowScale))
+        let blur: CGFloat = (pressed ? 2 : (raised ? 10 : 5)) * strength
+        let offset: CGFloat = (pressed ? 0.75 : (raised ? 5 : 2)) * strength
         content.background {
             ZStack {
                 shape.fill(surface)
-                    .shadow(color: VisionCraftHomeUI.highlight, radius: blur, x: -offset, y: -offset)
+                    .shadow(color: VisionCraftHomeUI.highlight.opacity(Double(strength)), radius: blur, x: -offset, y: -offset)
                 shape.fill(surface)
-                    .shadow(color: VisionCraftHomeUI.shadow, radius: blur, x: offset, y: offset)
+                    .shadow(color: VisionCraftHomeUI.shadow.opacity(Double(strength)), radius: blur, x: offset, y: offset)
                 if raised, fill == nil {
                     shape.fill(
                         LinearGradient(
@@ -568,14 +767,16 @@ extension View {
         fill: Color? = nil,
         outlined: Bool = true,
         outlineColor: Color? = nil,
-        raised: Bool = false
+        raised: Bool = false,
+        shadowScale: CGFloat = 1
     ) -> some View {
         modifier(VisionCraftHomeSurfaceModifier(
             cornerRadius: cornerRadius,
             fill: fill,
             outlined: outlined,
             outlineColor: outlineColor,
-            raised: raised
+            raised: raised,
+            shadowScale: shadowScale
         ))
     }
 

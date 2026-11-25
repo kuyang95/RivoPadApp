@@ -2805,20 +2805,20 @@
 "aiDocument.readHangul" = "Read";
 
 /* Launcher and media discovery */
-"미디어 탐색" = "Media";
+"미디어" = "Media";
 "쉬운 브라우저" = "Easy Browser";
 "쉬운 유튜브" = "Easy YouTube";
 "리보 웹" = "Rivo Web";
 "리보 유튜브" = "Rivo YouTube";
 "리보 뉴스" = "Rivo News";
-"가로 타일" = "Wide shortcut";
+"세로 타일" = "Tall shortcut";
 "주간 날짜" = "Week dates";
 "오늘이 포함된 한 주 표시" = "Show the week that includes today";
 "웹과 영상을 편하게 찾아보세요." = "Browse the web and watch videos.";
 "검색과 즐겨찾기로 웹을 둘러봅니다." = "Browse with search and favorites.";
 "큰 글자와 간단한 조작으로 영상을 봅니다." = "Watch videos with large text and simple controls.";
-"미디어 탐색 표시" = "Show Media";
-"목록형과 카테고리형 홈에 미디어 탐색을 표시합니다." = "Show Media in both list and category home layouts.";
+"미디어 표시" = "Show Media";
+"목록형과 카테고리형 홈에 미디어를 표시합니다." = "Show Media in both list and category home layouts.";
 "런처 변경" = "Change launcher";
 "기존 홈" = "Classic home";
 "위젯 런처" = "Widget launcher";
@@ -2883,7 +2883,52 @@
 "뉴스 즐겨찾기 편집" = "Edit news favorites";
 "최대 3개까지 선택할 수 있어요. 새 분야를 고르면 가장 먼저 선택한 분야가 빠져요. 아무것도 선택하지 않으면 최신에서 전체 뉴스를 보여줘요." = "Choose up to 3 favorites. Choosing a fourth replaces the oldest selection. With no favorites, Latest shows all news.";
 
+
+
+/* Daisy widget reading entrance */
+
+/* Selected book imports */
+
+// 리보 이메일
+"리보 이메일" = "Rivo Mail";
+"이메일 주소를 입력해 주세요" = "Enter your email address";
+"이메일 주소" = "Email address";
+"계속" = "Continue";
+"다른 메일" = "Other mail";
+"메일 사이트 주소" = "Webmail address";
+"비밀번호와 인증번호는 메일 서비스의 공식 로그인 화면에서 입력해 주세요." = "Enter your password and verification code on your mail service’s official sign-in page.";
+"이메일 주소를 확인해 주세요" = "Check your email address";
+"메일 사이트의 https 주소를 확인해 주세요" = "Check the https address of your mail site";
+"메일 선택" = "Choose mail";
+"주소 복사" = "Copy address";
+"주소 복사됨" = "Address copied";
+"브라우저로 열기" = "Open in browser";
+"이메일을 큰 글자로 읽고 씁니다." = "Read and write email with larger text.";
+
+"기본 보기" = "Original view";
+"편하게 보기" = "Easy view";
+"이메일 주소를\n입력해 주세요" = "Enter your\nemail address";
+"메일 서비스를\n선택해 주세요" = "Choose your\nmail service";
+"주소 수정" = "Edit address";
+
+"메일 도구" = "Mail tools";
+"비밀번호를\n입력해 주세요" = "Enter your\npassword";
+"비밀번호" = "Password";
+"비밀번호 보기" = "Show password";
+"비밀번호 숨기기" = "Hide password";
+"비밀번호를 입력해 주세요" = "Enter your password";
+"로그인" = "Sign in";
+"다음 메일 주소와 카카오계정 주소가 다르면 카카오계정 주소로 다시 시도해 주세요." = "If your Daum Mail and Kakao Account addresses differ, try your Kakao Account address.";
+"로그인하지 못했어요. 주소와 비밀번호를 확인해 주세요." = "Could not sign in. Check your address and password.";
+"로그인을 완료하지 못했어요. 다시 시도해 주세요." = "Could not complete sign-in. Please try again.";
+"로그인 상태 유지 설정" = "Stay signed in options";
+"메일을 여는 중" = "Opening mail";
+
+/* Radio and podcasts */
 "라디오·팟캐스트" = "Radio & Podcasts";
+"이메일" = "Email";
+"유튜브" = "YouTube";
+"주제별로 뉴스를 찾아 기사를 읽습니다." = "Browse the news by topic and read articles.";
 "listen.title" = "Rivo Radio·Podcasts";
 "listen.description" = "Find and listen to radio and podcasts.";
 "listen.radio" = "Radio";
@@ -2922,12 +2967,21 @@
 "listen.radio_source" = "Audio: each broadcaster · Station directory: radio.bsod.kr";
 "listen.podcast_source" = "Charts & search: Apple Podcasts Korea · Audio: each show’s RSS feed";
 "listen.media_description" = "Enjoy books, the web, email, videos, and audio.";
+
+"카테고리 타일 (2 × 4)" = "Category tile (2 × 4)";
+
 "listen.stations" = "Stations";
+
 "listen.shows" = "Shows";
+
 "listen.info" = "About";
+
 "listen.close" = "Close";
+
 "listen.podcast_start" = "Find a story you want to hear.";
+
 "listen.radio_providers" = "Station directory";
+
 "listen.back_list" = "Back to list";
 "listen.open_player" = "Open player";
 "listen.live" = "LIVE RADIO";
@@ -2946,26 +3000,148 @@
 "listen.schedule_error" = "Could not load the schedule. Audio playback is still available.";
 "listen.schedule_empty" = "No programme information is available right now.";
 "listen.schedule_source" = "Source: official broadcaster schedule · Korea time · Actual broadcasts may vary.";
+
+"네이버 메일 연결" = "Connect NAVER Mail";
+"네이버 받은편지함" = "NAVER Inbox";
+"네이버에서 IMAP을 켜고 앱 전용 비밀번호를 발급해 주세요. 연결하면 다음부터 바로 메일을 볼 수 있어요." = "Enable IMAP in NAVER and create an app password. Once connected, you can open your inbox directly.";
+"앱 전용 비밀번호" = "App password";
+"메일 연결" = "Connect mail";
+"네이버 연결 방법" = "NAVER setup guide";
+"네이버에서 연결을 승인하지 않았어요. IMAP 설정과 앱 전용 비밀번호를 확인해 주세요." = "NAVER rejected the connection. Check your IMAP settings and app password.";
+"메일을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." = "Couldn't load mail. Try again in a moment.";
+"받은 메일이 없어요." = "Your inbox is empty.";
+"이 메일은 웹메일에서 열어 주세요." = "Open this message in webmail.";
+"이 기기에서 연결 해제" = "Disconnect on this device";
+"카카오메일" = "Kakao Mail";
+"브라우저를 열 수 없어요." = "Could not open the browser.";
+"웹메일 열기" = "Open webmail";
+
+"브라우저" = "Browser";
+"메시지" = "Messages";
+"뉴스" = "News";
+"이전 홈 페이지" = "Previous home page";
+"다음 홈 페이지" = "Next home page";
+"위젯 편집" = "Edit widgets";
+"모든 앱 보기" = "View all apps";
+"즐겨찾는 앱" = "Favorite apps";
+"즐겨찾기" = "Favorites";
+"런처 설정" = "Launcher settings";
+"전체 앱·기능" = "All apps and features";
+"%lld페이지 중 %lld페이지" = "Page %2$lld of %1$lld";
+"전체" = "All";
+"안 읽음" = "Unread";
+"계정" = "Accounts";
+"계정 추가" = "Add account";
+"모든 계정" = "All accounts";
+"메일 검색" = "Search mail";
+"다시 로그인" = "Sign in again";
+"목록을 불러오지 못했어요. 웹메일 열기" = "List unavailable. Open webmail";
+"표시할 메일이 없어요." = "No messages to display.";
+"메일 작성" = "Compose";
+"메일함" = "Mailbox";
+"받은메일함" = "Inbox";
+"전체메일" = "All mail";
+"보낸메일함" = "Sent";
+"프로모션" = "Promotions";
+"청구·결제" = "Bills and payments";
+"SNS" = "Social";
+"카페" = "Cafe";
+"메일 닫기" = "Close mail";
+"메일 새로고침" = "Refresh mail";
+"메일 작업" = "Mail actions";
+"답장" = "Reply";
+"읽음 상태 변경" = "Change read status";
+"즐겨찾기 추가" = "Add to favorites";
+"즐겨찾기 해제" = "Remove from favorites";
+"로그인 상태를 확인하고 있어요" = "Checking your sign-in status";
+"로그인 상태를 확인하지 못했어요. 다시 시도해 주세요." = "Couldn’t check your sign-in status. Please try again.";
+
+/* Category launcher favorite arrangement */
+"현재 즐겨찾기" = "Current favorites";
+"등록된 즐겨찾기가 없습니다." = "No favorites yet.";
+"즐겨찾기 %d / %d개" = "Favorites %d / %d";
+"%d개 중 %d번째" = "%2$d of %1$d";
+"변경할 항목 선택" = "Choose a replacement";
+"%@ 대신 사용할 항목을 선택하세요." = "Choose an item to replace %@.";
+"위로" = "Move up";
+"아래로" = "Move down";
+"변경" = "Change";
+"위로, 아래로, 변경, 삭제" = "Move up, move down, change, delete";
+
+/* Shared Google website sign-in */
+
 "listen.popular" = "Popular podcasts · Korea";
 "listen.popular_empty" = "No popular shows are available. Search for a show you want to hear.";
+"연결 확인 중…" = "Checking connection…";
+"자동 연결 가능" = "Automatic connection available";
+"로그인 또는 추가 확인 필요" = "Sign-in or verification needed";
+"연결을 확인하지 못했어요" = "Could not verify the connection";
+"Gmail 열기" = "Open Gmail";
+"Gmail 로그인" = "Sign in to Gmail";
+
+/* Verified service sign-in status */
+"로그인 확인 중…" = "Checking sign-in…";
+"로그인됨" = "Signed in";
+"로그인 안 됨" = "Not signed in";
+"확인 실패" = "Check failed";
+
 "listen.previous_station" = "Previous station";
+
 "listen.next_station" = "Next station";
+
 "listen.previous_episode" = "Previous episode";
+
 "listen.next_episode" = "Next episode";
+
 "listen.previous_chapter" = "Previous chapter";
+
 "listen.next_chapter" = "Next chapter";
+
 "listen.last_played" = "Last played podcast";
+
 "listen.episodes" = "Episodes";
+
 "listen.hide_episodes" = "Hide episodes";
+
 "listen.more" = "More";
 "listen.expanded" = "Expanded";
 "listen.collapsed" = "Collapsed";
+
+"유튜브를 준비하고 있어요" = "Getting YouTube ready";
+
+"유튜브를 준비하지 못했어요. 다시 시도해 주세요." = "Couldn’t get YouTube ready. Please try again.";
+
 "listen.return_player" = "Player";
 "listen.more_hint" = "Opens the More dialog.";
+
+"AI" = "AI";
+"ChatGPT 웹을 큰 글자와 익숙한 화면으로 이용합니다." = "Use ChatGPT on the web with large text and familiar controls.";
+
 "listen.broadcast_list" = "Broadcast list";
 "listen.choose_broadcast" = "Choose a radio station or podcast from the broadcast list.";
+"AI 도구 더보기" = "More AI controls";
+
 "listen.open_catalog" = "Open broadcast list";
+
+"%@ 갱신" = "Updated %@";
+
+"AI 화면 설정" = "AI display settings";
+"쉬운 AI 화면" = "Easy AI view";
+"AI를 준비하고 있어요" = "Preparing AI";
+
+"전체 앱" = "All apps";
+
+"앱 추가" = "Add apps";
+"즐겨찾기에서 빼기" = "Remove from favorites";
+"%@ 대신 넣을 앱 선택" = "Choose an app to replace %@";
+"추가됨" = "Added";
+"앱을 바꾸거나 하나를 빼서 자리를 만들어 주세요." = "Replace an app or remove one to make room.";
+"앱 검색" = "Search apps";
+
 "listen.playback_settings" = "Playback settings";
+
 "listen.off" = "Off";
+
 "listen.back" = "Back";
+
 "listen.chapter" = "Chapter";

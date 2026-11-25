@@ -13,8 +13,8 @@ enum AccessibleWebAppearance {
         "{enabled: \(enabled), palette: '\(palette.rawValue)'}"
     }
 
-    static func bootstrap(enabled: Bool, palette: AccessibleWebPalette) -> String {
-        AccessibleWebTheme.script + source + "\nwindow.__rivoAccessibleWeb.set(\(configuration(enabled: enabled, palette: palette)));"
+    static func bootstrap(enabled: Bool, palette: AccessibleWebPalette, aiWeb: Bool = false) -> String {
+        AccessibleWebTheme.script + "window.__rivoAIWeb = \(aiWeb);\n" + source + "\nwindow.__rivoAccessibleWeb.set(\(configuration(enabled: enabled, palette: palette)));"
     }
 
     static let source = #"""
@@ -551,7 +551,11 @@ enum AccessibleWebAppearance {
     config = {enabled:next.enabled, palette:next.palette};
     mount();
   }
-  window.__rivoAccessibleWeb = {set};
+  window.__rivoAccessibleWeb = {set, flushPending() {
+    if (!timer) return;
+    clearTimeout(timer);
+    scanPending();
+  }};
   // Only presentation enums are passed to child frames; never page contents.
   window.addEventListener('message', event => {
     if (window !== window.top && event.source === window.parent && event.data?.rivoAccessibleWeb) set(event.data.rivoAccessibleWeb);

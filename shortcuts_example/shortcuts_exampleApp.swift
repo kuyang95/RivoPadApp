@@ -76,12 +76,18 @@ struct shortcuts_exampleApp: App {
                             HomeAllSettingsView()
                         case .standardHome:
                             HomeView()
+                        case .aiWeb:
+                            AccessibleWebBrowserView(aiWeb: true)
                         case .easyBrowser:
                             AccessibleWebBrowserView()
                         case .listening:
                             ListeningView()
+                        case .easyMail:
+                            AccessibleWebBrowserView(easyMail: true)
                         case .easyYouTube:
                             AccessibleWebBrowserView(easyYouTube: true)
+                        case .mediaWidget(let kind):
+                            RatioMediaWidgetScreen(kind: kind)
                         case .releaseNotes:
                             HelpReleaseNotesView(
                                 notes: (try? HelpContentLibrary.releaseNotes(

@@ -1,6 +1,6 @@
 # 의존성 / 라이브러리 버전
 
-점검일: 2026-11-25 · 기준 코드: `a0e8981d`+작업 트리 (쉬운 유튜브·접근성 웹 실기기 검증 범위) · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리 · 뉴스 읽기 추출기: 2026-10-30 `b4aa7cf7`+작업 트리 · 라디오·팟캐스트 대조: 2026-11-25 `a4f028e3`+작업 트리
+점검일: 2026-11-25 · 기준 코드: `2abc6bdf`+작업 트리 (네이버 메일 의존성) · 이전 점검일: 2026-11-25 · 기준 코드: `a0e8981d`+작업 트리 (쉬운 유튜브·접근성 웹 실기기 검증 범위) · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리 · 뉴스 읽기 추출기: 2026-10-30 `b4aa7cf7`+작업 트리 · 라디오·팟캐스트 대조: 2026-11-25 `a4f028e3`+작업 트리
 
 `Podfile.lock`, `shortcuts_example.xcworkspace/xcshareddata/swiftpm/Package.resolved`, Xcode 프로젝트의 로컬 패키지 참조, GitHub `kuyang95/VisionCraftDocumentEngine`의 `Package.swift` 출처.
 
@@ -114,3 +114,7 @@ Mozilla `@mozilla/readability` 0.6.0(Apache-2.0)을 앱에 고정 포함한다. 
 ## 듣기 이미지
 
 추가 이미지 SDK 없이 iPad는 ImageIO·UIKit과 Foundation URLSession, Android는 BitmapFactory·Compose Image·LruCache·기존 코루틴 Semaphore를 사용한다. 원격 이미지는 축소 후 메모리 캐시만 사용하며 이미지 파일을 영구 보관하지 않는다.
+
+## 네이버 메일 직접 연결
+
+SwiftPM `Cocoanetics/SwiftMail` 1.9.2의 IMAPServer로 네이버 IMAP을 TLS로 연결한다. SwiftMail은 앱 주 타깃에만 연결한다.

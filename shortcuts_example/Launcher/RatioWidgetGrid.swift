@@ -10,25 +10,32 @@ struct RatioHomeItem: Identifiable, Codable {
     var iconOnly: Bool?
     var colorKey: String?
     var iconText: Bool?
+    var categoryTile: Bool?
+    var isCategoryTile: Bool { categoryTile == true }
+    // Keep the Codable key used by previously saved shortcut tiles.
     var wideShortcut: Bool?
-    var isWideShortcut: Bool { wideShortcut == true }
+    var isTallShortcut: Bool { wideShortcut == true }
     var isWeather: Bool { id == "widget:weather" }
     var isTimer: Bool { id == "widget:timer" }
     var isUtility: Bool { isWeather || isTimer }
     var isNews: Bool { id == "widget:news" }
     var isListening: Bool { id == "widget:listening" }
     static var listeningName: String { AppLocalization.string("listen.title") }
+    var isMail: Bool { id == "widget:mail" }
+    static let mailName = String(localized: "리보 이메일")
     var isYouTube: Bool { id == "widget:youtube" }
-    var isFullPage: Bool { isListening || isYouTube || isBrowser || isDaisy || isNews }
+    var isFullPage: Bool { isListening || isMail || isYouTube || isBrowser || isDaisy || isNews }
     var isDaisy: Bool { id == "widget:daisy" }
     var isBrowser: Bool { id == "widget:browser" }
     static let webName = String(localized: "리보 웹")
     static let youTubeName = String(localized: "리보 유튜브")
     static let newsName = String(localized: "리보 뉴스")
-    static let wideShortcutName = String(localized: "가로 타일")
+    static let categoryTileName = String(localized: "카테고리 타일 (2 × 4)")
+    static let tallShortcutName = String(localized: "세로 타일")
 
     var shortcutShapeName: String {
-        if isWideShortcut { return Self.wideShortcutName }
+        if isCategoryTile { return Self.categoryTileName }
+        if isTallShortcut { return Self.tallShortcutName }
         if textOnly { return "텍스트 바로가기" }
         return iconOnly == true ? "아이콘 바로가기" : "타일 바로가기"
     }
@@ -37,19 +44,28 @@ struct RatioHomeItem: Identifiable, Codable {
         if id == "listening", name != Self.listeningName { var item = self; item.name = Self.listeningName; return item.normalized }
         if isWeek { return Self.week }
         if isUtility { var item = self; item.columns = columns < 4 ? 2 : 4; item.rows = min(5, max(2, rows)); item.textOnly = false; item.iconOnly = false; return item }
-        if isListening || isYouTube || isNews {
+        if isListening || isMail || isYouTube || isNews {
             var item = self
-            item.name = isListening ? Self.listeningName : isYouTube ? Self.youTubeName : Self.newsName
+            item.name = isListening ? Self.listeningName : isMail ? Self.mailName : isYouTube ? Self.youTubeName : Self.newsName
             item.columns = 4
             item.rows = 10
             item.textOnly = false
             item.iconOnly = false
             return item
         }
-        if isWideShortcut {
+        if isCategoryTile {
             var item = self
-            item.columns = 4
-            item.rows = 1
+            item.columns = 2
+            item.rows = 4
+            item.textOnly = false
+            item.iconOnly = false
+            item.wideShortcut = nil
+            return item
+        }
+        if isTallShortcut {
+            var item = self
+            item.columns = 1
+            item.rows = 2
             item.textOnly = false
             item.iconOnly = false
             return item
@@ -69,13 +85,14 @@ struct RatioSwatch: Identifiable {
     var rgb: UInt32
     var color: Color { VisionCraftUI.fixedColor(rgb) }
 }
+let ratioSandSwatch = RatioSwatch(id: "sand", name: "샌드", rgb: 0xDACDBA)
 let ratioPalette: [RatioSwatch] = [
     .init(id: "lemon", name: "레몬", rgb: 0xF3F565), .init(id: "butter", name: "버터", rgb: 0xF1D89A),
     .init(id: "apricot", name: "살구", rgb: 0xF3BC91), .init(id: "coral", name: "코랄", rgb: 0xEDA99A),
     .init(id: "rose", name: "로즈", rgb: 0xE5B2C4), .init(id: "lavender", name: "라벤더", rgb: 0xCBBCEB),
     .init(id: "periwinkle", name: "페리윙클", rgb: 0xAFBDE8), .init(id: "sky", name: "스카이", rgb: 0x9FCDE5),
     .init(id: "aqua", name: "아쿠아", rgb: 0x95D4D1), .init(id: "mint", name: "민트", rgb: 0xADE0C8),
-    .init(id: "sage", name: "세이지", rgb: 0xC1CFAD), .init(id: "sand", name: "샌드", rgb: 0xDACDBA)
+    .init(id: "sage", name: "세이지", rgb: 0xC1CFAD), ratioSandSwatch
 ]
 struct RatioSize: Identifiable {
     var columns: Int
@@ -217,7 +234,7 @@ func installFullPageWidgets(_ items: [RatioHomeItem]) -> [RatioHomeItem] {
     let youtube = items.first(where: \.isYouTube) ?? RatioHomeItem(id: "widget:youtube", name: RatioHomeItem.youTubeName, columns: 4, rows: 10)
     let browser = items.first(where: \.isBrowser) ?? RatioHomeItem(id: "widget:browser", name: RatioHomeItem.webName, columns: 4, rows: 8)
     let daisy = items.first(where: \.isDaisy) ?? RatioHomeItem(id: "widget:daisy", name: "데이지 플레이어", columns: 4, rows: 6)
-    return ordinary + [youtube, browser, daisy] + items.filter { $0.isNews || $0.isListening }
+    return ordinary + [youtube, browser, daisy] + items.filter { $0.isNews || $0.isMail || $0.isListening }
 }
 
 /// Match Android's 4-bit RGB histogram; cache by image data rather than recomputing during layout.

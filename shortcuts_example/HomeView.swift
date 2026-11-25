@@ -1,10 +1,22 @@
 import SwiftUI
 import UIKit
 
+struct LauncherHomeOptions {
+    let widgetNavigation: CategoryWidgetNavigation?
+    let addWidgets: () -> Void
+    let openAllApps: () -> Void
+}
+
 /// 홈. Android `compose/MainScreen.kt`와 같은 구성: 제목 줄(앱 이름·리모컨 상태·전체 설정),
 /// 사용법 안내(5번째 방문부터 설정 오른쪽 아이콘), 그 아래 목록형 또는 카테고리형(2x2 타일).
 /// 항목 목록은 여기에서 한 번만 정의하고 두 구성이 같이 쓴다.
 struct HomeView: View {
+    private let launcher: LauncherHomeOptions?
+
+    init(launcher: LauncherHomeOptions? = nil) {
+        self.launcher = launcher
+    }
+
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var appRouter: AppRouter
     @EnvironmentObject private var rivoRemoteManager: RivoRemoteManager
@@ -25,10 +37,17 @@ struct HomeView: View {
     @State private var hasConversations = false
     @ScaledMetric(relativeTo: .title2) private var homeTitleLineHeight: CGFloat = 32
 
+    private var homeBackground: Color {
+        launcher != nil && openCategory == nil ? VisionCraftHomeUI.launcherPosterCanvas : VisionCraftHomeUI.background
+    }
+
     var body: some View {
         ZStack {
-            VisionCraftHomeUI.background
+            homeBackground
                 .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .gesture(LongPressGesture().onEnded { _ in launcher?.addWidgets() },
+                         including: launcher != nil && openCategory == nil ? .gesture : .none)
 
             GeometryReader { geometry in
                 // Android 홈의 44/32는 화면 가장자리 기준이다. 안전 영역을 다시 더하지 않는다.
@@ -82,7 +101,7 @@ struct HomeView: View {
             }
         }
         .tint(VisionCraftUI.primary)
-        .background(VisionCraftHomeUI.background.ignoresSafeArea())
+        .background(homeBackground.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             isHomeVisible = true
@@ -109,6 +128,9 @@ struct HomeView: View {
         .onChange(of: showsMedia) { _, value in if !value && openCategory?.id == "media" { openCategory = nil } }
         .onChange(of: homeLayoutModeRaw) { _, _ in
             openCategory = nil
+        }
+        .onChange(of: appRouter.launcherHomeRequestID) { _, _ in
+            if launcher != nil { openCategory = nil }
         }
         .onChange(of: openCategory?.id) { _, _ in
             UIAccessibility.post(
@@ -140,7 +162,8 @@ struct HomeView: View {
     }
 
     private var homeLayoutMode: HomeLayoutMode {
-        HomeLayoutMode(rawValue: homeLayoutModeRaw) ?? .list
+        if launcher != nil { return .grid }
+        return HomeLayoutMode(rawValue: homeLayoutModeRaw) ?? .list
     }
 
     private var showsCompactHomeGuide: Bool {
@@ -148,7 +171,7 @@ struct HomeView: View {
     }
 
     private func recordHomeVisitIfNeeded() {
-        guard isHomeVisible, scenePhase != .background, !hasRecordedCurrentHomeVisit else { return }
+        guard launcher == nil, isHomeVisible, scenePhase != .background, !hasRecordedCurrentHomeVisit else { return }
         hasRecordedCurrentHomeVisit = true
         homeGuideVisitCount = HomeGuideVisitStore.recordVisit()
     }
@@ -157,44 +180,50 @@ struct HomeView: View {
 
     private var homeCategories: [VisionCraftHomeCategory] {
         [
-            VisionCraftHomeCategory(id: "ai", title: "AI 대화", tone: .ai, artName: "HomeTileAIChat", description: "궁금한 내용을 AI에게 물어보세요.", items: chatActions),
+            VisionCraftHomeCategory(id: "ai", title: "AI 대화", tone: .ai, artName: "HomeTileAIChat", description: "궁금한 내용을 AI에게 물어보세요.", posterAccentIndex: 0, items: chatActions),
             // 카메라 기능은 홈에서 각각 선택해 들어간다.
-            VisionCraftHomeCategory(id: "camera", title: "카메라/이미지", tone: .camera, artName: "HomeTileCamera", description: "확대해서 보고, 글자와 이미지를 인식하세요.", items: categoryCameraActions),
-            VisionCraftHomeCategory(id: "reading", title: "텍스트/문서", tone: .reading, artName: "HomeTileReading", description: "글과 문서를 읽고 편집하세요.", items: readingActions.map(categoryMenuItem)),
-            VisionCraftHomeCategory(id: "link", title: "비전링크", tone: .link, artName: "HomeTilePhoneLink", description: "스마트폰과 VisionCraft를 함께 사용하세요.", items: connectionActions),
-        ] + (showsMedia ? [VisionCraftHomeCategory(id: "media", title: "미디어 탐색", tone: .link, artName: nil,
-            systemImage: "globe", description: "웹과 영상을 편하게 찾아보세요.", items: mediaActions)] : [])
+            VisionCraftHomeCategory(id: "camera", title: "카메라/이미지", tone: .camera, artName: "HomeTileCamera", description: "확대해서 보고, 글자와 이미지를 인식하세요.", posterAccentIndex: 1, items: categoryCameraActions),
+            VisionCraftHomeCategory(id: "reading", title: "텍스트/문서", tone: .reading, artName: "HomeTileReading", description: "글과 문서를 읽고 편집하세요.", posterAccentIndex: 2, items: readingActions.map(categoryMenuItem)),
+            VisionCraftHomeCategory(id: "link", title: "비전링크", tone: .link, artName: "HomeTilePhoneLink", description: "스마트폰과 VisionCraft를 함께 사용하세요.", posterAccentIndex: 3, items: connectionActions),
+        ] + (showsMedia ? [VisionCraftHomeCategory(id: "media", title: "미디어", tone: .link, artName: nil,
+            systemImage: "globe", description: "listen.media_description", posterAccentIndex: 4, items: mediaActions(inCategory: true))] : [])
     }
 
     /// 카테고리의 기능 타일에만 쓰는 그림. 목록·카메라 내부 버튼은 기존 심벌을 쓴다.
     private func categoryActionArtName(for actionID: String) -> String? {
         switch actionID {
-        case "new-chat": "HomeActionNewChat"
-        case "chat-history": "HomeActionChatHistory"
-        case "image-analysis-camera": "HomeActionDescribeImage"
-        case "image-analysis-photo": "HomeActionDescribePhoto"
-        case "magnifier": "HomeActionCamera"
-        case "scanner": "HomeActionScanDoc"
-        case "live-text": "HomeActionLiveReading"
-        case "describe-image": "HomeActionDescribeImage"
-        case "ask-ai": "HomeActionAskAI"
-        case "photo-review": "HomeActionSavedPhotos"
-        case "text-view": "HomeActionText"
-        case "files": "HomeActionDocument"
-        case "reader": "HomeActionBookReader"
+        case "new-chat": "HomeActionNewChatNoOutline"
+        case "chat-history": "HomeActionChatHistoryNoOutline"
+        case "image-analysis-camera": "HomeActionDescribeImageNoOutline"
+        case "image-analysis-photo": "HomeActionDescribePhotoNoOutline"
+        case "magnifier": "HomeActionCameraNoOutline"
+        case "scanner": "HomeActionScanDocNoOutline"
+        case "live-text": "HomeActionLiveReadingNoOutline"
+        case "describe-image": "HomeActionDescribeImageNoOutline"
+        case "ask-ai": "HomeActionAskAINoOutline"
+        case "photo-review": "HomeActionSavedPhotosNoOutline"
+        case "text-view": "HomeActionTextNoOutline"
+        case "files": "HomeActionDocumentNoOutline"
+        case "reader": "HomeActionBookReaderNoOutline"
         case "listening": "HomeActionListeningNoOutline"
+        case "easy-mail": "HomeActionMailNoOutline"
+        case "ai-web": "HomeActionNewChatNoOutline"
+        case "easy-browser": "HomeActionBrowserNoOutline"
+        case "easy-youtube": "HomeActionYouTubeNoOutline"
+        case "news": "HomeActionNewsNoOutline"
         default: nil
         }
     }
 
     /// 홈의 첫 네 칸을 기준으로 크기와 위치를 고정하고, 기능의 추가 행만 아래로 이어진다.
+    @ViewBuilder
     private func categoryHomeContent(
         availableSize: CGSize,
         topPadding: CGFloat,
         bottomPadding: CGFloat
     ) -> some View {
         let columns = availableSize.width > availableSize.height ? 4 : 2
-        let rootCategories = homeCategories
+        let nativeCategories = homeCategories
         let categories = openCategory.map { category in
             category.items.map { item in
                 VisionCraftHomeCategory(
@@ -202,56 +231,67 @@ struct HomeView: View {
                     artName: categoryActionArtName(for: item.id), systemImage: item.icon, items: [item]
                 )
             }
-        } ?? rootCategories
-        return ScrollView {
-            VisionCraftHomeTilePageLayout(
-                columns: columns,
-                referenceItemCount: rootCategories.count,
-                itemCount: categories.count,
-                firstPageHeight: max(0, availableSize.height - topPadding - bottomPadding - 12)
-            ) {
-                VStack(alignment: .leading, spacing: 0) {
-                    if let openCategory {
-                        // 원래 제목 행의 높이를 그대로 예약해 타일 시작 위치를 유지한다.
-                        homeTitleRow.hidden().overlay(alignment: .leading) {
-                            HStack(spacing: 0) {
-                                VisionCraftBackButton { navigateBackFromCategory() }
-                                    .padding(.trailing, 4)
-                                homeHeaderTitle(openCategory.title)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        }
-                    } else {
-                        homeTitleRow
-                    }
-                    if !showsCompactHomeGuide {
-                        sectionSpacer(height: 16)
-                        VisionCraftHomeGuideEntry {
-                            appRouter.route = .help
-                        }
-                    }
-                    sectionSpacer(height: 20)
-                }
-                VisionCraftHomeCategoryGrid(
-                    categories: categories,
-                    columns: columns,
-                    minimumTitleSize: openCategory == nil ? 0 : 16,
-                    identifierPrefix: openCategory == nil ? "home.category" : "home.action"
-                ) { category in
-                    if openCategory != nil {
-                        category.items.first?.action()
-                    } else if category.items.count == 1 {
-                        category.items[0].action()
-                    } else {
-                        openCategory = category
-                    }
-                }
+        } ?? nativeCategories
+        let onOpen: (VisionCraftHomeCategory) -> Void = { category in
+            if openCategory != nil || category.items.count == 1 {
+                category.items.first?.action()
+            } else {
+                openCategory = category
+            }
+        }
+        if let launcher, openCategory == nil {
+            VStack(spacing: 8) {
+                VisionCraftHomeCategoryGrid(categories: categories,
+                    columns: columns == 4 && categories.count > 4 ? 3 : 2,
+                    fillsHeight: true,
+                    onPosterLongPress: launcher.addWidgets,
+                    onOpen: onOpen)
             }
             .padding(.horizontal, 24)
-            .padding(.top, topPadding)
-            .padding(.bottom, bottomPadding + 12)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
+            .launcherHomeSwipe(height: availableSize.height, onCatalog: launcher.openAllApps)
+            .modifier(CategoryWidgetPageSwipe(navigation: launcher.widgetNavigation))
+            .accessibilityAction(named: Text("전체 앱·기능"), launcher.openAllApps)
+            .accessibilityAction(named: Text("위젯 추가"), launcher.addWidgets)
+            .modifier(CategoryWidgetPageActions(navigation: launcher.widgetNavigation))
+        } else {
+            ScrollView {
+                VisionCraftHomeTilePageLayout(
+                    columns: columns,
+                    referenceItemCount: nativeCategories.count,
+                    itemCount: categories.count,
+                    firstPageHeight: openCategory == nil ? max(0, availableSize.height - topPadding - bottomPadding - 12) : 0
+                ) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if openCategory == nil {
+                            homeTitleRow
+                            if !showsCompactHomeGuide {
+                                sectionSpacer(height: 16)
+                                VisionCraftHomeGuideEntry { appRouter.route = .help }
+                            }
+                            sectionSpacer(height: 20)
+                        }
+                    }
+                    VisionCraftHomeCategoryGrid(categories: categories, columns: columns,
+                        minimumTitleSize: openCategory == nil ? 0 : 16,
+                        identifierPrefix: openCategory == nil ? "home.category" : "home.action",
+                        onOpen: onOpen)
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, openCategory == nil ? topPadding : 12)
+                .padding(.bottom, openCategory == nil ? bottomPadding + 12 : 12)
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if openCategory != nil {
+                    VisionCraftBackButton(action: navigateBackFromCategory)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 24)
+                        .background(homeBackground)
+                }
+            }
+            .id(openCategory?.id ?? "home")
         }
-        .id(openCategory?.id ?? "home")
     }
 
     // MARK: - 목록형
@@ -281,8 +321,8 @@ struct HomeView: View {
 
         if showsMedia {
             sectionSpacer(height: 28)
-            VisionCraftHomeSectionHeader(title: "미디어 탐색", tone: .link)
-            VisionCraftHomeActionList(items: mediaActions)
+            VisionCraftHomeSectionHeader(title: "미디어", tone: .link)
+            VisionCraftHomeActionList(items: mediaActions())
         }
 
         // 비전링크 카드는 섹션 제목 없이 28 띄워 이어 붙인다.
@@ -311,13 +351,28 @@ struct HomeView: View {
 
     // MARK: - 항목 목록 (두 구성이 같이 쓴다)
 
-    private var mediaActions: [VisionCraftActionItem] {
-        [VisionCraftActionItem(id: "listening", icon: "headphones", title: "listen.title",
-            description: "listen.description", action: { appRouter.route = .listening }),
-         VisionCraftActionItem(id: "easy-browser", icon: "globe", title: "쉬운 브라우저",
-            description: "검색과 즐겨찾기로 웹을 둘러봅니다.", action: { appRouter.route = .easyBrowser }),
-         VisionCraftActionItem(id: "easy-youtube", icon: "play.rectangle", title: "쉬운 유튜브",
-            description: "큰 글자와 간단한 조작으로 영상을 봅니다.", action: { appRouter.route = .easyYouTube })]
+    private func mediaActions(inCategory: Bool = false) -> [VisionCraftActionItem] {
+        let books = VisionCraftActionItem(id: "reader", icon: "book.closed", title: "도서 읽기",
+            description: "EPUB·DAISY 도서를 읽습니다.",
+            action: { appRouter.route = inCategory ? .mediaWidget(.daisy) : .readerLibrary })
+        let radio = VisionCraftActionItem(id: "listening", icon: "headphones",
+            title: inCategory ? "라디오·팟캐스트" : "listen.title",
+            description: "listen.description", action: { appRouter.route = inCategory ? .mediaWidget(.listening) : .listening })
+        let browser = VisionCraftActionItem(id: "easy-browser", icon: "globe",
+            title: inCategory ? "브라우저" : "쉬운 브라우저",
+            description: "검색과 즐겨찾기로 웹을 둘러봅니다.", action: { appRouter.route = inCategory ? .mediaWidget(.browser) : .easyBrowser })
+        let email = VisionCraftActionItem(id: "easy-mail", icon: "envelope",
+            title: inCategory ? "이메일" : "리보 이메일",
+            description: "이메일을 큰 글자로 읽고 씁니다.", action: { appRouter.route = inCategory ? .mediaWidget(.mail) : .easyMail })
+        let youtube = VisionCraftActionItem(id: "easy-youtube", icon: "play.rectangle",
+            title: inCategory ? "유튜브" : "쉬운 유튜브",
+            description: "큰 글자와 간단한 조작으로 영상을 봅니다.", action: { appRouter.route = inCategory ? .mediaWidget(.youTube) : .easyYouTube })
+        let ai = VisionCraftActionItem(id: "ai-web", icon: "bubble.left.and.bubble.right", title: "AI",
+            description: "ChatGPT 웹을 큰 글자와 익숙한 화면으로 이용합니다.", action: { appRouter.route = .aiWeb })
+        guard inCategory else { return [books, radio, browser, ai, email, youtube] }
+        let news = VisionCraftActionItem(id: "news", icon: "newspaper", title: "뉴스",
+            description: "주제별로 뉴스를 찾아 기사를 읽습니다.", action: { appRouter.route = .mediaWidget(.news) })
+        return [books, radio, email, browser, ai, youtube, news]
     }
 
     private var chatActions: [VisionCraftActionItem] {
@@ -456,7 +511,10 @@ struct HomeView: View {
         }
         return VisionCraftActionItem(
             id: item.id, icon: item.icon, title: title,
-            description: description, accent: item.accent, badge: item.badge, action: item.action
+            description: description, accent: item.accent, badge: item.badge,
+            action: item.id == "text-view" ? {
+                appRouter.route = .textEditorText(title: AppLocalization.string("텍스트"), text: "")
+            } : item.action
         )
     }
 
@@ -485,16 +543,6 @@ struct HomeView: View {
                     "문서를 불러오거나 최근에 연 문서를 다시 엽니다.",
                 action: {
                     appRouter.route = .documentLibrary
-                }
-            ),
-            VisionCraftActionItem(
-                id: "reader",
-                icon: "book.closed",
-                title: "도서 읽기",
-                description:
-                    "EPUB·DAISY 도서를 읽습니다.",
-                action: {
-                    appRouter.route = .readerLibrary
                 }
             ),
         ]
@@ -635,7 +683,7 @@ struct HomeView: View {
 
     // MARK: - 텍스트 열기
 
-    /// Android `readingItems`: 클립보드에 글이 있으면 바로 열고, 없을 때만 원본 고르는 화면을 연다.
+    /// 목록형은 클립보드를 바로 연다. 카테고리형은 `categoryMenuItem`에서 항상 원본 선택으로 진입한다.
     private func openTextView() {
         if let text = HomeTextSourcePolicy.availableClipboardText(
             UIPasteboard.general.string
@@ -818,8 +866,8 @@ struct HomeSettingsPanel: View {
                 VisionCraftSettingValueTile(label: "런처 변경",
                     value: AppLocalization.string((AppLauncherMode(rawValue: launcherModeRaw) ?? .standard).title),
                     action: { selectionDialog = .launcher })
-                VisionCraftSettingSwitchTile(label: "미디어 탐색 표시",
-                    hint: "목록형과 카테고리형 홈에 미디어 탐색을 표시합니다.", isOn: $showsMedia)
+                VisionCraftSettingSwitchTile(label: "미디어 표시",
+                    hint: "목록형과 카테고리형 홈에 미디어를 표시합니다.", isOn: $showsMedia)
                 VisionCraftSettingValueTile(
                     label: "앱 테마",
                     value: AppLocalization.string(settings.appTheme.title),

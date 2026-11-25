@@ -43,8 +43,8 @@ struct AppSettingsView: View {
                 Picker("런처 변경", selection: $launcherModeRaw) {
                     ForEach(AppLauncherMode.allCases, id: \.rawValue) { mode in Text(AppLocalization.string(mode.title)).tag(mode.rawValue) }
                 }.onChange(of: launcherModeRaw) { _, _ in appRouter.requestSelectedHome() }
-                Toggle("미디어 탐색 표시", isOn: $showsMedia)
-                    .accessibilityHint("목록형과 카테고리형 홈에 미디어 탐색을 표시합니다.")
+                Toggle("미디어 표시", isOn: $showsMedia)
+                    .accessibilityHint("목록형과 카테고리형 홈에 미디어를 표시합니다.")
             }
             rivoQuickMenuSection
             documentSection

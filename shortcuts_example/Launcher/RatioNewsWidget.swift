@@ -727,36 +727,11 @@ struct RatioNewsWidget: View {
             }.foregroundStyle(style.text).accessibilityElement(children: .contain)
         }.fixedSize(horizontal: false, vertical: true)
     }
-    @ViewBuilder private var updatedTime: some View {
-        if let snapshot = store.snapshots[category] {
-            Text("\(snapshot.fetched.formatted(date: .omitted, time: .shortened)) 갱신")
-                .visionCraftAndroidText(16).foregroundStyle(style.text.opacity(0.8))
-        }
-    }
-    private var refreshButton: some View {
-        Button { request += 1 } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "arrow.clockwise").font(.system(size: 22)).accessibilityHidden(true)
-                Text("새로고침").visionCraftAndroidText(18)
-            }.padding(.horizontal, 8).padding(.vertical, 14).frame(minHeight: 56)
-        }
-        .buttonStyle(.plain).foregroundStyle(style.text)
-        .accessibilityLabel("뉴스 새로고침")
-        .accessibilityValue(busy ? Text("갱신 중") : Text(""))
-        .disabled(!enabled || busy)
-        .opacity(!enabled || busy ? 0.45 : 1)
-    }
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             controls
-            VStack(spacing: 4) {
-                sectionDivider
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) { updatedTime.fixedSize(); Spacer(minLength: 12); refreshButton.fixedSize() }
-                    VStack(alignment: .leading, spacing: 8) { updatedTime; refreshButton }
-                }
-                sectionDivider
-            }
+            WidgetRefreshRow(updatedAt: store.snapshots[category]?.fetched, ink: style.text, busy: busy,
+                             enabled: enabled, refreshLabel: "뉴스 새로고침") { request += 1 }
             if store.errors.contains(category) {
                 Text(store.snapshots[category] == nil ? "뉴스를 불러오지 못했어요. 새로고침으로 다시 시도해 주세요." : "갱신하지 못했어요. 이전 뉴스와 갱신 시각을 표시합니다.")
                     .visionCraftAndroidText(18).fixedSize(horizontal: false, vertical: true)
@@ -802,9 +777,6 @@ struct RatioNewsWidget: View {
                 while !Task.isCancelled { now = .now; do { try await Task.sleep(for: .seconds(60)) } catch { return } }
             }
             .sheet(isPresented: $settings) { topicSettings }
-    }
-    private var sectionDivider: some View {
-        Rectangle().fill(style.text.opacity(0.48)).frame(height: 1).accessibilityHidden(true)
     }
     private var topicSettings: some View {
         NavigationStack {

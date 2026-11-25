@@ -8,7 +8,6 @@ import UIKit
 /// 흐름과 화면 구성을 유지한다.
 struct TextEditorViewerView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var appRouter: AppRouter
     @EnvironmentObject private var remoteControl:
         RivoScreenRemoteControlCenter
@@ -39,9 +38,6 @@ struct TextEditorViewerView: View {
     @State private var currentLineIndex = 0
     @State private var scrollTargetIndex = 0
     @State private var scrollRevision: UInt64 = 0
-    /// Android `showClipboard`: the 클립보드 choice is only offered while the
-    /// clipboard actually holds text.
-    @State private var clipboardHasText = false
 
     init(fileURL: URL) {
         let store = LocalDocumentAppearanceStore()
@@ -84,18 +80,22 @@ struct TextEditorViewerView: View {
             (showsOpenSourcePage ? VisionCraftUI.background : editorBackground)
                 .ignoresSafeArea()
 
-            ZStack {
-                mainContent
-
+            Group {
                 if showsOpenSourcePage {
                     openSourcePage
-                        .transition(.opacity)
+                } else {
+                    mainContent
                 }
             }
-            .safeAreaInset(edge: .top, spacing: 8) {
-                editorTopBar
-                    .padding(.horizontal, 14)
-                    .padding(.top, 10)
+            .safeAreaInset(edge: .top, spacing: showsOpenSourcePage ? 0 : 8) {
+                if !showsOpenSourcePage {
+                    editorTopBar
+                        .padding(.horizontal, 14)
+                        .padding(.top, 10)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                feedbackBanner
             }
 
             if isMenuPresented {
@@ -133,6 +133,8 @@ struct TextEditorViewerView: View {
         }
         .animation(.easeOut(duration: 0.16), value: isMenuPresented)
         .toolbar(.hidden, for: .navigationBar)
+        .persistentSystemOverlays(.hidden)
+        .ignoresSafeArea(.container, edges: .bottom)
         .visionCraftHandlesBackNavigation()
         .accessibilityAction(.escape) {
             if isColorDialogPresented {
@@ -149,16 +151,6 @@ struct TextEditorViewerView: View {
         }
         .task {
             await loadInitialContentIfNeeded()
-        }
-        .onAppear {
-            refreshClipboardState()
-        }
-        .onReceive(
-            NotificationCenter.default.publisher(
-                for: UIApplication.didBecomeActiveNotification
-            )
-        ) { _ in
-            refreshClipboardState()
         }
         .onDisappear {
             stopReading()
@@ -258,24 +250,26 @@ struct TextEditorViewerView: View {
             )
         }
         .padding(.bottom, 14)
-        .overlay(alignment: .bottom) {
-            if let feedback {
-                Text(feedback)
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(VisionCraftUI.primaryText)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 12)
-                    .background(
-                        VisionCraftUI.surface,
-                        in: Capsule()
-                    )
-                    .overlay {
-                        Capsule()
-                            .stroke(VisionCraftUI.outline, lineWidth: 1)
-                    }
-                    .padding(.bottom, 12)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
+    }
+
+    @ViewBuilder
+    private var feedbackBanner: some View {
+        if let feedback {
+            Text(feedback)
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(VisionCraftUI.primaryText)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .background(
+                    VisionCraftUI.surface,
+                    in: Capsule()
+                )
+                .overlay {
+                    Capsule()
+                        .stroke(VisionCraftUI.outline, lineWidth: 1)
+                }
+                .padding(.bottom, 12)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
 
@@ -364,78 +358,60 @@ struct TextEditorViewerView: View {
             && !isEditing
     }
 
-    /// Android `OpenSourcePage`: theme background, faint illustration behind,
-    /// 28pt bold heading and three outlined `VcHomeSoftButton`s (max 320).
+    /// 홈 카테고리와 같은 큰 그림 타일. 클립보드는 비어 있어도 선택할 수 있다.
     private var openSourcePage: some View {
-        ZStack {
-            VisionCraftUI.background
-                .ignoresSafeArea()
-
-            Image("TextOpenSourceIllustration")
-                .resizable()
-                .scaledToFit()
-                .padding(.horizontal, 40)
-                .opacity(colorScheme == .dark ? 0.08 : 0.12)
-                .accessibilityHidden(true)
-
-            GeometryReader { geometry in
-                ScrollView {
-                VStack(spacing: 14) {
-                    Text(AppLocalization.string("텍스트 가져오기"))
-                        .visionCraftAndroidText(28, weight: .bold, relativeTo: .title)
-                        .foregroundStyle(VisionCraftUI.primaryText)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
-                        .accessibilityAddTraits(.isHeader)
-                        .padding(.bottom, 18)
-
-                    if clipboardHasText {
-                        openSourceButton(
-                            title: "클립보드",
-                            hint: "복사해 둔 텍스트를 붙여 넣습니다."
-                        ) {
-                            replaceContentFromClipboard()
-                        }
+        let items = [
+            VisionCraftActionItem(
+                id: "clipboard", icon: "doc.on.clipboard", title: "클립보드",
+                description: "복사해 둔 텍스트를 붙여 넣습니다.",
+                action: replaceContentFromClipboard
+            ),
+            VisionCraftActionItem(
+                id: "image", icon: "photo", title: "이미지",
+                description: "사진 앨범에서 고른 이미지의 글자를 읽어옵니다.",
+                action: { isPhotoPickerPresented = true }
+            ),
+            VisionCraftActionItem(
+                id: "document", icon: "doc.text", title: "문서",
+                description: "파일 앱에서 텍스트·문서 파일을 엽니다.",
+                action: { isDocumentImporterPresented = true }
+            ),
+        ]
+        let artNames = ["HomeActionClipboard", "HomeActionTextImage", "HomeActionTextDocument"]
+        let tiles = zip(items, artNames).map { item, artName in
+            VisionCraftHomeCategory(
+                id: item.id, title: item.title, tone: .reading,
+                artName: artName, items: [item]
+            )
+        }
+        return GeometryReader { geometry in
+            let columns = geometry.size.width > geometry.size.height ? 4 : 2
+            let topPadding = max(0, 44 - geometry.safeAreaInsets.top)
+            let bottomPadding = max(0, 32 - geometry.safeAreaInsets.bottom)
+            ScrollView {
+                VisionCraftHomeTilePageLayout(
+                    columns: columns, referenceItemCount: 4, itemCount: tiles.count,
+                    firstPageHeight: max(0, geometry.size.height - topPadding - bottomPadding - 12)
+                ) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        VisionCraftScreenTitleRow(
+                            title: "텍스트 가져오기", onBack: { dismiss() }
+                        )
+                        .frame(minHeight: 52)
+                        Spacer().frame(height: 20)
                     }
-                    openSourceButton(
-                        title: "이미지",
-                        hint: "사진 앨범에서 고른 이미지의 글자를 읽어옵니다."
-                    ) {
-                        isPhotoPickerPresented = true
-                    }
-                    openSourceButton(
-                        title: "문서",
-                        hint: "파일 앱에서 텍스트·문서 파일을 엽니다."
-                    ) {
-                        isDocumentImporterPresented = true
+                    VisionCraftHomeCategoryGrid(
+                        categories: tiles, columns: columns, minimumTitleSize: 16,
+                        identifierPrefix: "text.source"
+                    ) { tile in
+                        tile.items.first?.action()
                     }
                 }
-                .padding(.horizontal, 48)
-                .padding(.vertical, 32)
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: geometry.size.height)
-                }
+                .padding(.horizontal, 24)
+                .padding(.top, topPadding)
+                .padding(.bottom, bottomPadding + 12)
             }
         }
-    }
-
-    private func openSourceButton(
-        title: String,
-        hint: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Text(AppLocalization.string(title))
-                .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(VisionCraftAndroidButtonStyle())
-        .frame(maxWidth: 320)
-        .accessibilityLabel(AppLocalization.string(title))
-        .accessibilityHint(AppLocalization.string(hint))
-    }
-
-    private func refreshClipboardState() {
-        clipboardHasText = UIPasteboard.general.hasStrings
     }
 
     @ViewBuilder
