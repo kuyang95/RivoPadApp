@@ -1,6 +1,6 @@
 import Foundation
 
-struct EasyMailProvider: Identifiable, Equatable {
+struct EasyMailProvider: Identifiable, Equatable, Sendable {
     let id: String
     let name: String
     let home: String

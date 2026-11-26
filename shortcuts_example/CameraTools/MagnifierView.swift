@@ -462,7 +462,7 @@ struct PhotoReviewView: View {
                 TTSManager.shared.speak(caption)
             } catch {
                 guard !Task.isCancelled else { return }
-                fail(CameraImageDescriber.userMessage(for: error))
+                fail(GeminiVisionService.userMessage(for: error))
             }
         }
     }

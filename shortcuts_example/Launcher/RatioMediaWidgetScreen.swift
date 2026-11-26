@@ -17,16 +17,26 @@ nonisolated enum RatioMediaKind: String, CaseIterable, Hashable {
 
 struct RatioWidgetWallpaper: View {
     let dark: Bool
+    var home = false
 
     var body: some View {
         GeometryReader { geometry in
             Image(dark ? "RatioForestMist" : "RatioBlueMist")
                 .resizable().scaledToFill()
                 .frame(width: geometry.size.width, height: geometry.size.height)
-                .scaleEffect(1.06).blur(radius: 10).clipped()
-                .overlay(Color.black.opacity(dark ? 0.60 : 0.08))
-                .overlay(LinearGradient(colors: [.clear, .black.opacity(dark ? 0.25 : 0.10)],
-                                        startPoint: .top, endPoint: .bottom))
+                .scaleEffect(home ? 1.10 : 1.06)
+                .saturation(home ? 0.62 : 1)
+                .blur(radius: home ? 24 : 10).clipped()
+                .opacity(home ? (dark ? 0.45 : 0.44) : 1)
+                .overlay {
+                    if !home {
+                        ZStack {
+                            Color.black.opacity(dark ? 0.60 : 0.08)
+                            LinearGradient(colors: [.clear, .black.opacity(dark ? 0.25 : 0.10)],
+                                           startPoint: .top, endPoint: .bottom)
+                        }
+                    }
+                }
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
@@ -59,7 +69,7 @@ struct RatioMediaWidgetScreen: View {
     var body: some View {
         ZStack {
             RatioExperience().background.ignoresSafeArea()
-            RatioWidgetWallpaper(dark: usesDarkWallpaper)
+            if active || preview { RatioWidgetWallpaper(dark: usesDarkWallpaper) }
             VStack(spacing: 0) {
                 if showsBackButton {
                     let style = RatioExperience()

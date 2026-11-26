@@ -10,6 +10,7 @@ struct ScannerCalibrationView: View {
     @State private var message = ""
     @State private var runs: [URL] = []
     @State private var recorder: ScannerCalibrationRecorder?
+    @State private var startTask: Task<Void, Never>?
     @State private var showingScanner = false
     @State private var busy = false
     @State private var exportURL: URL?
@@ -26,12 +27,7 @@ struct ScannerCalibrationView: View {
                     TextField("예: 나무 책상 / 그림자 / 영수증", text: $label)
                     Text("테스트 장면·촬영 원본·결과 이미지와 OCR 원문이 이 기기에 저장됩니다. 실측 기록은 자동 전송하지 않으며 내보내기 ZIP에 포함됩니다. OCR 교정은 기존 설정대로 동작합니다.")
                         .font(.footnote)
-                    Button("테스트 시작") {
-                        do {
-                            recorder = try ScannerCalibrationRecorder.start(label: label)
-                            showingScanner = true
-                        } catch { message = error.localizedDescription }
-                    }.disabled(busy)
+                    Button("테스트 시작", action: startTrial).disabled(busy)
                 }
                 Section("저장된 테스트 \(runs.count)개") {
                     if !runs.isEmpty {
@@ -59,6 +55,7 @@ struct ScannerCalibrationView: View {
         .background(VisionCraftUI.background.ignoresSafeArea()).tint(VisionCraftUI.primary)
         .toolbar(.hidden, for: .navigationBar)
         .task { refresh() }
+        .onDisappear { startTask?.cancel() }
         .fullScreenCover(isPresented: $showingScanner, onDismiss: finishTrial) {
             VStack(spacing: 0) {
                 Button("테스트 종료하고 기록으로 돌아가기") { showingScanner = false }
@@ -102,12 +99,41 @@ struct ScannerCalibrationView: View {
               let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return "중단됨 / 저장 중" }
         return value["state"] as? String == "storage_error" ? "저장 오류: \(value["storageError"] as? String ?? "")" : "종료됨"
     }
+    private func startTrial() {
+        let trialLabel = label
+        busy = true
+        startTask = Task {
+            defer {
+                busy = false
+                startTask = nil
+            }
+            do {
+                let trial = try await Task.detached(priority: .userInitiated) {
+                    try ScannerCalibrationRecorder.start(label: trialLabel)
+                }.value
+                guard !Task.isCancelled else {
+                    _ = await trial.finish()
+                    return
+                }
+                recorder = trial
+                showingScanner = true
+            } catch {
+                message = error.localizedDescription
+            }
+        }
+    }
+
     private func finishTrial() {
         busy = true
         Task {
-            await recorder?.finish()
-            recorder = nil; busy = false
-            message = "테스트 기록을 저장했습니다. 결과 평가를 남겨 주세요."
+            let error = await recorder?.finish()
+            recorder = nil
+            busy = false
+            if let error {
+                message = "일부 기록을 저장하지 못했습니다. \(error)"
+            } else {
+                message = "테스트 기록을 저장했습니다. 결과 평가를 남겨 주세요."
+            }
             refresh()
             assessment = ""
         }

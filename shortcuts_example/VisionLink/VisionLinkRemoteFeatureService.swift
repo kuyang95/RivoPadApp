@@ -315,13 +315,21 @@ final class VisionLinkLocalRemoteFeatureService:
         image: CIImage
     ) async throws -> String {
         // 이미지 분석은 Gemini 가 처리하므로 로컬 세션을 열지 않는다.
-        let stream = try await
-            GeminiVisionService.stream(
+        let result: String
+        do {
+            let stream = try await GeminiVisionService.stream(
                 system: system,
                 prompt: prompt,
                 images: [image]
             )
-        let result = try await Self.collect(stream)
+            result = try await Self.collect(stream)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw VisionLinkRemoteFeatureError.imageDescriptionFailed(
+                GeminiVisionService.userMessage(for: error)
+            )
+        }
         return try Self.validatedResult(result)
     }
 
@@ -357,6 +365,7 @@ nonisolated enum VisionLinkRemoteFeatureError:
     Equatable
 {
     case invalidImage
+    case imageDescriptionFailed(String)
     case noTextToTranslate
     case localAIBusy
     case emptyResult
@@ -369,6 +378,8 @@ nonisolated enum VisionLinkRemoteFeatureError:
             return AppLocalization.string(
                 "이미지를 읽을 수 없습니다."
             )
+        case .imageDescriptionFailed(let message):
+            return message
         case .noTextToTranslate:
             return AppLocalization.string(
                 "번역할 텍스트가 없습니다."

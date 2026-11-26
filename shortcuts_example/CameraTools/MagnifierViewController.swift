@@ -2332,7 +2332,7 @@ final class MagnifierViewController:
                 self.showCameraBand(caption, duration: 12)
             } catch {
                 guard self.isCameraScreenVisible, !self.isOpeningCaptureResult else { return }
-                self.handleAnalysisError(CameraImageDescriber.userMessage(for: error))
+                self.handleAnalysisError(GeminiVisionService.userMessage(for: error))
             }
         }
     }

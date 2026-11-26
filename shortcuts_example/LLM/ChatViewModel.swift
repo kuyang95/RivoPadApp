@@ -1605,16 +1605,19 @@ final class ChatViewModel: ObservableObject {
                 guard generationRequestID == requestID else {
                     return
                 }
+                let message = mode == .vision
+                    ? GeminiVisionService.userMessage(for: error)
+                    : error.localizedDescription
                 messages[assistantIndex].text +=
                     AppLocalization.format(
                         "\n\n(스트림 오류: %@)",
-                        error.localizedDescription
+                        message
                     )
                 conversationUpdatedAt = Date()
                 status = AppLocalization.string(
                     "답변 생성 실패"
                 )
-                historyErrorDescription = error.localizedDescription
+                historyErrorDescription = message
                 isInitialQueryRunning = false
                 isGenerating = false
                 generationRequestID = nil

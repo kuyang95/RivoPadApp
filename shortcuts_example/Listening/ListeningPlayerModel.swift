@@ -9,8 +9,10 @@ import AVFoundation
     @Published var showingPopularPodcasts = false
     @Published var episodes: [ListeningItem] = []
     @Published var show: ListeningItem?
-    @Published var busy = false
-    @Published var message = ""
+    @Published private(set) var searchBusy = false
+    @Published private(set) var searchMessage = ""
+    @Published private(set) var feedBusy = false
+    @Published private(set) var feedMessage = ""
     @Published var saved: [ListeningItem] = []
     @Published var current: ListeningItem?
     @Published var playbackEpisodes: [ListeningItem] = []
@@ -92,7 +94,8 @@ import AVFoundation
         }
     }
 
-    private var request: Task<Void, Never>?
+    private var searchRequest: Task<Void, Never>?
+    private var feedRequest: Task<Void, Never>?
     private var popularCache: (items: [ListeningItem], fetchedAt: Date)?
     private var sleepTask: Task<Void, Never>?
     private var playRequest: Task<Void, Never>?
@@ -109,6 +112,8 @@ import AVFoundation
     private let defaults = UserDefaults.standard
     private var progress: [String: Double] = [:]
     private var progressOrder: [String] = []
+    private var lastProgressWrite: TimeInterval = 0
+    private var pendingSeek: (id: UUID, target: Double)?
 
     init() {
         saved = (defaults.data(forKey: "listening.saved.v1").flatMap { try? JSONDecoder().decode([ListeningItem].self, from: $0) }) ?? []
@@ -133,7 +138,8 @@ import AVFoundation
         observer = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 1), queue: .main) { [weak self] _ in
             Task { @MainActor [weak self] in self?.tick() }
         }
-        interruptionObserver = NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] _ in
+        interruptionObserver = NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
+            guard note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt == AVAudioSession.InterruptionType.began.rawValue else { return }
             Task { @MainActor [weak self] in self?.pause() }
         }
         failureObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: nil, queue: .main) { [weak self] note in
@@ -145,25 +151,34 @@ import AVFoundation
         endObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: nil, queue: .main) { [weak self] note in
             MainActor.assumeIsolated {
                 guard let self, note.object as? AVPlayerItem === self.player.currentItem else { return }
-                if let current = self.current { self.progress[current.id] = 0; self.defaults.set(self.progress, forKey: "listening.progress.v1") }
+                if let current = self.current, current.kind == "episode" {
+                    self.progress.removeValue(forKey: current.id)
+                    self.progressOrder.removeAll { $0 == current.id }
+                    self.persistProgress()
+                }
                 self.pause(save: false)
-                self.player.seek(to: .zero)
+                self.pendingSeek = nil
+                self.player.replaceCurrentItem(with: nil)
+                self.itemObserver = nil
+                self.position = 0
+                self.duration = 0
             }
         }
     }
 
     func search() {
-        request?.cancel()
-        show = nil; episodes = []; results = []; message = ""
+        closeShow()
+        searchRequest?.cancel()
+        results = []; searchMessage = ""
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let selectedTab = tab
         showingPopularPodcasts = selectedTab == "podcast" && term.isEmpty
         let loadPopular = showingPopularPodcasts
         if loadPopular, let cache = popularCache, Date().timeIntervalSince(cache.fetchedAt) < 3600 {
-            results = cache.items; busy = false; return
+            results = cache.items; searchBusy = false; return
         }
-        busy = true
-        request = Task {
+        searchBusy = true
+        searchRequest = Task {
             do {
                 let rows: [ListeningItem]
                 if selectedTab == "radio" { rows = try await Task.detached(priority: .userInitiated) { try RadioStations.search(term) }.value }
@@ -171,23 +186,26 @@ import AVFoundation
                 else { rows = try await ListeningCatalog.podcasts(term) }
                 try Task.checkCancellation()
                 if loadPopular && !rows.isEmpty { popularCache = (rows, Date()) }
-                results = rows; busy = false
-                if rows.isEmpty { message = loadPopular ? "listen.popular_empty" : "listen.empty" }
+                results = rows; searchBusy = false
+                if rows.isEmpty { searchMessage = loadPopular ? "listen.popular_empty" : "listen.empty" }
             } catch {
                 guard !Task.isCancelled else { return }
-                busy = false; message = "listen.network_error"
+                searchBusy = false; searchMessage = "listen.network_error"
             }
         }
     }
     func selectTab(_ value: String) { tab = value; query = ""; search() }
     func open(_ item: ListeningItem) {
         if item.kind != "podcast" {
-            if current?.id == RadioStations.canonical(item).id && (playing || buffering) { playerVisible = true }
-            else { play(item) }
+            if current?.id == RadioStations.canonical(item).id {
+                playerVisible = true
+                if !wantsPlayback { togglePlayback() }
+            } else { play(item) }
             return
         }
-        request?.cancel(); show = item; episodes = []; results = []; busy = true; message = ""
-        request = Task {
+        feedRequest?.cancel()
+        show = item; episodes = []; feedBusy = true; feedMessage = ""
+        feedRequest = Task {
             do {
                 let page = try await ListeningCatalog.episodes(item)
                 try Task.checkCancellation()
@@ -197,13 +215,18 @@ import AVFoundation
                     saved[index] = page.show
                     defaults.set(try? JSONEncoder().encode(saved), forKey: "listening.saved.v1")
                 }
-                episodes = rows; busy = false
-                if rows.isEmpty { message = "listen.no_episodes" }
+                episodes = rows; feedBusy = false
+                if rows.isEmpty { feedMessage = "listen.no_episodes" }
             } catch {
                 guard !Task.isCancelled else { return }
-                busy = false; message = "listen.feed_error"
+                feedBusy = false; feedMessage = "listen.feed_error"
             }
         }
+    }
+    func closeShow() {
+        if feedRequest == nil && show == nil { return }
+        feedRequest?.cancel(); feedRequest = nil
+        show = nil; episodes = []; feedBusy = false; feedMessage = ""
     }
     func toggleSaved(_ item: ListeningItem) {
         if saved.contains(where: { $0.id == item.id }) { saved.removeAll { $0.id == item.id } }
@@ -213,6 +236,7 @@ import AVFoundation
     func play(_ original: ListeningItem, retrying: Bool = false) {
         guard original.kind != "podcast" else { return }
         pause()
+        pendingSeek = nil
         player.replaceCurrentItem(with: nil); itemObserver = nil
         var item = RadioStations.canonical(original)
         if item.kind == "episode" {
@@ -220,14 +244,20 @@ import AVFoundation
                 if (item.chapters ?? []).isEmpty { item.chapters = cached.chapters }
                 item.artworkURL = item.artworkURL ?? cached.artworkURL
             }
-            if episodes.contains(where: { $0.id == item.id && $0.feedURL == item.feedURL }) { playbackEpisodes = episodes }
-            else if !playbackEpisodes.contains(where: { $0.id == item.id }) { playbackEpisodes = [item] }
-            playbackEpisodes = playbackEpisodes.map { $0.id == item.id ? item : $0 }
-            defaults.set(try? JSONEncoder().encode(playbackEpisodes), forKey: "listening.queue.v1")
+            let sourceQueue: [ListeningItem]
+            if episodes.contains(where: { $0.id == item.id && $0.feedURL == item.feedURL }) { sourceQueue = episodes }
+            else if playbackEpisodes.contains(where: { $0.id == item.id }) { sourceQueue = playbackEpisodes }
+            else { sourceQueue = [item] }
+            let queue = sourceQueue.map { $0.id == item.id ? item : $0 }
+            if queue != playbackEpisodes {
+                playbackEpisodes = queue
+                defaults.set(try? JSONEncoder().encode(queue), forKey: "listening.queue.v1")
+            }
         }
         if current?.id != item.id { programs = []; scheduleStationID = ""; scheduleBusy = false; scheduleFailed = false }
         if !retrying { playerVisible = true }
-        current = item; position = 0; duration = 0; message = ""; speed = 1
+        if current?.id != item.id { speed = 1 }
+        current = item; position = 0; duration = 0
         retriedRadio = retrying; wantsPlayback = true; buffering = true
         defaults.set(try? JSONEncoder().encode(item), forKey: "listening.current.v1")
         let generation = playGeneration
@@ -247,7 +277,7 @@ import AVFoundation
                     }
                 }
                 if item.kind == "episode", let offset = progress[item.id], offset > 0 {
-                    player.seek(to: CMTime(seconds: offset, preferredTimescale: 600), completionHandler: { _ in })
+                    seekPlayer(to: offset)
                 }
                 resume()
             } catch {
@@ -263,7 +293,7 @@ import AVFoundation
         else { pause(); playbackError = true }
     }
     func togglePlayback() {
-        if playing || buffering { pause() }
+        if wantsPlayback { pause() }
         else if let current, current.kind == "radio" { play(current) }
         else if player.currentItem != nil, player.currentItem?.status != .failed { resume() }
         else if let current { play(current) }
@@ -292,13 +322,26 @@ import AVFoundation
     func skip(_ seconds: Double) {
         guard current?.kind == "episode", duration > 0 else { return }
         let value = player.currentTime().seconds
-        seek((value.isFinite ? value : position) + seconds)
+        seek((pendingSeek?.target ?? (value.isFinite ? value : position)) + seconds)
     }
     private func seek(_ seconds: Double) {
-        position = min(max(0, seconds), duration)
-        player.seek(to: CMTime(seconds: position, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        seekPlayer(to: min(max(0, seconds), duration))
     }
-    func setSpeed(_ value: Float) { speed = value; if playing { player.rate = value } }
+    private func seekPlayer(to target: Double) {
+        let id = UUID()
+        pendingSeek = (id, target)
+        position = target
+        player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.pendingSeek?.id == id else { return }
+                self.pendingSeek = nil
+            }
+        }
+    }
+    func setSpeed(_ value: Float) {
+        speed = value
+        if wantsPlayback && playRequest == nil { player.playImmediately(atRate: value) }
+    }
     func setSleep(_ minutes: Int) {
         sleepTask?.cancel(); sleepMinutes = minutes
         guard minutes > 0 else { return }
@@ -308,26 +351,32 @@ import AVFoundation
         }
     }
     private func tick() {
+        guard current?.kind == "episode", player.currentItem != nil else { return }
         let seconds = player.currentTime().seconds
-        if seconds.isFinite { position = max(0, seconds) }
+        if pendingSeek == nil, seconds.isFinite, position != max(0, seconds) { position = max(0, seconds) }
         let total = player.currentItem?.duration.seconds ?? 0
-        duration = total.isFinite ? max(0, total) : 0
-        if playing && Int(position) % 5 == 0 { saveProgress() }
+        let validDuration = total.isFinite ? max(0, total) : 0
+        if duration != validDuration { duration = validDuration }
+        if playing && ProcessInfo.processInfo.systemUptime - lastProgressWrite >= 5 { saveProgress() }
     }
     private func saveProgress() {
         guard let current, current.kind == "episode", player.currentItem != nil else { return }
-        let value = player.currentTime().seconds
+        let value = pendingSeek?.target ?? player.currentTime().seconds
         guard value.isFinite else { return }
+        lastProgressWrite = ProcessInfo.processInfo.systemUptime
         progress[current.id] = max(0, value)
         progressOrder.removeAll { $0 == current.id }
         progressOrder.append(current.id)
         while progressOrder.count > 200 { progress.removeValue(forKey: progressOrder.removeFirst()) }
+        persistProgress()
+    }
+    private func persistProgress() {
         defaults.set(progressOrder, forKey: "listening.progressOrder.v1")
         defaults.set(progress, forKey: "listening.progress.v1")
     }
-    func close() { request?.cancel(); sleepTask?.cancel(); sleepMinutes = 0; pause() }
+    func close() { searchRequest?.cancel(); feedRequest?.cancel(); sleepTask?.cancel(); sleepMinutes = 0; pause() }
     deinit {
-        request?.cancel(); sleepTask?.cancel(); playRequest?.cancel()
+        searchRequest?.cancel(); feedRequest?.cancel(); sleepTask?.cancel(); playRequest?.cancel()
         if let observer { player.removeTimeObserver(observer) }
         if let interruptionObserver { NotificationCenter.default.removeObserver(interruptionObserver) }
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }

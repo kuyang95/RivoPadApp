@@ -1,6 +1,6 @@
 # Firebase 서비스
 
-점검일 2026-09-29 · 기준 코드 `babc3875`
+점검일: 2026-11-04 · 기준 코드: `b4aa7cf7`+작업 트리 (AI Logic App Check 강제 적용과 실기 환경 범위) · 이전 점검일 2026-09-29 · 기준 코드 `babc3875`
 
 ## Pod / 의존성
 
@@ -44,9 +44,8 @@ FirebaseApp.configure()
 | 항목 | 값 |
 |---|---|
 | Entitlement | `com.apple.developer.devicecheck.appattest-environment` = `$(APP_ATTEST_ENVIRONMENT)` |
-| Debug 구성 | `APP_ATTEST_ENVIRONMENT = development` |
-| Release 구성 | `APP_ATTEST_ENVIRONMENT = production` |
-| 개발 빌드 경고 | 콘솔에 `App attestation failed 403` 이 찍히지만 Gemini 요청은 그대로 성공한다 (2026-09 실기 확인). Firebase 콘솔 App Check 강제(enforce)가 켜지면 개발 빌드는 실패할 수 있으니 그때는 Debug 토큰 등록 필요 |
+| 실기 Debug·Release 구성 | `APP_ATTEST_ENVIRONMENT = production`. Firebase App Check는 App Attest 샌드박스 토큰을 받지 않는다. |
+| 서버 강제 적용 | 2026-11-03 21:00 KST부터 Firebase AI Logic 요청에 유효한 App Check 토큰이 필요하다. |
 | 시뮬레이터 | Debug provider 코드는 있으나 ML Kit 제약으로 시뮬레이터 빌드 자체가 불가 ([dependencies.md](dependencies.md)) |
 
 ## GoogleService-Info.plist (키 이름만)

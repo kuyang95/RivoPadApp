@@ -735,24 +735,12 @@ struct VoiceQueryResponseView: View {
         )
     }
 
-    /// Android: quota → "일일 할당량이 소진되었습니다.", anything else from the
-    /// cloud → "인터넷 연결이 좋지 않습니다". The on-device model has no
-    /// network to blame, so its errors keep their own description.
     private static func failureText(
         for error: Error,
         usesCloud: Bool
     ) -> String {
-        if error is CloudAITokenBudgetError {
-            return AppLocalization.string("일일 할당량이 소진되었습니다.")
-        }
-        let description = error.localizedDescription.lowercased()
-        if description.contains("quota")
-            || description.contains("resource_exhausted")
-            || description.contains("429") {
-            return AppLocalization.string("일일 할당량이 소진되었습니다.")
-        }
         if usesCloud {
-            return AppLocalization.string("인터넷 연결이 좋지 않습니다")
+            return GeminiVisionService.userMessage(for: error)
         }
         return AppLocalization.format(
             "답변 생성 실패: %@",

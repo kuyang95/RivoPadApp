@@ -274,10 +274,20 @@ private nonisolated struct NewsArticle: Codable, Equatable, Identifiable, Sendab
     var id: String { url }
 }
 private nonisolated struct NewsSnapshot: Codable, Sendable {
+    private enum CodingKeys: String, CodingKey { case items, fetched, sourceFetched, partial }
+
     var items: [NewsArticle]
     var fetched: Date
     var sourceFetched: [String: Date]
     var partial: Bool
+    let identity = UUID()
+    var displayedItems: [NewsArticle] = []
+
+    func preparedForDisplay() -> Self {
+        var prepared = self
+        prepared.displayedItems = NewsRSSParser.displayOrder(self)
+        return prepared
+    }
 }
 
 /// Parses only RSS metadata, caps summaries, and rejects document/entity declarations.
@@ -470,7 +480,7 @@ private final class LauncherNewsStore: ObservableObject {
     static let shared = LauncherNewsStore()
     static let interval: TimeInterval = 2 * 60 * 60
     static let retry: TimeInterval = 5 * 60
-    static let maxAge: TimeInterval = 24 * 60 * 60
+    nonisolated static let maxAge: TimeInterval = 24 * 60 * 60
     @Published var favorites: [NewsCategory] = {
         let defaults = UserDefaults.standard
         if let saved = defaults.stringArray(forKey: "ratio.news.favorite.topics.v2") {
@@ -488,9 +498,9 @@ private final class LauncherNewsStore: ObservableObject {
         favorites = NewsCategory.favorites(values)
         UserDefaults.standard.set(favorites.map(\.rawValue), forKey: "ratio.news.favorite.topics.v2")
         UserDefaults.standard.removeObject(forKey: "ratio.news.selected.topics.v1")
-        for category in topicList { restore(category) }
+        latestInputs = []
         snapshots[.latest] = nil; errors.remove(.latest)
-        Task { await rebuildLatest() }
+        Task { await restoreLatest() }
         LauncherNewsRefresh.topicsChanged()
     }
     @Published var snapshots: [NewsCategory: NewsSnapshot] = [:]
@@ -500,12 +510,17 @@ private final class LauncherNewsStore: ObservableObject {
     private var retries: [NewsCategory: Date] = [:]
     private var intervals: [NewsCategory: TimeInterval] = [:]
     private var aggregateRevision = 0
+    private var latestInputs: [UUID] = []
+    private var cacheReads: [NewsCategory: Task<NewsSnapshot?, Never>] = [:]
     private func usable(_ value: NewsSnapshot?) -> NewsSnapshot? {
-        guard let old = value, (0..<Self.maxAge).contains(Date.now.timeIntervalSince(old.fetched)) else { return nil }
-        let times = old.sourceFetched.filter { (0..<Self.maxAge).contains(Date.now.timeIntervalSince($0.value)) }
+        let now = Date.now
+        guard let old = value, !old.items.isEmpty, (0..<Self.maxAge).contains(now.timeIntervalSince(old.fetched)) else { return nil }
+        if old.sourceFetched.values.allSatisfy({ (0..<Self.maxAge).contains(now.timeIntervalSince($0)) }) { return old }
+        let times = old.sourceFetched.filter { (0..<Self.maxAge).contains(now.timeIntervalSince($0.value)) }
         let items = old.items.filter { times[$0.source.rawValue] != nil }
-        return items.isEmpty ? nil : NewsSnapshot(items: items, fetched: old.fetched,
-            sourceFetched: times, partial: old.partial || times.count < old.sourceFetched.count)
+        guard !items.isEmpty else { return nil }
+        return NewsSnapshot(items: items, fetched: old.fetched, sourceFetched: times, partial: true,
+            displayedItems: old.displayedItems.filter { times[$0.source.rawValue] != nil })
     }
     func delay(_ category: NewsCategory) -> TimeInterval {
         if category == .latest { return topicList.map { delay($0) }.min() ?? Self.interval }
@@ -516,46 +531,89 @@ private final class LauncherNewsStore: ObservableObject {
     }
     init() {
         UserDefaults.standard.removeObject(forKey: "ratio.news.cache.sokbo.v4")
-        for category in topicList { restore(category) }
-        Task { await rebuildLatest() }
+    }
+    private func restoreLatest() async {
+        for category in topicList {
+            guard !Task.isCancelled else { return }
+            await restore(category)
+        }
+        await rebuildLatest()
     }
     private func rebuildLatest() async {
+        guard !Task.isCancelled else { return }
         aggregateRevision += 1
         let revision = aggregateRevision
         let selected = topics
-        let values = topicList.compactMap { usable(snapshots[$0]) }
-        guard !values.isEmpty else { snapshots[.latest] = nil; return }
-        let payload = values.flatMap(\.items)
-        let articles = await Task.detached(priority: .utility) { NewsRSSParser.merge(payload) }.value
+        let values = topicList.compactMap { topic -> NewsSnapshot? in
+            guard let previous = snapshots[topic] else { return nil }
+            let valid = usable(previous)
+            if valid?.identity != previous.identity { snapshots[topic] = valid }
+            return valid
+        }
+        let inputs = values.map(\.identity)
+        guard !inputs.isEmpty else {
+            latestInputs = []
+            if snapshots[.latest] != nil { snapshots[.latest] = nil }
+            return
+        }
+        guard latestInputs != inputs else { return }
+        let next = await Task.detached(priority: .utility) {
+            let articles = NewsRSSParser.merge(values.flatMap(\.items))
+            var times: [String: Date] = [:]
+            for value in values {
+                for (source, date) in value.sourceFetched { times[source] = max(times[source] ?? .distantPast, date) }
+            }
+            return NewsSnapshot(items: articles, fetched: values.map(\.fetched).min() ?? .now,
+                sourceFetched: times, partial: values.count < selected.count || values.contains { $0.partial })
+                .preparedForDisplay()
+        }.value
         guard !Task.isCancelled, topics == selected, revision == aggregateRevision else { return }
-        var times: [String: Date] = [:]
-        for value in values { for (source, date) in value.sourceFetched { times[source] = max(times[source] ?? .distantPast, date) } }
-        let next = NewsSnapshot(items: articles, fetched: values.map(\.fetched).min() ?? .now,
-            sourceFetched: times, partial: values.count < selected.count || values.contains { $0.partial })
+        latestInputs = inputs
         snapshots[.latest] = next
         fetched[.latest] = next.fetched; intervals[.latest] = next.partial ? Self.retry : Self.interval
     }
-    private func restore(_ category: NewsCategory) {
-        guard topics.contains(category) else { return }
-        let key = "ratio.news.cache.\(category.rawValue).v5"
-        UserDefaults.standard.removeObject(forKey: "ratio.news.cache.\(category.rawValue).v3")
-        UserDefaults.standard.removeObject(forKey: "ratio.news.cache.\(category.rawValue).v2")
-        UserDefaults.standard.removeObject(forKey: "ratio.news.cache.\(category.rawValue).v1")
-        if let old = snapshots[category], !(0..<Self.maxAge).contains(Date.now.timeIntervalSince(old.fetched)) { snapshots[category] = nil; fetched[category] = nil }
-        if snapshots[category] == nil, let data = UserDefaults.standard.data(forKey: key) ?? UserDefaults.standard.data(forKey: "ratio.news.cache.\(category.rawValue).v4"),
-           let cache = try? JSONDecoder().decode(NewsSnapshot.self, from: data), cache.items.count <= NewsRSSParser.maxItems,
-           cache.items.allSatisfy({ $0.source.accepts($0.url) }), (0..<Self.maxAge).contains(Date.now.timeIntervalSince(cache.fetched)) {
-            let allowed = Set(NewsSource.available(category))
-            var cleaned = cache
-            cleaned.items = cache.items.filter { allowed.contains($0.source) }.compactMap { article in
-                var value = article
-                value.title = String(NewsRSSParser.clean(value.title).prefix(240))
-                value.summary = String(NewsRSSParser.clean(value.summary).prefix(161))
-                return value.title.isEmpty ? nil : value
-            }
-            snapshots[category] = cleaned; fetched[category] = cleaned.fetched; intervals[category] = cleaned.partial ? Self.retry : Self.interval
+    private func restore(_ category: NewsCategory) async {
+        guard topics.contains(category), !Task.isCancelled else { return }
+        if let old = snapshots[category] {
+            let valid = usable(old)
+            if valid?.identity != old.identity { snapshots[category] = valid }
+            if valid == nil { fetched[category] = nil }
+            return
         }
-        snapshots[category] = usable(snapshots[category])
+        let value: NewsSnapshot?
+        if let pending = cacheReads[category] { value = await pending.value }
+        else {
+            let read = Task.detached(priority: .utility) { Self.readCache(category) }
+            cacheReads[category] = read
+            value = await read.value
+            cacheReads[category] = nil
+        }
+        guard !Task.isCancelled, topics.contains(category), snapshots[category] == nil, let value = usable(value) else { return }
+        snapshots[category] = value
+        fetched[category] = value.fetched
+        intervals[category] = value.partial ? Self.retry : Self.interval
+    }
+    nonisolated private static func readCache(_ category: NewsCategory) -> NewsSnapshot? {
+        let defaults = UserDefaults.standard
+        let key = "ratio.news.cache.\(category.rawValue).v5"
+        for version in 1...3 { defaults.removeObject(forKey: "ratio.news.cache.\(category.rawValue).v\(version)") }
+        let now = Date.now
+        guard let data = defaults.data(forKey: key) ?? defaults.data(forKey: "ratio.news.cache.\(category.rawValue).v4"),
+              var cache = try? JSONDecoder().decode(NewsSnapshot.self, from: data), cache.items.count <= NewsRSSParser.maxItems,
+              (0..<Self.maxAge).contains(now.timeIntervalSince(cache.fetched)),
+              cache.items.allSatisfy({ $0.source.accepts($0.url) }) else { return nil }
+        let allowed = Set(NewsSource.available(category))
+        let times = cache.sourceFetched.filter { (0..<Self.maxAge).contains(now.timeIntervalSince($0.value)) }
+        cache.items = cache.items.compactMap { article in
+            guard allowed.contains(article.source), times[article.source.rawValue] != nil else { return nil }
+            var value = article
+            value.title = String(NewsRSSParser.clean(value.title).prefix(240))
+            value.summary = String(NewsRSSParser.clean(value.summary).prefix(161))
+            return value.title.isEmpty ? nil : value
+        }
+        cache.partial = cache.partial || times.count < cache.sourceFetched.count
+        cache.sourceFetched = times
+        return cache.preparedForDisplay()
     }
     private func checkpoint(_ category: NewsCategory, feeds: [(NewsSource, [NewsArticle]?, Date?)],
         cache: NewsSnapshot?, expected: Int) async -> NewsSnapshot? {
@@ -568,10 +626,17 @@ private final class LauncherNewsStore: ObservableObject {
             times[source.rawValue] = date ?? .now; sources[source] = items ?? []
         }
         let payload = sources.values.flatMap { $0 }
-        let articles = await Task.detached(priority: .utility) { NewsRSSParser.merge(payload) }.value
-        guard !Task.isCancelled, topics.contains(category), !articles.isEmpty else { return nil }
-        let next = NewsSnapshot(items: articles, fetched: .now, sourceFetched: times, partial: successes.count < expected)
-        guard let data = try? JSONEncoder().encode(next) else { return nil }
+        let sourceTimes = times
+        let partial = successes.count < expected
+        let prepared = await Task.detached(priority: .utility) { () -> (NewsSnapshot, Data)? in
+            let articles = NewsRSSParser.merge(payload)
+            guard !articles.isEmpty else { return nil }
+            let next = NewsSnapshot(items: articles, fetched: .now, sourceFetched: sourceTimes, partial: partial)
+                .preparedForDisplay()
+            guard let data = try? JSONEncoder().encode(next) else { return nil }
+            return (next, data)
+        }.value
+        guard !Task.isCancelled, topics.contains(category), let (next, data) = prepared else { return nil }
         UserDefaults.standard.set(data, forKey: "ratio.news.cache.\(category.rawValue).v5")
         UserDefaults.standard.removeObject(forKey: "ratio.news.cache.\(category.rawValue).v4")
         snapshots[category] = next
@@ -581,14 +646,17 @@ private final class LauncherNewsStore: ObservableObject {
     }
     func refresh(_ category: NewsCategory, force: Bool, revalidate: Bool = false) async {
         if category == .latest {
+            await restoreLatest()
             for topic in topicList {
                 guard !Task.isCancelled else { return }
                 if topics.contains(topic) { await refresh(topic, force: force, revalidate: revalidate) }
             }
             await rebuildLatest()
+            guard !Task.isCancelled else { return }
             if snapshots[.latest] == nil && !topics.isEmpty { errors.insert(.latest) } else { errors.remove(.latest) }
             return
         }
+        await restore(category)
         guard topics.contains(category), !loading.contains(category) else { return }
         // Foreground and scheduled refresh share one three-request budget.
         while !loading.isEmpty {
@@ -596,7 +664,6 @@ private final class LauncherNewsStore: ObservableObject {
             if Task.isCancelled || loading.contains(category) { return }
         }
         guard topics.contains(category), !Task.isCancelled else { return }
-        restore(category)
         if !force && !revalidate {
             if let retry = retries[category], retry > .now { return }
             if !errors.contains(category), snapshots[category] != nil, let time = fetched[category], (0..<(intervals[category] ?? Self.interval)).contains(Date.now.timeIntervalSince(time)) { return }
@@ -745,7 +812,7 @@ struct RatioNewsWidget: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             Color.clear.frame(height: 1).id("newsTop").accessibilityHidden(true)
-                            let displayedItems = NewsRSSParser.displayOrder(snapshot)
+                            let displayedItems = snapshot.displayedItems
                             ForEach(displayedItems) { article in
                                 articleRow(article)
                                 if article.id != displayedItems.last?.id {
@@ -781,15 +848,22 @@ struct RatioNewsWidget: View {
     private var topicSettings: some View {
         NavigationStack {
             List {
-                Section {
-                    ForEach(NewsCategory.topics, id: \.self) { topic in
-                        Toggle(topic.title, isOn: Binding(get: { draft.contains(topic) }, set: { checked in
-                            draft = NewsCategory.toggling(topic, checked: checked, in: draft)
-                        })).visionCraftAndroidText(20).frame(minHeight: 56)
-                    }
-                } header: { Text("최대 3개까지 선택할 수 있어요. 새 분야를 고르면 가장 먼저 선택한 분야가 빠져요. 아무것도 선택하지 않으면 최신에서 전체 뉴스를 보여줘요.") }
-            }.navigationTitle("즐겨찾기 편집")
+                ForEach(NewsCategory.topics, id: \.self) { topic in
+                    Toggle(topic.title, isOn: Binding(get: { draft.contains(topic) }, set: { checked in
+                        draft = NewsCategory.toggling(topic, checked: checked, in: draft)
+                    })).visionCraftAndroidText(20).frame(minHeight: 56)
+                }
+            }
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("즐겨찾기").font(.headline)
+                            Text("최대 3개").font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityAddTraits(.isHeader)
+                    }
                     ToolbarItem(placement: .cancellationAction) { Button("취소") { settings = false } }
                     ToolbarItem(placement: .confirmationAction) { Button("저장") {
                         category = .latest; store.selectTopics(draft); scrollRequest += 1; settings = false

@@ -1244,10 +1244,9 @@ final class LocalDocumentScannerViewController: UIViewController {
             let detection = try await detector.detect(
                 prepared: payload.modelInput
             )
+            let inferenceMilliseconds = ScannerDiagnostics.milliseconds(since: inferenceStartedAt)
             diagnostics.recordLiveInference(
-                milliseconds: ScannerDiagnostics.milliseconds(
-                    since: inferenceStartedAt
-                ),
+                milliseconds: inferenceMilliseconds,
                 preprocessingMilliseconds:
                     payload.preprocessingMilliseconds,
                 preprocessingBackend: payload.preprocessingBackend,
@@ -1314,7 +1313,7 @@ final class LocalDocumentScannerViewController: UIViewController {
                     "accelVariance": motionMonitor.variance() as Any? ?? NSNull(),
                     "framingOk": gates.framingGuidance == nil, "guidance": gates.framingGuidance.map { String(describing: $0) } ?? "",
                     "cornersStable": gates.cornersStable, "still": gates.deviceStill, "sharp": gates.sharpEnough, "focus": gates.focusReady,
-                    "preprocessMs": payload.preprocessingMilliseconds, "inferenceMs": ScannerDiagnostics.milliseconds(since: inferenceStartedAt),
+                    "preprocessMs": payload.preprocessingMilliseconds, "inferenceMs": inferenceMilliseconds,
                     "preprocessBackend": payload.preprocessingBackend.rawValue,
                     "iso": captureDevice?.iso ?? 0, "exposureSeconds": captureDevice?.exposureDuration.seconds ?? 0,
                     "lensPosition": captureDevice?.lensPosition ?? 0])

@@ -162,7 +162,7 @@ struct RatioLauncherView: View {
             RatioEntry(id: "history", name: "대화 기록", icon: "clock.arrow.circlepath", route: .chatHistory),
             RatioEntry(id: "browser", name: RatioHomeItem.webName, icon: "globe"),
             RatioEntry(id: "listening", name: AppLocalization.string("listen.title"), icon: "headphones", route: .listening),
-            RatioEntry(id: "ai-web", name: "AI", icon: "bubble.left.and.bubble.right", route: .aiWeb),
+            RatioEntry(id: "ai-web", name: "AI", icon: "rectangle.on.rectangle", route: .aiWeb),
             RatioEntry(id: "mail", name: RatioHomeItem.mailName, icon: "envelope", route: .easyMail),
             RatioEntry(id: "youtube", name: RatioHomeItem.youTubeName, icon: "play.rectangle", route: .easyYouTube),
             RatioEntry(id: "app-settings", name: "앱 설정", icon: "gearshape", route: .allSettings),
@@ -215,13 +215,7 @@ struct RatioLauncherView: View {
             if let dark = widgetWallpaperDark {
                 RatioWidgetWallpaper(dark: dark)
             } else if page == "home" && !categoryStyle {
-                GeometryReader { geometry in
-                    Image(lightHome ? "RatioBlueMist" : "RatioForestMist").resizable().scaledToFill()
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .scaleEffect(1.10).saturation(0.62).blur(radius: 24).clipped()
-                        .opacity(lightHome ? 0.44 : 0.45)
-                }
-                .ignoresSafeArea().allowsHitTesting(false).accessibilityHidden(true)
+                RatioWidgetWallpaper(dark: !lightHome, home: true)
             }
             VStack(alignment: .leading, spacing: 12) {
                 if page != "home" {

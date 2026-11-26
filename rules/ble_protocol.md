@@ -1,6 +1,6 @@
 # BLE 프로토콜 (Rivo 리모컨)
 
-점검일 2026-10-06 · 기준 코드 `c0b9f54a`
+점검일 2026-10-22 · 기준 코드 `f56b06f0`+작업 트리 (홈 명령 분기 대조)
 
 iPad 앱은 BLE 페리페럴 **Rivo Three / Rivo Mini** 키패드의 버튼 입력을 받아 앱 내부 기능을 조작한다. 구현은 `shortcuts_example/RivoRemote/`. Android 와 같은 펌웨어 프로토콜.
 
@@ -129,3 +129,7 @@ notify (6E400003) → RivoPacketAssembler → RivoRemotePacketParser.parse → R
 ## 위젯 스냅샷
 
 `RivoRemote/RivoWidgetStatusStore.swift` — App Group 키 `rivo.widget.snapshot.v1`, `RivoWidgetConnectionKind` (`notConnected/connecting/connected/unavailable/failed`), 저장 후 `WidgetCenter.shared.reloadTimelines(ofKind: "RivoStatusWidget")`.
+
+### 런처 내부 홈 명령
+
+`shortcuts_exampleApp.performRivoRemoteCommand`는 런처가 표시 중이면 `AppRouter.requestLauncherHome`을 통해 런처의 첫 페이지로 복귀한다. 그 외에는 앱 전역 NavigationPath를 비운다. 리모컨 키 매핑·BLE 패킷은 같다.

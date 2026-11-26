@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-private enum ListeningMorePage: Equatable { case settings, episodes, speed, sleep, schedule }
+private enum ListeningMorePage: Hashable { case settings, episodes, speed, sleep, schedule }
 
 /// Center the podcast content beneath its navigation tools.
 private struct ListeningPodcastWideLayout: Layout {
@@ -83,6 +83,12 @@ private struct ListeningPlayerPageLayout: Layout {
 }
 
 struct ListeningView: View {
+    private enum ReadingFocus: Hashable {
+        case player, radioTab, podcastTab, feedRadioTab, feedPodcastTab, feed
+        case podcast(String, subscribed: Bool)
+        case moreButton, moreHeading(ListeningMorePage)
+    }
+
     var embedded = false
     var active = true
     var backRequest = 0
@@ -97,16 +103,25 @@ struct ListeningView: View {
     @State private var moreVisible = false
     @State private var showingPlayer = true
     @State private var catalogLoaded = false
+    @State private var searchScrollRequest = 0
+    @State private var openedShowFocus: ReadingFocus?
+    @State private var playerReadingFocus = ReadingFocus.player
     @FocusState private var queryFocused: Bool
+    @AccessibilityFocusState(for: .voiceOver) private var readingFocus: ReadingFocus?
     private func text(_ key: String) -> String { AppLocalization.string(key) }
     private func subtitle(_ item: ListeningItem) -> String {
         item.kind == "radio" ? item.subtitle.components(separatedBy: " · ").filter { $0 != "수도권" }.joined(separator: " · ") : item.subtitle
     }
-    private func search() { queryFocused = false; model.search() }
+    private func search() {
+        queryFocused = false
+        openedShowFocus = nil
+        model.search()
+        searchScrollRequest += 1
+    }
     private func back() {
         if moreVisible { if morePage == .settings { moreVisible = false } else { morePage = .settings } }
         else if !showingPlayer {
-            if model.show != nil { search() } else { showingPlayer = true }
+            if model.show != nil { model.closeShow() } else { showingPlayer = true }
         }
         else if embedded { onExit() }
         else { dismiss() }
@@ -188,13 +203,31 @@ struct ListeningView: View {
             }
         }
         .onDisappear { model.close() }
-        .onChange(of: active) { _, value in if !value { showingPlayer = true; moreVisible = false; queryFocused = false; model.pause(); model.setSleep(0) } }
+        .onChange(of: active) { _, value in
+            if !value {
+                showingPlayer = true; moreVisible = false; playerReadingFocus = .player; queryFocused = false
+                model.pause(); model.setSleep(0)
+            }
+        }
         .onChange(of: scenePhase) { _, phase in if phase != .active { model.pause() } }
         .onChange(of: model.playerVisible) { _, value in
             if value { queryFocused = false; showingPlayer = true; model.playerVisible = false }
         }
+        .task(id: active ? preferredReadingFocus : nil) {
+            guard active else { return }
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            readingFocus = preferredReadingFocus
+        }
         .onChange(of: backRequest) { _, _ in if active { back() } }
         .accessibilityAction(.escape) { back() }
+    }
+
+    private var preferredReadingFocus: ReadingFocus {
+        if moreVisible { return .moreHeading(morePage) }
+        if showingPlayer { return playerReadingFocus }
+        if model.show != nil { return .feed }
+        return openedShowFocus ?? (model.tab == "radio" ? .radioTab : .podcastTab)
     }
 
     private var playerToolbar: some View {
@@ -211,57 +244,79 @@ struct ListeningView: View {
         }
     }
     private var playerNavigation: some View {
-        Button { queryFocused = false; showingPlayer = false } label: {
+        Button { queryFocused = false; playerReadingFocus = .player; showingPlayer = false } label: {
             Label(text("listen.broadcast_list"), systemImage: "list.bullet")
         }.buttonStyle(ListeningPillStyle()).accessibilityLabel(text("listen.open_catalog"))
+            .accessibilityFocused($readingFocus, equals: .player)
     }
 
     private var catalogPage: some View {
-        GeometryReader { _ in
+        ZStack {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 28) {
-                        HStack(spacing: 28) {
-                            tabButton("radio", "listen.radio")
-                            tabButton("podcast", "listen.podcast")
-                        }.id("listening.catalog")
-                        if let show = model.show {
-                            Button(text("listen.back_results"), action: search).buttonStyle(ListeningPillStyle())
-                            HStack(alignment: .top, spacing: 24) {
-                                ListeningArtwork(url: show.artworkURL, title: show.title, radio: false).frame(width: 112)
-                                VStack(alignment: .leading, spacing: 16) {
-                                    Text(verbatim: show.title).visionCraftAndroidText(30, weight: .medium).accessibilityAddTraits(.isHeader)
-                                    saveButton(show, expanded: true)
-                                }
-                            }
-                        } else {
-                            searchField
-                            let saved = model.saved.filter { $0.kind == model.tab }
-                            if model.tab == "podcast" && !saved.isEmpty {
+                        catalogTabs(inFeed: false).id("listening.catalog")
+                        searchField
+                        if model.tab == "podcast" {
+                            let saved = model.saved.filter { $0.kind == "podcast" }
+                            if !saved.isEmpty {
                                 section("listen.subscriptions", count: saved.count)
-                                catalog(saved)
-                            }
-                            section(model.tab == "radio" ? "listen.stations" : model.showingPopularPodcasts ? "listen.popular" : "listen.results", count: model.results.count)
-                        }
-                        if model.busy {
-                            HStack(spacing: 14) {
-                                ProgressView().tint(ListeningAppearance.accent)
-                                Text(text("listen.loading")).visionCraftAndroidText(20).foregroundStyle(ListeningAppearance.secondary)
+                                catalog(saved, subscribed: true)
                             }
                         }
-                        if !model.message.isEmpty {
-                            Text(text(model.message)).visionCraftAndroidText(20).foregroundStyle(ListeningAppearance.secondary)
-                            if !model.busy {
-                                Button(text("listen.retry")) { if let show = model.show { model.open(show) } else { search() } }.buttonStyle(ListeningPillStyle())
-                            }
-                        }
-                        catalog(model.show == nil ? model.results : model.episodes)
+                        section(model.tab == "radio" ? "listen.stations" : model.showingPopularPodcasts ? "listen.popular" : "listen.results", count: model.results.count)
+                        listStatus(busy: model.searchBusy, message: model.searchMessage, retry: search)
+                        catalog(model.results)
                         footer
-                    }.padding(24).frame(maxWidth: 1000).frame(maxWidth: .infinity).id("listening.top")
+                    }.padding(24).frame(maxWidth: 1000).frame(maxWidth: .infinity)
                 }
-                .onChange(of: model.show?.id) { _, value in
-                    if value != nil { queryFocused = false; proxy.scrollTo("listening.catalog", anchor: .top) }
-                }
+                .onChange(of: searchScrollRequest) { _, _ in proxy.scrollTo("listening.catalog", anchor: .top) }
+            }
+            .opacity(model.show == nil ? 1 : 0)
+            .allowsHitTesting(model.show == nil)
+            .accessibilityHidden(model.show != nil)
+            .environment(\.listeningImagesActive, active && scenePhase == .active && !showingPlayer && model.show == nil)
+            if let show = model.show {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 28) {
+                        catalogTabs(inFeed: true)
+                        Button(text("listen.back_results"), action: model.closeShow).buttonStyle(ListeningPillStyle())
+                        HStack(alignment: .top, spacing: 24) {
+                            ListeningArtwork(url: show.artworkURL, title: show.title, radio: false).frame(width: 112)
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text(verbatim: show.title).visionCraftAndroidText(30, weight: .medium)
+                                    .accessibilityAddTraits(.isHeader)
+                                    .accessibilityFocused($readingFocus, equals: .feed)
+                                saveButton(show, expanded: true)
+                            }
+                        }
+                        listStatus(busy: model.feedBusy, message: model.feedMessage) { model.open(show) }
+                        catalog(model.episodes)
+                        footer
+                    }.padding(24).frame(maxWidth: 1000).frame(maxWidth: .infinity)
+                }.id(show.id)
+            }
+        }
+    }
+
+    private func catalogTabs(inFeed: Bool) -> some View {
+        HStack(spacing: 28) {
+            tabButton("radio", "listen.radio", inFeed ? .feedRadioTab : .radioTab)
+            tabButton("podcast", "listen.podcast", inFeed ? .feedPodcastTab : .podcastTab)
+        }
+    }
+
+    @ViewBuilder private func listStatus(busy: Bool, message: String, retry: @escaping () -> Void) -> some View {
+        if busy {
+            HStack(spacing: 14) {
+                ProgressView().tint(ListeningAppearance.accent).accessibilityHidden(true)
+                Text(text("listen.loading")).visionCraftAndroidText(20).foregroundStyle(ListeningAppearance.secondary)
+            }
+        }
+        if !message.isEmpty {
+            Text(text(message)).visionCraftAndroidText(20).foregroundStyle(ListeningAppearance.secondary)
+            if !busy {
+                Button(text("listen.retry"), action: retry).buttonStyle(ListeningPillStyle())
             }
         }
     }
@@ -276,9 +331,14 @@ struct ListeningView: View {
         let label = text(model.tab == "radio" ? "listen.radio_hint" : "listen.search_hint")
         return HStack(spacing: 12) {
             Image(systemName: "magnifyingglass").font(.system(size: 24)).accessibilityHidden(true)
-            TextField("", text: $model.query, prompt: Text(label).foregroundStyle(ListeningAppearance.secondary.opacity(0.8)))
-                .visionCraftAndroidText(24).focused($queryFocused).submitLabel(.search).onSubmit(search)
-                .autocorrectionDisabled().textInputAutocapitalization(.never).accessibilityLabel(label)
+            ZStack(alignment: .leading) {
+                if model.query.isEmpty {
+                    Text(verbatim: label).foregroundStyle(ListeningAppearance.secondary.opacity(0.8))
+                        .lineLimit(1).accessibilityHidden(true).allowsHitTesting(false)
+                }
+                TextField("", text: $model.query).focused($queryFocused).submitLabel(.search).onSubmit(search)
+                    .autocorrectionDisabled().textInputAutocapitalization(.never).accessibilityLabel(label)
+            }.visionCraftAndroidText(24)
             Button(action: search) {
                 Image(systemName: "arrow.right").font(.system(size: 24)).foregroundStyle(ListeningAppearance.ink)
                     .frame(width: 56, height: 56).background(ListeningAppearance.accent, in: Circle())
@@ -287,15 +347,21 @@ struct ListeningView: View {
             .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 22))
             .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(queryFocused ? ListeningAppearance.accent : .white.opacity(0.4), lineWidth: queryFocused ? 2 : 1))
     }
-    private func tabButton(_ value: String, _ title: String) -> some View {
+    private func tabButton(_ value: String, _ title: String, _ target: ReadingFocus) -> some View {
         let selected = model.tab == value
-        return Button { queryFocused = false; model.selectTab(value) } label: {
+        return Button {
+            queryFocused = false
+            openedShowFocus = nil
+            model.selectTab(value)
+            searchScrollRequest += 1
+        } label: {
             VStack(alignment: .leading, spacing: 18) {
                 Text(text(title)).visionCraftAndroidText(32, weight: .medium, relativeTo: .largeTitle)
                     .foregroundStyle(selected ? ListeningAppearance.text : ListeningAppearance.secondary.opacity(0.65)).frame(maxWidth: .infinity, alignment: .leading)
                 Rectangle().fill(selected ? ListeningAppearance.accent : .white.opacity(0.24)).frame(height: selected ? 3 : 1)
             }.padding(.top, 8).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
+            .accessibilityFocused($readingFocus, equals: target)
     }
     private func section(_ title: String, count: Int) -> some View {
         HStack {
@@ -304,13 +370,18 @@ struct ListeningView: View {
             if count > 0 { Text(verbatim: String(count)).visionCraftAndroidText(20).foregroundStyle(ListeningAppearance.secondary) }
         }
     }
-    private func catalog(_ items: [ListeningItem]) -> some View {
-        ForEach(items) { item in row(item) }
+    private func catalog(_ items: [ListeningItem], subscribed: Bool = false) -> some View {
+        ForEach(items) { item in row(item, subscribed: subscribed) }
     }
-    private func row(_ item: ListeningItem) -> some View {
-        VStack(spacing: 10) {
+    private func row(_ item: ListeningItem, subscribed: Bool) -> some View {
+        let target = ReadingFocus.podcast(item.id, subscribed: subscribed)
+        return VStack(spacing: 10) {
             HStack(spacing: 12) {
-                Button { queryFocused = false; model.open(item) } label: {
+                Button {
+                    queryFocused = false
+                    if item.kind == "podcast" { openedShowFocus = target }
+                    model.open(item)
+                } label: {
                     HStack(spacing: 20) {
                         ListeningArtwork(url: item.artworkURL, title: item.title, radio: item.kind == "radio").frame(width: item.kind == "episode" ? 68 : 88)
                         VStack(alignment: .leading, spacing: 8) {
@@ -320,6 +391,7 @@ struct ListeningView: View {
                         Image(systemName: item.kind == "episode" ? "play.fill" : "chevron.right").font(.system(size: 24)).accessibilityHidden(true)
                     }.padding(.vertical, 12).contentShape(Rectangle()).multilineTextAlignment(.leading)
                 }.buttonStyle(.plain).accessibilityElement(children: .combine)
+                    .accessibilityFocused($readingFocus, equals: target)
                 if item.kind == "podcast" { saveButton(item) }
             }
             Rectangle().fill(.white.opacity(0.2)).frame(height: 1).accessibilityHidden(true)
@@ -375,7 +447,7 @@ struct ListeningView: View {
         }.multilineTextAlignment(centered ? .center : .leading)
     }
     private var moreButton: some View {
-        Button { morePage = .settings; moreVisible = true } label: {
+        Button { playerReadingFocus = .moreButton; morePage = .settings; moreVisible = true } label: {
             Image(systemName: "ellipsis").font(.system(size: 28))
                 .frame(width: 56, height: 56)
                 .background(.white.opacity(0.07), in: Circle())
@@ -383,6 +455,7 @@ struct ListeningView: View {
                 .contentShape(Circle())
         }.buttonStyle(.plain).accessibilityLabel(text("listen.more"))
             .accessibilityHint(text("listen.more_hint"))
+            .accessibilityFocused($readingFocus, equals: .moreButton)
     }
     private func podcastHeading(_ item: ListeningItem, compact: Bool) -> some View {
         HStack(spacing: 20) {
@@ -404,14 +477,20 @@ struct ListeningView: View {
         }
     }
     private func podcastPlayback(_ item: ListeningItem) -> some View {
-        VStack(spacing: 20) {
+        let position = clock(model.position)
+        let duration = clock(model.duration)
+        let playbackTime = String(format: text("listen.playback_time"), position, duration)
+        return VStack(spacing: 20) {
             VStack(spacing: 8) {
                 ProgressView(value: min(model.position / max(model.duration, 1), 1)).tint(ListeningAppearance.accent).accessibilityHidden(true)
                 HStack {
-                    Text(clock(model.position))
+                    Text(position)
                     Spacer()
-                    Text(clock(model.duration))
+                    Text(duration)
                 }.visionCraftAndroidText(16).monospacedDigit().foregroundStyle(ListeningAppearance.secondary)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text(verbatim: playbackTime))
+                    .accessibilityHidden(model.duration <= 0)
             }
             transport(item)
             if model.playbackError { Text(text("listen.play_error")).visionCraftAndroidText(18).foregroundStyle(ListeningAppearance.secondary) }
@@ -477,6 +556,7 @@ struct ListeningView: View {
         let width: CGFloat = spacious ? 128 : 80
         let iconHeight: CGFloat = spacious ? 128 : 96
         let circleSize: CGFloat = spacious ? 96 : 64
+        let enabled = model.adjacentItem(direction) != nil
         return Button { model.moveItem(direction) } label: {
             Image(systemName: direction < 0 ? "backward.end.fill" : "forward.end.fill").font(.system(size: spacious ? 36 : 30))
                 .frame(width: circleSize, height: circleSize)
@@ -484,7 +564,7 @@ struct ListeningView: View {
                 .overlay(Circle().strokeBorder(.white.opacity(0.45), lineWidth: 1.5))
                 .frame(width: width, height: iconHeight).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityLabel(text(direction < 0 ? "listen.previous_station" : "listen.next_station"))
-            .disabled(model.adjacentItem(direction) == nil).opacity(model.adjacentItem(direction) == nil ? 0.38 : 1)
+            .disabled(!enabled).opacity(enabled ? 1 : 0.38)
     }
     private func skipButton(_ seconds: Double, width: CGFloat) -> some View {
         Button { model.skip(seconds) } label: {
@@ -540,6 +620,7 @@ struct ListeningView: View {
             }
             VStack(alignment: .leading, spacing: 6) {
                 Text(text(moreTitle)).visionCraftAndroidText(28, weight: .medium).accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($readingFocus, equals: .moreHeading(morePage))
                 if morePage == .settings, let item = model.current {
                     Text(verbatim: item.kind == "episode" ? item.subtitle : item.title)
                         .visionCraftAndroidText(18).foregroundStyle(ListeningAppearance.secondary).lineLimit(2)
@@ -558,11 +639,12 @@ struct ListeningView: View {
     private func moreRow(_ label: String, symbol: String, value: String? = nil, selected: Bool? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 16) {
-                Image(systemName: symbol).font(.system(size: 24)).foregroundStyle(ListeningAppearance.accent).frame(width: 32)
+                Image(systemName: symbol).font(.system(size: 24)).foregroundStyle(ListeningAppearance.accent).frame(width: 32).accessibilityHidden(true)
                 Text(text(label)).visionCraftAndroidText(22, weight: .medium).frame(maxWidth: .infinity, alignment: .leading)
                 if let value { Text(verbatim: value).visionCraftAndroidText(18).foregroundStyle(ListeningAppearance.secondary) }
                 Image(systemName: selected == nil ? "chevron.right" : selected == true ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22)).foregroundStyle(selected == true ? ListeningAppearance.accent : ListeningAppearance.secondary)
+                    .accessibilityHidden(true)
             }.padding(.horizontal, 24).padding(.vertical, 18).frame(minHeight: 76).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityAddTraits(selected == true ? .isSelected : [])
     }
@@ -606,7 +688,10 @@ struct ListeningView: View {
                                                 HStack(spacing: 16) {
                                                     ListeningArtwork(url: episode.artworkURL, title: episode.title, radio: false).frame(width: 56)
                                                     Text(verbatim: episode.title).visionCraftAndroidText(22, weight: .medium).frame(maxWidth: .infinity, alignment: .leading)
-                                                    if model.current?.id == episode.id { Image(systemName: "checkmark.circle.fill").foregroundStyle(ListeningAppearance.accent) }
+                                                    if model.current?.id == episode.id {
+                                                        Image(systemName: "checkmark.circle.fill")
+                                                            .foregroundStyle(ListeningAppearance.accent).accessibilityHidden(true)
+                                                    }
                                                 }.padding(.horizontal, 24).padding(.vertical, 18).contentShape(Rectangle())
                                             }.buttonStyle(.plain).accessibilityAddTraits(model.current?.id == episode.id ? .isSelected : [])
                                             Divider().overlay(.white.opacity(0.1)).padding(.leading, 96)
@@ -630,8 +715,6 @@ struct ListeningView: View {
                 .foregroundStyle(ListeningAppearance.text)
             }
         }.accessibilityAddTraits(.isModal).accessibilityAction(.escape, back)
-            .onAppear { UIAccessibility.post(notification: .screenChanged, argument: text(moreTitle)) }
-            .onChange(of: morePage) { _, _ in UIAccessibility.post(notification: .screenChanged, argument: text(moreTitle)) }
             .zIndex(100)
     }
     private func programTimeline(_ item: ListeningItem) -> some View {

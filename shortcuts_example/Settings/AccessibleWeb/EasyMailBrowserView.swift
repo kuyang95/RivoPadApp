@@ -8,6 +8,7 @@ struct EasyMailBrowserView: View {
     let onClose: () -> Void
     let dialogColorScheme: ColorScheme
     let showsInboxBackButton: Bool
+    let contentActive: Bool
     @Environment(\.openURL) private var openURL
     @State private var address = ""
     @State private var retryProvider: EasyMailProvider?
@@ -19,7 +20,6 @@ struct EasyMailBrowserView: View {
     @State private var inboxSearchOpen = false
     @State private var inboxSearch = ""
     @State private var inboxScrollID: String?
-    @State private var inboxResults: [MailInboxKey: MailInboxResult] = [:]
     @FocusState private var editing: Bool
     private var theme: RatioExperience { AccessibleWebTheme.colors }
 
@@ -27,8 +27,8 @@ struct EasyMailBrowserView: View {
         VStack(spacing: 0) {
             if browser.mailInbox {
                 UnifiedMailInbox(browser: browser, embedded: embedded, onClose: onClose, dialogColorScheme: dialogColorScheme,
-                                 accountID: $inboxAccountID, folder: $inboxFolder, scrollID: $inboxScrollID,
-                                 searchOpen: $inboxSearchOpen, search: $inboxSearch, results: $inboxResults)
+                                 contentActive: contentActive, accountID: $inboxAccountID, folder: $inboxFolder,
+                                 scrollID: $inboxScrollID, searchOpen: $inboxSearchOpen, search: $inboxSearch)
             } else if browser.mailStart {
                 if browser.mailDirectConnection { NaverConnectedMailView(browser: browser, onBack: back) }
                 else if browser.mailPasswordRequired {
@@ -49,10 +49,11 @@ struct EasyMailBrowserView: View {
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16)
                 }
                 ZStack {
-                    AccessibleWebSurface(webView: browser.webView)
+                    let webAvailable = contentActive && !browser.mailLoginHidesWeb && !browser.naverMailBlocksInput && browser.mailReaderActions == nil
+                    AccessibleWebSurface(webView: browser.webView, interactionAvailable: webAvailable)
                         .opacity(browser.mailLoginHidesWeb ? 0 : 1)
-                        .allowsHitTesting(!browser.mailLoginHidesWeb && !browser.naverMailBlocksInput)
-                        .accessibilityHidden(browser.mailLoginHidesWeb || browser.naverMailBlocksInput)
+                        .allowsHitTesting(webAvailable)
+                        .accessibilityHidden(!webAvailable)
                         .overlay(alignment: .top) {
                             if browser.isLoading && !browser.mailLoginHidesWeb {
                                 ProgressView().progressViewStyle(.linear).tint(theme.accent)

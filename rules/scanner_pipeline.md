@@ -1,6 +1,6 @@
 # 문서 스캔 파이프라인 (자체 스캐너, Android 패리티)
 
-점검일 2026-10-30 · 기준 코드 `b4aa7cf7` + 작업 트리 (탐지·촬영 게이트·방향 판별·진단 코드 대조, 실기기 재측정 없음) · 문서스캔 실측보정 대조: 2026-10-30 `b4aa7cf7`+작업 트리
+점검일 2026-11-04 · 기준 코드 `0138337d` + 작업 트리 (Debug 실측 기록과 계측 경로)
 
 VisionKit `VNDocumentCameraViewController` 를 쓰지 않고 Android VisionCraft 와 **같은 모델·같은 수치** 로 동작하는 자체 스캐너. 코드는 `shortcuts_example/DocumentScan/CustomScanner/`. 목표는 Android 문서 [scanner_pipeline.md](../../../AndroidProject/VisionCraft/rules/scanner_pipeline.md) 의 Step 0-5 결과를 iPad 에서 재현하는 것 (`Tools/ScannerParity/` 로 결과 비교).
 
@@ -107,6 +107,6 @@ AVCaptureSession(.photo, builtInWideAngleCamera, continuousAutoFocus)      Local
 - 테스트별 디렉터리에 `metadata.json`, `events.jsonl`, `status.json`, `assessment.json`과 이미지가 저장된다. 이벤트는 schemaVersion 1, seq, 세션 시작 후 elapsedMs, captureId를 포함한다. 카메라 원래 프레임 timestamp는 별도 필드이며 elapsedMs와 직접 빼지 않는다. 정답 모서리나 문자 정확도는 자동 산출하지 않는다.
 - 프레임별 탐지 여부·heatmap peak·confidence·모서리·좌표계·ROI·회전·휘도·선명도, 안정/정지/초점/프레이밍 게이트, 촬영·초점·강제 촬영·재시도, 촬영본 모서리 선택·후처리 단계·사용 백엔드·오류/폴백, 4방향 OCR 점수·선택, 본문 OCR 원문/영역과 교정 결과/상태를 기록한다. 설정·모델 해시·앱/OS/기기 정보와 메모리·열 상태도 남긴다. iPad의 기존 진단 문자열은 구조화된 단계 이벤트와 함께 보관한다.
 - 장면 샘플은 2초 간격 최대 30장이다(Android는 긴 변 640px 이하 ROI, iPad는 256px letterbox 모델 입력). 촬영 시 원근 보정 전 ROI 원본과 최종 결과를 JPEG 95로 저장한다. Android는 원근 보정 중간 결과·보정된 OCR 입력도 저장한다. 이미지 저장은 무손실 golden fixture가 아니며 미세한 픽셀 비교와 구분한다.
-- 이미지 복사/인코딩 시간이 계측에 영향을 준다. `artifact_queued`의 copyMs/encodeMs와 세션 전체 시간을 함께 보고, 단계별 durationMs와 혼동하지 않는다. 라이브 frame 이벤트는 20,000개까지 기록하며 장면 샘플 상한 이후에도 촬영 이벤트는 계속 남는다.
+- iPad의 JSON 직렬화, 이미지 변환과 파일 저장은 백그라운드 기록 큐에서 순서대로 처리한다. 기록 종료는 대기 작업과 상태 파일 저장이 완료된 뒤 반환한다. 프레임의 `inferenceMs`는 탐지 반환 직후 확정한다. 이미지 복사/인코딩 시간이 계측에 영향을 줄 수 있다. `artifact_queued`의 copyMs/encodeMs와 세션 전체 시간을 함께 보고, 단계별 durationMs와 혼동하지 않는다. 라이브 frame 이벤트는 20,000개까지 기록하며 장면 샘플 상한 이후에도 촬영 이벤트는 계속 남는다.
 - 정상 종료는 session_end와 status.json으로 확인한다. 앱 강제 종료 등으로 종료 표식이 없으면 중단된 테스트로 분류하고 미완료 시간을 성공 통계에 넣지 않는다. 내보내기는 대기 중인 저장이 끝난 뒤 모든 테스트를 ZIP으로 만든다. 저장 오류는 기록 목록에 표시한다.
 - 일반 스캔에서는 실측 레코더를 만들지 않는다. Debug UI에서 시작한 테스트만 장면·문서·OCR 내용을 기기에 보관하며 자동 업로드하지 않는다. 기존 Remote Config/사용자 설정에 따라 OCR 교정 등 스캔 기능의 클라우드 호출은 그대로다. ZIP 내보내기와 확인 후 전체 삭제를 제공한다. 저장 기록 1GB 이상이면 새 테스트 시작을 막는다.

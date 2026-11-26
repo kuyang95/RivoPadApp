@@ -34,6 +34,8 @@ struct HomeView: View {
     @State private var isImageAnalysisDialogPresented = false
     @State private var showsFontSelection = false
     @State private var openCategory: VisionCraftHomeCategory?
+    @State private var lastCategoryActionID: String?
+    @AccessibilityFocusState(for: .voiceOver) private var categoryReadingFocus: String?
     @State private var hasConversations = false
     @ScaledMetric(relativeTo: .title2) private var homeTitleLineHeight: CGFloat = 32
 
@@ -117,6 +119,16 @@ struct HomeView: View {
         .onDisappear {
             isHomeVisible = false
             hasRecordedCurrentHomeVisit = false
+            categoryReadingFocus = nil
+        }
+        .task(id: isHomeVisible) {
+            guard isHomeVisible, let actionID = lastCategoryActionID else { return }
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            if openCategory?.items.contains(where: { $0.id == actionID }) == true {
+                categoryReadingFocus = actionID
+            }
+            lastCategoryActionID = nil
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background {
@@ -132,11 +144,12 @@ struct HomeView: View {
         .onChange(of: appRouter.launcherHomeRequestID) { _, _ in
             if launcher != nil { openCategory = nil }
         }
-        .onChange(of: openCategory?.id) { _, _ in
-            UIAccessibility.post(
-                notification: .screenChanged,
-                argument: openCategory.map { AppLocalization.string($0.title) } ?? "VisionCraft"
-            )
+        .onChange(of: openCategory?.id) { _, categoryID in
+            guard let categoryID else { return }
+            Task { @MainActor in
+                await Task.yield()
+                if openCategory?.id == categoryID { categoryReadingFocus = "category.back" }
+            }
         }
         .accessibilityAction(.escape) {
             navigateBackFromCategory()
@@ -207,7 +220,7 @@ struct HomeView: View {
         case "reader": "HomeActionBookReaderNoOutline"
         case "listening": "HomeActionListeningNoOutline"
         case "easy-mail": "HomeActionMailNoOutline"
-        case "ai-web": "HomeActionNewChatNoOutline"
+        case "ai-web": "HomeActionAIPlatforms"
         case "easy-browser": "HomeActionBrowserNoOutline"
         case "easy-youtube": "HomeActionYouTubeNoOutline"
         case "news": "HomeActionNewsNoOutline"
@@ -234,6 +247,7 @@ struct HomeView: View {
         } ?? nativeCategories
         let onOpen: (VisionCraftHomeCategory) -> Void = { category in
             if openCategory != nil || category.items.count == 1 {
+                if openCategory != nil { lastCategoryActionID = category.id }
                 category.items.first?.action()
             } else {
                 openCategory = category
@@ -245,6 +259,7 @@ struct HomeView: View {
                     columns: columns == 4 && categories.count > 4 ? 3 : 2,
                     fillsHeight: true,
                     onPosterLongPress: launcher.addWidgets,
+                    readingFocus: $categoryReadingFocus,
                     onOpen: onOpen)
             }
             .padding(.horizontal, 24)
@@ -276,6 +291,7 @@ struct HomeView: View {
                     VisionCraftHomeCategoryGrid(categories: categories, columns: columns,
                         minimumTitleSize: openCategory == nil ? 0 : 16,
                         identifierPrefix: openCategory == nil ? "home.category" : "home.action",
+                        readingFocus: $categoryReadingFocus,
                         onOpen: onOpen)
                 }
                 .padding(.horizontal, 24)
@@ -285,6 +301,7 @@ struct HomeView: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 if openCategory != nil {
                     VisionCraftBackButton(action: navigateBackFromCategory)
+                        .accessibilityFocused($categoryReadingFocus, equals: "category.back")
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 24)
                         .background(homeBackground)
@@ -365,10 +382,10 @@ struct HomeView: View {
             title: inCategory ? "이메일" : "리보 이메일",
             description: "이메일을 큰 글자로 읽고 씁니다.", action: { appRouter.route = inCategory ? .mediaWidget(.mail) : .easyMail })
         let youtube = VisionCraftActionItem(id: "easy-youtube", icon: "play.rectangle",
-            title: inCategory ? "유튜브" : "쉬운 유튜브",
+            title: "유튜브",
             description: "큰 글자와 간단한 조작으로 영상을 봅니다.", action: { appRouter.route = inCategory ? .mediaWidget(.youTube) : .easyYouTube })
-        let ai = VisionCraftActionItem(id: "ai-web", icon: "bubble.left.and.bubble.right", title: "AI",
-            description: "ChatGPT 웹을 큰 글자와 익숙한 화면으로 이용합니다.", action: { appRouter.route = .aiWeb })
+        let ai = VisionCraftActionItem(id: "ai-web", icon: "rectangle.on.rectangle", title: "AI",
+            description: "Claude, Gemini, GPT를 이용합니다.", action: { appRouter.route = .aiWeb })
         guard inCategory else { return [books, radio, browser, ai, email, youtube] }
         let news = VisionCraftActionItem(id: "news", icon: "newspaper", title: "뉴스",
             description: "주제별로 뉴스를 찾아 기사를 읽습니다.", action: { appRouter.route = .mediaWidget(.news) })
@@ -519,7 +536,15 @@ struct HomeView: View {
     }
 
     private func navigateBackFromCategory() {
+        let previousCategory = openCategory?.id
+        lastCategoryActionID = nil
         openCategory = nil
+        if let previousCategory {
+            Task { @MainActor in
+                await Task.yield()
+                if openCategory == nil { categoryReadingFocus = previousCategory }
+            }
+        }
     }
 
     private var readingActions: [VisionCraftActionItem] {

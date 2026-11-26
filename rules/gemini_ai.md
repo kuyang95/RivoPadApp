@@ -1,6 +1,6 @@
 # AI 백엔드 — 로컬 MLX + Gemini (Firebase AI Logic)
 
-점검일: 2026-10-13 · 기준 코드: `c25bf291` (이번 기능 변경 범위)
+점검일: 2026-10-16 · 기준 코드: `63f88e9b`+작업 트리 (Ratio 런처 추가 및 로컬 모델 선택·추론 설정 확인 범위)
 
 iPad 앱은 **로컬 우선**: 텍스트 채팅·문서 Q&A·번역·음성 명령·VisionLink 원격 채팅은 기기 안 MLX 모델. 클라우드(Gemini)는 이미지 설명, Google Search grounding, OCR 교정, Excel/Word AI 에만 쓴다. Apple `FoundationModels` 는 import 조차 없다.
 
@@ -17,6 +17,8 @@ iPad 앱은 **로컬 우선**: 텍스트 채팅·문서 Q&A·번역·음성 명�
 | Word/HWP 양식 AI | `Documents/WordAICommandService.swift` (호출·토큰·오류). 프롬프트·스키마·요청 JSON·응답 해석·구역 선택 검증은 엔진 `WordAIAssistant` | `0.1` | 일반 계획 `4_096` / 대용량 문서 구역 선택 `1_024` | JSON 스키마 응답 (`intent: answer|clarify|edit`) |
 
 토큰 회계: 각 서비스가 `model.countTokens(contents).totalTokens` 로 입력을 세고 `CloudAITokenBudgetStore.reserve` → `commit(actualTokens: usageMetadata.totalTokenCount)` / `cancel` ([server_endpoints.md](server_endpoints.md)). 일일 한도 `1_000_000`.
+
+`GeminiVisionService.userMessage`는 촬영·사진 검토·문서 스캔·VisionLink의 이미지 설명과 이미지 채팅·음성 질의에서 응답 지연, 서비스 요청 한도, 그 밖의 서비스 오류 세 문구를 사용한다. 앱 인증과 서버 연결 실패에는 그 밖의 서비스 오류 문구를 사용한다. 서비스 요청 한도와 기기 내 일일 토큰 한도는 따로 안내한다.
 
 ### 문서 AI의 원문 전달
 
@@ -68,6 +70,7 @@ HWP/HWPX의 모델 입력은 엔진 `HWPAISource.snapshot`이 만들고, 검증�
 - 티어: `DeviceCapabilityProfiler.memoryTier` — 물리 메모리 ≥ 14 GiB `expanded`, ≥ 10 GiB `balanced`, 그 외 `standard` (광고 12/16 GB 기기의 OS 예약분 감안).
 - `LocalInferencePolicy.make`: MLX 메모리 상한 standard 5 GiB / balanced 7 GiB / expanded 8 GiB 를 앱 가용 메모리·Metal 권장치(×1.5)와 min. `textMaxTokens` 768/1024/1024, `textMaxKVSize` 4096/4096/8192, vision 512 토큰 / KV 4096, `kvBits 4`, `kvGroupSize 64`, `quantizedKVStart 512`, 캐시 20 MiB.
 - 생성 파라미터 (`LLMService.generationParameters`): `temperature 0.6`, `topP 0.9`, `prefillStepSize 512`. DEBUG 벤치마크 시 권장 샘플링(1.0/0.95/topK 20/presencePenalty 1.5) 또는 greedy.
+- 추론 모드 (`LLMService`의 `ChatSession` 생성): 일반 실행은 `additionalContext["enable_thinking"] = false`. DEBUG 벤치마크에서는 `LocalLLMBenchmark.isThinkingEnabled`로 선택한다. 원본 모델의 공개 벤치마크 점수는 앱의 4bit 양자화·추론 모드·출력 길이 제한에서 측정한 점수가 아니다.
 - 스트리밍: `LLMService.streamText(conversationID:system:prompt:)` → `AsyncThrowingStream<String>`; `StreamingThinkFilter` 가 `<think>…</think>` 구간을 제거하고 화면에 내보낸다.
 - 모델 저장: Application Support `HFModels/` (`LocalModelDownloader`, `LocalModelSnapshotValidator` 로 safetensors 인덱스 검증). 준비 UI `LocalModelPreparationView`.
 

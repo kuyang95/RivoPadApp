@@ -660,7 +660,7 @@ struct DocumentScanRootView: View {
             } catch {
                 guard !Task.isCancelled, self.pendingImage === pendingImage else { return }
                 isDescribingImage = false
-                failReviewDescription(CameraImageDescriber.userMessage(for: error))
+                failReviewDescription(GeminiVisionService.userMessage(for: error))
             }
         }
     }

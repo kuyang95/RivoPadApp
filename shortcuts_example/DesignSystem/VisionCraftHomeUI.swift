@@ -175,6 +175,7 @@ struct VisionCraftHomeCategoryGrid: View {
     var identifierPrefix = "home.category"
     var fillsHeight = false
     var onPosterLongPress: (() -> Void)? = nil
+    var readingFocus: AccessibilityFocusState<String?>.Binding? = nil
     let onOpen: (VisionCraftHomeCategory) -> Void
 
     var body: some View {
@@ -188,7 +189,7 @@ struct VisionCraftHomeCategoryGrid: View {
 
     private var tiles: some View {
         ForEach(categories) { category in
-            Button {
+            let tile = Button {
                 onOpen(category)
             } label: {
                 if fillsHeight {
@@ -204,9 +205,16 @@ struct VisionCraftHomeCategoryGrid: View {
             }
             .modifier(LauncherPosterLongPress(onTap: { onOpen(category) }, onLongPress: onPosterLongPress))
             .buttonStyle(VisionCraftHomePressStyle())
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilityLabel(for: category))
             .accessibilityHint(category.description.map { AppLocalization.string($0) } ?? "")
+            .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier("\(identifierPrefix).\(category.id)")
+            if let readingFocus {
+                tile.accessibilityFocused(readingFocus, equals: category.id)
+            } else {
+                tile
+            }
         }
     }
 
@@ -253,7 +261,7 @@ private struct VisionCraftLauncherPosterTile: View {
                         let side = max(0, min(art.size.width * 0.52, art.size.height * 0.90))
                         Group {
                             if let artworkName = posterArtworkName {
-                                Image(artworkName).resizable()
+                                Image(decorative: artworkName).resizable()
                             } else {
                                 Image(systemName: category.systemImage ?? "square.grid.3x3").resizable()
                                     .foregroundStyle(iconTint)
@@ -332,7 +340,7 @@ struct VisionCraftActionArtwork: View {
 
     var body: some View {
         let appliesTone = name.hasPrefix("HomeAction") && !name.hasSuffix("NoOutline")
-        Image(name)
+        Image(decorative: name)
             .resizable()
             .scaledToFit()
             .saturation(appliesTone ? 0.70 : 1)
@@ -384,6 +392,7 @@ struct VisionCraftHomeCategoryTileContent: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityHidden(true)
 
                 VisionCraftHomeTileTitle(
                     title: title,

@@ -136,6 +136,42 @@ nonisolated enum GeminiVisionService {
         }
     }
 
+    static func userMessage(for error: Error) -> String {
+        if error is CloudAITokenBudgetError {
+            return AppLocalization.string("일일 할당량이 소진되었습니다.")
+        }
+        if let generationError = error as? GenerateContentError {
+            switch generationError {
+            case .internalError(let underlying):
+                return userMessage(for: underlying)
+            case .promptImageContentError, .promptBlocked, .responseStoppedEarly:
+                return AppLocalization.string("사진을 해석하지 못했어요.")
+            }
+        }
+        if let encodingError = error as? ServiceError {
+            return encodingError.localizedDescription
+        }
+
+        let detail = error as NSError
+        RVLogger.e("Gemini vision request failed: \(detail.domain) (\(detail.code))", category: RVLogger.network)
+        if detail.domain == NSURLErrorDomain,
+           detail.code == URLError.timedOut.rawValue {
+            return AppLocalization.string("이미지 설명 서비스의 응답이 지연되고 있습니다. 다시 시도해 주세요.")
+        }
+        // Firebase AI Logic wraps HTTP status codes in its backend NSError.
+        if detail.domain.hasPrefix("com.google.firebase.firebaseai.") {
+            switch detail.code {
+            case 429:
+                return AppLocalization.string("이미지 설명 서비스의 요청 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.")
+            case 408, 504:
+                return AppLocalization.string("이미지 설명 서비스의 응답이 지연되고 있습니다. 다시 시도해 주세요.")
+            default:
+                break
+            }
+        }
+        return AppLocalization.string("이미지 설명 서비스를 이용할 수 없습니다. 잠시 후 다시 시도해 주세요.")
+    }
+
     /// 대화 맥락을 요청 본문으로 바꾼다. 이미지는 첫 사용자 턴에 붙여
     /// 후속 질문마다 다시 올리지 않는다.
     private static func contents(

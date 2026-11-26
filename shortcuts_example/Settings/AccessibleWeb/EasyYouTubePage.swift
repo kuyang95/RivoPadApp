@@ -9,6 +9,7 @@ enum EasyYouTubePage {
 
     static var source: String {
         let literals = [
+            "__RIVO_YOUTUBE_TITLE__": AppLocalization.string("유튜브"),
             "__RIVO_YOUTUBE_ACCOUNT_STATUS__": AppLocalization.string(checkingAccountTitle),
             "__RIVO_YOUTUBE_REFRESH_LABEL__": AppLocalization.string("새로고침"),
             "__RIVO_YOUTUBE_UPDATED_FORMAT__": AppLocalization.string("%@ 갱신").replacingOccurrences(of: "%@", with: "{time}")
@@ -28,6 +29,11 @@ enum EasyYouTubePage {
   window.__rivoEasyYouTubeInstalled=true;
   const install=()=>{
   const rivoTheme=window.__rivoWebTheme||{bg:'#101C2D',surface:'#1C2D43',text:'#F5F3E9',edge:'#7F93AB',link:'#E6EF87',scheme:'dark'};
+  const youtubeTitle=__RIVO_YOUTUBE_TITLE__;
+  const nextShortLabel=/다음 동영상|Next video|次の動画/i,previousShortLabel=/이전 동영상|Previous video|前の動画/i;
+  const shortButtons=()=>[...document.body.querySelectorAll('button[aria-label]')];
+  const shortButton=(buttons,next)=>buttons.find(button=>(next?nextShortLabel:previousShortLabel).test(button.getAttribute('aria-label')));
+  const canUseShortButton=button=>!!button&&!button.disabled&&button.getAttribute('aria-disabled')!=='true';
   const themeCSS=`--bg:${rivoTheme.bg};--surface:${rivoTheme.surface};--text:${rivoTheme.text};--muted:${rivoTheme.text};--accent:${rivoTheme.link};--soft:${rivoTheme.surface};--border:${rivoTheme.edge};--on-accent:${rivoTheme.bg}`;
 
 (() => {
@@ -41,7 +47,7 @@ enum EasyYouTubePage {
     for (const child of children) node.appendChild(typeof child === 'string' ? document.createTextNode(child) : child);
     return node;
   };
-  let closeCurrent = null, activePlayer = null, changeShort = null, prepareShort = null;
+  let closeCurrent = null, activePlayer = null, changeShort = null, prepareShort = null, cancelShort = null;
   // A hidden launcher page or paused screen must never start playback, even when the player becomes ready later.
   const contentInactive = () => window.__rivoYouTubeContentActive === false;
   const originalAction = fn => { const old=document.body.inert;document.body.inert=false;try{return fn();}finally{document.body.inert=old;} };
@@ -147,6 +153,7 @@ enum EasyYouTubePage {
     close() { closeCurrent?.(); },
     pause() { activePlayer?.pauseVideo?.(); },
     prepareShortTransition() { prepareShort?.(); },
+    cancelShortTransition() { cancelShort?.(); },
     state() {
       if (!activePlayer) return null;
       return {state:activePlayer.getPlayerState?.(),time:activePlayer.getCurrentTime?.(),duration:activePlayer.getDuration?.(),rate:activePlayer.getPlaybackRate?.()};
@@ -167,17 +174,39 @@ enum EasyYouTubePage {
 
         ${window.__rivoLauncherEmbedded?':host{background:transparent}':''}
         *{box-sizing:border-box}[hidden]{display:none!important}main{height:100%;min-height:0;overflow:auto;overflow-anchor:none;overscroll-behavior:contain;touch-action:pan-y pinch-zoom;-webkit-overflow-scrolling:touch;padding:12px;display:flex;flex-direction:column;gap:14px;max-width:1400px;margin:auto}main>*{flex-shrink:0}h1{font-size:22px;line-height:1.45;margin:0;overflow-wrap:anywhere}h2{font-size:22px;margin:8px 0}p{margin:0;color:var(--muted)}
-        button,select{font:inherit;min-height:56px;padding:12px 18px;border:1px solid var(--border);border-radius:16px;background:var(--surface);color:var(--text)}button{cursor:pointer}button:disabled,select:disabled{opacity:.55}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+        button{font:inherit;min-height:56px;padding:12px 18px;border:1px solid var(--border);border-radius:16px;background:var(--surface);color:var(--text)}button{cursor:pointer}button:disabled{opacity:.55}button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
         .screen{width:100%;aspect-ratio:16/9;min-height:200px;background:#000;overflow:hidden;border-radius:16px;position:relative;flex:none}.screen.portrait{width:440px;max-width:100%;aspect-ratio:9/16;min-height:360px;align-self:center}.screen iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}.timeline{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:12px;row-gap:0}.time{grid-column:1/-1;font-size:16px;font-variant-numeric:tabular-nums;color:var(--muted)}.timeline input{width:100%;min-height:48px;min-width:0;margin:0;accent-color:var(--text)}.short-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:100%;max-width:720px;align-self:center}.short-actions button{min-width:0;border:0;background:var(--surface);overflow-wrap:anywhere}.short-actions[data-loading]{visibility:hidden;pointer-events:none}.screen.portrait{border:0;box-shadow:none}main:focus{outline:none}#speed{min-width:72px;min-height:56px;padding:8px;border:0;border-radius:8px;background:transparent;font-size:21px;font-weight:600;cursor:pointer}#channel{display:flex;align-items:center;gap:14px;width:100%;min-height:80px;padding:10px 0 16px;border:0;border-radius:0;background:transparent;text-align:start;overflow-wrap:anywhere}.channel-copy{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px}.channel-name{font-size:23px;font-weight:700;line-height:1.4}.channel-hint{font-size:14px;font-weight:450;line-height:1.5;color:var(--muted)}.channel-arrow{flex:none;font-size:32px;font-weight:400;color:var(--muted)}.channel-avatar{width:52px;height:52px;flex:none;object-fit:cover;border:0;border-radius:50%}.comment-section{display:grid;gap:22px;margin-top:18px}.comment-heading{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}.comment-heading h2{margin:0;font-size:18px;font-weight:650}.comment-heading #comment-status{margin:0;font-size:14px}.comments{display:grid;gap:30px}.comment{display:flex;flex-direction:column;gap:10px;padding:0;background:transparent;border:0;border-radius:0;overflow-wrap:anywhere}.comment-author{display:flex;align-items:baseline;gap:8px;color:var(--muted);font-size:14px;line-height:1.5}.comment strong{font-size:14px;font-weight:500}.comment p{margin:0;color:var(--text);white-space:pre-wrap;font-size:20px;line-height:1.7}#status:empty{display:none}#comment-status{min-height:1.5em}#more-comments{align-self:flex-start;justify-self:start;min-height:56px;padding:8px 0;border:0;border-radius:0;background:transparent;font-weight:650;text-decoration:underline;text-underline-offset:5px}
 
+        #speed-dialog{
+          width:min(420px,calc(100% - 32px));max-height:calc(100% - 32px);padding:16px;
+          border:1px solid var(--border);border-radius:16px;background:var(--surface);color:var(--text);
+          overflow:auto;overscroll-behavior:contain
+        }
+        #speed-dialog::backdrop{background:rgba(0,0,0,.6)}
+        #speed-heading{margin:0 4px 12px}
+        .speed-choices{display:grid;gap:6px}
+        .speed-choice{
+          display:flex;align-items:center;justify-content:space-between;gap:12px;
+          padding:10px 14px;text-align:start;background:transparent
+        }
+        .speed-choice[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:650}
+        .speed-choice[aria-pressed="false"] .speed-check{visibility:hidden}
+        .speed-close{display:block;margin:12px 0 0 auto}
       `]));
       const main=element('main',{role:'dialog','aria-modal':'true','aria-labelledby':'official-title',tabindex:'-1'});
       const screen=element('div',{class:short?'screen portrait':'screen'}),target=element('div');screen.appendChild(target);
       const heading=element('h1',{id:'official-title'},[title||'YouTube 동영상']);
       heading.hidden=short;if(short){main.removeAttribute('aria-labelledby');main.setAttribute('aria-label','YouTube 쇼츠');}
-      const time=element('span',{id:'time',class:'time'},['0:00 / 0:00']);
+      const time=element('span',{id:'time',class:'time','aria-hidden':'true'},['0:00 / 0:00']);
       const seek=element('input',{id:'seek',type:'range',min:0,max:1,value:0,step:1,disabled:'','aria-label':'재생 위치'});
-      const speed=element('select',{id:'speed',disabled:'','aria-label':'재생속도'});speed.appendChild(element('option',{value:1,'aria-label':'1배'},['1×']));
+      const speed = element('button', {
+        id:'speed', type:'button', disabled:'', 'aria-label':'재생속도 1배', 'aria-haspopup':'dialog'
+      }, ['1×']);
+      const speedChoices = element('div', {class:'speed-choices'});
+      const speedClose = element('button', {type:'button', class:'speed-close'}, ['닫기']);
+      const speedDialog = element('dialog', {id:'speed-dialog', 'aria-labelledby':'speed-heading'}, [
+        element('h2', {id:'speed-heading'}, ['재생속도']), speedChoices, speedClose
+      ]);
       const status=element('p',{id:'status',role:'status','aria-live':'polite'});
       const avatar=element('img',{class:'channel-avatar',alt:'','aria-hidden':'true',hidden:'',width:52,height:52});
       avatar.onerror=()=>{avatar.hidden=true;};
@@ -190,6 +219,7 @@ enum EasyYouTubePage {
       const more=element('button',{id:'more-comments',hidden:''},['댓글 더 보기']);
       const timeline=element('div',{class:'timeline'},[seek,speed,time]);timeline.hidden=short;status.hidden=short;
       main.append(screen,heading,timeline,status);
+      if (!short) main.appendChild(speedDialog);
       let previousButton,nextButton,shortActions;
       if(short){
         previousButton=element('button',{id:'short-previous'},['이전']);nextButton=element('button',{id:'short-next'},['다음']);
@@ -209,7 +239,8 @@ enum EasyYouTubePage {
       // The source page is outside this shadow root: observe its changes without
       // rebuilding our player or repeatedly scanning an unchanged source DOM.
       const detailsObserver=new MutationObserver(()=>{detailsDirty=true;});
-      detailsObserver.observe(document.body,{subtree:true,childList:true,characterData:true});
+      detailsObserver.observe(document.body,{subtree:true,childList:true,characterData:true,
+        attributes:short,attributeFilter:short?['aria-label','aria-disabled','disabled']:undefined});
       let captionDefaultsDone=false,captionModuleSeen=false,captionDefaultChanges=0,captionInitialRequested=false,changingCaptionDefaults=false,captionDeadline=Infinity,captionPlaybackStarted=false;
       const applyDefaultCaptionsOff=target=>{
         if(closed||!ready||captionDefaultsDone||changingCaptionDefaults||Date.now()>captionDeadline||captionDefaultChanges>=4)return;
@@ -255,6 +286,7 @@ enum EasyYouTubePage {
       };
       if(short){
         prepareShort=()=>{shortSwitching=true;updateShortState(null);player?.pauseVideo?.();};
+        cancelShort=()=>{shortSwitching=false;updateShortState(player?.getPlayerState?.());};
         changeShort=next=>{
           if(closed||!ready)return false;
           captionDefaultsDone=false;captionModuleSeen=false;captionDefaultChanges=0;captionInitialRequested=false;captionDeadline=Infinity;captionPlaybackStarted=false;
@@ -269,10 +301,13 @@ enum EasyYouTubePage {
       const updateDetails=(force=false)=>{
         if(closed||contentInactive()||document.visibilityState==='hidden')return;
         const now=Date.now(),needsComments=!short&&!commentCache.size&&!details.disabled&&totalCommentCount!=='0개';
-        if(!force&&(now-lastDetailsRead<1000||(!detailsDirty&&!needsComments&&!commentsRequestAt&&details.channelName)))return;
+        if(!force&&(now-lastDetailsRead<1000||(!detailsDirty&&
+          (short||(!needsComments&&!commentsRequestAt&&details.channelName)))))return;
         lastDetailsRead=now;detailsDirty=false;
         if(short){
-          for(const [next,b]of[[false,previousButton],[true,nextButton]]){const native=[...document.querySelectorAll('button[aria-label]')].find(e=>new RegExp(next?'다음 동영상|Next video':'이전 동영상|Previous video','i').test(e.getAttribute('aria-label')));b.disabled=!native||native.disabled;}
+          const buttons=shortButtons();
+          previousButton.disabled=!canUseShortButton(shortButton(buttons,false));
+          nextButton.disabled=!canUseShortButton(shortButton(buttons,true));
           return;
         }
         details=readDetails(shown+5);
@@ -313,16 +348,62 @@ enum EasyYouTubePage {
       const update=()=>{
         if(closed||contentInactive()||document.visibilityState==='hidden')return;updateDetails();if(!ready)return;
         const current=player.getCurrentTime(),duration=player.getDuration(),label=`${clock(current)} / ${clock(duration)}`;if(time.textContent!==label)time.textContent=label;
-        seek.max=Math.max(1,Number.isFinite(duration)?duration:0);seek.disabled=!(duration>0);if(!seeking)seek.value=current;seek.setAttribute('aria-valuetext',time.textContent);speed.value=String(player.getPlaybackRate());
+        seek.max=Math.max(1,Number.isFinite(duration)?duration:0);seek.disabled=!(duration>0);if(!seeking)seek.value=current;seek.setAttribute('aria-valuetext',time.textContent);updateSpeed(player.getPlaybackRate());
       };
-      const close=()=>{if(closed)return;closed=true;clearInterval(timer);detailsObserver.disconnect();resizeObserver?.disconnect();window.removeEventListener('resize',resizePlayer);window.visualViewport?.removeEventListener('resize',resizePlayer);player?.destroy();if(activePlayer===player)activePlayer=null;host.remove();document.body.inert=previousInert;window.dispatchEvent(new Event('rivo-official-player-closed'));if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});closeCurrent=null;changeShort=null;prepareShort=null;};
+      const close=()=>{if(closed)return;closed=true;clearInterval(timer);detailsObserver.disconnect();resizeObserver?.disconnect();window.removeEventListener('resize',resizePlayer);window.visualViewport?.removeEventListener('resize',resizePlayer);player?.destroy();if(activePlayer===player)activePlayer=null;host.remove();document.body.inert=previousInert;window.dispatchEvent(new Event('rivo-official-player-closed'));if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});closeCurrent=null;changeShort=null;prepareShort=null;cancelShort=null;};
       closeCurrent=close;
       seek.oninput=()=>{seeking=true;};seek.onchange=()=>{seeking=false;player.seekTo(Math.max(0,Math.min(Number(seek.value),player.getDuration())),true);};
-      speed.onchange=()=>player.setPlaybackRate(Number(speed.value));
+      const updateSpeed = rate => {
+        const label = `${rate}×`;
+        if (speed.textContent === label) return;
+        speed.textContent = label;
+        speed.setAttribute('aria-label', `재생속도 ${rate}배`);
+        if (speedDialog.open) {
+          for (const choice of speedChoices.children) {
+            choice.setAttribute('aria-pressed', String(Number(choice.dataset.rate) === rate));
+          }
+        }
+      };
+      speed.onclick = () => {
+        if (speedDialog.open) return;
+        const currentRate = player.getPlaybackRate();
+        const rates = player.getAvailablePlaybackRates();
+        const choices = (rates.length ? rates : [currentRate]).map(rate => {
+          const choice = element('button', {
+            type:'button', class:'speed-choice', 'data-rate':rate,
+            'aria-label':`${rate}배`, 'aria-pressed':String(rate === currentRate)
+          }, [`${rate}×`, element('span', {class:'speed-check', 'aria-hidden':'true'}, ['✓'])]);
+          choice.onclick = () => {
+            player.setPlaybackRate(rate);
+            speedDialog.close();
+          };
+          return choice;
+        });
+        speedChoices.replaceChildren(...choices);
+        const selected = choices.find(choice => choice.getAttribute('aria-pressed') === 'true') || choices[0];
+        selected.setAttribute('autofocus', '');
+        speedDialog.showModal();
+      };
+      speedClose.onclick = () => speedDialog.close();
+      speedDialog.onclick = event => {
+        if (event.target !== speedDialog) return;
+        const bounds = speedDialog.getBoundingClientRect();
+        if (event.clientX < bounds.left || event.clientX >= bounds.right ||
+            event.clientY < bounds.top || event.clientY >= bounds.bottom) speedDialog.close();
+      };
+      speedDialog.onclose = () => {
+        if (!closed && !speedDialog.open) (speed.disabled ? main : speed).focus({preventScroll:true});
+      };
       root.addEventListener('keydown',event=>{
-        if(event.key==='Escape'){event.preventDefault();window.__rivoYouTubePrototype?.back?.()||close();}
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          if (speedDialog.open) speedDialog.close();
+          else window.__rivoYouTubePrototype?.back?.() || close();
+        }
         if(event.key==='Tab'){
-          const items=[...root.querySelectorAll('button,input,select,iframe')].filter(e=>!e.disabled&&!e.closest('[hidden],[inert]'));
+          const scope = speedDialog.open ? speedDialog : main;
+          const items = [...scope.querySelectorAll('button,input,iframe')]
+            .filter(item => !item.disabled && !item.closest('[hidden],[inert],dialog:not([open])'));
           if(event.shiftKey&&root.activeElement===items[0]){event.preventDefault();items.at(-1)?.focus();}
           else if(!event.shiftKey&&root.activeElement===items.at(-1)){event.preventDefault();items[0]?.focus();}
         }
@@ -332,7 +413,6 @@ enum EasyYouTubePage {
           playerVars:{autoplay:autoplay&&!contentInactive()?1:0,controls:1,start:Number.isFinite(startSeconds)?Math.floor(Math.max(0,startSeconds)):0,playsinline:1,enablejsapi:1,origin:location.origin,hl:'ko',cc_load_policy:0},
           events:{
             onReady:event=>{if(closed){event.target.destroy();return;}ready=true;host.removeAttribute('data-rivo-player-preparing');activePlayer=event.target;applyDefaultCaptionsOff(event.target);speed.disabled=false;
-              speed.replaceChildren(...event.target.getAvailablePlaybackRates().map(rate=>element('option',{value:rate,'aria-label':`${rate}배`},[`${rate}×`])));
               const frame=event.target.getIframe();frame.title=title||'YouTube 동영상';frame.setAttribute('allow','autoplay; encrypted-media; picture-in-picture; fullscreen');frame.removeAttribute('aria-hidden');frame.setAttribute('tabindex','0');
               if(autoplay&&!contentInactive())event.target.playVideo?.();present();updateShortState(event.target.getPlayerState?.());say('');update();},
             onStateChange:event=>{if(closed)return;
@@ -344,9 +424,9 @@ enum EasyYouTubePage {
               if([1,5].includes(event.data))shortSwitching=false;
               if(event.data===1){endedShortID='';if(!captionPlaybackStarted){captionPlaybackStarted=true;captionDeadline=Date.now()+8000;}applyDefaultCaptionsOff(event.target||player);}updateShortState(event.data);const labels={0:'',1:'',2:'일시정지',3:''};say(labels[event.data]||'');update();},
             onApiChange:event=>{applyDefaultCaptionsOff(event.target||player);},
-            onPlaybackRateChange:event=>{if(!closed)speed.value=String(event.data);},
+            onPlaybackRateChange:event=>{if(!closed)updateSpeed(event.data);},
             onAutoplayBlocked:()=>{if(!closed){host.removeAttribute('data-rivo-player-preparing');shortSwitching=false;present();updateShortState(player.getPlayerState?.());say('동영상을 눌러 재생해 주세요.');}},
-            onError:event=>{if(closed)return;host.removeAttribute('data-rivo-player-preparing');present();updateShortState(null);speed.disabled=true;seek.disabled=true;say(`영상을 재생할 수 없어요. 오류 ${event.data}. 이전 화면에서 다른 영상을 선택해 주세요.`,true);}
+            onError:event=>{if(closed)return;host.removeAttribute('data-rivo-player-preparing');present();updateShortState(null);speed.disabled=true;if(speedDialog.open)speedDialog.close();seek.disabled=true;say(`영상을 재생할 수 없어요. 오류 ${event.data}. 이전 화면에서 다른 영상을 선택해 주세요.`,true);}
           }});
         timer=setInterval(update,500);updateDetails();
       }catch(error){close();throw error;}
@@ -367,6 +447,12 @@ enum EasyYouTubePage {
   let host=null, root=null, previousInert=false, previousFocus=null, selection=null;
   let section='home', signature='', pending=null, timer=null, searchDraft='', lastRoute='', accountState=null,startupComplete=false;
   let feedRoute='', feedItems=new Map(),loadStarted=Date.now(),morePending=null,feedRefreshing=false,feedUpdatedAt=null;
+  let sourceRevision=0, feedSourceRevision=-1, accountSourceRevision=-1, lastFeedScan=0;
+  // React to source changes without walking the original YouTube DOM on every timer tick.
+  // The Rivo UI is outside body, so our own rendering does not invalidate this snapshot.
+  const sourceObserver=new MutationObserver(()=>{sourceRevision++;});
+  sourceObserver.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,
+    attributeFilter:['href','src','srcset','hidden','aria-hidden']});
   const refreshLabel=__RIVO_YOUTUBE_REFRESH_LABEL__,updatedFormat=__RIVO_YOUTUBE_UPDATED_FORMAT__;
   const refreshTimeFormatter=new Intl.DateTimeFormat(document.documentElement.lang||navigator.language,{hour:'numeric',minute:'2-digit'});
   const feedCacheKey='rivo.youtube.feed.v1',feedIdleLimit=30*60*1000;
@@ -395,7 +481,35 @@ enum EasyYouTubePage {
   };
   const feedVisibility=()=>activateFeed(document.visibilityState!=='hidden'&&window.__rivoYouTubeContentActive!==false,{native:false});
   const feedPageHide=()=>{saveFeed();if(contentActive){feedCache.lastSeen=Date.now();writeFeedCache();}};
-  const feedPageShow=()=>{if(window.__rivoYouTubeContentActive!==false)activateFeed(true,{native:false});};
+  const returnFocusKey='rivo.youtube.return-focus.v1';
+  const readReturnFocus=()=>{
+    try{
+      const target=JSON.parse(sessionStorage.getItem(returnFocusKey)||'null');
+      return target&&Date.now()-target.at<60000?target:null;
+    }catch(_){return null;}
+  };
+  let returnFocus=readReturnFocus();
+  const rememberReturnFocus=target=>{
+    try{sessionStorage.setItem(returnFocusKey,JSON.stringify({...target,at:Date.now()}));}catch(_){}
+  };
+  const restoreReturnFocus=()=>{
+    if(!returnFocus||!startupComplete||!contentActive||!host||host.inert||
+       window.__rivoYouTubeNativePreparing===true||document.visibilityState==='hidden'||returnFocus.route!==routeKey())return;
+    const target=returnFocus.id&&/^[\w-]{11}$/.test(returnFocus.id)
+      ?root.querySelector(`[data-video-id="${returnFocus.id}"]`)
+      :root.querySelector('[data-section="shorts"]');
+    const focus=target||root.querySelector('[aria-current="page"]')||$('query');
+    if(focus.disabled||focus.closest('[hidden]'))return;
+    focus.focus({preventScroll:true});
+    if(root.activeElement===focus){
+      returnFocus=null;
+      try{sessionStorage.removeItem(returnFocusKey);}catch(_){}
+    }
+  };
+  const feedPageShow=event=>{
+    if(window.__rivoYouTubeContentActive!==false)activateFeed(true,{native:false});
+    if(event.persisted){returnFocus=readReturnFocus();restoreReturnFocus();}
+  };
   document.addEventListener('visibilitychange',feedVisibility);
   window.addEventListener('pagehide',feedPageHide);window.addEventListener('pageshow',feedPageShow);
   const restoreCachedFeed=key=>{
@@ -415,18 +529,21 @@ enum EasyYouTubePage {
   const spokenDuration=value=>{const parts=value.split(':').map(Number);return parts.length===3?`${parts[0]}시간 ${parts[1]}분 ${parts[2]}초`:`${parts[0]}분 ${parts[1]}초`;};
   const intentKey='rivo.youtube.playback.v1';
   const readIntent=()=>{try{const value=JSON.parse(sessionStorage.getItem(intentKey)||'null');return value&&Date.now()-value.createdAt>=0&&Date.now()-value.createdAt<120000&&['watch','shorts'].includes(value.kind)?value:null;}catch(_){return null;}};
-  let playbackIntent=readIntent(),autoShorts=playbackIntent?.kind==='shorts',lastOpenedVideo='',shortTransitionFrom=null;
+  let playbackIntent=readIntent(),watchOrigin=null,autoShorts=playbackIntent?.kind==='shorts',lastOpenedVideo='',shortTransitionFrom=null;
   const rememberIntent=value=>{playbackIntent={...value,createdAt:Date.now()};try{sessionStorage.setItem(intentKey,JSON.stringify(playbackIntent));}catch(_){}};
   const clearIntent=()=>{playbackIntent=null;try{sessionStorage.removeItem(intentKey);}catch(_){}};
   const currentVideoID=()=>location.pathname.startsWith('/shorts/')?location.pathname.split('/')[2]:location.pathname==='/watch'?new URLSearchParams(location.search).get('v'):null;
-  const moveShort=next=>{const button=nativeShortButton(next);if(button&&!button.disabled&&button.getAttribute('aria-disabled')!=='true'){rememberIntent({kind:'shorts'});autoShorts=true;startPending('shorts');originalAction(()=>button.click());return true;}return false;};
+  const moveShort=next=>{const button=shortButton(shortButtons(),next);if(canUseShortButton(button)){rememberIntent({kind:'shorts'});autoShorts=true;startPending('shorts');originalAction(()=>button.click());return true;}return false;};
   const openPlayback=()=>{
     const id=currentVideoID(),short=location.pathname.startsWith('/shorts/');
     if(!/^[\w-]{11}$/.test(id||'')||id===lastOpenedVideo||typeof window.YT?.Player!=='function'||(short&&(!autoShorts||id===shortTransitionFrom)))return;
     lastOpenedVideo=id;shortTransitionFrom=null;
     const title=(playbackIntent?.id===id?playbackIntent.title:null)||document.querySelector('h1,h2')?.textContent.trim()||(short?'쇼츠 영상':'YouTube 동영상');
     const autoplay=short?autoShorts:playbackIntent?.kind==='watch'&&playbackIntent.id===id;
-    if(!short)clearIntent();
+    if(!short){
+      watchOrigin=playbackIntent?.id===id&&playbackIntent.feed?{route:playbackIntent.feed,id}:null;
+      clearIntent();
+    }
     try{if(!short)host.inert=true;window.__rivoOfficialPlayer.open({videoId:id,title,short,autoplay,
       onChannel:url=>{clearIntent();autoShorts=false;location.assign(url);},onPrevious:()=>moveShort(false),onNext:()=>moveShort(true)});if(!short)host.inert=true;}
     catch(error){lastOpenedVideo='';host.inert=false;say(error.message);}
@@ -498,9 +615,8 @@ enum EasyYouTubePage {
   };
   const nativeTab=name=>[...document.querySelectorAll('ytm-pivot-bar-item-renderer')].find(e=>name==='Shorts'?/^(Shorts|쇼츠|ショート)$/i.test(e.textContent.trim()):e.textContent.trim()===name)?.querySelector('[role="tab"],a[href]');
   const emptySubscriptions=()=>sectionForURL()==='subscriptions' && [...document.querySelectorAll('ytm-background-promo-renderer,ytd-background-promo-renderer,ytm-message-renderer,ytd-message-renderer,ytm-item-section-renderer')].some(e=>!e.querySelector('ytm-video-with-context-renderer,ytm-rich-item-renderer,ytd-video-renderer,ytd-rich-item-renderer')&&/마음에 드는 채널을 구독|구독.*영상.*없|아직 구독한 채널|subscribe to.*channels|haven.t subscribed|no (?:new )?(?:videos|subscriptions)|チャンネルに登録して|登録チャンネル.*(?:ありません|ない)/i.test(e.textContent));
-  const nativeShortButton=next=>[...document.querySelectorAll('button[aria-label]')].find(b=>new RegExp(next?'다음 동영상|Next video':'이전 동영상|Previous video','i').test(b.getAttribute('aria-label')));
   const setSection=(next,{focus=false}={})=>{
-    section=next;root.querySelector('main').setAttribute('aria-label',`${window.__rivoLauncherEmbedded ? '리보 유튜브' : '쉬운 유튜브'} ${labels[next]}`);
+    section=next;root.querySelector('main').setAttribute('aria-label',`${youtubeTitle} ${labels[next]}`);
     for(const b of root.querySelectorAll('[data-section]')){if(b.dataset.section===next)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');}
     $('heading').textContent=labels[next];
     // Keep the outgoing shell in place until the official Shorts frame is ready.
@@ -509,7 +625,12 @@ enum EasyYouTubePage {
       root.querySelector('header').hidden=!!window.__rivoLauncherEmbedded;
       $('grid').hidden=false;$('status').hidden=false;$('empty-subscriptions').hidden=true;$('more').hidden=true;
     }
-    if(focus&&next!=='shorts'){root.querySelector('main').scrollTop=0;(next==='search'?$('query'):$('heading')).focus({preventScroll:true});}
+    if(focus&&next!=='shorts'){
+      root.querySelector('main').scrollTop=0;
+      const heading=$('heading'),selectedTab=root.querySelector('[aria-current="page"]');
+      const target=next==='search'?$('query'):heading.closest('[hidden]')?(selectedTab||$('query')):heading;
+      target.focus({preventScroll:true});
+    }
   };
   const playerPresented=()=>{if(host){finishStartup();host.setAttribute('data-player-presented','');host.inert=true;}};
   window.addEventListener('rivo-official-player-presented',playerPresented);
@@ -548,7 +669,7 @@ enum EasyYouTubePage {
     if(accountState!=='signed-in')return;
     selection=button;saveFeed();feedRestored=true;
     if(item.short){rememberIntent({kind:'shorts',id:item.id,title:item.title});autoShorts=true;lastOpenedVideo='';openPlayback();return;}
-    rememberIntent({kind:'watch',id:item.id,title:item.title});
+    rememberIntent({kind:'watch',id:item.id,title:item.title,feed:feedRoute});
     if(currentVideoID()===item.id){lastOpenedVideo='';openPlayback();return;}
     location.assign('/watch?v='+item.id);
   };
@@ -613,12 +734,14 @@ enum EasyYouTubePage {
   const refreshAccount=()=>{
     // LOGGED_IN is authoritative. A stable signed-in watch page does not need
     // full-document anchor/button scans or repeated presentation writes.
-    if(accountState==='signed-in'&&window.ytcfg?.get?.('LOGGED_IN')===true){
+    const loggedIn=window.ytcfg?.get?.('LOGGED_IN');
+    if(accountState==='signed-in'&&loggedIn===true){
       $('search-submit').disabled=!!pending||!$('query').value.trim();return true;
     }
+    if(accountState==='signed-out'&&loggedIn===false&&accountSourceRevision===sourceRevision)return false;
+    accountSourceRevision=sourceRevision;
     const link=[...document.querySelectorAll('a[href]')].find(a=>{try{const u=new URL(a.href);return (u.hostname==='accounts.google.com'&&(u.pathname.includes('ServiceLogin')||u.pathname.includes('signin')))||(['m.youtube.com','www.youtube.com','youtube.com'].includes(u.hostname)&&u.pathname==='/signin');}catch(_){return false;}});
     const button=[...document.querySelectorAll('button,[role="button"]')].find(b=>/^(로그인|Sign in|ログイン)$/i.test((b.textContent||b.getAttribute('aria-label')||'').trim()));
-    const loggedIn=window.ytcfg?.get?.('LOGGED_IN');
     const previous=accountState;
     let next='pending';
     if(loggedIn===true)next='signed-in';
@@ -657,13 +780,28 @@ enum EasyYouTubePage {
     if(contentActive&&feedCache.needsRefresh&&sectionForURL()!=='shorts'){
       feedCache.needsRefresh=false;feedCache.routes=[];feedCacheInvalidated=true;writeFeedCache();location.reload();return;
     }
-    const current=sectionForURL(),key=routeKey(),items=snapshot(),ids=items.map(i=>i.id).join(',');
+    const current=sectionForURL(),key=routeKey(),scanTime=Date.now();
+    if(startupComplete&&!pending&&!morePending&&current!=='shorts'&&key===feedRoute&&signature&&
+       feedSourceRevision===sourceRevision&&scanTime-lastFeedScan<3000)return;
+    feedSourceRevision=sourceRevision;lastFeedScan=scanTime;
+    const items=snapshot(),ids=items.map(i=>i.id).join(',');
     if(pending){
       if(pending.waitTab){
         const name={home:'홈',subscriptions:'구독',shorts:'Shorts'}[pending.waitTab],tab=nativeTab(name);
         if(tab){delete pending.waitTab;originalAction(()=>tab.click());return;}
       }
-      if(Date.now()-pending.since>12000){pending=null;loading(false);$('more').hidden=true;$('status').hidden=false;say('불러오기가 오래 걸려요. 메뉴를 다시 눌러 주세요.');finishStartup();return;}
+      if(Date.now()-pending.since>12000){
+        const retryShort=pending.section==='shorts'&&!!document.querySelector('[data-rivo-official-player]');
+        pending=null;
+        if(retryShort){
+          shortTransitionFrom=null;
+          window.__rivoOfficialPlayer.cancelShortTransition();
+        }else{
+          loading(false);$('more').hidden=true;$('status').hidden=false;
+          say('불러오기가 오래 걸려요. 메뉴를 다시 눌러 주세요.');finishStartup();
+        }
+        return;
+      }
       const shortReady=current==='shorts'&&/^[\w-]{11}$/.test(currentVideoID()||'')&&currentVideoID()!==shortTransitionFrom;
       if(current!==pending.section||(!items.length&&!emptySubscriptions()&&!shortReady)||Date.now()-pending.since<350)return;
       if(items.length&&ids===pending.before&&Date.now()-pending.since<1800)return;
@@ -696,13 +834,20 @@ enum EasyYouTubePage {
     loading(initial||!!moreLoading,{append:visible.length>0});
     if(!initial&&!visible.length&&!confirmedEmpty){$('more').textContent='다시 불러오기';say('영상을 아직 불러오지 못했어요. 다시 시도해 주세요.');}
     else $('more').textContent='영상 더 불러오기';
-    if(!initial)finishStartup();
+    if(!initial){finishStartup();restoreReturnFocus();}
+  };
+  const setNativePreparing=preparing=>{
+    window.__rivoYouTubeNativePreparing=preparing;
+    if(!preparing)requestAnimationFrame(restoreReturnFocus);
+    if(preparing)host?.setAttribute('aria-hidden','true');
+    else host?.removeAttribute('aria-hidden');
   };
   const show=()=>{
     if(host)return;
     signature='';pending=null;accountState=null;startupComplete=false;
     previousInert=document.body.inert;previousFocus=document.activeElement;
     host=make('div',{'data-rivo-you-tube-home':''});Object.assign(host.style,{position:'fixed',inset:'0',zIndex:'2147483500'});root=host.attachShadow({mode:'open'});
+    setNativePreparing(window.__rivoYouTubeNativePreparing===true);
     setUIScale(window.__rivoYouTubeUIScale||1);
     root.appendChild(make('style',{},`
       :host{color-scheme:light;--bg:#f5f3ee;--surface:#fff;--text:#252b28;--muted:#4c5d54;--accent:#17644e;--soft:#e3eee6;--border:#69786f;display:block;background:var(--bg);color:var(--text);font:17px/1.5 system-ui,-apple-system,sans-serif}
@@ -711,7 +856,7 @@ enum EasyYouTubePage {
       main{height:100%;overflow:auto;overflow-anchor:none;padding:20px;scrollbar-gutter:stable;overscroll-behavior:contain;touch-action:pan-y pinch-zoom;-webkit-overflow-scrolling:touch}header{text-align:center;margin-bottom:18px}.brand{font-size:14px;color:var(--muted)}h1{font-size:29px;margin:0;line-height:1.4}
       button,input{font:inherit;min-height:54px;padding:12px 18px;border:1px solid var(--border);border-radius:16px;color:var(--text);background:var(--surface)}button{cursor:pointer}button:disabled{opacity:.5;cursor:default}button:focus-visible,input:focus-visible,h1:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
       nav{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:900px;margin:0 auto 20px}nav button{display:flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:8px 18px;font-weight:650}nav button[aria-current]{background:var(--accent);color:var(--bg);border-color:var(--accent)}svg{width:23px;height:23px;flex:none}nav button:not([aria-current]):hover{background:var(--soft)}
-      form{display:flex;gap:12px;align-items:center;max-width:900px;margin:0 auto 20px}label{font-weight:650}.sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}input{flex:1;min-width:0}form button{background:var(--accent);color:var(--bg);font-weight:650}
+      form{display:flex;gap:12px;align-items:center;max-width:900px;margin:0 auto 20px}input{flex:1;min-width:0}form button{background:var(--accent);color:var(--bg);font-weight:650}
       #search-form{display:flex;align-items:center;flex-wrap:nowrap;gap:4px;min-height:64px;padding:6px 6px 6px 20px;border:1px solid rgba(245,243,233,.7);border-radius:32px;background:rgba(16,16,16,.75);color:${rivoTheme.text};}
       #search-form:focus-within{border-color:${rivoTheme.text};box-shadow:inset 0 0 0 1px ${rivoTheme.text};}
       #query{flex:1;min-width:0;min-height:48px;padding:8px 0;border:0;border-radius:0;background:transparent;color:${rivoTheme.text};font-size:20px;outline:none;}
@@ -759,7 +904,7 @@ enum EasyYouTubePage {
     `));
     const main=make('main',{id:'content',hidden:''}),header=make('header');
     header.hidden=!!window.__rivoLauncherEmbedded;
-    const title=make('div');title.appendChild(make('div',{'class':'brand'},'이지 유튜브'));title.appendChild(make('h1',{id:'heading',tabindex:'-1'}));header.appendChild(title);
+    const title=make('div');title.appendChild(make('div',{'class':'brand'},youtubeTitle));title.appendChild(make('h1',{id:'heading',tabindex:'-1'}));header.appendChild(title);
     main.appendChild(header);
     const nav=make('nav',{'aria-label':'유튜브 메뉴'});
     const icons={home:['M3 11 12 3l9 8','M5 10v11h5v-7h4v7h5V10'],subscriptions:['M4 8h16v13H4z','M7 4h10','M10 12l5 3-5 3z'],shorts:['M15 3 5 9v5l4 1-3 3 3 3 10-6v-5l-4-1 3-3z','M10 9v6l5-3z'],search:['M20 20l-5-5','M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0']};
@@ -768,8 +913,7 @@ enum EasyYouTubePage {
       for(const d of icons[key]){const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',d);svg.appendChild(path);}b.append(svg,document.createTextNode(text));b.onclick=()=>navigate(key);nav.appendChild(b);
     }main.appendChild(nav);
     const form=make('form',{id:'search-form',role:'search'});
-    form.appendChild(make('label',{for:'query',class:'sr-only'},'영상 검색'));
-    const queryInput=make('input',{id:'query',type:'search',placeholder:'검색',autocomplete:'off',maxlength:'200'});
+    const queryInput=make('input',{id:'query',type:'search','aria-label':'영상 검색',placeholder:'검색',autocomplete:'off',maxlength:'200'});
     const searchIcon=paths=>{const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');for(const[k,v]of Object.entries({viewBox:'0 0 24 24',fill:'none',stroke:'currentColor','stroke-width':'1.8','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true',focusable:'false'}))svg.setAttribute(k,v);for(const d of paths){const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',d);svg.appendChild(path);}return svg;};
     const send=make('button',{id:'search-submit',type:'submit','aria-label':'검색어 전송',hidden:''});send.appendChild(searchIcon(['M12 19V5','M5 12l7-7 7 7']));
     const voice=make('a',{id:'search-voice',href:'rivo-browser://voice',class:'voice-search',role:'button','aria-label':'음성 검색'});voice.appendChild(searchIcon(['M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0z','M5 10v2a7 7 0 0 0 14 0v-2','M12 19v3','M8 22h8']));
@@ -830,19 +974,26 @@ enum EasyYouTubePage {
     // Shorts always exit to YouTube home, including before the player is ready.
     if(sectionForURL()==='shorts'||section==='shorts'||pending?.section==='shorts'){
       autoShorts=false;shortTransitionFrom=null;lastOpenedVideo='';clearIntent();
-      startPending('home');location.replace('/');return true;
+      rememberReturnFocus({route:'/'});startPending('home');location.replace('/');return true;
     }
-    if(document.querySelector('[data-rivo-official-player]')){
-      const watch=location.pathname==='/watch';window.__rivoOfficialPlayer?.close();clearIntent();
+    const playerHost = document.querySelector('[data-rivo-official-player]');
+    if (playerHost) {
+      const speedDialog = playerHost.shadowRoot?.getElementById('speed-dialog');
+      if (speedDialog?.open) {
+        speedDialog.close();
+        return true;
+      }
+      const watch=location.pathname==='/watch';
+      if(watch&&watchOrigin){rememberReturnFocus(watchOrigin);returnFocus=readReturnFocus();}
+      window.__rivoOfficialPlayer?.close();clearIntent();
       if(watch){if(history.length>1)history.back();else location.replace(feedCache.routes.at(-1)?.route||'/');}
       return true;
     }
-    // Home is the exit boundary; do not revisit earlier tabs or login redirects.
-    if(location.pathname==='/')return false;
     if(host&&root.activeElement===$('query')){$('query').blur();return true;}
+    // With search dismissed, let the native layer apply the home exit boundary.
     return false;
   };
-  window.__rivoYouTubePrototype={show,navigate,back,setUIScale,setActive:activateFeed,accountReady:()=>accountState==='signed-in'||accountState==='signed-out',startupReady:()=>accountState==='signed-out'||(accountState==='signed-in'&&startupComplete),playbackReady:()=>accountState==='signed-out'||(startupComplete&&!document.querySelector('[data-rivo-official-player][data-rivo-player-preparing]')),state:()=>({section,path:location.pathname,pending:pending?.section||null,count:root?.querySelectorAll('.card').length||0}),uninstall(){saveFeed();document.removeEventListener('visibilitychange',feedVisibility);window.removeEventListener('pagehide',feedPageHide);window.removeEventListener('pageshow',feedPageShow);closeHome();window.removeEventListener('rivo-official-player-closed',playerClosed);window.removeEventListener('rivo-official-player-presented',playerPresented);delete window.__rivoYouTubePrototype;}};
+  window.__rivoYouTubePrototype={show,navigate,back,setUIScale,setNativePreparing,setActive:activateFeed,accountReady:()=>accountState==='signed-in'||accountState==='signed-out',startupReady:()=>accountState==='signed-out'||(accountState==='signed-in'&&startupComplete),playbackReady:()=>accountState==='signed-out'||(startupComplete&&!document.querySelector('[data-rivo-official-player][data-rivo-player-preparing]')),state:()=>({section,path:location.pathname,pending:pending?.section||null,count:root?.querySelectorAll('.card').length||0}),uninstall(){saveFeed();sourceObserver.disconnect();document.removeEventListener('visibilitychange',feedVisibility);window.removeEventListener('pagehide',feedPageHide);window.removeEventListener('pageshow',feedPageShow);closeHome();window.removeEventListener('rivo-official-player-closed',playerClosed);window.removeEventListener('rivo-official-player-presented',playerPresented);delete window.__rivoYouTubePrototype;}};
   show();return 'RIVO_YOUTUBE_NAVIGATION_READY';
 })();
 

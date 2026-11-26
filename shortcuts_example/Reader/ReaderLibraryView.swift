@@ -71,35 +71,25 @@ struct ReaderLibraryView: View {
                 spacing: 16
             ) {
                 if embedded {
-                    VStack(spacing: 20) {
-                        Image(systemName: "book")
-                            .font(.system(size: 64))
-                            .foregroundStyle(VisionCraftUI.accent)
-                            .accessibilityHidden(true)
-                        Text("도서 읽기")
-                            .visionCraftAndroidText(32, weight: .bold, relativeTo: .largeTitle)
-                            .foregroundStyle(VisionCraftUI.primaryText)
-                            .accessibilityAddTraits(.isHeader)
-                    }
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .padding(.bottom, 8)
+                    ReaderWelcomeView(
+                        lastBookTitle: lastBook?.title,
+                        enabled: !isImporting,
+                        onContinue: {
+                            guard !isImporting, let lastBook else { return }
+                            openBook(lastBook.fileURL)
+                        },
+                        onChoose: {
+                            guard !isImporting else { return }
+                            isImporterPresented = true
+                        }
+                    )
+                } else {
+                    Text("EPUB 또는 DAISY ZIP 파일을 선택하세요")
+                        .visionCraftAndroidText(16)
+                        .foregroundStyle(VisionCraftUI.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    VisionCraftHomeActionList(items: actionItems)
                 }
-                Text("EPUB 또는 DAISY ZIP 파일을 선택하세요")
-                    .visionCraftAndroidText(16)
-                    .foregroundStyle(
-                        VisionCraftUI.secondaryText
-                    )
-                    .fixedSize(
-                        horizontal: false,
-                        vertical: true
-                    )
-                    .multilineTextAlignment(embedded ? .center : .leading)
-                    .frame(maxWidth: .infinity, alignment: embedded ? .center : .leading)
-
-                VisionCraftHomeActionList(
-                    items: actionItems
-                )
 
                 if isImporting {
                     loadingPanel
@@ -109,7 +99,7 @@ struct ReaderLibraryView: View {
                     errorPanel(errorDescription)
                 }
 
-                if let summary {
+                if !embedded, let summary {
                     summaryPanel(summary)
                 }
 
@@ -117,12 +107,14 @@ struct ReaderLibraryView: View {
                     statusPanel(statusDescription)
                 }
 
-                librarySection
+                if !embedded || !books.isEmpty { librarySection }
             }
-            .frame(maxWidth: embedded ? 592 : .infinity)
-            .visionCraftScreenPadding()
-            .frame(minHeight: embedded ? geometry.size.height : 0)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, embedded ? 40 : VisionCraftUI.horizontalPadding)
+            .padding(.top, embedded ? 32 : 12)
+            .padding(.bottom, embedded ? 32 : 24)
+            .frame(minHeight: embedded ? geometry.size.height : 0, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .visionCraftListScreen(background: embedded ? .clear : VisionCraftUI.background)
@@ -133,7 +125,7 @@ struct ReaderLibraryView: View {
             isPresented: $isImporterPresented,
             allowedContentTypes:
                 supportedBookTypes,
-            allowsMultipleSelection: false
+            allowsMultipleSelection: true
         ) { result in
             importBook(result)
         }
@@ -176,7 +168,7 @@ struct ReaderLibraryView: View {
             reloadBooks()
         }
         .task(id: lastBook?.id) {
-            await loadSummary()
+            if !embedded { await loadSummary() }
         }
     }
 
@@ -446,6 +438,11 @@ struct ReaderLibraryView: View {
         }
         .padding(.top, 12)
 
+        Text("99권을 넘으면 오래 읽지 않은 책의 보관 사본과 읽기 위치를 정리합니다.")
+            .visionCraftAndroidText(14, relativeTo: .footnote)
+            .foregroundStyle(VisionCraftUI.secondaryText)
+            .fixedSize(horizontal: false, vertical: true)
+
         if isLoading {
             HStack(spacing: 14) {
                 ProgressView()
@@ -645,41 +642,37 @@ struct ReaderLibraryView: View {
         summary = loaded
     }
 
-    private func importBook(
-        _ result: Result<[URL], Error>
-    ) {
+    private func importBook(_ result: Result<[URL], Error>) {
         Task {
             isImporting = true
             errorDescription = nil
-            defer {
-                isImporting = false
-            }
+            statusDescription = nil
+            defer { isImporting = false }
             do {
-                guard let sourceURL = try result.get().first else {
+                let sources = try result.get()
+                guard sources.count <= 99 else {
+                    errorDescription = AppLocalization.string("한 번에 최대 99권을 선택할 수 있습니다.")
                     return
                 }
-                let importResult =
-                    try await EPUBLibraryStore.shared
-                        .importBookWithResult(
-                            from: sourceURL
-                        )
-                EPUBProgressStore.lastBookURL =
-                    importResult.book.fileURL
-                books = try await
-                    EPUBLibraryStore.shared.books()
-                if importResult
-                    .reusedExistingBook {
-                    statusDescription =
-                        AppLocalization.string(
-                            "같은 내용의 책이 이미 있어 기존 책을 열었습니다."
-                        )
-                } else {
-                    statusDescription = nil
+                var imported = 0
+                var failures: [String] = []
+                var lastImported: URL?
+                for source in sources {
+                    try Task.checkCancellation()
+                    do {
+                        let outcome = try await EPUBLibraryStore.shared.importBookWithResult(from: source)
+                        imported += 1
+                        lastImported = outcome.book.fileURL
+                    } catch is CancellationError { throw CancellationError() }
+                    catch { failures.append(source.lastPathComponent + ": " + error.localizedDescription) }
                 }
-                openBook(importResult.book.fileURL)
-            } catch {
-                errorDescription = error.localizedDescription
-            }
+                if let lastImported { EPUBProgressStore.lastBookURL = lastImported }
+                books = try await EPUBLibraryStore.shared.books()
+                statusDescription = AppLocalization.format("%lld권 가져옴 · %lld권 가져오지 못함", imported, failures.count)
+                errorDescription = failures.first
+            } catch is CancellationError {
+                // Every completed import is already durable; unfinished copies are cleaned by the store.
+            } catch { errorDescription = error.localizedDescription }
         }
     }
 

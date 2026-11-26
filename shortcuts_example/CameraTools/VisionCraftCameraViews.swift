@@ -135,18 +135,6 @@ enum CameraImageDescriber {
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Android `GeminiResultState` 분기와 같은 사용자 문구.
-    static func userMessage(for error: Error) -> String {
-        if error is CloudAITokenBudgetError {
-            return AppLocalization.string("일일 할당량이 소진되었습니다.")
-        }
-        let nsError = error as NSError
-        if error is URLError || nsError.domain == NSURLErrorDomain {
-            return AppLocalization.string("인터넷 연결을 확인해주세요.")
-        }
-        return AppLocalization.string("사진을 해석하지 못했어요.")
-    }
-
     private static func downscaled(_ image: UIImage, maximumEdge: CGFloat) -> UIImage {
         let longest = max(image.size.width, image.size.height)
         guard longest > maximumEdge, longest > 0 else { return image }

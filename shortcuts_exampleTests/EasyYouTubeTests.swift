@@ -1,5 +1,6 @@
 #if DEBUG
 import XCTest
+import UIKit
 import WebKit
 @testable import shortcuts_example
 
@@ -47,21 +48,23 @@ final class EasyYouTubeTests: XCTestCase {
         defer { browser.shutdown() }
         let web = browser.webView
         web.frame = CGRect(x: 0, y: 0, width: 900, height: 700)
+        let fixtureWindow = try showWebFixture(web)
+        defer { fixtureWindow.isHidden = true }
         web.stopLoading()
-        web.loadHTMLString(Self.feedHTML.replacingOccurrences(of: "i<16", with: "i<0"), baseURL: URL(string: EasyYouTubePage.home))
+        web.loadHTMLString(Self.feedHTML.replacingOccurrences(of: "rivoFillFeed(16)", with: "rivoFillFeed(0)"), baseURL: URL(string: EasyYouTubePage.home))
         try await waitForLogin(web, expression: """
-        (()=>{const r=document.querySelector('[data-rivo-you-tube-home]')?.shadowRoot;return r && !r.getElementById('loading').hidden && !r.getElementById('skeleton').hidden && r.querySelectorAll('.skeleton-card').length===6 && r.getElementById('more').hidden;})()
+        (()=>{const r=document.querySelector('[data-rivo-you-tube-home]')?.shadowRoot;return r && !r.getElementById('sign-in-gate').hidden && r.getElementById('content').hidden && !r.querySelector('.skeleton-card') && r.getElementById('more').hidden;})()
         """)
-        web.loadHTMLString(Self.feedHTML, baseURL: URL(string: EasyYouTubePage.home))
+        _ = try await web.evaluateJavaScript("window.rivoFillFeed(16);true")
         try await waitForLogin(web, expression: "document.querySelector('[data-rivo-you-tube-home]')?.shadowRoot.querySelectorAll('.card').length===16")
         let prepared = try await web.evaluateJavaScript("""
         (()=>{const r=document.querySelector('[data-rivo-you-tube-home]').shadowRoot;
-        if(r.querySelector('.duration').textContent!=='2일 전 · 길이 1:02:03'||r.querySelector('.meta').textContent!=='리보 채널 · 조회수 1.2만회'||!r.querySelector('.card').getAttribute('aria-label').includes('1시간 2분 3초')||r.querySelector('.copy').getAttribute('aria-hidden')!=='true')return false;window.rivoFirstCard=r.querySelector('.card');window.rivoFirstImage=r.querySelector('.card img');r.getElementById('content').scrollTop=200;
+        if(r.querySelector('.duration').textContent!=='1:02:03'||r.querySelector('.channel-meta').textContent!=='리보 채널'||r.querySelector('.views').textContent!=='조회수 1.2만회'||r.querySelector('.posted').textContent!=='2일 전'||!r.querySelector('.card').getAttribute('aria-label').includes('1시간 2분 3초')||r.querySelector('.copy').getAttribute('aria-hidden')!=='true')return false;window.rivoFirstCard=r.querySelector('.card');window.rivoFirstImage=r.querySelector('.card img');r.getElementById('content').scrollTop=200;
         return getComputedStyle(document.body).visibility==='hidden' && !r.querySelector('.play') && [...r.querySelectorAll('.card img')].every(i=>i.src.includes('/hqdefault.jpg'));})()
         """) as? Bool
         XCTAssertEqual(prepared, true)
         let loading = try await web.evaluateJavaScript("""
-        (()=>{const r=document.querySelector('[data-rivo-you-tube-home]').shadowRoot;r.getElementById('more').click();return r.getElementById('more').hidden && !r.getElementById('loading').hidden && r.getElementById('skeleton').hidden && r.querySelectorAll('.card').length===16;})()
+        (()=>{const r=document.querySelector('[data-rivo-you-tube-home]').shadowRoot;r.getElementById('more').click();return r.getElementById('more').hidden && !r.getElementById('loading').hidden && r.getElementById('loading').classList.contains('append') && !r.querySelector('.skeleton-card') && r.querySelectorAll('.card').length===16;})()
         """) as? Bool
         XCTAssertEqual(loading,true)
         _ = try await web.evaluateJavaScript("document.querySelectorAll('ytm-video-with-context-renderer').forEach(e=>e.remove());true")
@@ -73,12 +76,25 @@ final class EasyYouTubeTests: XCTestCase {
         XCTAssertEqual(stable, true)
         _ = try await web.evaluateJavaScript(#"const c=document.createElement('ytm-video-with-context-renderer');c.innerHTML='<a href="/watch?v=dQw4w9WgXcQ"><h3>추천 영상</h3></a>';document.body.appendChild(c);window.__rivoYouTubePrototype.navigate('subscriptions');true"#)
         try await waitForLogin(web, expression: "location.pathname==='/feed/subscriptions' && window.__rivoYouTubePrototype.state().pending===null && document.querySelector('[data-rivo-you-tube-home]').shadowRoot.querySelector('.title')?.textContent==='구독 영상'")
+        let subscriptionFocus = try await web.evaluateJavaScript("""
+        (()=>{const root=document.querySelector('[data-rivo-you-tube-home]').shadowRoot;
+        return root.querySelector('header').hidden && root.activeElement?.dataset.section==='subscriptions'
+          && root.getElementById('query').getAttribute('aria-label')==='영상 검색' && !root.querySelector('label[for="query"]');})()
+        """) as? Bool
+        XCTAssertEqual(subscriptionFocus, true)
         _ = try await web.evaluateJavaScript("history.pushState({},'', '/shorts/dQw4w9WgXcQ');window.__rivoYouTubePrototype.navigate('shorts');true")
-        try await waitForLogin(web, expression: "location.pathname==='/shorts/dQw4w9WgXcQ' && window.__rivoYouTubePrototype.state().pending===null && window.__rivoYouTubePrototype.state().count===0")
-        _ = try await web.evaluateJavaScript("document.querySelector('h1').remove();const next=document.createElement('button');next.setAttribute('aria-label','다음 동영상');next.onclick=()=>history.pushState({},'', '/shorts/dQw4w9WgXcR');document.body.appendChild(next);true")
-        try await waitForLogin(web, expression: "!document.querySelector('[data-rivo-official-player]')?.shadowRoot.getElementById('short-next').disabled")
-        _ = try await web.evaluateJavaScript("document.querySelector('[data-rivo-official-player]')?.shadowRoot.getElementById('short-next').click();true")
-        try await waitForLogin(web, expression: "location.pathname==='/shorts/dQw4w9WgXcR' && window.__rivoYouTubePrototype.state().pending===null")
+        try await waitForLogin(web, expression: "location.pathname==='/shorts/dQw4w9WgXcQ' && window.__rivoYouTubePrototype.state().pending===null && document.querySelector('[data-rivo-you-tube-home]').inert")
+        _ = try await web.evaluateJavaScript("const next=document.createElement('button');next.id='fixture-next';next.setAttribute('aria-label','다음 동영상');next.setAttribute('aria-disabled','true');document.body.appendChild(next);true")
+        try await waitForLogin(web, expression: "document.querySelector('[data-rivo-official-player]')?.shadowRoot.getElementById('short-next')?.disabled===true")
+        _ = try await web.evaluateJavaScript("document.getElementById('fixture-next').removeAttribute('aria-disabled');true")
+        try await waitForLogin(web, expression: "document.querySelector('[data-rivo-official-player]')?.shadowRoot.getElementById('short-next')?.disabled===false")
+        _ = try await web.evaluateJavaScript("document.querySelector('[data-rivo-official-player]').shadowRoot.getElementById('short-next').click();true")
+        try await waitForLogin(web, expression: "window.__rivoYouTubePrototype.state().pending==='shorts' && document.querySelector('[data-rivo-official-player]').shadowRoot.querySelector('.short-actions').inert")
+        _ = try await web.evaluateJavaScript("window.rivoRealNow=Date.now;Date.now=()=>window.rivoRealNow()+13000;true")
+        try await waitForLogin(web, expression: "window.__rivoYouTubePrototype.state().pending===null && !document.querySelector('[data-rivo-official-player]').shadowRoot.querySelector('.short-actions').inert")
+        _ = try await web.evaluateJavaScript("Date.now=window.rivoRealNow;window.rivoShortFrame=document.querySelector('[data-rivo-official-player]').shadowRoot.querySelector('iframe');document.getElementById('fixture-next').onclick=()=>history.pushState({},'', '/shorts/dQw4w9WgXcR');true")
+        _ = try await web.evaluateJavaScript("document.querySelector('[data-rivo-official-player]').shadowRoot.getElementById('short-next').click();true")
+        try await waitForLogin(web, expression: "location.pathname==='/shorts/dQw4w9WgXcR' && window.rivoLoadedVideo==='dQw4w9WgXcR' && document.querySelector('[data-rivo-official-player]').shadowRoot.querySelector('iframe')===window.rivoShortFrame && window.__rivoYouTubePrototype.state().pending===null")
     }
 
     func testEmbeddedYouTubeSwipeUsesNativePageCallbackAndKeepsVerticalAndRangeGestures() async throws {
@@ -86,6 +102,8 @@ final class EasyYouTubeTests: XCTestCase {
         defer { browser.shutdown() }
         let web = browser.webView
         web.frame = CGRect(x: 0, y: 0, width: 900, height: 1000)
+        let fixtureWindow = try showWebFixture(web)
+        defer { fixtureWindow.isHidden = true }
         web.stopLoading()
         web.loadHTMLString(Self.feedHTML, baseURL: URL(string: EasyYouTubePage.home))
         try await waitForLogin(web, expression: "!!document.querySelector('[data-rivo-you-tube-home]')?.shadowRoot.querySelector('.card')")
@@ -110,7 +128,7 @@ final class EasyYouTubeTests: XCTestCase {
         swipe.finish(translation:CGPoint(x:-300,y:0))
         XCTAssertEqual(turns, [])
         _ = try await web.evaluateJavaScript("window.testRange.remove();window.__rivoOfficialPlayer.open({videoId:'dQw4w9WgXcQ',short:true});true")
-        try await waitForLogin(web, expression:"!!document.querySelector('[data-rivo-official-player]')?.shadowRoot.querySelector('iframe')")
+        try await waitForLogin(web, expression:"document.querySelector('[data-rivo-official-player]')?.inert===false")
         let frameGuard = try await web.evaluateJavaScript("""
         (()=>{const r=document.querySelector('[data-rivo-official-player]').shadowRoot,f=r.querySelector('iframe').getBoundingClientRect();return window.__rivoLauncherCanPageAt((f.left+f.width/2)/innerWidth,(f.top+f.height/2)/innerHeight) && !window.__rivoLauncherCanPageAt((f.left+f.width/2)/innerWidth,(f.bottom-20)/innerHeight)})()
         """) as? Bool
@@ -128,54 +146,49 @@ final class EasyYouTubeTests: XCTestCase {
         XCTAssertEqual(web.url?.host, "m.youtube.com", "Page requests must be cancelled before web navigation")
     }
 
-    func testBrowserWidgetReflowsWideContentAndPagesAtLargeText() async throws {
+    func testBrowserWidgetPreservesWideContentAndItsHorizontalGestures() async throws {
         let browser=AccessibleWebBrowserModel(easyYouTube:false,embedded:true)
         defer { browser.shutdown() }
         let web=browser.webView
         web.frame=CGRect(x:0,y:0,width:600,height:900)
+        let fixtureWindow = try showWebFixture(web)
+        defer { fixtureWindow.isHidden = true }
         web.stopLoading()
         web.loadHTMLString(Self.wideBrowserHTML,baseURL:URL(string:"https://example.test/"))
-        try await waitForLogin(web,expression:"document.querySelectorAll('#wide [data-rivo-fit-label]').length===6")
+        try await waitForLogin(web,expression:"window.__rivoLauncherBrowser===true && document.querySelectorAll('#wide td').length===6")
         browser.setZoom(100)
         try await Task.sleep(for:.milliseconds(150))
         _ = try await web.evaluateJavaScript("const sample=document.createElement('span');sample.id='font-sample';sample.style='font-size:22px;display:inline-block';sample.textContent='가';document.getElementById('article').prepend(sample);true")
         let initialTextHeight=try await web.evaluateJavaScript("document.getElementById('font-sample').getBoundingClientRect().height") as! Double
         browser.setZoom(150)
         try await Task.sleep(for:.milliseconds(200))
-        let fits=try await web.evaluateJavaScript("""
-        (()=>{const width=document.documentElement.clientWidth;
-        return [...document.querySelectorAll('#article,#photo,#code,.grid,.rail,#wide,td')].every(e=>e.getBoundingClientRect().right<=width+2) &&
-          [...document.querySelectorAll('#article,#photo,#code,.grid,.rail,#wide,td')].every(e=>e.scrollWidth<=e.clientWidth+2) &&
-          document.querySelectorAll('#wide td').length===6 &&
+        let preservesLayout = try await web.evaluateJavaScript("""
+        (()=>{const page=document.scrollingElement,rail=document.querySelector('.rail');
+        return page.scrollWidth>page.clientWidth && rail.scrollWidth>rail.clientWidth &&
+          document.querySelectorAll('#wide td').length===6 && !document.querySelector('[data-rivo-fit-label]') &&
           document.getElementById('field').value==='유지할 입력값' && document.getElementById('photo').naturalWidth===1600;})()
         """) as? Bool
-        let diagnostics=try await web.evaluateJavaScript("JSON.stringify({flag:window.__rivoLauncherBrowser,fit:window.__rivoLauncherReflow,styles:document.querySelectorAll('[data-rivo-browser-fit-style]').length,labels:document.querySelectorAll('[data-rivo-fit-label]').length,width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,font:getComputedStyle(document.body).fontSize,photo:document.getElementById('photo').naturalWidth,value:document.getElementById('field').value,nodes:[...document.querySelectorAll('#article,#photo,#code,.grid,.rail,#wide,td')].map(e=>[e.id||e.className,e.clientWidth,e.scrollWidth,e.getBoundingClientRect().right])})")
-        XCTAssertEqual(fits,true,"\(diagnostics), native content: \(web.scrollView.contentSize), bounds: \(web.bounds)")
-        XCTAssertLessThanOrEqual(web.scrollView.contentSize.width,web.bounds.width+2)
+        XCTAssertEqual(preservesLayout, true)
+        XCTAssertGreaterThan(web.scrollView.contentSize.width, web.bounds.width)
         let enlargedTextHeight=try await web.evaluateJavaScript("document.getElementById('font-sample').getBoundingClientRect().height") as! Double
         XCTAssertGreaterThan(enlargedTextHeight,initialTextHeight*1.4,"Default: \(browser.defaultZoomPercent), initial: \(initialTextHeight), enlarged: \(enlargedTextHeight)")
         XCTAssertEqual(web.pageZoom,1)
         XCTAssertEqual(browser.zoomPercent,150)
         let layoutZoom=try await web.evaluateJavaScript("parseFloat(getComputedStyle(document.documentElement).zoom)") as? Double
         XCTAssertEqual(layoutZoom,1.5)
-        _ = try await web.evaluateJavaScript("document.getElementById('action').click();const p=document.createElement('div');p.style='width:1900px;white-space:nowrap';p.textContent='늦게 나타난 내용 '.repeat(50);document.getElementById('article').appendChild(p);true")
-        try await waitForLogin(web,expression:"document.documentElement.scrollWidth<=document.documentElement.clientWidth+2")
-        let dynamic=try await web.evaluateJavaScript("document.getElementById('article').getBoundingClientRect().right<=document.documentElement.clientWidth+2 && document.getElementById('action').textContent==='눌렀어요'") as? Bool
-        XCTAssertEqual(dynamic,true)
+        let buttonStillWorks = try await web.evaluateJavaScript("document.getElementById('action').click();document.getElementById('action').textContent==='눌렀어요'") as? Bool
+        XCTAssertEqual(buttonStillWorks, true)
         var turns:[Int]=[]
         browser.onLauncherPageTurn={turns.append($0)}
         let swipe=try XCTUnwrap(browser.launcherSwipe(for:web))
         XCTAssertFalse(web.allowsBackForwardNavigationGestures)
-        func prepare() async throws {
-            swipe.prepare(at:CGPoint(x:450,y:450))
-            for _ in 0..<40 { if swipe.eligible { return };try await Task.sleep(for:.milliseconds(25)) }
-            XCTFail("Browser page swipe did not receive its geometric hit test")
-        }
-        try await prepare();swipe.finish(translation:CGPoint(x:-150,y:300))
-        XCTAssertEqual(turns,[])
-        try await prepare();swipe.finish(translation:CGPoint(x:-250,y:0))
-        try await prepare();swipe.finish(translation:CGPoint(x:250,y:0))
-        XCTAssertEqual(turns,[1,-1])
+        let canPage = try await web.evaluateJavaScript("window.__rivoLauncherCanPageAt(0.5,0.5)") as? Bool
+        XCTAssertEqual(canPage, false)
+        swipe.prepare(at: CGPoint(x: 300, y: 450))
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertFalse(swipe.eligible)
+        swipe.finish(translation: CGPoint(x: -300, y: 0))
+        XCTAssertEqual(turns, [])
         XCTAssertEqual(web.url?.host,"example.test")
     }
     private static let wideBrowserHTML = #"""
@@ -191,12 +204,12 @@ final class EasyYouTubeTests: XCTestCase {
     """#
 
     private static let feedHTML = #"""
-    <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script>window.ytcfg={get:key=>key==='LOGGED_IN'?true:undefined};window.YT={Player:function(target,options){window.rivoPlayerOptions=options;window.rivoPlayerEvents=options.events;const f=document.createElement('iframe');f.id='test-official-player';target.replaceWith(f);let rate=1,state=5;this.getIframe=()=>f;this.destroy=()=>f.remove();this.getCurrentTime=()=>5;this.getDuration=()=>60;this.getPlayerState=()=>state;this.getPlaybackRate=()=>rate;this.getAvailablePlaybackRates=()=>[.5,1,1.5,2];this.setPlaybackRate=value=>{rate=value;window.rivoPlaybackRate=value};this.seekTo=value=>window.rivoSeek=value;this.pauseVideo=()=>{state=2};this.playVideo=()=>{state=1;window.rivoPlayRequested=true};setTimeout(()=>options.events.onReady({target:this}),0);}};</script></head><body>
+    <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script>window.ytcfg={get:key=>key==='LOGGED_IN'?true:undefined};window.YT={Player:function(target,options){window.rivoPlayerOptions=options;window.rivoPlayerEvents=options.events;const f=document.createElement('iframe');f.id='test-official-player';target.replaceWith(f);let rate=1,state=5;this.getIframe=()=>f;this.destroy=()=>f.remove();this.getCurrentTime=()=>5;this.getDuration=()=>60;this.getPlayerState=()=>state;this.getPlaybackRate=()=>rate;this.getAvailablePlaybackRates=()=>[.5,1,1.5,2];this.setPlaybackRate=value=>{rate=value;window.rivoPlaybackRate=value};this.seekTo=value=>window.rivoSeek=value;this.pauseVideo=()=>{state=2};this.playVideo=()=>{state=1;window.rivoPlayRequested=true};this.loadVideoById=({videoId})=>{window.rivoLoadedVideo=videoId;state=1;options.events.onStateChange({data:state,target:this});};setTimeout(()=>options.events.onReady({target:this}),0);}};</script></head><body>
     <h1>원본 쇼츠 제목</h1>
     <ytm-pivot-bar-item-renderer><button role="tab" onclick="history.pushState({},'', '/');document.querySelector('h3').textContent='추천 영상'">홈</button></ytm-pivot-bar-item-renderer>
     <ytm-pivot-bar-item-renderer><button role="tab" onclick="history.pushState({},'', '/feed/subscriptions');document.querySelector('h3').textContent='구독 영상'">구독</button></ytm-pivot-bar-item-renderer>
     <ytm-pivot-bar-item-renderer><button role="tab" onclick="history.pushState({},'', '/shorts/dQw4w9WgXcQ')">Shorts</button></ytm-pivot-bar-item-renderer>
-    <script>for(let i=0;i<16;i++){const card=document.createElement('ytm-video-with-context-renderer');const a=document.createElement('a');a.href='/watch?v=dQw4w9WgXc'+i.toString(16);const title=document.createElement('h3');title.textContent='추천 영상 '+i;a.appendChild(title);card.appendChild(a);const duration=document.createElement('span');duration.className='ytBadgeShapeText';duration.textContent=i===0?'1:02:03':'12:34';card.appendChild(duration);const meta=document.createElement('span');meta.className='ytContentMetadataViewModelMetadataText';meta.textContent='리보 채널 · 조회수 1.2만회 · 2일 전';card.appendChild(meta);card.appendChild(document.createElement('img'));document.body.appendChild(card);}</script>
+    <script>window.rivoFillFeed=count=>{for(let i=0;i<count;i++){const card=document.createElement('ytm-video-with-context-renderer');const a=document.createElement('a');a.href='/watch?v=dQw4w9WgXc'+i.toString(16);const title=document.createElement('h3');title.textContent='추천 영상 '+i;a.appendChild(title);card.appendChild(a);const duration=document.createElement('span');duration.className='ytBadgeShapeText';duration.textContent=i===0?'1:02:03':'12:34';card.appendChild(duration);const meta=document.createElement('span');meta.className='ytContentMetadataViewModelMetadataText';meta.textContent='리보 채널 · 조회수 1.2만회 · 2일 전';card.appendChild(meta);card.appendChild(document.createElement('img'));document.body.appendChild(card);}};window.rivoFillFeed(16);</script>
     </body></html>
     """#
 
@@ -205,6 +218,8 @@ final class EasyYouTubeTests: XCTestCase {
         defer { browser.shutdown() }
         let web = browser.webView
         web.frame = CGRect(x: 0, y: 0, width: 900, height: 1000)
+        let fixtureWindow = try showWebFixture(web)
+        defer { fixtureWindow.isHidden = true }
         web.stopLoading()
         web.loadHTMLString(Self.watchHTML, baseURL: URL(string: EasyYouTubePage.home))
         try await waitForLogin(web, expression: "!!window.__rivoYouTubePrototype && document.readyState==='complete'")
@@ -219,7 +234,14 @@ final class EasyYouTubeTests: XCTestCase {
         """) as? Bool
         XCTAssertEqual(simplified, true)
         let fullShort = try await web.evaluateJavaScript("""
-        (()=>{const r=document.querySelector('[data-rivo-official-player]').shadowRoot,s=r.querySelector('.screen').getBoundingClientRect(),m=r.querySelector('main').getBoundingClientRect();return r.getElementById('official-title').hidden && r.querySelector('.timeline').hidden && r.getElementById('status').hidden && Math.abs(s.height-Math.min(m.height-24-r.querySelector('.short-actions').offsetHeight-14,(m.width-24)*16/9))<3 && s.top>=m.top+11;})()
+        (()=>{const r=document.querySelector('[data-rivo-official-player]').shadowRoot;
+        const screen=r.querySelector('.screen').getBoundingClientRect(),main=r.querySelector('main');
+        const controls=r.querySelector('.short-actions').getBoundingClientRect(), style=getComputedStyle(main);
+        const innerHeight=Math.min(main.clientHeight,window.visualViewport?.height||window.innerHeight)-parseFloat(style.paddingTop)-parseFloat(style.paddingBottom);
+        const innerWidth=main.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight);
+        const expected=Math.min(innerWidth*16/9,innerHeight-controls.height-parseFloat(style.rowGap));
+        return r.getElementById('official-title').hidden && r.querySelector('.timeline').hidden && r.getElementById('status').hidden
+          && Math.abs(r.querySelector('.screen').offsetHeight-expected)<3 && screen.bottom<controls.top;})()
         """) as? Bool
         XCTAssertEqual(fullShort,true)
         _ = try await web.evaluateJavaScript("window.__rivoOfficialPlayer.open({videoId:'dQw4w9WgXcQ',title:'일반 영상'});true")
@@ -298,7 +320,12 @@ final class EasyYouTubeTests: XCTestCase {
         _ = try await web.evaluateJavaScript("document.getElementById('ca').style.display='none';history.pushState({},'', '/v3/signin/challenge/pwd');const field=document.getElementById('identifierId');field.type='password';field.name='Passwd';document.getElementById('identifierNext').id='passwordNext';true")
         try await waitForLogin(web, expression: "document.documentElement.getAttribute('data-rivo-google-login')==='password'")
         _ = try await web.evaluateJavaScript("history.pushState({},'', '/v3/signin/challenge/totp');document.body.appendChild(document.createElement('span'));true")
-        try await waitForLogin(web, expression: "!document.documentElement.hasAttribute('data-rivo-google-login') && getComputedStyle(document.querySelector('footer')).display!=='none'")
+        try await waitForLogin(web, expression: """
+        document.documentElement.getAttribute('data-rivo-google-verification')==='totp'
+          && !document.documentElement.hasAttribute('data-rivo-google-login')
+          && document.querySelector('main input')===window.originalLoginInput
+          && document.getElementById('next').getBoundingClientRect().height>0
+        """)
     }
 
     func testGoogleLoginAdapterDoesNotChangeUnrelatedHostsOrConsent() async throws {
@@ -341,13 +368,28 @@ final class EasyYouTubeTests: XCTestCase {
         let browser = AccessibleWebBrowserModel(easyYouTube: true)
         defer { browser.shutdown() }
         let web = browser.webView
+        let fixtureWindow = try showWebFixture(web)
+        defer { fixtureWindow.isHidden = true }
         web.stopLoading()
-        web.loadHTMLString("<html><head><script>window.ytcfg={get:()=>true}</script></head><body></body></html>", baseURL: URL(string: EasyYouTubePage.home))
-        try await waitForLogin(web, expression: "!!window.__rivoYouTubePrototype")
-        _ = try await web.evaluateJavaScript("window.__rivoYouTubePrototype.navigate('search');true")
+        web.loadHTMLString(Self.watchHTML, baseURL: URL(string: EasyYouTubePage.home))
+        try await waitForLogin(web, expression: "!!document.querySelector('[data-rivo-you-tube-home]')?.shadowRoot.querySelector('.card')")
         var exhausted = false
+        // Keep the local document in place when the adapter requests history traversal.
+        _ = try await web.evaluateJavaScript("""
+        Object.defineProperty(history,'length',{value:2,configurable:true});
+        history.back=()=>history.replaceState({},'', '/');
+        history.pushState({},'', '/watch?v=dQw4w9WgXcQ');
+        document.querySelector('[data-rivo-you-tube-home]').shadowRoot.querySelector('.card').click();true
+        """)
+        try await waitForLogin(web, expression: "!!document.querySelector('[data-rivo-official-player]')?.shadowRoot.querySelector('iframe')")
         browser.handleBack { exhausted = true }
-        try await waitForLogin(web, expression: "window.__rivoYouTubePrototype.state().section==='home'")
+        try await waitForLogin(web, expression: "location.pathname==='/' && document.querySelector('[data-rivo-you-tube-home]').shadowRoot.activeElement?.dataset.videoId==='dQw4w9WgXcQ'")
+        XCTAssertFalse(exhausted)
+        _ = try await web.evaluateJavaScript("delete history.back;delete history.length;true")
+        let focused = try await web.evaluateJavaScript("window.__rivoYouTubePrototype.navigate('search');document.querySelector('[data-rivo-you-tube-home]').shadowRoot.activeElement?.id")
+        XCTAssertEqual(focused as? String, "query")
+        browser.handleBack { exhausted = true }
+        try await waitForLogin(web, expression: "document.querySelector('[data-rivo-you-tube-home]').shadowRoot.activeElement?.id!=='query'")
         XCTAssertFalse(exhausted)
         // loadHTMLString does not commit a normal back-forward item in WKWebView.
         // Local data pages give the native history fallback two committed entries.
@@ -364,6 +406,24 @@ final class EasyYouTubeTests: XCTestCase {
         browser.handleBack { exhausted = true }
         try await waitForLogin(web, expression: "document.readyState==='complete' && document.body.textContent==='First'")
         XCTAssertFalse(exhausted)
+    }
+
+    func testBrowserAdBlockRulesCompileOnWebKit() async {
+        let identifier: String? = await withCheckedContinuation { continuation in
+            BrowserAdBlocker.prepare { continuation.resume(returning: $0?.identifier) }
+        }
+        XCTAssertEqual(identifier, BrowserAdBlocker.identifier)
+    }
+
+    private func showWebFixture(_ view: WKWebView) throws -> UIWindow {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive || $0.activationState == .foregroundInactive })
+        let window = UIWindow(windowScene: scene)
+        let controller = UIViewController()
+        window.rootViewController = controller
+        controller.view.addSubview(view)
+        window.makeKeyAndVisible()
+        return window
     }
 
     private func waitForLogin(_ web: WKWebView, expression: String) async throws {
@@ -403,6 +463,9 @@ final class EasyYouTubeTests: XCTestCase {
         defer { browser.shutdown() }
         XCTAssertTrue(browser.webView.configuration.websiteDataStore.isPersistent)
         let web = browser.webView
+        web.frame = CGRect(x: 0, y: 0, width: 900, height: 1000)
+        let fixtureWindow = try showWebFixture(web)
+        defer { fixtureWindow.isHidden = true }
         web.stopLoading()
         web.loadHTMLString("""
         <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script>window.ytcfg={get:key=>key==='LOGGED_IN'?true:undefined};</script></head>
@@ -417,10 +480,15 @@ final class EasyYouTubeTests: XCTestCase {
         return !!r && r.querySelectorAll('nav button').length===3 && !r.getElementById('theme') && !r.getElementById('original');})()
         """) as? Bool
         XCTAssertEqual(installed, true)
+        let displayedTitle = try await web.evaluateJavaScript("document.querySelector('[data-rivo-you-tube-home]').shadowRoot.querySelector('.brand').textContent") as? String
+        XCTAssertEqual(displayedTitle, AppLocalization.string("유튜브"))
         XCTAssertTrue(browser.easyYouTube)
         let generic = AccessibleWebBrowserModel()
         defer { generic.shutdown() }
-        XCTAssertFalse(generic.webView.configuration.websiteDataStore.isPersistent)
+        let genericStore = generic.webView.configuration.websiteDataStore
+        XCTAssertTrue(genericStore.isPersistent)
+        XCTAssertNotNil(genericStore.identifier)
+        XCTAssertNotEqual(genericStore.identifier, browser.webView.configuration.websiteDataStore.identifier)
     }
 }
 #endif

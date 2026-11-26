@@ -107,7 +107,7 @@ final class UICompareCaptureTests: XCTestCase {
     }
 
     func testLauncherSingleStylePreservesSavedLayout() async throws {
-        await show(RatioLauncherView().environmentObject(RivoScreenRemoteControlCenter()))
+        await show(RatioLauncherView(categoryStyle: false).environmentObject(RivoScreenRemoteControlCenter()))
         let pageDot = await waitFor(timeout: 8) { $0.label.contains("페이지 중") }
         let dot = try XCTUnwrap(pageDot)
         let count = try XCTUnwrap(Int(dot.label.components(separatedBy: "페이지")[0]))
@@ -125,7 +125,7 @@ final class UICompareCaptureTests: XCTestCase {
 
     func testLauncherFeaturePagesShowWallpaperWithoutWidgetChrome() async throws {
         let savedLayout = UserDefaults.standard.data(forKey: "ratio.home.widgets.v2")
-        await show(RatioLauncherView().environmentObject(RivoScreenRemoteControlCenter()))
+        await show(RatioLauncherView(categoryStyle: false).environmentObject(RivoScreenRemoteControlCenter()))
         let pageDot = await waitFor(timeout: 8) { $0.label.contains("페이지 중") }
         let dot = try XCTUnwrap(pageDot)
         let count = try XCTUnwrap(Int(dot.label.components(separatedBy: "페이지")[0]))
@@ -144,7 +144,7 @@ final class UICompareCaptureTests: XCTestCase {
 
     func testWebWidgetsTrackDragAndSettleWithoutRemovingSource() async throws {
         let savedLayout = UserDefaults.standard.data(forKey: "ratio.home.widgets.v2")
-        await show(RatioLauncherView().environmentObject(RivoScreenRemoteControlCenter()))
+        await show(RatioLauncherView(categoryStyle: false).environmentObject(RivoScreenRemoteControlCenter()))
         let pageDot = await waitFor(timeout: 8) { $0.label.contains("페이지 중") }
         let dot = try XCTUnwrap(pageDot)
         let count = try XCTUnwrap(Int(dot.label.components(separatedBy: "페이지")[0]))

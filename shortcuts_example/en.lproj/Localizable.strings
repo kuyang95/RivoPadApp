@@ -2807,7 +2807,6 @@
 /* Launcher and media discovery */
 "미디어" = "Media";
 "쉬운 브라우저" = "Easy Browser";
-"쉬운 유튜브" = "Easy YouTube";
 "리보 웹" = "Rivo Web";
 "리보 유튜브" = "Rivo YouTube";
 "리보 뉴스" = "Rivo News";
@@ -2875,19 +2874,30 @@
 "사진이 저장되었습니다" = "Photo saved";
 "텍스트를 클립보드에 저장했습니다" = "Text copied to the clipboard";
 "VisionLink 호환 규격을 확인할 수 없습니다. 송신앱과 수신앱을 모두 업데이트한 뒤 다시 연결해주세요." = "VisionLink compatibility could not be confirmed. Update both the sending and receiving apps, then connect again.";
+"이미지 설명 서비스의 요청 한도에 도달했습니다. 잠시 후 다시 시도해 주세요." = "The image description service has reached its request limit. Try again later.";
+"이미지 설명 서비스의 응답이 지연되고 있습니다. 다시 시도해 주세요." = "The image description service took too long to respond. Please try again.";
+"이미지 설명 서비스를 이용할 수 없습니다. 잠시 후 다시 시도해 주세요." = "The image description service is unavailable. Try again later.";
 "분야" = "Topics";
 "새로고침" = "Refresh";
 "뉴스 분야 편집" = "Edit news topics";
 "갱신 중" = "Updating";
 "즐겨찾기 편집" = "Edit favorites";
 "뉴스 즐겨찾기 편집" = "Edit news favorites";
-"최대 3개까지 선택할 수 있어요. 새 분야를 고르면 가장 먼저 선택한 분야가 빠져요. 아무것도 선택하지 않으면 최신에서 전체 뉴스를 보여줘요." = "Choose up to 3 favorites. Choosing a fourth replaces the oldest selection. With no favorites, Latest shows all news.";
+"최대 3개" = "Up to 3";
 
+"리보 데이지" = "Rivo Daisy";
 
+"읽고 싶은 책을 펼쳐보세요" = "Open your next read";
 
 /* Daisy widget reading entrance */
+"읽을 책을 선택하세요." = "Select a book to read.";
+"최근 읽은 책" = "Recently Read";
+"이어서 읽기" = "Continue Reading";
 
 /* Selected book imports */
+"한 번에 최대 99권을 선택할 수 있습니다." = "Select up to 99 books at a time.";
+"%lld권 가져옴 · %lld권 가져오지 못함" = "%lld imported · %lld could not be imported";
+"99권을 넘으면 오래 읽지 않은 책의 보관 사본과 읽기 위치를 정리합니다." = "Beyond 99 books, the least recently opened saved copy and reading position are removed.";
 
 // 리보 이메일
 "리보 이메일" = "Rivo Mail";
@@ -2993,6 +3003,7 @@
 "listen.on_now" = "On now";
 "listen.previous" = "Previously";
 "listen.up_next" = "Up next";
+"listen.playback_time" = "Playback position %1$@, total %2$@";
 "listen.program_progress" = "Scheduled programme progress";
 "listen.live_timeline_hint" = "Based on the broadcast schedule. Live radio cannot be rewound.";
 "listen.schedule_loading" = "Loading schedule…";
@@ -3076,8 +3087,6 @@
 "자동 연결 가능" = "Automatic connection available";
 "로그인 또는 추가 확인 필요" = "Sign-in or verification needed";
 "연결을 확인하지 못했어요" = "Could not verify the connection";
-"Gmail 열기" = "Open Gmail";
-"Gmail 로그인" = "Sign in to Gmail";
 
 /* Verified service sign-in status */
 "로그인 확인 중…" = "Checking sign-in…";
@@ -3115,7 +3124,7 @@
 "listen.more_hint" = "Opens the More dialog.";
 
 "AI" = "AI";
-"ChatGPT 웹을 큰 글자와 익숙한 화면으로 이용합니다." = "Use ChatGPT on the web with large text and familiar controls.";
+"Claude, Gemini, GPT를 이용합니다." = "Use Claude, Gemini, and GPT.";
 
 "listen.broadcast_list" = "Broadcast list";
 "listen.choose_broadcast" = "Choose a radio station or podcast from the broadcast list.";
@@ -3145,3 +3154,18 @@
 "listen.back" = "Back";
 
 "listen.chapter" = "Chapter";
+
+"사용할 AI를 선택하세요." = "Choose an AI platform.";
+
+"계정 관리" = "Manage accounts";
+"로그아웃" = "Sign out";
+"로그아웃할 계정" = "Choose an account";
+"로그아웃 확인" = "Confirm sign out";
+"%@에서 로그아웃할까요?" = "Sign out of %@?";
+"%@에서 로그아웃할까요? 리보에 연결된 다른 Gmail 계정과 유튜브도 함께 로그아웃돼요." = "Sign out of %@? This also signs out other Gmail accounts and YouTube in Rivo.";
+"로그아웃 중…" = "Signing out…";
+"로그아웃하지 못했어요. 다시 시도해 주세요." = "Could not sign out. Please try again.";
+
+"메일 더 불러오기" = "Load more mail";
+"메일 더 불러오는 중" = "Loading more mail";
+"메일을 더 불러오지 못했어요. 다시 시도해 주세요." = "Couldn’t load more mail. Please try again.";

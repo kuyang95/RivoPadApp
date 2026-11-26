@@ -94,7 +94,7 @@ actor EPUBLibraryStore {
         fileManager: FileManager = .default,
         booksDirectory: URL? = nil,
         maximumFileSize: Int64 = 250 * 1_024 * 1_024,
-        maximumBookCount: Int = 2_000
+        maximumBookCount: Int = 99
     ) {
         self.fileManager = fileManager
         self.maximumFileSize = maximumFileSize
@@ -232,13 +232,12 @@ actor EPUBLibraryStore {
             )
         }
 
-        guard existingBooks.count
-                < maximumBookCount else {
-            throw EPUBLibraryError
-                .libraryCapacityReached(
-                    maximumBooks:
-                        maximumBookCount
-                )
+        // Validate only selected files, and retain their publication identity for duplicates and progress.
+        let publication = try AccessiblePublicationParser.parse(
+            data: Data(contentsOf: sourceURL, options: .mappedIfSafe)
+        )
+        let replacedBooks = existingBooks.filter {
+            $0.publicationIdentifier == publication.identifier
         }
 
         try ensureBooksDirectory()
@@ -259,6 +258,7 @@ actor EPUBLibraryStore {
         let destinationURL = bookDirectory
             .appendingPathComponent(fileName)
         let importedAt = Date()
+        var metadataCommitted = false
         do {
             try fileManager.copyItem(
                 at: sourceURL,
@@ -285,10 +285,9 @@ actor EPUBLibraryStore {
                 id:
                     bookDirectory.lastPathComponent,
                 fileURL: destinationURL,
-                title:
-                    destinationURL
-                        .deletingPathExtension()
-                        .lastPathComponent,
+                title: publication.title.isEmpty
+                    ? destinationURL.deletingPathExtension().lastPathComponent
+                    : publication.title,
                 importedAt: importedAt,
                 lastOpenedAt: importedAt,
                 fileSize: Int64(
@@ -297,22 +296,48 @@ actor EPUBLibraryStore {
                 ),
                 contentDigest:
                     copiedDigest.value,
-                publicationIdentifier: nil
+                publicationIdentifier: publication.identifier
             )
-            try writeMetadata(
-                for: book
-            )
+            try writeMetadata(for: book)
+            metadataCommitted = true
+            // Only retire prior copies after the replacement and its metadata are durable.
+            // A replacement has the same publication progress key, so that key is preserved.
+            for replaced in replacedBooks { try deleteBook(replaced) }
+            _ = try pruneLibrary(keeping: book.id)
             return EPUBLibraryImportResult(
                 book: book,
                 reusedExistingBook: false
             )
         } catch {
-            try? fileManager.removeItem(at: bookDirectory)
+            if !metadataCommitted { try? fileManager.removeItem(at: bookDirectory) }
             throw error
         }
     }
 
     func books() throws -> [EPUBLibraryBook] {
+        try pruneLibrary()
+    }
+
+    private func pruneLibrary(keeping identifier: String? = nil) throws -> [EPUBLibraryBook] {
+        let all = try allBooks()
+        let retained: [EPUBLibraryBook]
+        if let identifier, let current = all.first(where: { $0.id == identifier }) {
+            retained = [current] + Array(all.filter { $0.id != identifier }.prefix(maximumBookCount - 1))
+        } else {
+            retained = Array(all.prefix(maximumBookCount))
+        }
+        let retainedIDs = Set(retained.map(\.id))
+        let retainedProgress = Set(retained.compactMap(\.publicationIdentifier))
+        for book in all where !retainedIDs.contains(book.id) {
+            try deleteBook(book)
+            if let key = book.publicationIdentifier, !retainedProgress.contains(key) {
+                EPUBProgressStore.removeProgress(for: key)
+            }
+        }
+        return retained.sorted { $0.activityDate > $1.activityDate }
+    }
+
+    private func allBooks() throws -> [EPUBLibraryBook] {
         try ensureBooksDirectory()
         let directories = try fileManager
             .contentsOfDirectory(
@@ -331,11 +356,9 @@ actor EPUBLibraryStore {
             )
         )
         for directory in directories {
-            guard result.count
-                    < maximumBookCount,
-                  let book = try? book(
-                      in: directory
-                  ) else {
+            guard let book = try? book(
+                in: directory
+            ) else {
                 continue
             }
             result.append(book)
@@ -772,7 +795,7 @@ enum EPUBProgressStore {
         )
     }
 
-    static func removeProgress(
+    nonisolated static func removeProgress(
         for bookIdentifier: String,
         defaults: UserDefaults = .standard
     ) {
@@ -784,12 +807,12 @@ enum EPUBProgressStore {
         )
     }
 
-    private static func chapterKey(_ identifier: String) -> String {
+    nonisolated private static func chapterKey(_ identifier: String) -> String {
         let encoded = Data(identifier.utf8).base64EncodedString()
         return "reader.epub.chapter.\(encoded)"
     }
 
-    private static func progressKey(
+    nonisolated private static func progressKey(
         _ identifier: String
     ) -> String {
         let encoded = Data(identifier.utf8).base64EncodedString()

@@ -43,7 +43,7 @@ struct RatioBrowserWidgetView: View {
     var body: some View {
         Group {
             if let browser = session.browser, !session.expanded {
-                AccessibleWebBrowserView(browser: browser, embedded: true, ownsSession: false,
+                AccessibleWebBrowserView(browser: browser, embedded: true, ownsSession: false, contentActive: active,
                     showsMailInboxBackButton: showsMailInboxBackButton,
                     onClose: { browser.resetExitRequest(); onClose() })
             } else if session.easyYouTube && active && !session.expanded {

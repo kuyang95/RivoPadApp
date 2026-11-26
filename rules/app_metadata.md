@@ -1,6 +1,6 @@
 # 앱 메타데이터 / 빌드 정보
 
-점검일: 2026-11-25 · 기준 코드: `2abc6bdf`+작업 트리 (AI 웹 마이크) · 이전 점검일: 2026-11-25 · 기준 코드: `c5865248`+작업 트리 (런처 웹 내부 탐색 URL 범위) · 런처 유틸리티 대조: 2026-10-22 `514e00f5`+작업 트리 · 현재 위치 날씨 대조: 2026-10-22 `f56b06f0`+작업 트리 · 브라우저 즐겨찾기 대조: 2026-10-22 `f56b06f0`+작업 트리 · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리 · 라디오·팟캐스트 대조: 2026-11-25 `a4f028e3`+작업 트리
+점검일: 2026-11-23 · 기준 코드: `b4aa7cf7`+작업 트리 (App Attest entitlement 범위) · 이전 점검일: 2026-10-23 · 기준 코드: `c5865248`+작업 트리 (런처 웹 내부 탐색 URL 범위) · 런처 유틸리티 대조: 2026-10-22 `514e00f5`+작업 트리 · 현재 위치 날씨 대조: 2026-10-22 `f56b06f0`+작업 트리 · 브라우저 즐겨찾기 대조: 2026-10-22 `f56b06f0`+작업 트리 · 뉴스 2시간 백그라운드 캐시 대조: 2026-10-23 `2d5aae7e`+작업 트리 · 런처 릴리즈·미디어 탐색 대조: 2026-10-23 `329441fb`+작업 트리 · 라디오 193개 목록·재생 주소 대조: 2026-11-09 `a4f028e3`+작업 트리 · AI 마이크 권한 대조: 2026-11-23 `a4f028e3`+작업 트리
 
 `shortcuts_example.xcodeproj/project.pbxproj`, `shortcuts-example-Info.plist`, `*.entitlements` 출처. 코드 안 봐도 한눈에 알 수 있는 정보만.
 
@@ -42,7 +42,7 @@
 
 | 파일 | 키 | 값 |
 |---|---|---|
-| `shortcuts_example/shortcuts_example.entitlements` | `com.apple.developer.devicecheck.appattest-environment` | `$(APP_ATTEST_ENVIRONMENT)` → Debug `development`, Release `production` |
+| `shortcuts_example/shortcuts_example.entitlements` | `com.apple.developer.devicecheck.appattest-environment` | `$(APP_ATTEST_ENVIRONMENT)` → Debug·Release `production` |
 | 〃 | `com.apple.developer.kernel.increased-memory-limit` | `true` (MLX 로컬 모델 5~8 GiB 메모리 정책 — [gemini_ai.md](gemini_ai.md)) |
 | 〃 + 익스텐션 3개 | `com.apple.security.application-groups` | `group.net.rivo.visioncraft` |
 

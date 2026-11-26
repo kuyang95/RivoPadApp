@@ -14,6 +14,7 @@ struct AccessibleWebBrowserView: View {
     @State private var ownsRecording = false
     @State private var speechTask: Task<Void, Never>?
     private var embedded = false
+    private var contentActive = true
     private var ownsSession = true
     private var showsMailInboxBackButton = false
     private var onExpand: (() -> Void)?
@@ -26,10 +27,12 @@ struct AccessibleWebBrowserView: View {
     }
 
     init(browser: AccessibleWebBrowserModel, embedded: Bool = false, ownsSession: Bool = true,
-         showsMailInboxBackButton: Bool = false, onExpand: (() -> Void)? = nil, onClose: (() -> Void)? = nil) {
+         contentActive: Bool = true, showsMailInboxBackButton: Bool = false,
+         onExpand: (() -> Void)? = nil, onClose: (() -> Void)? = nil) {
         _browser = StateObject(wrappedValue: browser)
         _address = State(initialValue: browser.currentAddress)
         self.embedded = embedded; self.ownsSession = ownsSession
+        self.contentActive = contentActive
         self.showsMailInboxBackButton = showsMailInboxBackButton
         self.onExpand = onExpand; self.onClose = onClose
     }
@@ -40,14 +43,17 @@ struct AccessibleWebBrowserView: View {
                 EasyAIBrowserView(browser: browser, onClose: close)
             } else if browser.easyMail {
                 EasyMailBrowserView(browser: browser, embedded: embedded, onClose: close, dialogColorScheme: colorScheme,
-                                    showsInboxBackButton: !embedded || showsMailInboxBackButton)
+                                    showsInboxBackButton: !embedded || showsMailInboxBackButton, contentActive: contentActive)
             } else { webBody }
         }
         .onDisappear { if (browser.easyMail || browser.aiWeb) && ownsSession { browser.shutdown() } }
         .onChange(of: scenePhase) { _, phase in if (browser.easyMail || browser.aiWeb) && ownsSession { browser.setContentActive(phase == .active) } }
     }
     private var webBody: some View {
-        VStack(spacing: 0) {
+        let preparingYouTube = embedded && browser.easyYouTube && !browser.youtubeReady && !browser.youtubePlaybackLoading
+        let preparingArticle = browser.newsArticle && browser.newsAwaitingDocument && browser.errorMessage == nil
+        let webAvailable = contentActive && !preparingYouTube && !preparingArticle
+        return VStack(spacing: 0) {
             if !browser.easyYouTube && !isBrowserHome && !browser.newsArticle {
             HStack(spacing: 0) {
                 if !embedded {
@@ -171,10 +177,11 @@ struct AccessibleWebBrowserView: View {
                 .accessibilityElement(children: .contain)
             }
 
-            AccessibleWebSurface(webView: browser.webView)
+            AccessibleWebSurface(webView: browser.webView, interactionAvailable: webAvailable)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .opacity(embedded && browser.easyYouTube && !browser.youtubeReady && !browser.youtubePlaybackLoading ? 0 : 1)
-                .accessibilityHidden(embedded && browser.easyYouTube && !browser.youtubeReady && !browser.youtubePlaybackLoading)
+                .opacity(preparingYouTube ? 0 : 1)
+                .allowsHitTesting(webAvailable)
+                .accessibilityHidden(!webAvailable)
                 .overlay(alignment: .top) {
                     if !browser.easyYouTube && !browser.newsArticle && browser.isLoading && browser.errorMessage == nil {
                         ProgressView(value: Optional<Double>.none)
@@ -187,10 +194,10 @@ struct AccessibleWebBrowserView: View {
                     }
                 }
                 .overlay {
-                    if embedded && browser.easyYouTube && !browser.youtubeReady && !browser.youtubePlaybackLoading && browser.errorMessage == nil {
+                    if preparingYouTube && browser.errorMessage == nil {
                         EasyYouTubeCheckingAccountView()
                     }
-                    if browser.newsArticle && browser.newsAwaitingDocument && browser.errorMessage == nil {
+                    if preparingArticle {
                         NewsArticleLoadingSurface()
                     }
                     if browser.easyYouTube && browser.errorMessage == nil && (!embedded || browser.youtubeReady || browser.youtubePlaybackLoading) &&
@@ -335,10 +342,14 @@ struct EasyYouTubeCheckingAccountView: View {
 
 struct AccessibleWebSurface: UIViewRepresentable {
     let webView: WKWebView
+    var interactionAvailable = true
 
     func makeUIView(context: Context) -> UIView { UIView() }
 
     func updateUIView(_ container: UIView, context: Context) {
+        container.isUserInteractionEnabled = interactionAvailable
+        container.accessibilityElementsHidden = !interactionAvailable
+        webView.accessibilityElementsHidden = !interactionAvailable
         guard webView.superview !== container else { return }
         container.subviews.forEach { $0.removeFromSuperview() }
         webView.translatesAutoresizingMaskIntoConstraints = false

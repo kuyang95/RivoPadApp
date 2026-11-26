@@ -1,7 +1,7 @@
 import Foundation
 import WebKit
 
-struct MailAccount: Identifiable, Equatable {
+struct MailAccount: Identifiable, Equatable, Sendable {
     let id: String
     let provider: EasyMailProvider
     let address: String
@@ -18,7 +18,7 @@ struct MailAccount: Identifiable, Equatable {
     }
 }
 
-enum MailFolder: String, CaseIterable, Identifiable {
+enum MailFolder: String, CaseIterable, Identifiable, Sendable {
     case inbox = "0", all = "-1", sent = "1", promotions = "10", billing = "7", social = "9", cafe = "8"
     var id: Self { self }
     var gmailRoute: String? {
@@ -83,7 +83,7 @@ enum MailAccounts {
     }
 }
 
-struct MailInboxItem: Identifiable {
+struct MailInboxItem: Identifiable, Sendable {
     let account: MailAccount
     let url: String
     let subject: String
@@ -93,14 +93,17 @@ struct MailInboxItem: Identifiable {
     var id: String { "\(account.id):\(url)" }
 }
 
-enum MailInboxResult {
-    case loaded([MailInboxItem], fetched: Date), signIn, unavailable
+enum MailInboxResult: Sendable {
+    case loaded([MailInboxItem], fetched: Date, next: String?), signIn, unavailable
 }
 
 @MainActor
 enum MailInboxReader {
-    static func read(_ account: MailAccount, folder: MailFolder) async -> MailInboxResult {
-        guard account.supports(folder) else { return .unavailable }
+    static func read(_ account: MailAccount, folder: MailFolder, after: String? = nil) async -> MailInboxResult {
+        let identifier = account.storeIdentifier
+        let logout = MailWebLogout.shared
+        guard account.supports(folder), logout.storeInProgress != identifier else { return .unavailable }
+        let version = logout.version(identifier)
         let gmail = account.provider.id == "gmail"
         var gmailURL = URLComponents(string: "https://mail.google.com/mail/")!
         gmailURL.queryItems = [URLQueryItem(name: "authuser", value: account.address)]
@@ -113,19 +116,46 @@ enum MailInboxReader {
         let view = WKWebView(frame: CGRect(x: 0, y: 0, width: gmail ? 1200 : 450, height: gmail ? 1600 : 800), configuration: configuration)
         defer { view.stopLoading() }
         view.load(URLRequest(url: home))
-        let script = gmail ? gmailSnapshot.replacingOccurrences(of: "RIVO_FOLDER", with: jsonLiteral(folder.gmailRoute ?? ""))
-            .replacingOccurrences(of: "RIVO_ADDRESS", with: jsonLiteral(account.address)) : snapshot
-        for _ in 0..<36 {
+        let snapshot = gmail ? gmailSnapshot : naverSnapshot
+        let expectedFolder = jsonLiteral(gmail ? (folder.gmailRoute ?? "") : folder.rawValue)
+        let address = jsonLiteral(account.address)
+        let anchor = jsonLiteral(after ?? "")
+        var waiting = ""
+        var reached = false
+        var advancedAt = 0
+        for poll in 0..<(after == nil ? 36 : 60) {
             do { try await Task.sleep(for: .milliseconds(350)) }
             catch { return .unavailable }
-            guard let url = view.url, url.scheme == "https", let host = url.host, url.user == nil, url.password == nil, url.port == nil || url.port == 443, !view.isLoading else { continue }
-            if account.provider.authHosts.contains(host) { return .signIn }
-            guard (gmail ? ["mail.google.com"] : Array(account.provider.nativeInboxHosts)).contains(host) else { continue }
-            if let raw = (try? await view.evaluateJavaScript(script)) as? String,
-               let items = decode(raw, account: account, folder: folder) {
-                if gmail { GoogleWebSession.shared.update(youtube: false, value: true) }
-                return .loaded(items, fetched: Date())
+            guard let url = view.url, url.scheme == "https", let host = url.host, url.user == nil, url.password == nil, url.port == nil || url.port == 443 else { continue }
+            if !view.isLoading, account.provider.authHosts.contains(host) { return .signIn }
+            let expectedHost = gmail ? host == "mail.google.com" : account.provider.nativeInboxHosts.contains(host)
+            guard expectedHost, gmail || !view.isLoading else { continue }
+            // The Gmail snapshot verifies the account, folder and rows. Other resources can still be loading.
+            let script = """
+            (() => {
+              const RIVO_FOLDER = \(expectedFolder);
+              const RIVO_ADDRESS = \(address);
+              const RIVO_ANCHOR = \(anchor);
+              const RIVO_WAITING = \(jsonLiteral(waiting));
+              const RIVO_REACHED = \(reached);
+              const RIVO_SETTLED = \(poll - advancedAt >= 9);
+              \(pagination)
+              return (\(snapshot));
+            })()
+            """
+            guard let raw = (try? await view.evaluateJavaScript(script)) as? String,
+                  let payload = try? JSONDecoder().decode(Payload.self, from: Data(raw.utf8)) else { continue }
+            // Advancing the provider can synchronously change its URL. Only snapshots must match the sampled URL.
+            if after != nil, let marker = payload.waiting {
+                waiting = marker
+                reached = payload.reached == true
+                advancedAt = poll
+                continue
             }
+            guard view.url == url, let result = decode(payload, account: account, folder: folder) else { continue }
+            guard !Task.isCancelled, logout.storeInProgress != identifier, logout.version(identifier) == version else { return .unavailable }
+            if gmail { GoogleWebSession.shared.update(youtube: false, value: true) }
+            return result
         }
         return .unavailable
     }
@@ -138,23 +168,26 @@ enum MailInboxReader {
             let time: String
             let received: Double?
         }
-        let origin: String
-        let folder: String
-        let items: [Row]
+        let origin: String?
+        let folder: String?
+        let items: [Row]?
+        let more: Bool?
+        let waiting: String?
+        let reached: Bool?
     }
 
-    private static func decode(_ raw: String, account: MailAccount, folder: MailFolder) -> [MailInboxItem]? {
-        guard let payload = try? JSONDecoder().decode(Payload.self, from: Data(raw.utf8)) else { return nil }
+    private static func decode(_ payload: Payload, account: MailAccount, folder: MailFolder) -> MailInboxResult? {
+        guard let origin = payload.origin, let rows = payload.items else { return nil }
         let gmail = account.provider.id == "gmail"
         if gmail {
-            guard payload.origin == "https://mail.google.com", payload.folder == folder.gmailRoute else { return nil }
+            guard origin == "https://mail.google.com", payload.folder == folder.gmailRoute else { return nil }
         } else {
             guard payload.folder == folder.rawValue,
-                  ["https://mail.naver.com", "https://m.mail.naver.com"].contains(payload.origin) else { return nil }
+                  ["https://mail.naver.com", "https://m.mail.naver.com"].contains(origin) else { return nil }
         }
-        return payload.items.prefix(30).compactMap { row in
+        let items: [MailInboxItem] = rows.prefix(30).compactMap { row in
             if gmail {
-                guard let url = URLComponents(string: payload.origin + row.path),
+                guard let url = URLComponents(string: origin + row.path),
                       url.path.range(of: #"^/mail/u/[0-9]+/$"#, options: .regularExpression) != nil,
                       url.queryItems?.first(where: { $0.name == "authuser" })?.value == account.address,
                       url.queryItems?.first(where: { $0.name == "view" })?.value == "pt",
@@ -166,10 +199,12 @@ enum MailInboxReader {
             } else {
                 guard row.path.range(of: #"^/v2/read/[0-9]+/[0-9]+/?$"#, options: .regularExpression) != nil else { return nil }
             }
-            return MailInboxItem(account: account, url: payload.origin + row.path,
+            return MailInboxItem(account: account, url: origin + row.path,
                 subject: String(row.subject.prefix(500)), sender: String(row.sender.prefix(500)),
                 time: String(row.time.prefix(80)), received: gmail ? Date(timeIntervalSince1970: max(0, row.received ?? 0) / 1000) : received(row.time))
         }
+        guard items.count == rows.count else { return nil }
+        return .loaded(items, fetched: Date(), next: payload.more == true ? rows.last?.path : nil)
     }
 
     private static func received(_ value: String) -> Date {
@@ -203,7 +238,9 @@ enum MailInboxReader {
   if (window.top !== window || location.origin !== 'https://mail.google.com' || !/^\/mail\/u\/\d+\/$/.test(location.pathname)) return null;
   const expected = RIVO_ADDRESS.toLowerCase();
   const route = RIVO_FOLDER;
-  if (!expected || location.hash.slice(1) !== route) return null;
+  const currentRoute = location.hash.slice(1);
+  if (!expected || (currentRoute !== route &&
+      (!RIVO_ANCHOR || !currentRoute.startsWith(route + '/') || !/^p[0-9]+$/.test(currentRoute.slice(route.length + 1))))) return null;
   // Read only the current Google account control, never account chooser contents.
   const controls = [...document.querySelectorAll('a[href*="accounts.google.com"][aria-label],a[href*="/SignOutOptions"][aria-label]')];
   const current = controls.flatMap(node => (node.getAttribute('aria-label') || '').match(/[A-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || []);
@@ -222,26 +259,38 @@ enum MailInboxReader {
     if (clock?.[1]) hour = hour % 12 + (/오후|PM/i.test(clock[1]) ? 12 : 0);
     return new Date(Number(date[1]),Number(date[2])-1,Number(date[3]),hour,clock ? Number(clock[3]) : 0).getTime();
   };
-  const items = rows.slice(0,30).flatMap(row => {
+  const path = row => {
+    if (!row) return null;
     const legacy = row.getAttribute('data-legacy-thread-id') || row.querySelector('[data-legacy-thread-id]')?.getAttribute('data-legacy-thread-id') || '';
+    if (!/^[a-f0-9]{10,32}$/i.test(legacy)) return null;
+    return location.pathname + '?authuser=' + encodeURIComponent(RIVO_ADDRESS) + '&ui=2&view=pt&search=all&th=' + legacy;
+  };
+  const read = row => {
+    const url = path(row);
     const subject = row.querySelector('.bog');
     const sender = row.querySelector('.yW');
     const date = row.querySelector('.xW [title]');
-    if (!/^[a-f0-9]{10,32}$/i.test(legacy) || !subject || !sender || !date) return [];
-    return [{path:location.pathname + '?authuser=' + encodeURIComponent(RIVO_ADDRESS) + '&ui=2&view=pt&search=all&th=' + legacy,
-      subject:text(subject),sender:text(sender),time:text(date).slice(0,80),received:timestamp(date.getAttribute('title') || '')}];
-  });
+    if (!url || !subject || !sender || !date) return null;
+    return {path:url, subject:text(subject), sender:text(sender), time:text(date).slice(0,80),
+      received:timestamp(date.getAttribute('title') || '')};
+  };
   // An unknown/new DOM must not turn into an apparently empty mailbox.
-  if (rows.length && items.length !== Math.min(30,rows.length)) return null;
   if (!rows.length && ![...main.querySelectorAll('.TC')].some(node => node.getClientRects().length && text(node))) return null;
-  return JSON.stringify({origin:location.origin,folder:route,items});
+  const older = [...document.querySelectorAll('.amD[role="button"],[role="button"][data-tooltip],[role="button"][aria-label],button[aria-label]')]
+    .find(node => node.getClientRects().length && !node.closest('tr.zA') &&
+      (node.matches('.amD[role="button"]') ||
+        [node.getAttribute('data-tooltip'), node.getAttribute('aria-label')]
+          .some(label => /^(?:older(?: (?:messages|conversations))?|이전(?: 메일)?|오래된 메일|古い(?:メール)?)(?:\s*\([^)]*\))?$/i.test(label?.trim() || ''))));
+  return page(rows, path, read, route, older);
 })()
 """#
 
-    private static let snapshot = #"""
+    private static let naverSnapshot = #"""
 (() => {
   if (window.top !== window || !['https://mail.naver.com','https://m.mail.naver.com'].includes(location.origin)) return null;
   if (!/^\/v2\/folders\/-?\d+(?:\/|$)/.test(location.pathname)) return null;
+  const folder = location.pathname.split('/')[3];
+  if (folder !== RIVO_FOLDER) return null;
   const list = document.querySelector('.contents_area .mail_list_wrap > .mail_list');
   if (!list) return null;
   const text = node => (node?.textContent || '').trim().slice(0,500);
@@ -251,18 +300,63 @@ enum MailInboxReader {
     label.querySelectorAll('.blind,[aria-hidden="true"]').forEach(child => child.remove());
     return text(label);
   };
-  const items = [...list.querySelectorAll(':scope > .mail_item')].slice(0,30).flatMap(row => {
-    const link = row.querySelector('.mail_title_link[href]');
-    if (!link || link.origin !== location.origin || !/^\/v2\/read\/\d+\/\d+\/?$/.test(link.pathname)) return [];
-    return [{
-      path: link.pathname,
-      subject: text(link.querySelector('.text')),
-      sender: sender(row.querySelector('.mail_sender .button_sender')),
-      time: text(row.querySelector('.mail_sender .mail_date')),
-    }];
+  const rows = [...list.querySelectorAll(':scope > .mail_item')];
+  const path = row => {
+    const link = row?.querySelector('.mail_title_link[href]');
+    return link && link.origin === location.origin && /^\/v2\/read\/\d+\/\d+\/?$/.test(link.pathname)
+      ? link.pathname : null;
+  };
+  const read = row => ({
+    path: path(row),
+    subject: text(row.querySelector('.mail_title_link .text')),
+    sender: sender(row.querySelector('.mail_sender .button_sender')),
+    time: text(row.querySelector('.mail_sender .mail_date')),
   });
-  if (!items.length && !document.querySelector('.mail_list_wrap .no_mail,.contents_area .empty')) return null;
-  return JSON.stringify({origin:location.origin,folder:location.pathname.split('/')[3],items});
+  const available = rows.filter(path);
+  if (!available.length && !document.querySelector('.mail_list_wrap .no_mail,.contents_area .empty')) return null;
+  const wrap = list.parentElement;
+  const next = [...wrap.parentElement.querySelectorAll('button,a[href],[role="button"]')].find(node =>
+    !node.closest('.mail_item') && node.getClientRects().length &&
+    (!node.matches('a[href]') || (node.origin === location.origin && node.pathname === location.pathname)) &&
+    !!(list.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+    [node.getAttribute('aria-label'), node.getAttribute('title'), text(node)].some(label =>
+      /^(?:목록\s*더\s*보기|메일\s*더\s*보기|더\s*보기|다음\s*페이지|(?:load|show) more(?: (?:mail|messages))?|more|next page|もっと見る|さらに表示|次のページ)$/i.test(label?.trim() || '')));
+  const last = available.at(-1);
+  const scroll = last ? () => last.scrollIntoView({block:'end'}) : null;
+  const scrollMayLoadMore = !next && !!last &&
+    (available.length >= 30 || last.getBoundingClientRect().bottom > window.innerHeight);
+  return page(available, path, read, folder, next, scroll, scrollMayLoadMore);
 })()
+"""#
+
+    private static let pagination = #"""
+function page(rows, path, read, folder, next, scrollToEnd, scrollMayLoadMore = false) {
+  const anchor = RIVO_ANCHOR;
+  const waiting = RIVO_WAITING;
+  const reached = RIVO_REACHED;
+  const marker = JSON.stringify([rows.length, path(rows[0]), path(rows.at(-1))]);
+  const anchorIndex = anchor ? rows.findIndex(row => path(row) === anchor) : -1;
+  const publish = (items, more) => JSON.stringify({origin: location.origin, folder, items, more});
+  const enabled = next && !next.disabled && next.getAttribute('aria-disabled') !== 'true';
+  if (waiting === marker) {
+    // In scroll mode there may be no button or page count to signal the end.
+    if (scrollToEnd && !next && RIVO_SETTLED && reached) return publish([], false);
+    return null;
+  }
+
+  const afterAnchor = !anchor || anchorIndex >= 0 || reached;
+  if (afterAnchor) {
+    const remaining = rows.slice(anchorIndex + 1);
+    const items = remaining.slice(0, 30).map(read);
+    if (items.some(item => !item)) return null;
+    if (!anchor || items.length) {
+      return publish(items, items.length > 0 && (remaining.length > items.length || !!enabled || scrollMayLoadMore));
+    }
+  }
+  if (enabled) next.click();
+  else if (scrollToEnd && !next) scrollToEnd();
+  else return afterAnchor ? publish([], false) : null;
+  return JSON.stringify({waiting: marker, reached: afterAnchor});
+}
 """#
 }

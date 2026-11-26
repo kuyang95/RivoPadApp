@@ -198,7 +198,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     @Published private(set) var mailDirectConnection = false
     @Published private(set) var mailInbox = false
     @Published private(set) var mailAccounts: [MailAccount] = []
-    @Published private(set) var mailInboxRevision = 0
+    @Published var mailInboxResults: [MailInboxKey: MailInboxResult] = [:]
     private var mailStoreIdentifier = EasyMailPage.storeIdentifier
     @Published var mailChoosingProvider = false
     @Published var mailEntryEditing = false
@@ -294,11 +294,22 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     }
 
     func openMailAccount(_ account: MailAccount, target: String? = nil, compose: Bool = false) {
+        guard MailWebLogout.shared.storeInProgress != account.storeIdentifier else { return }
+        if account.storeIdentifier == EasyYouTubePage.storeIdentifier {
+            googleLogoutVersion = MailWebLogout.shared.version(account.storeIdentifier)
+        }
         resetMailReaderActions()
         let provider = account.provider
         let address = account.address
         mailInbox = false
         mailAccounts = MailAccounts.all()
+        if target == nil, !compose {
+            // Opening webmail can restore a session or make a failed account readable again.
+            mailInboxResults = mailInboxResults.filter { key, result in
+                if case .loaded = result { return true }
+                return key.accountID != account.id
+            }
+        }
         mailLogin.cancel()
         mailRestoring = false
         mailAuthenticating = false
@@ -347,13 +358,16 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
         }
     }
 
-    func restoreMail() { mailAccounts = MailAccounts.all() }
+    func restoreMail() {
+        mailAccounts = MailAccounts.all()
+        let accountIDs = Set(mailAccounts.map(\.id))
+        mailInboxResults = mailInboxResults.filter { accountIDs.contains($0.key.accountID) }
+    }
 
     func showMailInbox() {
         showMailStart()
         restoreMail()
         mailInbox = !mailAccounts.isEmpty
-        mailInboxRevision += 1
     }
 
     private static func mailConfiguration(_ identifier: UUID) -> WKWebViewConfiguration {
@@ -381,6 +395,32 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
         webView.stopLoading(); webView.load(URLRequest(url: URL(string: "about:blank")!))
     }
     let newsArticle: Bool
+    @Published private(set) var aiPlatform: EasyAIPlatform?
+    @Published private(set) var showsAIHome = false
+
+    private func showAIHome() { showsAIHome = true }
+
+    func openAIPlatform(_ platform: EasyAIPlatform) {
+        UserDefaults.standard.set(platform.rawValue, forKey: "ai.lastPlatform")
+        if aiPlatform != platform {
+            if aiPlatform != nil {
+                while hasPopup { closePopup() }
+                let previous = webView
+                let next = WKWebView(frame: .zero, configuration: previous.configuration)
+                previous.navigationDelegate = nil
+                previous.uiDelegate = nil
+                previous.stopLoading()
+                configure(next)
+                windows = [next]
+                webView = next
+                observeActiveWindow()
+            }
+            aiPlatform = platform
+            navigate(platform.address)
+        }
+        showsAIHome = false
+    }
+
     let aiWeb: Bool
     private var usesBrowserPreparation: Bool { !easyYouTube && !easyMail && !newsArticle && !aiWeb }
 
@@ -415,14 +455,21 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
         if easyMail {
             restoreMail()
             mailInbox = !mailAccounts.isEmpty
+        } else if aiWeb {
+            if let saved = UserDefaults.standard.string(forKey: "ai.lastPlatform"),
+               let platform = EasyAIPlatform(rawValue: saved) {
+                openAIPlatform(platform)
+            } else {
+                showAIHome()
+            }
         }
         if let initialQuery {
             if usesBrowserPreparation, let url = AccessibleWebAddress.resolve(initialQuery) {
                 currentAddress = url.absoluteString
             }
             navigate(initialQuery)
-        } else if !easyMail && !newsArticle {
-            navigate(aiWeb ? "https://chatgpt.com/" : easyYouTube ? EasyYouTubePage.home : "https://www.google.com")
+        } else if !easyMail && !aiWeb && !newsArticle {
+            navigate(easyYouTube ? EasyYouTubePage.home : "https://www.google.com")
         }
     }
 
@@ -474,7 +521,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
             return
         }
         if easyYouTube {
-            controller.addUserScript(WKUserScript(source: "window.__rivoYouTubeUIScale=\(Double(zoomPercent) / 100);" + AccessibleWebTheme.script + GoogleSignInPage.source + EasyYouTubePage.source, injectionTime: .atDocumentStart,
+            controller.addUserScript(WKUserScript(source: youTubeBootstrap, injectionTime: .atDocumentStart,
                                                  forMainFrameOnly: true, in: .page))
             return
         }
@@ -482,7 +529,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
                                              forMainFrameOnly: false, in: .page))
         applyAdBlockRules(to: view)
         controller.addUserScript(WKUserScript(
-            source: AccessibleWebAppearance.bootstrap(enabled: appearanceEnabled, palette: palette, aiWeb: aiWeb) + "\n" + (newsArticle ? NewsArticlePage.source + "\nwindow.__rivoNewsArticle?.set(\(appearanceEnabled));\n" : "") + AccessibleGooglePage.bootstrap(enabled: simpleGoogleEnabled, appearanceEnabled: appearanceEnabled, palette: palette) + (aiWeb ? "\n" + EasyAIPage.bootstrap(enabled: appearanceEnabled, palette: palette) : ""),
+            source: AccessibleWebAppearance.bootstrap(enabled: appearanceEnabled, palette: palette, aiWeb: aiWeb) + "\n" + (newsArticle ? NewsArticlePage.source + "\nwindow.__rivoNewsArticle?.set(\(appearanceEnabled));\n" : "") + AccessibleGooglePage.bootstrap(enabled: simpleGoogleEnabled, appearanceEnabled: appearanceEnabled, palette: palette) + (aiWeb ? "\n" + GoogleSignInPage.source + "\n" + EasyAIPage.bootstrap(enabled: appearanceEnabled, palette: palette) : ""),
             injectionTime: .atDocumentStart,
             forMainFrameOnly: false,
             in: Self.world
@@ -494,6 +541,13 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
                 injectionTime: .atDocumentStart, forMainFrameOnly: true, in: Self.world
             ))
         }
+    }
+
+    private var youTubeBootstrap: String {
+        let preparing = embedded && !youtubeReady && !youtubePlaybackLoading
+        return "window.__rivoYouTubeUIScale=\(Double(zoomPercent) / 100);window.__rivoYouTubeNativePreparing=\(preparing);\n"
+            + AccessibleWebTheme.script + GoogleSignInPage.source + EasyYouTubePage.source
+            + "\nwindow.__rivoYouTubePrototype?.setNativePreparing?.(\(preparing));"
     }
 
     func applyAppearance() {
@@ -556,19 +610,33 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     }
 
     @discardableResult func goBack() -> Bool {
-        if easyMail && webView.backForwardList.backItem?.url.absoluteString == "about:blank" { return false }
+        if (easyMail || aiWeb) && webView.backForwardList.backItem?.url.absoluteString == "about:blank" { return false }
         if webView.canGoBack { webView.goBack(); return true }
         if hasPopup { closePopup(); return true }
         return false
     }
 
+    func aiInitialPageReady(in view: WKWebView) async -> Bool {
+        let script = """
+        document.readyState !== 'loading' && location.href !== 'about:blank' &&
+        (location.hostname !== 'chatgpt.com' || /^\\/(auth|api|backend-api)(\\/|$)/.test(location.pathname) ||
+        window.__rivoEasyAI?.ready?.() === true)
+        """
+        let result = try? await view.evaluateJavaScript(script, in: nil, contentWorld: Self.world)
+        return view === webView && (result as? Bool == true)
+    }
+
     func handleBack(onExhausted: @escaping () -> Void) {
         if aiWeb {
+            if showsAIHome {
+                onExhausted()
+                return
+            }
             let view = webView
             view.evaluateJavaScript("window.__rivoEasyAI?.back?.() === true", in: nil, in: Self.world) { [weak self] result in
                 guard let self, self.webView === view else { return }
                 if case .success(let handled) = result, handled as? Bool == true { return }
-                if !self.goBack() { onExhausted() }
+                if !self.goBack() { self.showAIHome() }
             }
             return
         }
@@ -627,28 +695,55 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     private var googleStatusRequest = 0
     private var googleSessionClosed = false
 
-    func connectSharedGoogleLogin() {
-        if easyYouTube { navigate(EasyYouTubePage.home + "signin") }
-        else if easyMail, let provider = EasyMailProvider.all.first(where: { $0.id == "gmail" }) {
-            openMailAccount(MailAccount(id: "google-session", provider: provider, address: ""))
+    private var googleLogoutVersion = MailWebLogout.shared.version(EasyYouTubePage.storeIdentifier)
+
+    private func reloadYouTubeAfterLogout() -> Bool {
+        let version = MailWebLogout.shared.version(EasyYouTubePage.storeIdentifier)
+        guard easyYouTube, version != googleLogoutVersion else { return false }
+        googleLogoutVersion = version
+        googleStatusRequest += 1
+        for view in windows {
+            view.stopLoading()
+            view.navigationDelegate = nil
+            view.uiDelegate = nil
+            launcherSwipes.removeValue(forKey: ObjectIdentifier(view))
         }
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = Self.youtubeStore
+        configuration.defaultWebpagePreferences.preferredContentMode = .mobile
+        configuration.allowsInlineMediaPlayback = true
+        configuration.mediaTypesRequiringUserActionForPlayback = []
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
+        webView = WKWebView(frame: .zero, configuration: configuration)
+        configure(webView)
+        windows = [webView]
+        observeActiveWindow()
+        youtubeReady = false
+        youtubePlaybackLoading = false
+        navigate(EasyYouTubePage.home)
+        return true
     }
 
     private func refreshGoogleLoginStatus(reconnect: Bool = false) {
         googleStatusRequest += 1
         guard !googleSessionClosed, youtubeContentActive,
               easyYouTube || (easyMail && !mailStart && !mailInbox && mailProvider?.id == "gmail") else { return }
-        pollGoogleLoginStatus(in: webView, request: googleStatusRequest, reconnect: reconnect)
+        pollGoogleLoginStatus(in: webView, request: googleStatusRequest,
+                              logoutVersion: googleLogoutVersion, reconnect: reconnect)
     }
 
-    private func pollGoogleLoginStatus(in view: WKWebView, request: Int, reconnect: Bool = false) {
+    private func pollGoogleLoginStatus(in view: WKWebView, request: Int, logoutVersion: Int, reconnect: Bool = false) {
         let serviceHosts = easyYouTube ? ["m.youtube.com", "www.youtube.com", "youtube.com"] : ["mail.google.com"]
         guard request == googleStatusRequest, !googleSessionClosed, youtubeContentActive, view === webView,
+              MailWebLogout.shared.storeInProgress != EasyYouTubePage.storeIdentifier,
+              logoutVersion == MailWebLogout.shared.version(EasyYouTubePage.storeIdentifier),
               let url = view.url, url.scheme == "https", url.port == nil, url.user == nil,
               let host = url.host, host == "accounts.google.com" || serviceHosts.contains(host) else { return }
         view.evaluateJavaScript(GoogleWebSession.statusScript) { [weak self, weak view] result, _ in
             guard let self, let view, request == self.googleStatusRequest, !self.googleSessionClosed,
-                  self.youtubeContentActive, view === self.webView, view.url == url else { return }
+                  self.youtubeContentActive, view === self.webView, view.url == url,
+                  MailWebLogout.shared.storeInProgress != EasyYouTubePage.storeIdentifier,
+                  logoutVersion == MailWebLogout.shared.version(EasyYouTubePage.storeIdentifier) else { return }
             let value: Bool? = (result as? String) == "in" ? true : (result as? String) == "out" ? false : nil
             if let value { GoogleWebSession.shared.update(youtube: self.easyYouTube, value: value) }
             if reconnect, self.easyYouTube, value == false, GoogleWebSession.shared.gmailSignedIn == true,
@@ -658,7 +753,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self, weak view] in
                 guard let self, let view else { return }
-                self.pollGoogleLoginStatus(in: view, request: request)
+                self.pollGoogleLoginStatus(in: view, request: request, logoutVersion: logoutVersion)
             }
         }
     }
@@ -675,6 +770,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
             }
         }
         youtubeContentActive = active
+        if active, reloadYouTubeAfterLogout() { return }
         refreshGoogleLoginStatus(reconnect: resuming)
         if active && !easyYouTube { applyAppearance() }
         if easyYouTube { webView.evaluateJavaScript("window.__rivoYouTubeContentActive=\(active);window.__rivoYouTubePrototype?.setActive?.(\(active));", completionHandler: nil) }
@@ -819,7 +915,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
             }
         }
         if easyYouTube {
-            let script = AccessibleWebTheme.script + GoogleSignInPage.source + EasyYouTubePage.source
+            let script = youTubeBootstrap
             if (embedded && !youtubeReady) || youtubePlaybackLoading, webView === self.webView,
                let url = webView.url, AccessibleWebAddress.isWebURL(url) {
                 let navigation = youtubeNavigation
@@ -851,6 +947,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
             guard let self, let view, self.isWaitingForYouTubeReady(in: view, url: url, navigation: navigation) else { return }
             if result as? Bool == true {
                 self.youtubeReady = true
+                view.evaluateJavaScript("window.__rivoYouTubePrototype?.setNativePreparing?.(false);", completionHandler: nil)
             } else if attempt < 96 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self, weak view] in
                     guard let self, let view else { return }

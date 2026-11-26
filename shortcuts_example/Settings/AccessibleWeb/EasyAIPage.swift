@@ -12,7 +12,177 @@ enum EasyAIPage {
 // Same source in EasyAIPage.swift. Original editors, messages and service actions stay in place.
 (() => {
   'use strict';
-  if (window !== window.top || location.protocol !== 'https:' || !['chatgpt.com','auth.openai.com','auth0.openai.com'].includes(location.hostname) || window.__rivoEasyAI) return;
+  if (window !== window.top || location.protocol !== 'https:' || window.__rivoEasyAI) return;
+  const host = location.hostname;
+  if (host === 'accounts.google.com' || (host === 'appleid.apple.com' && location.pathname === '/auth/authorize')) {
+    let providerTheme;
+    window.__rivoEasyAI = {set(next) {
+      providerTheme?.remove();
+      if (!next.enabled || !document.documentElement) return;
+      providerTheme = document.createElement('style');
+      const light = next.palette === 'light';
+      const bg = light ? '#F0F2F5' : '#23272B';
+      const ink = light ? '#283546' : '#F8F5EC';
+      const edge = light ? '#536176' : '#A8B1B9';
+      providerTheme.textContent = host === 'accounts.google.com' ? `
+        html[data-rivo-google-login] :is(#identifierNext,#passwordNext) button,
+        html[data-rivo-google-login] :is(#identifierNext,#passwordNext) button * {
+          color:#14271E!important; -webkit-text-fill-color:#14271E!important;
+        }
+        html[data-rivo-google-login] :is(#identifierNext,#passwordNext) button { background:#CCE7D3!important; }
+      ` : `
+        :is(#account_name_text_field,#password_text_field) {
+          background:${bg}!important; color:${ink}!important; -webkit-text-fill-color:${ink}!important;
+          caret-color:${ink}!important; border:1px solid ${edge}!important; min-height:52px!important;
+        }
+        :is(#account_name_text_field,#password_text_field)::placeholder,
+        :is(label[for="account_name_text_field"],label[for="password_text_field"]) {
+          color:${ink}!important; -webkit-text-fill-color:${ink}!important; opacity:1!important;
+        }
+        :is(#account_name_text_field,#password_text_field):focus-visible { outline:2px solid ${edge}!important; outline-offset:2px!important; }
+        #sign-in { min-height:48px!important; }
+        #sign-in:not(:disabled):not([aria-disabled="true"]) { background:#CCE7D3!important; }
+        #sign-in:not(:disabled):not([aria-disabled="true"]),#sign-in:not(:disabled):not([aria-disabled="true"]) * {
+          color:#14271E!important; -webkit-text-fill-color:#14271E!important;
+        }
+      `;
+      document.documentElement.appendChild(providerTheme);
+    }};
+    return;
+  }
+  if (host === 'claude.ai' || host === 'gemini.google.com') {
+    let presentation, title, geminiLogin, queued = false;
+    let options = {enabled:true,palette:'dark',language:'ko'};
+    const root = document.documentElement;
+    const claude = 'html[data-rivo-claude-login]';
+    const gemini = 'html[data-rivo-gemini-guest]';
+    const refreshProvider = () => {
+      queued = false;
+      const signIn = host === 'claude.ai' && /^\/login\/?$/.test(location.pathname) &&
+        document.querySelector('main claude-sign-in:has(#signin input#email[type="email"])');
+      const login = host === 'gemini.google.com' && /^\/app(?:\/|$)/.test(location.pathname) &&
+        [...document.querySelectorAll('gem-button button')].find(node =>
+          /^(?:로그인|Sign in|Log in|ログイン)$/i.test(node.textContent.trim()) && node.getClientRects().length);
+      root.toggleAttribute('data-rivo-claude-login', !!(options.enabled && signIn));
+      root.toggleAttribute('data-rivo-gemini-guest', !!(options.enabled && login));
+      if (geminiLogin && geminiLogin !== login) geminiLogin.removeAttribute('data-rivo-gemini-login');
+      geminiLogin = options.enabled && login || null;
+      geminiLogin?.setAttribute('data-rivo-gemini-login','');
+      if (!options.enabled || !signIn) { title?.remove(); title = null; }
+      else if (!title?.isConnected || title.nextElementSibling !== signIn) {
+        title?.remove();
+        title = document.createElement('h1');
+        title.setAttribute('data-rivo-claude-title','');
+        title.textContent = {ko:'Claude 로그인',en:'Sign in to Claude',ja:'Claudeにログイン'}[options.language] || 'Sign in to Claude';
+        signIn.before(title);
+      }
+      if (options.enabled && signIn) {
+        for (const button of signIn.querySelectorAll('.si-social button:is([data-testid="login-with-google"],[data-testid="login-with-apple"])')) {
+          const name = button.textContent.trim();
+          if (name && !button.hasAttribute('aria-label')) button.setAttribute('aria-label',name);
+        }
+      }
+      if (!options.enabled || (!signIn && !login)) { presentation?.remove(); presentation = null; return; }
+      const light = options.palette === 'light';
+      const bg = light ? '#FFFFFF' : '#181A1B';
+      const surface = light ? '#F0F2F5' : '#23272B';
+      const ink = light ? '#283546' : '#F8F5EC';
+      const edge = light ? '#536176' : '#8C979E';
+      const css = `
+        ${claude},${claude} body,${claude} body > div,${claude} .cds-root,${claude} .root,
+        ${claude} div:has(> main) { background:${light ? bg : 'transparent'}!important; color:${ink}!important; }
+        ${claude} nav.fixed:has(a[href="/"]),
+        ${claude} a[href="/"]:not(main *):has(> svg[aria-label="Claude"]) { display:none!important; }
+        ${claude} div:has(> div > main) > div:empty[class*="h-[4.5rem]"] { display:none!important; }
+        ${claude} main { min-width:0!important; padding-bottom:24px!important; }
+        ${claude} main div:has(claude-sign-in) {
+          display:flex!important; flex-direction:column!important; align-items:center!important; justify-content:start!important;
+          width:100%!important; max-width:100%!important; min-width:0!important; height:auto!important; min-height:0!important;
+          padding-block:0!important; box-sizing:border-box!important; background:transparent!important;
+        }
+        ${claude} main div:has(> claude-sign-in) { padding:20px 18px!important; gap:12px!important; }
+        ${claude} main div:has(> claude-sign-in) > :is(h1,p):not([data-rivo-claude-title]) { display:none!important; }
+        ${claude} [data-rivo-claude-title] {
+          font:700 clamp(22px,4.5vw,30px)/1.4 system-ui,sans-serif!important; margin:0!important;
+          text-align:center!important; color:${ink}!important; -webkit-text-fill-color:${ink}!important;
+        }
+        ${claude} claude-sign-in,${claude} .si-card { min-width:0; }
+        ${claude} claude-sign-in {
+          display:block!important; width:100%!important; max-width:560px!important; margin-inline:auto!important;
+        }
+        ${claude} claude-sign-in .si-card { background:transparent!important; border:0!important; box-shadow:none!important; padding:0!important; margin-top:0!important; }
+        ${claude} claude-sign-in .si-steps { padding-block:0!important; margin-block:0!important; }
+        ${claude} claude-sign-in .si-social button,
+        ${claude} claude-sign-in #signin :is(button,input:not([type="hidden"])) {
+          box-sizing:border-box!important; width:100%!important; min-height:52px!important;
+          border:1px solid ${edge}!important; border-radius:14px!important;
+          background:${surface}!important; color:${ink}!important; -webkit-text-fill-color:${ink}!important;
+          font-size:clamp(16px,3.5vw,21px)!important; white-space:normal!important; line-height:1.4!important;
+        }
+        ${claude} .si-social:has([data-testid="login-with-google"]):has([data-testid="login-with-apple"]) {
+          display:grid!important; grid-template-columns:repeat(2,minmax(0,1fr))!important; gap:10px!important;
+        }
+        ${claude} .si-social > div:not(:has(> cds-button)) { grid-column:1/-1; }
+        ${claude} .si-social button:is([data-testid="login-with-google"],[data-testid="login-with-apple"]) {
+          display:flex!important; justify-content:center!important; gap:8px!important; padding-inline:6px!important;
+          min-height:56px!important; font-size:clamp(14px,3.5vw,19px)!important; font-weight:600!important;
+        }
+        ${claude} .si-social button[data-testid="login-with-google"] {
+          background-color:${surface}!important;
+          background-image:linear-gradient(90deg,rgba(66,133,244,.30),transparent 78%)!important;
+        }
+        ${claude} .si-social button[data-testid="login-with-apple"] {
+          background-color:${surface}!important;
+          background-image:linear-gradient(90deg,rgba(217,224,225,.23),transparent 78%)!important;
+        }
+        ${claude} .si-social button:is([data-testid="login-with-google"],[data-testid="login-with-apple"]) > span:has(> svg) {
+          display:flex!important; align-items:center!important; width:auto!important; gap:0!important;
+          font-size:0!important; line-height:0!important;
+        }
+        ${claude} .si-social button:is([data-testid="login-with-google"],[data-testid="login-with-apple"]) svg {
+          flex:none!important; width:24px!important; height:24px!important;
+        }
+        ${claude} .si-social button[data-testid="login-with-google"]::after { content:'Google'; }
+        ${claude} .si-social button[data-testid="login-with-apple"]::after { content:'Apple'; }
+        ${claude} .si-social button:is([data-testid="login-with-google"],[data-testid="login-with-apple"]) > span[aria-hidden="true"] span,
+        ${claude} #signin button[type="submit"]:not(:disabled) > span[aria-hidden="true"] span {
+          background:transparent!important;
+        }
+        ${claude} #signin button[type="submit"]:not(:disabled) > span:not([aria-hidden="true"]) * {
+          color:#14271E!important; -webkit-text-fill-color:#14271E!important;
+        }
+        ${claude} claude-sign-in #signin button[type="submit"]:not(:disabled) {
+          background:#CCE7D3!important; color:#14271E!important; -webkit-text-fill-color:#14271E!important;
+        }
+        ${claude} claude-sign-in #signin input::placeholder { color:${ink}!important; opacity:.82!important; }
+        ${claude} .si-consent { display:none!important; }
+        ${claude} claude-sign-in :is(input,button,a[href]):focus-visible {
+          outline:3px solid ${edge}!important; outline-offset:2px!important;
+        }
+        ${gemini} .signed-out-tooltip-anchor .tooltip-anchor-box { display:none!important; }
+        ${gemini} h1.gds-display-s { font-size:clamp(22px,5vw,34px)!important; line-height:1.35!important; text-wrap:balance; word-break:keep-all; }
+        ${gemini} button[data-rivo-gemini-login] {
+          min-width:84px!important; min-height:44px!important; padding-inline:14px!important; border-radius:14px!important;
+          background:#CCE7D3!important; color:#14271E!important; -webkit-text-fill-color:#14271E!important;
+          font-size:clamp(15px,3.5vw,20px)!important; font-weight:700!important;
+        }
+        ${gemini} button[data-rivo-gemini-login] * { color:inherit!important; -webkit-text-fill-color:inherit!important; }
+        ${gemini} button[data-rivo-gemini-login]:focus-visible { outline:3px solid ${edge}!important; outline-offset:2px!important; }`;
+      if (!presentation) { presentation = document.createElement('style'); root.appendChild(presentation); }
+      if (presentation.textContent !== css) presentation.textContent = css;
+    };
+    const scheduleProvider = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(refreshProvider);
+    };
+    window.__rivoEasyAI = {set(next) { options = {...options,...next}; scheduleProvider(); }};
+    new MutationObserver(scheduleProvider).observe(document,{subtree:true,childList:true,characterData:true});
+    window.addEventListener('pageshow',scheduleProvider);
+    window.addEventListener('popstate',scheduleProvider);
+    return;
+  }
+  if (!['chatgpt.com','auth.openai.com','auth0.openai.com'].includes(host)) return;
   if (location.hostname !== 'chatgpt.com') {
     // Official authentication fields stay original; only their presentation changes.
     let loginStyle, loginConfig = {enabled:true,palette:'dark'};
@@ -20,28 +190,66 @@ enum EasyAIPage {
       if (!document.documentElement) return;
       const known = !!document.querySelector('form input:is([type="email"],[type="password"],[autocomplete="username"],[autocomplete="one-time-code"])');
       document.documentElement.toggleAttribute('data-rivo-ai-login', loginConfig.enabled && known);
+      const codeStage = location.pathname === '/email-verification' && !!document.querySelector('form input[autocomplete="one-time-code"]');
+      document.documentElement.toggleAttribute('data-rivo-ai-code-stage', loginConfig.enabled && codeStage);
       if (!known || !loginConfig.enabled) { loginStyle?.remove(); loginStyle = null; return; }
       if (!loginStyle) { loginStyle = document.createElement('style'); document.documentElement.appendChild(loginStyle); }
       const p = loginConfig.palette === 'light' ? {bg:'#FFFFFF',surface:'#F0F2F5',text:'#283546',edge:'#536176',link:'#704000'} : window.__rivoWebTheme;
       if (!p) return;
-      const css = `html[data-rivo-ai-login] {background:${p.bg}!important;}
+      const scale = document.documentElement.currentCSSZoom || parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+      const availableHeight = Math.floor((window.visualViewport?.height || innerHeight) / scale);
+      const css = `html[data-rivo-ai-login],html[data-rivo-ai-login] body {background:${loginConfig.palette === 'light' ? p.bg : 'transparent'}!important;color:${p.text}!important;}
+        html[data-rivo-ai-login] :is(main,#root,#auth0-lock-container) {background:transparent!important;}
         html[data-rivo-ai-login] form {box-sizing:border-box!important;width:100%!important;max-width:560px!important;margin-inline:auto!important;padding:24px!important;}
         html[data-rivo-ai-login] :is(h1,h2) {font-size:30px!important;line-height:1.5!important;}
         html[data-rivo-ai-login] form :is(label,p,a) {font-size:20px!important;line-height:1.7!important;}
         html[data-rivo-ai-login] form input:not([type="checkbox"]):not([type="radio"]) {box-sizing:border-box!important;min-height:64px!important;width:100%!important;font-size:24px!important;background:${p.surface}!important;color:${p.text}!important;}
-        html[data-rivo-ai-login] form button {min-height:64px!important;font-size:22px!important;white-space:normal!important;}
-        html[data-rivo-ai-login] form :is(input,button,a):focus-visible {outline:3px solid ${p.link}!important;outline-offset:3px!important;}`;
+        html[data-rivo-ai-login] form button {min-height:56px!important;font-size:22px!important;white-space:normal!important;}
+        html[data-rivo-ai-login] form button[type="submit"] {width:100%!important;background:#CCE7D3!important;color:#14271E!important;-webkit-text-fill-color:#14271E!important;border-radius:14px!important;}
+        html[data-rivo-ai-login] form :is(input,button,a):focus-visible {outline:3px solid ${p.link}!important;outline-offset:4px!important;}
+        html[data-rivo-ai-code-stage] div:has(> div > fieldset input[autocomplete="one-time-code"]) {
+          display:flex!important; align-items:center!important; justify-content:safe center!important;
+          box-sizing:border-box!important; min-height:${availableHeight}px!important; height:auto!important; padding:24px 18px!important;
+          background:${loginConfig.palette === 'light' ? p.bg : 'transparent'}!important;
+        }
+        html[data-rivo-ai-code-stage] div:has(> fieldset input[autocomplete="one-time-code"]) {
+          width:100%!important; max-width:560px!important; min-width:0!important; margin-inline:auto!important;
+        }
+        html[data-rivo-ai-code-stage] form:has(input[autocomplete="one-time-code"]) {padding:16px 0 0!important;}
+        html[data-rivo-ai-code-stage] :is(h1,h2) {font-size:clamp(24px,4.5vw,32px)!important;line-height:1.35!important;text-wrap:balance;}
+        html[data-rivo-ai-code-stage] div:has(> input[autocomplete="one-time-code"]) {
+          display:flex!important; flex-direction:column!important; align-items:stretch!important; gap:6px!important;
+          height:auto!important; border:0!important; box-shadow:none!important; background:transparent!important;
+        }
+        html[data-rivo-ai-code-stage] div:has(> input[autocomplete="one-time-code"]) > label {
+          position:static!important; inset:auto!important; height:auto!important; padding:0!important;
+          margin:0!important; transform:none!important; translate:none!important; pointer-events:auto!important;
+          font-size:16px!important; line-height:1.4!important; color:${p.text}!important; -webkit-text-fill-color:${p.text}!important;
+        }
+        html[data-rivo-ai-code-stage] input[autocomplete="one-time-code"] {
+          box-sizing:border-box!important; width:100%!important; border:1px solid ${p.edge}!important;
+          border-radius:14px!important; padding:10px 14px!important; caret-color:${p.link}!important;
+          -webkit-text-fill-color:${p.text}!important; scroll-margin-block:12px;
+        }
+        html[data-rivo-ai-code-stage] input[autocomplete="one-time-code"]::placeholder {opacity:0!important;}
+        html[data-rivo-ai-code-stage] input[autocomplete="one-time-code"]:focus-visible {outline-offset:-3px!important;}
+        html[data-rivo-ai-code-stage] button[name="intent"][value="resend"] {
+          background:${p.surface}!important; border:1px solid ${p.edge}!important;
+          color:${p.text}!important; -webkit-text-fill-color:${p.text}!important;
+        }`;
       if (loginStyle.textContent !== css) loginStyle.textContent = css;
     };
     window.__rivoEasyAI = {set(next) { loginConfig = {...loginConfig,...next}; mountLogin(); }};
     new MutationObserver(records => { if(records.some(record => record.target !== loginStyle && [...record.addedNodes].some(node => node.nodeType === Node.ELEMENT_NODE && node !== loginStyle))) mountLogin(); }).observe(document,{subtree:true,childList:true});
     document.addEventListener('DOMContentLoaded',mountLogin,{once:true});
+    window.visualViewport?.addEventListener('resize',mountLogin);
+    window.addEventListener('rivo-page-zoom',mountLogin);
     return;
   }
   const translations = {
-    ko: {more:'더보기', platforms:'다른 AI 플랫폼', newChat:'새 대화', history:'대화 목록', account:'계정·설정', login:'로그인', back:'대화로 돌아가기', help:'궁금한 내용을 아래 질문칸에 입력하세요.', attach:'첨부', send:'보내기', stop:'답변 중지', missing:'이 기능을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.'},
-    en: {more:'More', platforms:'Other AI platforms', newChat:'New chat', history:'Chat list', account:'Account', login:'Log in', back:'Back to chat', help:'Type your question in the box below.', attach:'Attach', send:'Send', stop:'Stop', missing:'This control is currently unavailable. Please try again shortly.'},
-    ja: {more:'その他', platforms:'他のAIプラットフォーム', newChat:'新しい会話', history:'会話一覧', account:'アカウント', login:'ログイン', back:'会話に戻る', help:'下の入力欄に質問を入力してください。', attach:'添付', send:'送信', stop:'回答を停止', missing:'現在この操作は利用できません。しばらくしてからもう一度お試しください。'}
+    ko: {more:'더보기', newChat:'새 대화', history:'대화 목록', account:'계정·설정', login:'로그인', back:'대화로 돌아가기', help:'궁금한 내용을 아래 질문칸에 입력하세요.', attach:'첨부', send:'보내기', stop:'답변 중지', authEmail:'이메일', authPhone:'전화번호', historyLogin:'저장된 대화는 로그인 후 볼 수 있습니다.', missing:'이 기능을 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.'},
+    en: {more:'More', newChat:'New chat', history:'Chat list', account:'Account', login:'Log in', back:'Back to chat', help:'Type your question in the box below.', attach:'Attach', send:'Send', stop:'Stop', authEmail:'Email', authPhone:'Phone', historyLogin:'Log in to see your saved chats.', missing:'This control is currently unavailable. Please try again shortly.'},
+    ja: {more:'その他', newChat:'新しい会話', history:'会話一覧', account:'アカウント', login:'ログイン', back:'会話に戻る', help:'下の入力欄に質問を入力してください。', attach:'添付', send:'送信', stop:'回答を停止', authEmail:'メール', authPhone:'電話番号', historyLogin:'保存した会話を見るにはログインしてください。', missing:'現在この操作は利用できません。しばらくしてからもう一度お試しください。'}
   };
   const patterns = {
     newChat:/^(?:新しいチャット|新しい会話|새 (?:채팅|대화)|New chat)$/i,
@@ -56,6 +264,8 @@ enum EasyAIPage {
   };
   let config = {enabled:true, palette:'dark', language:'ko'};
   let style, toolbar, status, moreButton, menuPanel, help, moreOpen = false, main, composer, composerFooter, sidebar, closeButton, observer, resizeObserver, timer, historyTimer, pendingHistory = false, historyOpen = false, closingServiceSidebar = false, dismissingPromotion = null;
+  let stableTimer, missingSince, activeAuthDialog, authMethodRow, startupComplete = false;
+  let startupMain, startupEditor;
   const marked = new Map();
   const originalInert = new Map();
   const actionButtons = {};
@@ -95,6 +305,57 @@ enum EasyAIPage {
     const matches = originals().filter(node => scope.contains(node) && patterns[name]?.test(label(node)));
     return matches.find(visible) || matches[0] || null;
   }
+  const loginLabel = /^(?:로그인|Log in|Sign in|ログイン)$/i;
+  const historyLabel = /^(?:chat history|conversation history|채팅 기록|대화 기록|会話履歴|チャット履歴)$/i;
+  const historyRegion = '#history,#chat-history,[data-testid="chat-history"],[data-testid="conversation-list"]';
+  const menuRegion = '[role="menu"],[role="menuitem"],[data-testid*="settings"],[id*="settings"],[data-testid*="account-menu"]';
+  function isConversationLink(node) {
+    if (own(node) || node.closest(menuRegion)) return false;
+    const href = node.getAttribute('href');
+    if (!href || !URL.canParse(href, location.href)) return false;
+    const url = new URL(href, location.href);
+    return url.origin === location.origin && /^\/(?:g\/[^/]+\/)?c\/[^/]+\/?$/.test(url.pathname);
+  }
+  function findHistorySidebar() {
+    const usable = node => !own(node) && !node.closest(menuRegion) && !main.contains(node) &&
+      !node.contains(main) && !(composer && node.contains(composer));
+    const known = [...document.querySelectorAll(historyRegion)].find(usable);
+    if (known) return known;
+    const navigation = [...document.querySelectorAll('nav,[role="navigation"]')].filter(usable);
+    // A generic drawer can contain settings or account controls. Require a real
+    // conversation destination before using one as the history surface.
+    const withChats = node => [...node.querySelectorAll('a[href]')].some(isConversationLink);
+    return navigation.findLast(node => historyLabel.test(node.getAttribute('aria-label')?.trim() || '') && withChats(node)) ||
+      navigation.findLast(withChats) ||
+      [...document.querySelectorAll('aside,[data-testid="sidebar"]')].filter(usable).findLast(withChats) || null;
+  }
+  function historyContainerVisible() {
+    for (let node = sidebar?.parentElement; node; node = node.parentElement) {
+      const css = getComputedStyle(node);
+      if (css.display === 'none' || css.visibility === 'hidden') return false;
+    }
+    return !!sidebar;
+  }
+  function historyOpener() {
+    const button = findAction('openSidebar');
+    return button?.matches('button,[role="button"]') &&
+      !button.closest(`${menuRegion},dialog,[role="dialog"]`) ? button : null;
+  }
+  function serviceSidebarOpen() {
+    const mobileDrawer = document.querySelector('aside#ds-sidebar[role="dialog"]');
+    if (visible(mobileDrawer) && document.querySelector('[aria-controls="ds-sidebar"][aria-expanded="true"]')) return true;
+    return !!sidebar && historyOpener()?.getAttribute('aria-expanded') === 'true';
+  }
+  function dismissServiceSidebar() {
+    if (!serviceSidebarOpen()) { closingServiceSidebar = false; return; }
+    if (historyOpen || pendingHistory || closingServiceSidebar || document.querySelector('dialog[open]')) return;
+    const close = originals().find(node => node.matches('button,[role="button"]') &&
+      patterns.closeSidebar.test(label(node)) && available(node) && visible(node) && !node.closest(menuRegion));
+    if (close) {
+      closingServiceSidebar = true;
+      close.click();
+    }
+  }
   function element(tag, value, className) {
     const node = document.createElement(tag);
     if (value) node.textContent = value;
@@ -124,6 +385,24 @@ enum EasyAIPage {
     if (!config.enabled || !document.documentElement.hasAttribute('data-rivo-easy-ai')) return;
     fitEditor(document.querySelector('[data-rivo-ai-editor]'));
     measure();
+    if (activeAuthDialog?.open) requestAnimationFrame(revealAuthInput);
+  }
+  function revealAuthInput() {
+    const dialog = activeAuthDialog;
+    const field = document.activeElement;
+    if (!dialog?.open || !dialog.contains(field) || !field.matches('input,textarea,[contenteditable="true"]')) return;
+    const bounds = field.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    const frame = dialog.getBoundingClientRect();
+    const top = Math.max(frame.top, viewport?.offsetTop || 0) + 12;
+    const bottom = Math.min(frame.bottom, (viewport?.offsetTop || 0) + (viewport?.height || innerHeight)) - 12;
+    const submit = field.form?.querySelector('[data-rivo-auth-action="continue"],button[type="submit"]');
+    const submitBounds = visible(submit) ? submit.getBoundingClientRect() : null;
+    const targetBottom = submitBounds && submitBounds.bottom - bounds.top <= bottom - top
+      ? Math.max(bounds.bottom, submitBounds.bottom) : bounds.bottom;
+    const delta = bounds.top < top ? bounds.top - top : Math.max(0, targetBottom - bottom);
+    const zoom = document.documentElement.currentCSSZoom || 1;
+    if (delta) dialog.scrollTop += delta / zoom;
   }
   function measure() {
     if (!toolbar?.isConnected) return;
@@ -139,27 +418,11 @@ enum EasyAIPage {
   function setMore(open, focus = true) {
     moreOpen = open && !!menuPanel?.isConnected;
     if (menuPanel) menuPanel.hidden = !moreOpen;
-    if (!moreOpen) setPlatforms(false);
     moreButton?.setAttribute('aria-expanded', String(moreOpen));
     if (focus) {
       if (moreOpen) [...menuPanel.querySelectorAll('button')].find(node => !node.hidden && available(node))?.focus();
       else moreButton?.focus();
     }
-  }
-  function setPlatforms(open) {
-    const button = actionButtons.platforms;
-    if (!button) return;
-    button.setAttribute('aria-expanded', String(open));
-    const choices = menuPanel.querySelectorAll('[data-rivo-ai-platform]');
-    for (const choice of choices) choice.hidden = !open;
-    if (open) choices[0]?.focus();
-  }
-  function closeMoreLevel() {
-    const button = actionButtons.platforms;
-    if (button?.getAttribute('aria-expanded') === 'true') {
-      setPlatforms(false);
-      button.focus();
-    } else setMore(false);
   }
   function setHistory(open) {
     if (open) setMore(false, false);
@@ -171,9 +434,13 @@ enum EasyAIPage {
     if (sidebar) {
       if (!originalInert.has(sidebar)) originalInert.set(sidebar, sidebar.inert);
       sidebar.inert = historyOpen ? false : originalInert.get(sidebar);
-      mark(sidebar, 'role', historyOpen ? 'dialog' : marked.get(sidebar)?.get('role') || 'complementary');
-      mark(sidebar, 'aria-label', text().history);
-      mark(sidebar, 'aria-modal', historyOpen ? 'true' : 'false');
+      if (historyOpen) {
+        mark(sidebar, 'role', 'dialog');
+        mark(sidebar, 'aria-label', text().history);
+        mark(sidebar, 'aria-modal', 'true');
+      } else {
+        for (const attr of ['role', 'aria-label', 'aria-modal']) unmark(sidebar, attr);
+      }
     }
     actionButtons.history?.setAttribute('aria-expanded', String(historyOpen));
     if (historyOpen) closeButton?.focus();
@@ -181,22 +448,33 @@ enum EasyAIPage {
   }
   function activate(name) {
     if (name === 'history') {
-      if (sidebar) { setHistory(true); return; }
-      pendingHistory = true;
-      const open = findAction('openSidebar');
-      if (open && available(open)) open.click();
-      schedule();
-      if (sidebar) { pendingHistory = false; setHistory(true); }
-      else {
-        clearTimeout(historyTimer);
-        historyTimer = setTimeout(() => {
-          if (pendingHistory && status) { pendingHistory = false; status.textContent = text().missing; }
-        }, 2000);
+      status.textContent = '';
+      const account = findAction('account');
+      if (account && loginLabel.test(label(account)) &&
+          ![...sidebar?.querySelectorAll('a[href]') || []].some(isConversationLink)) {
+        status.textContent = text().historyLogin;
+        return;
       }
+      if (sidebar && historyContainerVisible()) { setHistory(true); return; }
+      const open = historyOpener();
+      const controlled = open && document.getElementById(open.getAttribute('aria-controls') || '');
+      const confirmedOpener = sidebar || (controlled && (controlled.matches(historyRegion) ||
+        historyLabel.test(controlled.getAttribute('aria-label')?.trim() || ''))) ||
+        (account && !loginLabel.test(label(account)) && open?.matches('[data-testid="open-sidebar-button"]'));
+      if (!available(open) || !confirmedOpener) { status.textContent = text().missing; return; }
+      pendingHistory = true;
+      open.click();
+      schedule();
+      clearTimeout(historyTimer);
+      historyTimer = setTimeout(() => {
+        if (!pendingHistory) return;
+        pendingHistory = false;
+        status.textContent = text().missing;
+      }, 2000);
       return;
     }
     const target = findAction(name);
-    if (name === 'account' && sidebar?.contains(target) && !/^(?:로그인|Log in|Sign in|ログイン)$/i.test(label(target))) setHistory(true);
+    if (name === 'account' && sidebar?.contains(target) && !loginLabel.test(label(target))) setHistory(true);
     if (!available(target)) { status.textContent = text().missing; return; }
     if (name === 'newChat') setHistory(false);
     // User-initiated activation of the service's original React control.
@@ -235,30 +513,6 @@ enum EasyAIPage {
       actionButtons[name] = button;
       menuPanel.appendChild(button);
     }
-    const platforms = element('button', text().platforms);
-    platforms.type = 'button';
-    platforms.setAttribute('role', 'menuitem');
-    platforms.setAttribute('aria-expanded', 'false');
-    platforms.addEventListener('click', () => setPlatforms(platforms.getAttribute('aria-expanded') !== 'true'));
-    actionButtons.platforms = platforms;
-    menuPanel.appendChild(platforms);
-    for (const [name, url] of [
-      ['Claude', 'https://claude.ai/'],
-      ['Gemini', 'https://gemini.google.com/'],
-      ['GPT', 'https://chatgpt.com/']
-    ]) {
-      const choice = element('button', name);
-      choice.type = 'button';
-      choice.hidden = true;
-      choice.setAttribute('role', 'menuitem');
-      choice.setAttribute('data-rivo-ai-platform', '');
-      if (location.origin === new URL(url).origin) choice.setAttribute('aria-current', 'true');
-      choice.addEventListener('click', () => {
-        setMore(false);
-        if (location.origin !== new URL(url).origin) location.assign(url);
-      });
-      menuPanel.appendChild(choice);
-    }
     status = element('p', '', 'rivo-ai-status');
     status.setAttribute('role', 'status');
     toolbar.append(help, menuPanel, status);
@@ -272,6 +526,8 @@ enum EasyAIPage {
     const p = config.palette === 'light' ? {bg:'#FFFFFF',surface:'#F0F2F5',text:'#283546',edge:'#536176',link:'#704000'} : theme;
     const panel = /^#[0-9a-f]{6}$/i.test(p.surface) ? `${p.surface}CC` : p.surface;
     const root = 'html[data-rivo-easy-ai]';
+    const auth = `${root} #mobile-auth-dialog[open]`;
+    const authSheet = `${auth} > div > div > section`;
     return `
       ${root} { --rivo-ai-bg:${p.bg}; --rivo-ai-surface:${p.surface}; --rivo-ai-text:${p.text}; --rivo-ai-edge:${p.edge}; --rivo-ai-accent:${p.link}; --rivo-ai-toolbar-height:160px;
         --main-surface-primary:transparent; --sidebar-surface-primary:${p.surface}; --message-surface:${p.surface};
@@ -347,7 +603,90 @@ enum EasyAIPage {
       ${root}[data-rivo-ai-mobile] [data-rivo-ai-attach-menu] nav::before, ${root}[data-rivo-ai-mobile] [data-rivo-ai-attach-menu] nav::after { display:none!important; }
       ${root}[data-rivo-ai-mobile] [data-rivo-ai-attach-menu] button { min-height:48px!important; font-size:20px!important; color:${p.text}!important; background:transparent!important; }
       ${root}[data-rivo-ai-mobile] [data-rivo-ai-attach-menu] button * { color:${p.text}!important; -webkit-text-fill-color:${p.text}!important; background-color:transparent!important; }
-      ${root}[data-rivo-ai-mobile] :is(#mobile-auth-dialog,#mobile-new-chat-dialog)[open] { inset:0!important; margin:0!important; width:var(--rivo-ai-viewport-width)!important; height:var(--rivo-ai-viewport-height)!important; max-height:var(--rivo-ai-viewport-height)!important; overflow:auto!important; transform:none!important; }
+      ${root}[data-rivo-ai-mobile] #mobile-new-chat-dialog[open] { inset:0!important; margin:0!important; width:var(--rivo-ai-viewport-width)!important; height:var(--rivo-ai-viewport-height)!important; max-height:var(--rivo-ai-viewport-height)!important; overflow:auto!important; transform:none!important; }
+      ${root}:has(#mobile-auth-dialog[open] > div > div > section) :is([data-rivo-ai-main],[data-rivo-ai-footer],.rivo-ai-toolbar,.rivo-ai-more) {
+        visibility:hidden!important;
+      }
+      ${auth}::backdrop { background:transparent!important; }
+      ${auth} {
+        position:fixed!important; inset:0 auto auto 0!important; display:flex!important; flex-direction:column!important;
+        margin:0!important; border:0!important; border-radius:0!important; box-shadow:none!important;
+        width:var(--rivo-ai-viewport-width,100vw)!important; max-width:none!important;
+        height:var(--rivo-ai-viewport-height,100dvh)!important; max-height:var(--rivo-ai-viewport-height,100dvh)!important;
+        min-height:0!important; box-sizing:border-box!important; transform:none!important;
+        padding:24px 18px!important; overflow:auto!important; overscroll-behavior:contain;
+        background:${config.palette === 'light' ? p.bg : 'transparent'}!important;
+        color:${p.text}!important; scroll-padding-block:16px!important;
+      }
+      /* Flatten the known mobile sheet wrappers without moving inputs or forms. */
+      ${auth} > div:has(> div > section), ${auth} > div > div:has(> section), ${authSheet}, ${authSheet} > div:has(header) {
+        position:relative!important; inset:auto!important; min-height:0!important; height:auto!important; max-height:none!important;
+        min-width:0!important; width:100%!important; max-width:none!important;
+        transform:none!important; translate:none!important; overflow:visible!important; flex:none!important;
+        box-sizing:border-box!important; padding:0!important; background:transparent!important; box-shadow:none!important; border:0!important;
+      }
+      ${auth} > div:has(> div > section) { margin-block:auto!important; }
+      ${auth} > div > div:has(> section) > form[method="dialog"] {
+        position:absolute!important; inset:0!important; width:100%!important; height:100%!important; min-height:0!important;
+        margin:0!important; overflow:hidden!important; background:transparent!important;
+      }
+      ${authSheet} div:has(> #mobile-auth-title) { gap:8px!important; padding-block-end:20px!important; }
+      ${authSheet} > div:has(header) > div:first-child:empty { display:none!important; }
+      ${authSheet} #mobile-auth-title { margin:0!important; padding-inline:12px!important; }
+      ${authSheet} #mobile-auth-description { margin:0!important; }
+      ${authSheet} {
+        z-index:1!important; max-width:560px!important; margin:0 auto!important;
+        padding-block:36px 8px!important; font-family:system-ui,-apple-system,sans-serif!important; color:${p.text}!important;
+      }
+      ${authSheet} :is(h1,h2,[role="heading"],[data-rivo-auth-copy="title"]) {
+        font-size:clamp(22px,4vw,28px)!important; line-height:1.35!important;
+        font-weight:700!important; text-align:center!important; word-break:keep-all!important; overflow-wrap:anywhere;
+      }
+      ${authSheet} :is(p,[data-rivo-auth-copy="description"]) {
+        font-size:clamp(16px,3.5vw,19px)!important; line-height:1.55!important; word-break:keep-all!important; overflow-wrap:anywhere;
+      }
+      ${authSheet} :is([data-rivo-auth-action="method"],[data-rivo-auth-action="continue"],input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])) {
+        width:100%!important; max-width:100%!important; min-height:56px!important; min-width:0!important;
+        box-sizing:border-box!important; white-space:normal!important; overflow-wrap:anywhere;
+        border:1px solid ${p.edge}!important; border-radius:14px!important;
+        padding:10px 14px!important; font-size:clamp(16px,4vw,22px)!important; line-height:1.35!important;
+        background:${p.surface}!important; color:${p.text}!important; -webkit-text-fill-color:${p.text}!important;
+        scroll-margin-block:16px!important;
+      }
+      ${authSheet}:has([data-rivo-auth-method-row]) #mobile-auth-description { display:none!important; }
+      ${authSheet} [data-rivo-auth-method-row] {
+        display:grid!important; grid-template-columns:repeat(3,minmax(0,1fr))!important;
+        gap:8px!important; width:100%!important; align-items:stretch!important; margin-top:8px!important;
+      }
+      ${authSheet} [data-rivo-auth-method-row] > :not([data-rivo-auth-short]) { grid-column:1/-1; }
+      ${authSheet} [data-rivo-auth-method-row] > [data-rivo-auth-action="method"][data-rivo-auth-short] {
+        grid-row:1; grid-column:var(--rivo-auth-method-column);
+        display:flex!important; flex-direction:column!important; align-items:center!important; justify-content:center!important;
+        gap:4px!important; text-align:center!important; padding-inline:4px!important;
+        font-size:clamp(14px,3.5vw,18px)!important; font-weight:600!important; text-decoration:none!important;
+      }
+      ${authSheet} [data-rivo-auth-method-row] > [data-rivo-auth-short="Google"] { --rivo-auth-method-column:1; }
+      ${authSheet} [data-rivo-auth-method-row] > [data-rivo-auth-short="Apple"] { --rivo-auth-method-column:2; }
+      ${authSheet} [data-rivo-auth-method-row] > [data-rivo-auth-short]:not([data-rivo-auth-short="Google"]):not([data-rivo-auth-short="Apple"]) { --rivo-auth-method-column:3; }
+      ${authSheet} [data-rivo-auth-method-row] > [data-rivo-auth-short] > span {
+        display:flex!important; align-items:center!important; justify-content:center!important; margin:0!important;
+      }
+      ${authSheet} [data-rivo-auth-method-row] > [data-rivo-auth-short] > span > :not(:has(svg,img)) { display:none!important; }
+      ${authSheet} [data-rivo-auth-method-row] > [data-rivo-auth-short] :is(svg,img) {
+        width:20px!important; height:20px!important; flex:none!important;
+      }
+      ${authSheet} [data-rivo-auth-method-row] > [data-rivo-auth-short]::after {
+        content:attr(data-rivo-auth-short); white-space:nowrap!important; font-size:clamp(14px,3vw,18px)!important;
+      }
+      ${authSheet} [data-rivo-auth-action="continue"] {
+        background:#CCE7D3!important; border-color:#CCE7D3!important; color:#14271E!important; -webkit-text-fill-color:#14271E!important;
+        font-weight:700!important;
+      }
+      ${authSheet} [data-rivo-auth-action="dial-code"] {
+        min-height:56px!important; width:100%!important; padding-inline:14px!important; font-size:18px!important;
+      }
+      ${authSheet} [data-rivo-auth-action="close"] { display:none!important; }
+      ${authSheet} :is(button,input,a[href]):focus-visible { outline:3px solid ${p.link}!important; outline-offset:-3px!important; }
       ${root}[data-rivo-ai-short] [data-rivo-ai-footer] { max-height:calc(var(--rivo-ai-viewport-height) - var(--rivo-ai-toolbar-height) - 12px)!important; }
       ${root}[data-rivo-ai-compact] .rivo-ai-toolbar:not([data-rivo-ai-empty-toolbar]) { padding-top:8px!important; padding-bottom:8px!important; }
       ${root}[data-rivo-ai-compact] .rivo-ai-menu button { min-height:52px!important; font-size:20px!important; }
@@ -383,7 +722,7 @@ enum EasyAIPage {
     document.documentElement.removeAttribute('data-rivo-ai-compact');
     document.documentElement.removeAttribute('data-rivo-ai-short');
     toolbar?.remove(); moreButton?.remove(); closeButton?.remove(); style?.remove();
-    toolbar = closeButton = style = moreButton = menuPanel = help = null;
+    toolbar = closeButton = style = moreButton = menuPanel = help = sidebar = activeAuthDialog = authMethodRow = null;
   }
   function dismissPromotions() {
     if (!config.enabled || !document.documentElement.hasAttribute('data-rivo-easy-ai')) return;
@@ -395,19 +734,127 @@ enum EasyAIPage {
     // Use the provider's explicit web alternative so its modal/inert state closes too.
     if (available(stayOnWeb)) { dismissingPromotion = sheet; stayOnWeb.click(); }
   }
+  function styleAuthMethodRow(dialog, sheet) {
+    const actions = [...sheet.querySelectorAll('[data-rivo-auth-action="method"]')].filter(visible);
+    const phoneMode = visible(sheet.querySelector('#mobile-auth-phone'));
+    const cards = [
+      [actions.find(node => /Google/i.test(label(node))), 'Google'],
+      [actions.find(node => /Apple/i.test(label(node))), 'Apple'],
+      [actions.find(node => node.querySelector('svg use[href$="#lightweight-auth-phone"],svg use[href$="#lightweight-auth-email"]')),
+        phoneMode ? text().authEmail : text().authPhone],
+    ];
+    const row = cards[0][0]?.parentElement;
+    const matched = row && cards.every(([node]) => node?.parentElement === row && node.childElementCount === 1 && node.firstElementChild.matches('span:has(svg,img)') &&
+      ![...node.childNodes].some(child => child.nodeType === Node.TEXT_NODE && child.textContent.trim()));
+    if (authMethodRow && authMethodRow !== (matched ? row : null)) {
+      unmark(authMethodRow, 'data-rivo-auth-method-row');
+      for (const node of authMethodRow.querySelectorAll('[data-rivo-auth-short]')) {
+        unmark(node, 'data-rivo-auth-short');
+        unmark(node, 'aria-label');
+      }
+      authMethodRow = null;
+    }
+    if (!matched) { unmark(dialog, 'aria-describedby'); return; }
+    authMethodRow = row;
+    mark(row, 'data-rivo-auth-method-row');
+    mark(dialog, 'aria-describedby', '');
+    for (const [node, shortName] of cards) {
+      const originalName = node.textContent?.trim() || label(node);
+      mark(node, 'aria-label', originalName);
+      mark(node, 'data-rivo-auth-short', shortName);
+    }
+  }
+  function styleAuthDialog() {
+    const dialog = document.querySelector('#mobile-auth-dialog[open]');
+    const sheet = dialog?.querySelector(':scope > div > div > section');
+    if (!sheet) { activeAuthDialog = null; return; }
+    if (activeAuthDialog !== dialog) {
+      activeAuthDialog = dialog;
+      requestAnimationFrame(() => {
+        if (activeAuthDialog !== dialog || !dialog.open) return;
+        const focused = document.activeElement;
+        if (sheet.contains(focused) && focused.matches('input,textarea,[contenteditable="true"],iframe')) return;
+        const title = sheet.querySelector('#mobile-auth-title,h1,h2,[role="heading"]');
+        if (title) {
+          mark(title, 'tabindex', '-1');
+          title.focus({preventScroll:true});
+        }
+        dialog.scrollTop = 0;
+      });
+    }
+    for (const [attr, kind] of [['aria-labelledby', 'title'], ['aria-describedby', 'description']]) {
+      for (const id of dialog.getAttribute(attr)?.split(/\s+/) || []) {
+        const node = document.getElementById(id);
+        if (sheet.contains(node)) mark(node, 'data-rivo-auth-copy', kind);
+      }
+    }
+    for (const button of sheet.querySelectorAll('button,[role="button"],a[href]')) {
+      const name = label(button);
+      if (/^(?:닫기|Close|閉じる)$/i.test(name)) mark(button, 'data-rivo-auth-action', 'close');
+      else if (/국가 코드|country code|国番号/i.test(name)) mark(button, 'data-rivo-auth-action', 'dial-code');
+      else if (button.matches('button[type="submit"]') || (button.closest('form') &&
+        !button.querySelector('svg use[href$="#lightweight-auth-phone"],svg use[href$="#lightweight-auth-email"]') &&
+        /^(?:휴대 전화 번호로 계속하기|Continue with (?:a )?phone(?: number)?|電話番号で続ける)$/i.test(name)))
+        mark(button, 'data-rivo-auth-action', 'continue');
+      else if (/Google|Apple|Microsoft|이메일|e-?mail|メール|전화\s*번호|phone|電話番号/i.test(name))
+        mark(button, 'data-rivo-auth-action', 'method');
+      else if (/^(?:계속|다음|로그인|Continue|Next|Log in|Sign in|続ける|次へ|ログイン)$/i.test(name))
+        mark(button, 'data-rivo-auth-action', 'continue');
+      else unmark(button, 'data-rivo-auth-action');
+    }
+    styleAuthMethodRow(dialog, sheet);
+  }
+  function findParts() {
+    const main = document.querySelector('main,[role="main"]');
+    const editor = [...document.querySelectorAll('#prompt-textarea,#mobile-composer-prompt,main [role="textbox"][contenteditable="true"],main textarea')].find(visible);
+    return {main, editor};
+  }
+  function confirmStartup(main, editor) {
+    if (startupComplete || document.readyState === 'loading' || serviceSidebarOpen() ||
+        (main === startupMain && editor === startupEditor)) return;
+    clearTimeout(stableTimer);
+    startupMain = main;
+    startupEditor = editor;
+    stableTimer = setTimeout(() => {
+      const current = findParts();
+      if (current.main === main && current.editor === editor && !serviceSidebarOpen() &&
+          document.documentElement.hasAttribute('data-rivo-easy-ai') && document.readyState !== 'loading') startupComplete = true;
+      else { startupMain = startupEditor = null; schedule(); }
+    }, 1000);
+  }
   function refresh() {
     timer = undefined;
     for (const node of marked.keys()) if (!node.isConnected) { resizeObserver?.unobserve(node); marked.delete(node); originalInert.delete(node); editorHeights.delete(node); }
-    if (!config.enabled || /^\/(?:auth|api|backend-api)(?:\/|$)/.test(location.pathname)) { if (marked.size) restore(); return; }
-    main = document.querySelector('main,[role="main"]');
-    const editor = [...document.querySelectorAll('#prompt-textarea,#mobile-composer-prompt,main [role="textbox"][contenteditable="true"],main textarea')].find(visible);
-    // Unknown or verification pages remain usable. Never hide a page while waiting.
-    if (!main || !editor) { if (marked.size) restore(); return; }
+    if (!config.enabled || /^\/(?:auth|api|backend-api)(?:\/|$)/.test(location.pathname)) {
+      startupComplete = true;
+      if (style) restore();
+      return;
+    }
+    const parts = findParts();
+    if (!parts.main || !parts.editor) {
+      if (style && document.querySelector('#mobile-auth-dialog[open]')) {
+        styleAuthDialog();
+        measure();
+        return;
+      }
+      clearTimeout(stableTimer);
+      startupMain = startupEditor = null;
+      if (style) {
+        missingSince ??= performance.now();
+        if (performance.now() - missingSince < 1000) schedule();
+        else restore();
+      }
+      return;
+    }
+    missingSince = undefined;
     if (!document.body) return;
+    main = parts.main;
+    const editor = parts.editor;
     if (!style) { style = element('style'); style.id = 'rivo-easy-ai-style'; style.textContent = stylesheet(); document.documentElement.appendChild(style); }
     document.documentElement.setAttribute('data-rivo-easy-ai', '');
     dismissPromotions();
     buildToolbar();
+    styleAuthDialog();
     mark(main, 'data-rivo-ai-main');
     mark(editor, 'data-rivo-ai-editor');
     const form = editor.closest('form') || editor.closest('[data-type="unified-composer"]');
@@ -474,20 +921,17 @@ enum EasyAIPage {
     if (header) for (const node of header.querySelectorAll('button')) {
       if (patterns.openSidebar.test(label(node))) mark(node, 'data-rivo-ai-secondary-nav');
     }
-    const nextSidebar = document.querySelector('aside,[data-testid="sidebar"]') ||
-      [...document.querySelectorAll('nav[aria-label],[role="navigation"],[role="dialog"]')].find(node =>
-        !own(node) && !main.contains(node) &&
-        (node.querySelector('a[href*="/c/"]') || /chat history|채팅 기록|会話履歴/i.test(node.getAttribute('aria-label') || '')));
-    if (sidebar !== nextSidebar) { if (historyOpen) setHistory(false); sidebar = nextSidebar; }
+    const nextSidebar = historyOpen && sidebar?.isConnected ? sidebar : findHistorySidebar();
+    if (sidebar !== nextSidebar) {
+      if (historyOpen) setHistory(false);
+      unmark(sidebar, 'data-rivo-ai-sidebar');
+      closeButton?.remove();
+      sidebar = nextSidebar;
+    }
+    // The provider can restore its menu even for guests who have no saved chats.
+    // Let the original close action clear the inert state from the composer.
+    dismissServiceSidebar();
     if (sidebar) {
-      // A persisted original drawer can keep the original main/footer inert even
-      // when our presentation hides it. Close it through the service's handler.
-      const serviceOpen = findAction('openSidebar')?.getAttribute('aria-expanded') === 'true';
-      if (!serviceOpen) closingServiceSidebar = false;
-      if (!historyOpen && serviceOpen && !closingServiceSidebar && !document.querySelector('dialog[open]')) {
-        const close = findAction('closeSidebar');
-        if (available(close)) { closingServiceSidebar = true; close.click(); }
-      }
       mark(sidebar, 'data-rivo-ai-sidebar');
       if (!closeButton || !sidebar.contains(closeButton)) {
         closeButton = element('button', text().back, 'rivo-ai-close');
@@ -495,26 +939,32 @@ enum EasyAIPage {
         closeButton.addEventListener('click', () => setHistory(false));
         sidebar.prepend(closeButton);
       }
-      if (pendingHistory) { pendingHistory = false; clearTimeout(historyTimer); setHistory(true); }
+      if (pendingHistory && historyContainerVisible()) {
+        pendingHistory = false;
+        clearTimeout(historyTimer);
+        setHistory(true);
+      }
     }
     // Guest conversations can stay on /, so the transcript determines this state.
     const hasConversation = !!main.querySelector('[data-message-author-role="user"],[data-message-author-role="assistant"],[data-message-role="user"],[data-message-role="assistant"],[data-user-message-bubble],[data-assistant-markdown]');
     actionButtons.newChat.hidden = !hasConversation;
     help.hidden = hasConversation;
     measure();
-    if (actionButtons.platforms.textContent !== text().platforms) actionButtons.platforms.textContent = text().platforms;
+    confirmStartup(main, editor);
     for (const name of ['newChat','history','account']) {
-      const target = name === 'history' ? sidebar || findAction('openSidebar') : findAction(name);
-      actionButtons[name].disabled = name === 'history' ? !target : !available(target);
-      const title = name === 'account' && target && /^(?:로그인|Log in|Sign in|ログイン)$/i.test(label(target)) ? text().login : text()[name];
+      const target = name === 'history' ? null : findAction(name);
+      actionButtons[name].disabled = name !== 'history' && !available(target);
+      const title = name === 'account' && target && loginLabel.test(label(target)) ? text().login : text()[name];
       if (actionButtons[name].textContent !== title) actionButtons[name].textContent = title;
     }
   }
   function schedule() { if (!timer && config.enabled) timer = setTimeout(refresh, 120); }
-  window.__rivoEasyAI = {back() {
-    if (moreOpen) { closeMoreLevel(); return true; }
+  window.__rivoEasyAI = {ready() { return startupComplete; }, back() {
+    if (moreOpen) { setMore(false); return true; }
     const dialog = [...document.querySelectorAll('dialog[open]')].filter(visible).at(-1);
     if (dialog) {
+      const authClose = dialog.id === 'mobile-auth-dialog' && dialog.querySelector('[data-rivo-auth-action="close"]');
+      if (available(authClose)) { authClose.click(); return true; }
       const close = [...dialog.querySelectorAll('button')].find(node => visible(node) && /^(?:닫기|취소|Close|Cancel|閉じる|キャンセル)$/i.test(label(node)));
       if (close) { close.click(); return true; }
       if (typeof dialog.requestClose === 'function') { dialog.requestClose(); return true; }
@@ -525,19 +975,20 @@ enum EasyAIPage {
   }, set(next) {
     if (!next || typeof next.enabled !== 'boolean') return;
     config = {...config, ...next};
-    if (!config.enabled) restore();
+    if (!config.enabled) { startupComplete = true; restore(); }
     else { if (style) style.textContent = stylesheet(); refresh(); if (style) style.textContent = stylesheet(); }
   }};
   observer = new MutationObserver(records => {
     if (records.some(record => !own(record.target) && record.target !== style &&
         (record.type === 'attributes' || [...record.addedNodes,...record.removedNodes].some(node => node.nodeType === Node.ELEMENT_NODE && !own(node))))) schedule();
   });
-  observer.observe(document, {subtree:true,childList:true,attributes:true,attributeFilter:['open','class','id','role','aria-label','disabled','aria-expanded','data-message-role','data-message-author-role']});
+  observer.observe(document, {subtree:true,childList:true,attributes:true,attributeFilter:['open','inert','class','id','role','aria-label','disabled','aria-expanded','aria-controls','href','data-message-role','data-message-author-role']});
   document.addEventListener('toggle', event => {
     if (event.target.id === 'beacon-content-sheet' && event.newState === 'open') dismissPromotions();
   }, true);
   document.addEventListener('click', event => {
-    if (historyOpen && !own(event.target) && event.target.closest('a[href*="/c/"]')) setHistory(false);
+    const link = historyOpen && event.target.closest?.('a[href]');
+    if (link && isConversationLink(link)) setHistory(false);
   }, true);
   document.addEventListener('pointerdown', event => {
     if (moreOpen && !menuPanel.contains(event.target) && !moreButton.contains(event.target)) setMore(false, false);
@@ -546,7 +997,7 @@ enum EasyAIPage {
     if (moreOpen && !menuPanel.contains(event.target) && !moreButton.contains(event.target)) setMore(false, false);
   }, true);
   document.addEventListener('keydown', event => {
-    if (moreOpen && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeMoreLevel(); return; }
+    if (moreOpen && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setMore(false); return; }
     if (moreOpen && menuPanel.contains(event.target) && ['ArrowDown','ArrowUp','Home','End'].includes(event.key)) {
       event.preventDefault();
       const items = [...menuPanel.querySelectorAll('button')].filter(node => !node.hidden && available(node));
@@ -569,6 +1020,7 @@ enum EasyAIPage {
     if (editor) { fitEditor(editor); measure(); }
   }, true);
   document.addEventListener('DOMContentLoaded', schedule, {once:true});
+  window.addEventListener('load', schedule, {once:true});
   window.addEventListener('pageshow', schedule);
   window.addEventListener('resize', resizeLayout);
   window.addEventListener('rivo-page-zoom', resizeLayout);
