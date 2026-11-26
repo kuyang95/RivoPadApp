@@ -382,7 +382,10 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     }
     let newsArticle: Bool
     let aiWeb: Bool
-    init(easyYouTube: Bool, embedded: Bool = false, newsArticle: Bool = false, easyMail: Bool = false, aiWeb: Bool = false) {
+    private var usesBrowserPreparation: Bool { !easyYouTube && !easyMail && !newsArticle && !aiWeb }
+
+    init(easyYouTube: Bool, embedded: Bool = false, newsArticle: Bool = false, easyMail: Bool = false,
+         aiWeb: Bool = false, initialQuery: String? = nil) {
         self.newsArticle = newsArticle
         self.aiWeb = aiWeb
         self.easyYouTube = easyYouTube
@@ -412,7 +415,13 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
         if easyMail {
             restoreMail()
             mailInbox = !mailAccounts.isEmpty
-        } else if !newsArticle {
+        }
+        if let initialQuery {
+            if usesBrowserPreparation, let url = AccessibleWebAddress.resolve(initialQuery) {
+                currentAddress = url.absoluteString
+            }
+            navigate(initialQuery)
+        } else if !easyMail && !newsArticle {
             navigate(aiWeb ? "https://chatgpt.com/" : easyYouTube ? EasyYouTubePage.home : "https://www.google.com")
         }
     }
@@ -478,6 +487,13 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
             forMainFrameOnly: false,
             in: Self.world
         ))
+        if usesBrowserPreparation {
+            controller.addUserScript(WKUserScript(
+                source: BrowserPagePreparation.bootstrap(appearanceEnabled: appearanceEnabled, simpleGoogleEnabled: simpleGoogleEnabled,
+                                                         palette: palette, embedded: embedded),
+                injectionTime: .atDocumentStart, forMainFrameOnly: true, in: Self.world
+            ))
+        }
     }
 
     func applyAppearance() {
@@ -509,7 +525,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
         if easyYouTube {
             view.evaluateJavaScript("window.__rivoYouTubeUIScale=\(scale);window.__rivoYouTubePrototype?.setUIScale?.(\(scale));", completionHandler: nil)
         }
-        if view === webView { zoomPercent = percent }
+        if view === webView && zoomPercent != percent { zoomPercent = percent }
     }
 
     func changeZoom(increase: Bool) {
@@ -582,7 +598,12 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
     }
 
     func reloadOrStop() {
-        if webView.isLoading { webView.stopLoading() }
+        if webView.isLoading {
+            webView.stopLoading()
+            if usesBrowserPreparation {
+                webView.evaluateJavaScript("window.__rivoBrowserPreparation?.finish()", in: nil, in: Self.world) { _ in }
+            }
+        }
         else { errorMessage = nil; webView.reload() }
     }
 
@@ -691,20 +712,26 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
             webView.observe(\.url, options: [.new]) { view, _ in update(view) },
             webView.observe(\.canGoBack, options: [.new]) { view, _ in update(view) },
             webView.observe(\.canGoForward, options: [.new]) { view, _ in update(view) },
-            webView.observe(\.isLoading, options: [.new]) { view, _ in update(view) },
-            webView.observe(\.estimatedProgress, options: [.new]) { view, _ in update(view) }
+            webView.observe(\.isLoading, options: [.new]) { view, _ in update(view) }
         ]
+        if easyYouTube {
+            observations.append(webView.observe(\.estimatedProgress, options: [.new]) { view, _ in update(view) })
+        }
         syncState()
     }
 
     private func syncState() {
-        currentAddress = webView.url?.absoluteString ?? (easyYouTube ? EasyYouTubePage.home : "https://www.google.com")
+        let address = webView.url?.absoluteString ?? (usesBrowserPreparation && windows.count == 1
+            ? currentAddress : easyYouTube ? EasyYouTubePage.home : "https://www.google.com")
+        if currentAddress != address { currentAddress = address }
         if let dialog = mailReaderActions, dialog.address != webView.url { resetMailReaderActions() }
-        hasPopup = windows.count > 1
-        canGoBack = webView.canGoBack || hasPopup
-        canGoForward = webView.canGoForward
-        isLoading = webView.isLoading
-        progress = webView.estimatedProgress
+        let popup = windows.count > 1
+        if hasPopup != popup { hasPopup = popup }
+        let canNavigateBack = webView.canGoBack || popup
+        if canGoBack != canNavigateBack { canGoBack = canNavigateBack }
+        if canGoForward != webView.canGoForward { canGoForward = webView.canGoForward }
+        if isLoading != webView.isLoading { isLoading = webView.isLoading }
+        if easyYouTube && progress != webView.estimatedProgress { progress = webView.estimatedProgress }
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
@@ -772,12 +799,15 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
             youtubeNavigation += 1
         }
         if easyMail && webView === self.webView { resetMailReaderActions() }
-        if webView === self.webView { errorMessage = nil; newsAwaitingDocument = newsArticle }
+        if webView === self.webView {
+            if errorMessage != nil { errorMessage = nil }
+            if newsArticle { newsAwaitingDocument = true }
+        }
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         if easyYouTube && webView === self.webView { youtubePlaybackLoading = isYouTubePlaybackURL(webView.url) }
-        if webView === self.webView { newsAwaitingDocument = false }
+        if newsArticle && webView === self.webView { newsAwaitingDocument = false }
         applyZoom(to: webView)
     }
 
@@ -802,7 +832,7 @@ final class AccessibleWebBrowserModel: NSObject, ObservableObject, WKNavigationD
                 webView.evaluateJavaScript(script, completionHandler: nil)
             }
         }
-        if webView === self.webView {
+        if webView === self.webView && !usesBrowserPreparation {
             setContentActive(youtubeContentActive)
         }
         applyZoom(to: webView)

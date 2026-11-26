@@ -20,9 +20,8 @@ struct AccessibleWebBrowserView: View {
     private var onClose: (() -> Void)?
 
     init(initialQuery: String? = nil, easyYouTube: Bool = false, newsArticle: Bool = false, easyMail: Bool = false, aiWeb: Bool = false) {
-        let model = AccessibleWebBrowserModel(easyYouTube: easyYouTube, newsArticle: newsArticle, easyMail: easyMail, aiWeb: aiWeb)
-        if let initialQuery { model.navigate(initialQuery) }
-        _browser = StateObject(wrappedValue: model)
+        _browser = StateObject(wrappedValue: AccessibleWebBrowserModel(easyYouTube: easyYouTube, newsArticle: newsArticle,
+            easyMail: easyMail, aiWeb: aiWeb, initialQuery: initialQuery))
         _address = State(initialValue: initialQuery ?? "https://www.google.com")
     }
 
@@ -177,8 +176,14 @@ struct AccessibleWebBrowserView: View {
                 .opacity(embedded && browser.easyYouTube && !browser.youtubeReady && !browser.youtubePlaybackLoading ? 0 : 1)
                 .accessibilityHidden(embedded && browser.easyYouTube && !browser.youtubeReady && !browser.youtubePlaybackLoading)
                 .overlay(alignment: .top) {
-                    if !browser.easyYouTube && !browser.newsArticle && browser.isLoading {
-                        ProgressView(value: browser.progress).tint(chromeAccent).accessibilityLabel("웹페이지 로딩")
+                    if !browser.easyYouTube && !browser.newsArticle && browser.isLoading && browser.errorMessage == nil {
+                        ProgressView(value: Optional<Double>.none)
+                            .progressViewStyle(.linear)
+                            .tint(chromeAccent)
+                            .frame(height: 2)
+                            .clipped()
+                            .allowsHitTesting(false)
+                            .accessibilityLabel("웹페이지 로딩")
                     }
                 }
                 .overlay {

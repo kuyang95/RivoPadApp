@@ -500,8 +500,9 @@ enum AccessibleGooglePage {
     return sites;
   }
   function refresh() {
+    clearTimeout(timer);
     timer = null;
-    if (!document.body) return;
+    if (window.__rivoBrowserPreparation || !document.body) return;
     const kind = route();
     if (!config.enabled || !kind || blocked()) { restore(); return; }
     // Don't mask unexpected home/consent variants with a fabricated homepage.
@@ -539,15 +540,16 @@ enum AccessibleGooglePage {
     document.documentElement.setAttribute('data-rivo-google-simple', kind);
     formatSources(ai);
   }
-  function schedule() { if (!timer) timer = setTimeout(refresh, 120); }
+  function schedule() { if (!window.__rivoBrowserPreparation && !timer) timer = setTimeout(refresh, 120); }
   window.__rivoGoogleSimple = {
+    refresh,
     set(value) {
-      const previousLanguage = config.language;
-      const previousFavorites = JSON.stringify(config.favorites||[]);
+      const previous = config;
       const draft = input?.value;
       config = {...config, ...value};
-      const favoritesChanged=previousFavorites!==JSON.stringify(config.favorites||[]);
-      if (previousLanguage !== config.language || favoritesChanged) restore();
+      const favoritesChanged = JSON.stringify(previous.favorites) !== JSON.stringify(config.favorites);
+      if (!favoritesChanged && Object.keys(value).every(key => key === 'favorites' || config[key] === previous[key])) return;
+      if (previous.language !== config.language || favoritesChanged) restore();
       refresh();
       if(favoritesChanged&&input&&draft!=null){input.value=draft;input.dispatchEvent(new Event('input',{bubbles:true}));}
     }

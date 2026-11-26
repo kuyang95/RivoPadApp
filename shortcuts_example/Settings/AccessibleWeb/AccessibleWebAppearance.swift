@@ -430,7 +430,7 @@ enum AccessibleWebAppearance {
   }
   function scanPending() {
     timer = undefined;
-    if (!style || !config.enabled) return;
+    if (window.__rivoBrowserPreparation || !style || !config.enabled) return;
     // Read authored styles, not our override. Restoring the sheet in the
     // same task avoids a repaint of the original colours between scans.
     withAuthoredPaint(() => {
@@ -439,6 +439,7 @@ enum AccessibleWebAppearance {
     pending.clear();
   }
   function schedule(root) {
+    if (window.__rivoBrowserPreparation) return;
     if (!(root instanceof Element) || root === style || root.matches(skipped)) return;
     if (pending.has(document.documentElement)) return;
     pending.add(root.closest(iconControl) || root);
@@ -528,7 +529,7 @@ enum AccessibleWebAppearance {
     });
   }
   function mount(force=false) {
-    if (!document.documentElement) return;
+    if (window.__rivoBrowserPreparation || !document.documentElement) return;
     const key=JSON.stringify(config);
     if(!force && style?.isConnected && appliedConfig===key)return;
     if (!style) {
@@ -551,7 +552,10 @@ enum AccessibleWebAppearance {
     config = {enabled:next.enabled, palette:next.palette};
     mount();
   }
-  window.__rivoAccessibleWeb = {set, flushPending() {
+  window.__rivoAccessibleWeb = {set, refreshInitialPaint() {
+    mount(true);
+    observer.takeRecords(); // The full scan already covered these mutations.
+  }, flushPending() {
     if (!timer) return;
     clearTimeout(timer);
     scanPending();
