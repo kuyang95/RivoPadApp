@@ -3,44 +3,42 @@ import UIKit
 
 private enum ListeningMorePage: Hashable { case settings, episodes, speed, sleep, schedule }
 
-/// Center the podcast content beneath its navigation tools.
-private struct ListeningPodcastWideLayout: Layout {
-    let minimumHeight: CGFloat
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.replacingUnspecifiedDimensions().width
-        let heights = subviews.map { $0.sizeThatFits(.init(width: width, height: nil)).height }
-        return .init(width: width, height: max(minimumHeight, heights.reduce(0, +) + 48))
-    }
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let toolbar = subviews[0].sizeThatFits(.init(width: bounds.width, height: nil))
-        let panel = subviews[1].sizeThatFits(.init(width: bounds.width, height: nil))
-        subviews[0].place(at: bounds.origin, anchor: .topLeading, proposal: .init(width: bounds.width, height: toolbar.height))
-        let y = bounds.minY + toolbar.height + max(24, (bounds.height - toolbar.height - panel.height) / 2)
-        subviews[1].place(at: .init(x: bounds.midX, y: y), anchor: .top, proposal: .init(width: bounds.width, height: panel.height))
-    }
-}
-
-/// Keep related information close and give playback a deliberate lower position.
+/// Reserve room for the title and controls before sizing the cover.
 private struct ListeningPodcastPageLayout: Layout {
     let minimumHeight: CGFloat
-    private func sizes(_ views: Subviews, width: CGFloat) -> [CGSize] {
-        views.map { $0.sizeThatFits(.init(width: width, height: nil)) }
+    let hasChapters: Bool
+    private var compact: Bool { minimumHeight < 650 }
+    private var gaps: [CGFloat] { compact ? [16, 12, 16, 12] : [24, 18, 22, 24] }
+
+    private func measure(_ views: Subviews, width: CGFloat) -> (heights: [CGFloat], total: CGFloat) {
+        let textProposal = ProposedViewSize(width: width, height: nil)
+        let toolbar = views[0].sizeThatFits(textProposal).height
+        let details = views[2].sizeThatFits(textProposal).height
+        let playback = views[3].sizeThatFits(textProposal).height
+        let fixedHeight = toolbar + details + playback + gaps.reduce(0, +)
+        let preferred = min(width * (hasChapters ? 0.72 : 0.8),
+                            minimumHeight * (hasChapters ? 0.42 : 0.48),
+                            hasChapters ? 360 : 420)
+        let cover = min(width, max(compact ? 80 : 112, min(preferred, minimumHeight - fixedHeight)))
+        return ([toolbar, cover, details, playback], fixedHeight + cover)
     }
-    private func naturalHeight(_ sizes: [CGSize]) -> CGFloat {
-        sizes.reduce(0) { $0 + $1.height } + 32 + (sizes[2].height > 0 ? 32 : 0) + 48
-    }
+
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let width = proposal.replacingUnspecifiedDimensions().width
-        return .init(width: width, height: max(minimumHeight, naturalHeight(sizes(subviews, width: width))))
+        return .init(width: width, height: max(minimumHeight, measure(subviews, width: width).total))
     }
+
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let s = sizes(subviews, width: bounds.width)
-        let headingY = bounds.minY + s[0].height + 32
-        let chapterY = headingY + s[1].height + (s[2].height > 0 ? 32 : 0)
-        let lift = min(64, max(0, bounds.height - naturalHeight(s)) / 4)
-        let playbackY = bounds.maxY - s[3].height - lift
-        for (index, y) in [bounds.minY, headingY, chapterY, playbackY].enumerated() {
-            subviews[index].place(at: .init(x: bounds.minX, y: y), anchor: .topLeading, proposal: .init(width: bounds.width, height: s[index].height))
+        let (heights, total) = measure(subviews, width: bounds.width)
+        let topSpace = min(48, max(0, bounds.height - total) / 3)
+        var y = bounds.minY
+        for index in heights.indices {
+            let height = heights[index]
+            let width = index == 1 ? height : bounds.width
+            subviews[index].place(at: .init(x: bounds.midX, y: y), anchor: .top,
+                                  proposal: .init(width: width, height: height))
+            y += height + gaps[index]
+            if index == 0 { y += topSpace }
         }
     }
 }
@@ -142,20 +140,13 @@ struct ListeningView: View {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 24) {
                                 if let item = model.current, item.kind == "episode" {
-                                    let compact = viewport.size.height - 48 < 650
-                                    let wide = compact && min(viewport.size.width, 1000) - 48 >= 900
-                                    if wide {
-                                        ListeningPodcastWideLayout(minimumHeight: max(0, viewport.size.height - 48)) {
-                                            playerToolbar
-                                            podcastContent(item, compact: compact, wide: true)
-                                        }
-                                    } else {
-                                        ListeningPodcastPageLayout(minimumHeight: max(0, viewport.size.height - 48)) {
-                                            playerToolbar
-                                            podcastHeading(item, compact: compact)
-                                            podcastChapter(compact: compact)
-                                            podcastPlayback(item).padding(.bottom, 24)
-                                        }
+                                    let pageHeight = max(0, viewport.size.height - 48)
+                                    let hasChapters = !model.currentChapters.isEmpty
+                                    ListeningPodcastPageLayout(minimumHeight: pageHeight, hasChapters: hasChapters) {
+                                        playerToolbar
+                                        ListeningArtwork(url: model.currentArtworkURL, title: item.title, radio: false)
+                                        podcastDetails(item, hasChapters: hasChapters, compact: pageHeight < 650)
+                                        podcastPlayback(item, compact: pageHeight < 650)
                                     }
                                 } else {
                                     ListeningPlayerPageLayout(minimumHeight: max(0, viewport.size.height - 48)) {
@@ -457,30 +448,24 @@ struct ListeningView: View {
             .accessibilityHint(text("listen.more_hint"))
             .accessibilityFocused($readingFocus, equals: .moreButton)
     }
-    private func podcastHeading(_ item: ListeningItem, compact: Bool) -> some View {
-        HStack(spacing: 20) {
-            ListeningArtwork(url: model.currentArtworkURL, title: item.title, radio: false, naturalAspect: true)
-                .frame(width: compact ? 80 : 96, height: compact ? 80 : 96)
-            podcastInformation(item)
-        }
+    private func podcastDetails(_ item: ListeningItem, hasChapters: Bool, compact: Bool) -> some View {
+        VStack(spacing: compact ? 12 : 18) {
+            VStack(spacing: compact ? 6 : 10) {
+                Text(verbatim: item.subtitle).visionCraftAndroidText(18).foregroundStyle(ListeningAppearance.accent)
+                Text(verbatim: item.title).visionCraftAndroidText(28, weight: .medium, relativeTo: .largeTitle)
+                    .accessibilityAddTraits(.isHeader)
+                if model.buffering || model.playbackError {
+                    Text(verbatim: playbackStatus).visionCraftAndroidText(18).foregroundStyle(ListeningAppearance.accent)
+                }
+            }.fixedSize(horizontal: false, vertical: true)
+            if hasChapters { chapterControls().frame(maxWidth: 460) }
+        }.multilineTextAlignment(.center).frame(maxWidth: 560).frame(maxWidth: .infinity)
     }
-    @ViewBuilder private func podcastChapter(compact: Bool) -> some View {
-        if !model.currentChapters.isEmpty {
-            chapterControls(compact: compact).padding(16)
-                .background(VisionCraftUI.fixedColor(0x1D3429).opacity(0.94), in: RoundedRectangle(cornerRadius: 18))
-        } else { Color.clear.frame(height: 0) }
-    }
-    private func podcastDetails(_ item: ListeningItem, compact: Bool) -> some View {
-        VStack(alignment: .leading, spacing: compact ? 16 : 24) {
-            podcastHeading(item, compact: compact)
-            if !model.currentChapters.isEmpty { podcastChapter(compact: compact) }
-        }
-    }
-    private func podcastPlayback(_ item: ListeningItem) -> some View {
+    private func podcastPlayback(_ item: ListeningItem, compact: Bool) -> some View {
         let position = clock(model.position)
         let duration = clock(model.duration)
         let playbackTime = String(format: text("listen.playback_time"), position, duration)
-        return VStack(spacing: 20) {
+        return VStack(spacing: compact ? 12 : 20) {
             VStack(spacing: 8) {
                 ProgressView(value: min(model.position / max(model.duration, 1), 1)).tint(ListeningAppearance.accent).accessibilityHidden(true)
                 HStack {
@@ -492,32 +477,9 @@ struct ListeningView: View {
                     .accessibilityLabel(Text(verbatim: playbackTime))
                     .accessibilityHidden(model.duration <= 0)
             }
-            transport(item)
+            transport(item, compactPodcast: compact)
             if model.playbackError { Text(text("listen.play_error")).visionCraftAndroidText(18).foregroundStyle(ListeningAppearance.secondary) }
-        }
-    }
-    private func podcastContent(_ item: ListeningItem, compact: Bool, wide: Bool) -> some View {
-        Group {
-            if wide {
-                HStack(spacing: 32) {
-                    podcastDetails(item, compact: true).frame(maxWidth: .infinity, alignment: .leading)
-                    podcastPlayback(item).frame(width: 300)
-                }
-            } else {
-                VStack(spacing: 32) {
-                    podcastDetails(item, compact: compact)
-                    podcastPlayback(item)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
-    private func podcastInformation(_ item: ListeningItem) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(verbatim: item.subtitle).visionCraftAndroidText(18).foregroundStyle(ListeningAppearance.accent)
-            Text(verbatim: item.title).visionCraftAndroidText(28, weight: .medium, relativeTo: .largeTitle).accessibilityAddTraits(.isHeader)
-            if model.buffering || model.playbackError { Text(verbatim: playbackStatus).visionCraftAndroidText(18).foregroundStyle(ListeningAppearance.accent) }
-        }.frame(maxWidth: .infinity, alignment: .leading).multilineTextAlignment(.leading)
+        }.multilineTextAlignment(.center).frame(maxWidth: 460).frame(maxWidth: .infinity)
     }
     private func playbackControls(_ item: ListeningItem) -> some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -525,22 +487,25 @@ struct ListeningView: View {
             if model.playbackError { Text(text("listen.play_error")).visionCraftAndroidText(18).foregroundStyle(ListeningAppearance.secondary) }
         }
     }
-    @ViewBuilder private func transport(_ item: ListeningItem) -> some View {
+    @ViewBuilder private func transport(_ item: ListeningItem, compactPodcast: Bool = false) -> some View {
         if item.kind == "radio" {
             ViewThatFits(in: .horizontal) {
                 transportRow(item, spacious: true).frame(minWidth: 480)
                 transportRow(item, spacious: false)
             }.frame(maxWidth: 640).frame(maxWidth: .infinity)
         } else {
-            transportRow(item, spacious: false).frame(maxWidth: 340).frame(maxWidth: .infinity)
+            ViewThatFits(in: .horizontal) {
+                if !compactPodcast { transportRow(item, spacious: false).frame(minWidth: 296) }
+                transportRow(item, spacious: false, compactPodcast: true)
+            }.frame(maxWidth: 340).frame(maxWidth: .infinity)
         }
     }
-    private func transportRow(_ item: ListeningItem, spacious: Bool) -> some View {
+    private func transportRow(_ item: ListeningItem, spacious: Bool, compactPodcast: Bool = false) -> some View {
         let running = model.playing || model.buffering
-        let controlSize: CGFloat = item.kind == "episode" ? 112 : spacious ? 128 : 96
+        let controlSize: CGFloat = item.kind == "episode" ? (compactPodcast ? 88 : 112) : (spacious ? 128 : 96)
         return HStack(alignment: .center, spacing: spacious ? 24 : 12) {
             if item.kind == "radio" { channelButton(-1, spacious: spacious) }
-            if item.kind == "episode" { skipButton(-10, width: 80) }
+            if item.kind == "episode" { skipButton(-10, compact: compactPodcast) }
             Button { model.togglePlayback() } label: {
                 VStack(spacing: 10) {
                     Image(systemName: running ? (item.kind == "radio" ? "stop.fill" : "pause.fill") : "play.fill").font(.system(size: spacious ? 44 : 38))
@@ -548,7 +513,7 @@ struct ListeningView: View {
                 }.frame(maxWidth: .infinity).contentShape(Rectangle())
             }.buttonStyle(.plain)
                 .accessibilityLabel(text(running ? (item.kind == "radio" ? "listen.stop" : "listen.pause") : "listen.play"))
-            if item.kind == "episode" { skipButton(10, width: 80) }
+            if item.kind == "episode" { skipButton(10, compact: compactPodcast) }
             if item.kind == "radio" { channelButton(1, spacious: spacious) }
         }
     }
@@ -566,39 +531,34 @@ struct ListeningView: View {
         }.buttonStyle(.plain).accessibilityLabel(text(direction < 0 ? "listen.previous_station" : "listen.next_station"))
             .disabled(!enabled).opacity(enabled ? 1 : 0.38)
     }
-    private func skipButton(_ seconds: Double, width: CGFloat) -> some View {
+    private func skipButton(_ seconds: Double, compact: Bool) -> some View {
         Button { model.skip(seconds) } label: {
             Image(systemName: seconds < 0 ? "gobackward.10" : "goforward.10").font(.system(size: 30))
                 .frame(width: 64, height: 64).background(.white.opacity(0.07), in: Circle())
                 .overlay(Circle().strokeBorder(.white.opacity(0.45), lineWidth: 1.5))
-                .frame(width: width, height: 96).contentShape(Rectangle())
+                .frame(width: compact ? 64 : 80, height: compact ? 72 : 96).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityLabel(text(seconds < 0 ? "listen.skip_back" : "listen.skip_forward"))
             .disabled(model.duration <= 0).opacity(model.duration <= 0 ? 0.38 : 1)
     }
-    private func chapterControls(compact: Bool) -> some View {
+    private func chapterControls() -> some View {
         let chapter = model.currentChapterIndex.map { model.currentChapters[$0] }
         let title = chapter.map { $0.title.isEmpty ? clock($0.start) : $0.title } ?? ""
-        return HStack(spacing: 24) {
-            Group {
-                if compact {
-                    HStack(spacing: 12) {
-                        Text(text("listen.chapter")).visionCraftAndroidText(16).foregroundStyle(ListeningAppearance.secondary)
-                        Text(verbatim: title).visionCraftAndroidText(20, weight: .medium)
-                    }
-                } else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(text("listen.chapter")).visionCraftAndroidText(16).foregroundStyle(ListeningAppearance.secondary)
-                        Text(verbatim: title).visionCraftAndroidText(20, weight: .medium)
-                    }
-                }
-            }.frame(maxWidth: .infinity, alignment: .leading).multilineTextAlignment(.leading)
-            HStack(spacing: 8) { chapterButton(-1); chapterButton(1) }
+        return HStack(spacing: 12) {
+            chapterButton(-1)
+            VStack(spacing: 4) {
+                Text(text("listen.chapter")).visionCraftAndroidText(16).foregroundStyle(ListeningAppearance.secondary)
+                if !title.isEmpty { Text(verbatim: title).visionCraftAndroidText(20, weight: .medium) }
+            }
+            .fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity)
+            .accessibilityElement(children: .combine)
+            chapterButton(1)
         }
     }
     private func chapterButton(_ direction: Int) -> some View {
         Button { model.moveChapter(direction) } label: {
             Image(systemName: direction < 0 ? "backward.end" : "forward.end").font(.system(size: 22))
-                .frame(width: 56, height: 56).contentShape(Circle()).background(.white.opacity(0.07), in: Circle())
+                .frame(width: 44, height: 44).background(.white.opacity(0.07), in: Circle())
+                .frame(width: 48, height: 48).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityLabel(text(direction < 0 ? "listen.previous_chapter" : "listen.next_chapter"))
             .disabled(!model.canMoveChapter(direction)).opacity(model.canMoveChapter(direction) ? 1 : 0.38)
     }
